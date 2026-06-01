@@ -1,0 +1,62 @@
+# EventLink .gitignore
+
+# === Secrets & Credentials ===
+.env
+.env.*
+*.key
+*.pem
+*.p12
+credentials.json
+secrets.yaml
+
+# === API Keys (any file containing keys) ===
+**/api_keys*
+**/config.local*
+
+# === Data & Cache ===
+data/
+llm_cache/
+*.db
+*.sqlite3
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+.Python
+
+# === IDE ===
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# === DevSquad runtime ===
+.mas_v3_*/
+checkpoint_*/
+scratchpad_*/
+
+# === Internal docs (sensitive) ===
+docs/internal/
+archive/
+
+# === Logs ===
+*.log
+logs/
+
+# === Temporary files ===
+*.tmp
+*.bak
+*_draft.*
+*_old.*
+*_tmp.*
