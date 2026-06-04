@@ -1,0 +1,154 @@
+"""Todo model - stores generated action items and notifications."""
+
+import uuid
+from datetime import datetime
+from typing import Any
+
+from sqlalchemy import JSON, CheckConstraint, ForeignKey, Index, String, Text, func
+from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID
+from sqlalchemy.orm import Mapped, mapped_column
+
+from eventlink.database import Base, IS_SQLITE, _uuid_default
+
+
+class Todo(Base):
+    """
+    Todo model representing action items and notifications.
+    
+    Schema aligned with Technical Design v1.7 §3.1
+    Supports 6 todo types (v4.0): 🟢 promise, 🟣 help, 🔵 care, 🟡 followup, ⚪ cooperation_signal, 🔴 risk
+    """
+
+    __tablename__ = "todos"
+
+    # Primary key
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        primary_key=True,
+        default=_uuid_default,
+    )
+
+    # Core fields
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        nullable=False,
+        index=True,
+    )
+    
+    # Todo type with emoji indicators
+    todo_type: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    
+    # Content
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    
+    # Related entities
+    related_entity_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        ForeignKey("entities.id", ondelete="SET NULL"),
+    )
+    related_association_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        ForeignKey("associations.id", ondelete="SET NULL"),
+    )
+    
+    # Priority and status
+    priority: Mapped[int] = mapped_column(nullable=False, default=3)  # 1=highest, 5=lowest
+    status: Mapped[str] = mapped_column(String(15), nullable=False, default="pending", index=True)
+    
+    # Scheduling
+    due_date: Mapped[datetime | None] = mapped_column(index=True)
+    reminder_at: Mapped[datetime | None] = mapped_column()
+    
+    # Additional metadata
+    properties: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB if not IS_SQLITE else JSON,
+    )
+    
+    # Source tracking
+    source_event_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        nullable=False,
+    )
+    
+    # Feedback
+    feedback: Mapped[str | None] = mapped_column(String(50))  # useful, not_useful, or custom
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(nullable=False, default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        nullable=False,
+        default=func.now(),
+        onupdate=func.now(),
+    )
+    completed_at: Mapped[datetime | None] = mapped_column()
+
+    # Constraints
+    __table_args__ = (
+        CheckConstraint(
+            """todo_type IN (
+                'promise', 'help', 'care', 'followup', 'cooperation_signal', 'risk'
+            )""",
+            name="todo_type_check",
+        ),
+        CheckConstraint(
+            """status IN ('pending', 'in_progress', 'done', 'dismissed', 'snoozed')""",
+            name="todo_status_check",
+        ),
+        CheckConstraint(
+            "priority >= 1 AND priority <= 5",
+            name="priority_range_check",
+        ),
+        CheckConstraint(
+            "feedback IS NULL OR length(feedback) > 0",
+            name="feedback_check",
+        ),
+        Index("idx_todos_user_type_status", "user_id", "todo_type", "status"),
+        Index("idx_todos_user_due", "user_id", "due_date"),
+        Index("idx_todos_user_priority", "user_id", "priority", "status"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<Todo(id={self.id}, type={self.todo_type}, status={self.status}, title={self.title[:30]})>"
+
+
+class SnoozeSchedule(Base):
+    """
+    Snooze schedule for todos with status='snoozed'.
+    
+    Schema aligned with Technical Design v1.7 §4.6
+    """
+
+    __tablename__ = "snooze_schedules"
+
+    # Primary key (same as todo_id)
+    todo_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        ForeignKey("todos.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    
+    # Original status before snooze
+    original_status: Mapped[str] = mapped_column(String(15), nullable=False)
+    
+    # When to recover
+    recover_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True) if not IS_SQLITE else None,
+        nullable=False,
+        index=True,
+    )
+    
+    # Timestamp
+    created_at: Mapped[datetime] = mapped_column(nullable=False, default=func.now())
+
+    # Constraints
+    __table_args__ = (
+        CheckConstraint(
+            "original_status IN ('pending', 'in_progress')",
+            name="original_status_check",
+        ),
+        Index("idx_snooze_recover_at", "recover_at"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<SnoozeSchedule(todo_id={self.todo_id}, recover_at={self.recover_at})>"

@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # FastAPI application
+  eventlink:
+    build: .
+    container_name: eventlink-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./data/eventlink.db
+      - DEBUG=true
+      - LOG_LEVEL=INFO
+      - REDIS_ENABLED=false
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+      - ./.env:/app/.env
+    command: python -m uvicorn eventlink.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - eventlink-network
+
+  # PostgreSQL (optional, for phase 1)
+  postgres:
+    image: postgres:15-alpine
+    container_name: eventlink-postgres
+    environment:
+      POSTGRES_DB: eventlink
+      POSTGRES_USER: eventlink
+      POSTGRES_PASSWORD: eventlink_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - eventlink-network
+    profiles:
+      - postgres
+
+  # Redis (optional, for caching)
+  redis:
+    image: redis:7-alpine
+    container_name: eventlink-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - eventlink-network
+    profiles:
+      - redis
+
+volumes:
+  postgres_data:
+
+networks:
+  eventlink-network:
+    driver: bridge

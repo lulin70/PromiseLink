@@ -1,0 +1,181 @@
+# =============================================================================
+# EventLink PoC 阶段 Docker Compose 部署配置
+# =============================================================================
+# 定位：AI驱动的个人商务关系经营助手 - PoC（概念验证）阶段
+#
+# 设计原则：
+#   - SQLite 单文件数据库，零外部依赖（无 PostgreSQL / Redis）
+#   - 单用户模式，本地 Docker 部署，零云成本
+#   - LLM 推理走云端 API（需配置 API Key）
+#   - 微信小程序为主入口，不做原生 APP
+#
+# 使用方法：
+#   1. 复制 .env.poc.example 为 .env.poc，填入实际配置
+#      cp .env.poc.example .env.poc
+#   2. 构建并启动服务
+#      docker compose -f docker-compose.poc.yml up -d --build
+#   3. 查看日志
+#      docker compose -f docker-compose.poc.yml logs -f
+#   4. 停止服务
+#      docker compose -f docker-compose.poc.yml down
+#
+# 参考：技术设计v1.7 §8.6.3
+# =============================================================================
+
+version: "3.8"
+
+services:
+  eventlink-api:
+    # ------------------------------------------------------------------
+    # 镜像构建：基于项目根目录的 Dockerfile
+    # PoC 阶段复用现有 Dockerfile，后续阶段可按需定制
+    # ------------------------------------------------------------------
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: eventlink:poc
+    container_name: eventlink-api
+
+    # ------------------------------------------------------------------
+    # 端口映射：仅暴露 API 端口
+    # 8000 -> FastAPI / Uvicorn
+    # ------------------------------------------------------------------
+    ports:
+      - "8000:8000"
+
+    # ------------------------------------------------------------------
+    # 环境变量：优先从 .env.poc 文件加载，支持运行时覆盖
+    # .env.poc 中包含所有配置项，此处仅列出关键变量作为文档参考
+    # ------------------------------------------------------------------
+    env_file:
+      - .env.poc
+    environment:
+      # 以下变量可在 docker-compose 层面覆盖 .env.poc 中的值
+      - EVENTLINK_STAGE=poc
+      - EVENTLINK_DB_PATH=/data/eventlink_poc.db
+
+    # ------------------------------------------------------------------
+    # 数据卷：持久化 SQLite 数据库文件
+    # ./data 映射到容器内 /data，数据库文件存于此
+    # ------------------------------------------------------------------
+    volumes:
+      - ./data:/data
+
+    # ------------------------------------------------------------------
+    # 健康检查：通过 /api/v1/health 端点检测服务可用性
+    # - 间隔 30s：常规检测频率
+    # - 超时 10s：单个请求最大等待时间
+    # - 重试 3 次：连续失败 3 次才标记为 unhealthy
+    # - 启动等待 40s：给应用初始化（含数据库迁移）留足时间
+    # ------------------------------------------------------------------
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    # ------------------------------------------------------------------
+    # 资源限制：PoC 阶段适度约束，防止异常时拖垮宿主机
+    # - 内存 512M：SQLite + FastAPI 足够，LLM 走云端不占本地内存
+    # - CPU 1 核：单用户场景无需多核
+    # ------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+
+    # ------------------------------------------------------------------
+    # 日志配置：防止日志文件无限增长占满磁盘
+    # - 最大单文件 10MB
+    # - 最多保留 3 个文件（总计约 30MB）
+    # ------------------------------------------------------------------
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "eventlink-{{.Name}}"
+
+    # ------------------------------------------------------------------
+    # 网络：独立桥接网络，为后续扩展（小程序网关等）预留隔离空间
+    # ------------------------------------------------------------------
+    networks:
+      - eventlink-poc-net
+
+    # ------------------------------------------------------------------
+    # 重启策略：除非手动停止，否则自动重启
+    # 适用于 PoC 阶段无人值守运行场景
+    # ------------------------------------------------------------------
+    restart: unless-stopped
+
+    # ------------------------------------------------------------------
+    # 依赖：PoC 阶段无外部服务依赖
+    # 后续阶段可在此添加 postgres / redis 等依赖
+    # ------------------------------------------------------------------
+    # depends_on: {}
+
+  # ==================================================================
+  # PostgreSQL：Phase 1 阶段的主数据库
+  # PoC 阶段可选，默认使用 SQLite
+  # ==================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: eventlink-postgres
+    environment:
+      POSTGRES_DB: eventlink
+      POSTGRES_USER: eventlink
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-eventlink_dev}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eventlink"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - eventlink-poc-net
+    restart: unless-stopped
+
+  # ==================================================================
+  # Redis：缓存与会话存储
+  # PoC 阶段可选，默认不启用
+  # ==================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: eventlink-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - eventlink-poc-net
+    restart: unless-stopped
+
+# =============================================================================
+# 网络：PoC 专用桥接网络
+# =============================================================================
+networks:
+  eventlink-poc-net:
+    driver: bridge
+    name: eventlink-poc
+
+# =============================================================================
+# 数据卷：持久化存储
+# =============================================================================
+volumes:
+  pg_data:
+    name: eventlink-pg-data
+  redis_data:
+    name: eventlink-redis-data

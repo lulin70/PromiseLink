@@ -3,6 +3,7 @@
 # === Secrets & Credentials ===
 .env
 .env.*
+!.env.poc.example
 *.key
 *.pem
 *.p12
@@ -60,3 +61,8 @@ logs/
 *_draft.*
 *_old.*
 *_tmp.*
+
+# === Test coverage ===
+.coverage
+htmlcov/
+.pytest_cache/

@@ -1,3 +1,5 @@
+<!-- ⚠️ 本文档已过时，仅供参考。当前产品定位已变更为"AI驱动的个人商务关系经营助手"，核心概念Alert已更名为Todo，类型从3种扩展为6种。请参考最新版PRD和技术设计文档。 -->
+
 # 🔄 分工模型修正 V2.1：基于林总澄清的最终版
 
 > **日期**: 2026-05-31
@@ -104,7 +106,7 @@ wx.request({
   method: 'POST',
   header: { 'Authorization': 'Bearer USER_TOKEN' },
   data: {
-    event_type: 'card_scan',
+    event_type: 'card_save',
     title: '查看了李明的数字名片',
     raw_text: JSON.stringify({
       name: '李明',

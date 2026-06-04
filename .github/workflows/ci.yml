@@ -1,0 +1,63 @@
+name: EventLink CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: eventlink
+          POSTGRES_PASSWORD: eventlink_test
+          POSTGRES_DB: eventlink_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev,test]"
+          pip install pytest pytest-cov pytest-asyncio httpx
+
+      - name: Run linting
+        run: ruff check src/ tests/
+
+      - name: Run type checking
+        run: mypy src/eventlink --ignore-missing-imports || true
+
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://eventlink:eventlink_test@localhost:5432/eventlink_test
+          TEST_MODE: "true"
+          LLM_API_KEY: "test-key-for-ci"
+          SECRET_KEY: "ci-test-secret-key-min-32-chars-long"
+          REDIS_ENABLED: "false"
+        run: |
+          pytest tests/ -v --cov=src/eventlink --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          fail_ci_if_error: false

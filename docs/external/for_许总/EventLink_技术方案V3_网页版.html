@@ -1,3 +1,4 @@
+<!-- ⚠️ 本文档已过时，仅供参考。当前产品定位已变更为"AI驱动的个人商务关系经营助手"，核心概念Alert已更名为Todo，类型从3种扩展为6种。请参考最新版PRD和技术设计文档。 -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -646,7 +647,7 @@
                 <div class="code-block"><span class="keyword">@dataclass</span>
 <span class="keyword">class</span> <span class="type">Event</span>:
     id: <span class="type">str</span>                    <span class="comment"># UUID v4</span>
-    event_type: <span class="type">str</span>            <span class="comment"># card_scan | meeting | call | manual</span>
+    event_type: <span class="type">str</span>            <span class="comment"># card_save | meeting | call | manual</span>
     source: <span class="type">str</span>               <span class="comment"># iamhere | recording_r1 | tencent_meeting</span>
     title: <span class="type">str</span>
     timestamp: <span class="type">datetime</span>        <span class="comment"># ISO 8601</span>
@@ -688,7 +689,7 @@
                     <div class="api-body">
                         <strong>请求：</strong><br>
                         <span class="json-bracket">{</span><br>
-                        &nbsp;&nbsp;<span class="json-string">"event_type"</span>: <span class="json-string">"card_scan"</span>,<br>
+                        &nbsp;&nbsp;<span class="json-string">"event_type"</span>: <span class="json-string">"card_save"</span>,<br>
                         &nbsp;&nbsp;<span class="json-string">"source"</span>: <span class="json-string">"iamhere_digital_card"</span>,<br>
                         &nbsp;&nbsp;<span class="json-string">"title"</span>: <span class="json-string">"查看了李明的数字名片"</span>,<br>
                         &nbsp;&nbsp;<span class="json-string">"raw_text"</span>: <span class="json-string">"{\"name\":\"李明\",\"company\":\"XX科技\",\"skills\":[\"IoT\"]}"</span><br>
