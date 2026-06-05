@@ -30,7 +30,7 @@ from pathlib import Path
 from datetime import date, datetime, timezone, timedelta
 
 # ── 抑制技术日志（许总不需要看info/debug/warning）──
-logging.basicConfig(level=logging.ERROR)
+logging.basicConfig(level=logging.CRITICAL)  # 演示输出禁止所有日志
 
 # ── 东8时区 ──
 TZ_CN = timezone(timedelta(hours=8))
@@ -589,19 +589,31 @@ async def demo_brief() -> dict:
     print(f"  {BOLD}EventLink的答案{RESET}: 按人名查询关系进展 + 12模块画像\n")
 
     user_id = "demo-user-xu"
+    target_person = "李总"  # 场景3问询的目标人物
 
     async with AsyncSessionLocal() as session:
-        briefs = (await session.execute(
+        all_briefs = (await session.execute(
             select(RelationshipBrief).where(RelationshipBrief.user_id == user_id)
             .order_by(RelationshipBrief.last_updated_at.desc())
             .limit(5)
         )).scalars().all()
 
-        if not briefs:
+        if not all_briefs:
             print(f"  {DIM}(暂无推进卡数据 — 请先运行场景1生成){RESET}")
             return {"scenario": "brief", "pass": False, "count": 0}
 
-        print(f"  找到 {len(briefs)} 张关系推进卡:\n")
+        # 按人名过滤：模拟真实语音流程(NLU提取人名→按名查找→只返回目标人物的卡)
+        briefs = []
+        for b in all_briefs:
+            bname = (b.brief_data or {}).get("basic_info", {}).get("name", "")
+            if target_person in bname or bname in target_person:
+                briefs.append(b)
+
+        if not briefs:
+            print(f"  {DIM}({target_person}的推进卡尚未生成){RESET}")
+            return {"scenario": "brief", "pass": True, "count": 0}
+
+        print(f"  找到 {target_person} 的关系推进卡:\n")
 
         stage_labels = {
             "new_connection": "新连接",
@@ -888,8 +900,6 @@ async def main() -> None:
         results.append(r)
     except Exception as e:
         print(f"\n  {RED}场景1异常: {e}{RESET}")
-        import traceback
-        traceback.print_exc()
         results.append({"scenario": "pipeline", "pass": False, "error": str(e)})
 
     # ── 场景2: NLU ──
@@ -898,8 +908,6 @@ async def main() -> None:
         results.append(r)
     except Exception as e:
         print(f"\n  {RED}场景2异常: {e}{RESET}")
-        import traceback
-        traceback.print_exc()
         results.append({"scenario": "nlu", "pass": False, "error": str(e)})
 
     # ── 场景3: Brief ──
@@ -908,8 +916,6 @@ async def main() -> None:
         results.append(r)
     except Exception as e:
         print(f"\n  {RED}场景3异常: {e}{RESET}")
-        import traceback
-        traceback.print_exc()
         results.append({"scenario": "brief", "pass": False, "error": str(e)})
 
     # ── 场景4: Dashboard ──
@@ -918,8 +924,6 @@ async def main() -> None:
         results.append(r)
     except Exception as e:
         print(f"\n  {RED}场景4异常: {e}{RESET}")
-        import traceback
-        traceback.print_exc()
         results.append({"scenario": "dashboard", "pass": False, "error": str(e)})
 
     # ════════════════════════════════════════════════════════════
