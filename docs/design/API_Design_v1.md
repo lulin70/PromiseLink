@@ -1,9 +1,9 @@
 # EventLink API设计文档
 
-> **版本**: v1.2  
-> **日期**: 2026-06-03  
-> **设计师**: 架构师 + 开发团队  
-> **参考**: PRD v3.6, 技术设计 v1.7 §7
+> **版本**: v2.0
+> **日期**: 2026-06-04
+> **设计师**: 架构师 + 开发团队
+> **参考**: PRD v4.3, 技术设计 v2.5 §7
 
 ---
 
@@ -103,12 +103,41 @@ sequenceDiagram
 }
 ```
 
-### 2.2 JWT认证
+### 2.2 JWT认证（v2.0安全加固）
 
 **Header格式**:
 ```http
 Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
+
+**Token格式**: `Bearer <JWT>`
+**签名算法**: HS256（cryptography库）
+
+**Payload结构**:
+```json
+{
+  "sub": "user_id (UUID)",
+  "iat": 1622619900,
+  "exp": 1622706300,
+  "role": "user"
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `sub` | string (UUID) | 用户唯一标识，对应 user_id |
+| `iat` | integer | 签发时间（Unix时间戳） |
+| `exp` | integer | 过期时间（Unix时间戳，默认24小时） |
+| `role` | string | 角色标识（预留扩展，当前固定为 `"user"`） |
+
+**安全约束（4项）**:
+
+| # | 约束 | 说明 | 实现要求 |
+|---|------|------|---------|
+| SC-JWT-1 | Secret Key ≥ 256位 | 签名密钥必须为≥256位随机值 | 启动时校验非默认值，否则拒绝启动 |
+| SC-JWT-2 | Token黑名单机制 | 登出/吊销的Token立即失效 | 写入Redis，TTL = token剩余有效期 |
+| SC-JWT-3 | Refresh Token旋转 | 每次刷新生成新token对，旧token立即失效 | 防止token重放攻击 |
+| SC-JWT-4 | CORS白名单 | 跨域请求仅允许配置的Origin列表 | **禁止使用 `*` 通配符** |
 
 **Token刷新**: `POST /api/v1/auth/refresh`
 
@@ -130,9 +159,34 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
   "title": "扫描张三名片",
   "timestamp": "2026-06-02T10:00:00Z",
   "raw_text": "张三\nCEO\nAI公司\n13812345678",
+  "input_scope": "auto",
   "metadata": {
     "card_image_url": "https://...",
     "language": "zh-CN"
+  }
+}
+```
+
+**字段说明**:
+- `event_type`: 事件类型（必填）
+- `source`: 来源（可选）
+- `title`: 标题（必填）
+- `timestamp`: 时间戳（必填，ISO 8601）
+- `raw_text`: 原始文本（必填）
+- `input_scope`: 输入分类（可选，v2.0新增）。仅接受 `"auto"` 或不传。传 `"auto"` 时服务端调用 InputClassifier 自动分类；不传时同 auto 行为。传入其他值返回 `400 INVALID_INPUT_SCOPE`。**安全约束 SC-01**：永远不以客户端传入值作为最终 scope，服务端始终以 classify() 结果为准。
+- `metadata`: 元数据（可选）
+
+**错误响应 — input_scope 非法值**: `400 Bad Request`
+```json
+{
+  "error": {
+    "code": "E1004",
+    "message": "无效的 input_scope 值",
+    "details": {
+      "provided_value": "invalid_scope",
+      "valid_values": ["auto"],
+      "hint": "仅接受 'auto' 或不传该字段"
+    }
   }
 }
 ```
@@ -202,6 +256,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
       "company": "AI公司",
       "title": "CEO",
       "resource_sensitivity": "matchable",
+      "relationship_stage": "new_connection",
       "properties": {
         "resource": ["AI算法专家"],
         "demand": ["寻找联合创始人"]
@@ -664,9 +719,19 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 ```json
 {
   "status": "in_progress",
-  "notes": "已联系张三"
+  "notes": "已联系张三",
+  "action_type": "my_promise",
+  "promisor_id": "entity-uuid",
+  "beneficiary_id": "entity-uuid"
 }
 ```
+
+**字段说明**（v2.0新增字段）:
+- `status`: 目标状态
+- `notes`: 备注信息
+- `action_type`: 动作类型（可选，v2.0新增）。枚举值：`my_promise`（我的承诺）、`their_promise`（对方承诺）、`help_provided`（已提供帮助）、`care_expression`（关怀表达）、`cooperation_signal`（合作信号）、`followup_needed`（需要跟进）
+- `promisor_id`: 承诺人实体ID（可选，v2.0新增，当 action_type 为 promise 类型时使用）
+- `beneficiary_id`: 受益人实体ID（可选，v2.0新增，当 action_type 为 promise 类型时使用）
 
 **响应**: `200 OK`（返回更新后的Todo）
 
@@ -984,6 +1049,13 @@ language: zh-CN
 
 ### 3.7 Resources API（资源管理）
 
+> **⚠️ F-05 暂停声明（Phase 2）**: 商机匹配相关API在 Phase 1 暂不实现。以下端点标记为 **Phase 2**：
+> - `GET /api/v1/resources/match` — 资源匹配查询（单边匹配+六维加权评分算法）
+> - 商机匹配度五维算法（keyword/industry/topic/llm/history/callability）
+>
+> **原因**: Phase 1 聚焦"关系经营闭环"核心能力（关系推进卡、Dashboard、日视图），资源匹配作为 Phase 2 深度整合能力延后。
+> **替代方案**: Phase 1 使用简化的 PromiseFulfillmentEngine（承诺兑现闭环）替代完整八维匹配。
+
 > **定位**: 资源管理是AI驱动的个人商务关系经营助手的核心能力，支持单边匹配——"我的需求匹配我人脉的供给"。
 
 #### 3.7.1 查看实体资源列表
@@ -1261,9 +1333,548 @@ language: zh-CN
 
 ---
 
-## 4. 错误码定义
+### 3.9 Dashboard & 关系推进卡 API（v2.0新增，P0端点）
 
-### 4.1 HTTP状态码
+> **定位**: v2.3/v2.4 新增的P0核心端点，支撑关系经营闭环。
+
+#### 3.9.1 获取关系推进卡
+
+**端点**: `GET /api/v1/persons/{id}/relationship-brief`
+
+**说明**: 获取指定人物的关系推进卡，包含当前阶段、关注点、洞察、贡献、待兑现承诺、反馈记录等12模块信息。**PII脱敏**：返回前对 evidence_quote 等文本字段执行 `redact_pii_from_text()` 处理。
+
+**路径参数**:
+- `id`: 人物实体ID（UUID）
+
+**响应**: `200 OK`
+```json
+{
+  "id": "brief-uuid",
+  "person_id": "entity-uuid",
+  "person_name": "张三",
+  "current_stage": "understanding_needs",
+  "stage_reason": "已识别对方关注点：融资进展",
+  "confirmed_by_user": false,
+  "latest_interaction": {
+    "event_id": "event-uuid",
+    "timestamp": "2026-06-03T14:00:00Z",
+    "summary": "讨论了AI算法合作方向"
+  },
+  "next_node": "了解对方关心什么",
+  "next_node_condition": "已识别对方至少1个关注点",
+  "concerns": [
+    {
+      "topic": "融资进展",
+      "status": "active",
+      "source": "manual"
+    }
+  ],
+  "need_insights": [
+    {
+      "insight": "对方正在寻找联合创始人",
+      "confidence_level": "medium",
+      "is_ai_inference": true,
+      "requires_confirmation": true
+    }
+  ],
+  "contributions": [
+    {
+      "content": "帮助对接了AI算法团队",
+      "date": "2026-05-20"
+    }
+  ],
+  "pending_promises": [
+    {
+      "content": "下周介绍赵六给张三认识",
+      "due_at": "2026-06-10T00:00:00Z",
+      "status": "pending"
+    }
+  ],
+  "feedback_records": [],
+  "cooperation_direction_candidate": null,
+  "version": 3,
+  "created_at": "2026-06-01T10:00:00Z",
+  "updated_at": "2026-06-04T12:00:00Z"
+}
+```
+
+#### 3.9.2 用户确认阶段变更（含乐观锁）
+
+**端点**: `PATCH /api/v1/persons/{id}/relationship-brief/stage`
+
+**说明**: 用户主动确认关系阶段变更。使用乐观锁（version 字段）防止并发冲突。**RS-01硬编码规则**：关系阶段不可仅由AI自动升级，必须用户确认。
+
+**请求**:
+```json
+{
+  "stage": "value_response",
+  "reason": "已向对方提供了有价值的行业报告",
+  "version": 3
+}
+```
+
+**字段说明**:
+- `stage`: 目标阶段（必填）。7阶段枚举：
+  - `new_connection` — 新认识
+  - `understanding_needs` — 了解需求
+  - `value_response` — 价值回应
+  - `cooperation_exploration` — 合作探索
+  - `intent_confirmed` — 意向确认
+  - `execution` — 执行合作
+  - `review` — 复盘回顾（终态）
+- `reason`: 变更原因（可选）
+- `version`: 乐观锁版本号（必填）。客户端读取 relationship-brief 时携带的 version 值
+
+**合法的阶段转换规则**:
+
+| 当前阶段 | 可转换到 |
+|---------|---------|
+| new_connection | understanding_needs |
+| understanding_needs | value_response, new_connection |
+| value_response | cooperation_exploration, understanding_needs |
+| cooperation_exploration | intent_confirmed, value_response |
+| intent_confirmed | execution, cooperation_exploration |
+| execution | review, intent_confirmed |
+| review | —（终态） |
+
+**响应**: `200 OK`
+```json
+{
+  "id": "brief-uuid",
+  "current_stage": "value_response",
+  "previous_stage": "understanding_needs",
+  "stage_reason": "已向对方提供了有价值的行业报告",
+  "confirmed_by_user": true,
+  "version": 4,
+  "updated_at": "2026-06-04T15:00:00Z"
+}
+```
+
+**错误响应 — 乐观锁冲突**: `409 Conflict`
+```json
+{
+  "error": {
+    "code": "E1005",
+    "error_type": "OPTIMISTIC_LOCK_CONFLICT",
+    "message": "关系推进卡已被其他请求更新，请刷新后重试",
+    "details": {
+      "current_version": 5,
+      "client_version": 3,
+      "hint": "请重新获取最新 relationship-brief 后重试"
+    },
+    "timestamp": "2026-06-04T15:00:01Z",
+    "request_id": "req-uuid"
+  }
+}
+```
+
+**错误响应 — 非法阶段转换**: `422 Unprocessable Entity`
+```json
+{
+  "error": {
+    "code": "E1003",
+    "message": "不允许从 new_connection 转移到 execution",
+    "details": {
+      "from_stage": "new_connection",
+      "to_stage": "execution",
+      "allowed_targets": ["understanding_needs"]
+    }
+  }
+}
+```
+
+#### 3.9.3 今日Dashboard
+
+**端点**: `GET /api/v1/dashboard/today`
+
+**说明**: 获取今日Dashboard概览，聚焦"需要回应的连接"——包含今日会议、待处理Todo、需要跟进的人物等关键信息。
+
+**响应**: `200 OK`
+```json
+{
+  "date": "2026-06-04",
+  "summary": {
+    "total_meetings": 3,
+    "pending_todos": 7,
+    "connections_need_response": 2
+  },
+  "meetings": [
+    {
+      "time": "09:00-10:30",
+      "title": "供应链优化方案讨论",
+      "participants": [
+        {"entity_id": "uuid", "name": "张总", "avatar": null}
+      ],
+      "todo_count": 2,
+      "key_topics": ["供应链", "成本优化"]
+    }
+  ],
+  "pending_todos": [
+    {
+      "id": "todo-uuid",
+      "todo_type": "promise",
+      "description": "承诺：建议联系赵六，介绍给张三",
+      "related_entity_name": "赵六",
+      "due_date": "2026-06-05T00:00:00Z",
+      "morandi_color": "#A0C4A8"
+    }
+  ],
+  "connections_need_response": [
+    {
+      "entity_id": "uuid",
+      "name": "李四",
+      "relationship_stage": "cooperation_exploration",
+      "last_interaction": "2026-06-02",
+      "suggested_action": "确认合作方向是否明确"
+    }
+  ]
+}
+```
+
+#### 3.9.4 我的待回应任务视图
+
+**端点**: `GET /api/v1/todos?view=my-responses`
+
+**说明**: 扩展 Todo 列表查询参数，支持 `view` 视图筛选。`my-responses` 视图返回需要用户主动回应的任务（如等待对方回应的 followup、需要确认的合作信号等）。
+
+**新增查询参数**:
+- `view`: 视图类型（可选，v2.0新增）
+  - `all` — 默认，返回所有Todo（向后兼容）
+  - `my-responses` — 我的待回应任务（含等待对方回应视图）
+  - `waiting-their-response` — 仅显示等待对方回应的任务
+
+**示例**: `GET /api/v1/todos?view=my-responses&status=pending&priority=high`
+
+**响应**: `200 OK`（格式与现有 TodoList 一致，items 按 urgency 排序）
+
+---
+
+### 3.10 记录贡献与反馈 API（v2.0新增）
+
+#### 3.10.1 记录已提供的帮助/回应
+
+**端点**: `POST /api/v1/contributions`
+
+**说明**: 独立记录为他人提供的帮助或做出的回应。与 PATCH `/entities/{id}/contribution` 的区别在于：本端点为独立创建，不依赖已有实体上下文；同时会自动关联到对应人物的关系推进卡的 contributions 数组中。
+
+**请求**:
+```json
+{
+  "target_entity_id": "entity-uuid",
+  "content": "帮助张三对接了AI算法团队",
+  "contribution_type": "help_provided",
+  "date": "2026-05-20",
+  "related_event_id": "event-uuid"
+}
+```
+
+**字段说明**:
+- `target_entity_id`: 目标人物实体ID（必填）
+- `content`: 帮助/回应内容描述（必填）
+- `contribution_type`: 类型（可选）。枚举：`help_provided`（提供帮助）、`response_made`（做出回应）、`resource_shared`（共享资源）、`introduction_made`（引荐介绍）
+- `date`: 发生日期（可选，ISO 8601 date，默认当天）
+- `related_event_id`: 关联事件ID（可选）
+
+**响应**: `201 Created`
+```json
+{
+  "id": "contribution-uuid",
+  "user_id": "user-uuid",
+  "target_entity_id": "entity-uuid",
+  "target_entity_name": "张三",
+  "content": "帮助张三对接了AI算法团队",
+  "contribution_type": "help_provided",
+  "date": "2026-05-20",
+  "related_event_id": "event-uuid",
+  "created_at": "2026-06-04T10:00:00Z"
+}
+```
+
+#### 3.10.2 记录反馈与下一步
+
+**端点**: `POST /api/v1/feedbacks`
+
+**说明**: 记录对某次互动/合作的反馈及规划下一步行动。反馈会写入对应关系推进卡的 feedback_records 数组中，并可能触发新的 Todo 生成。
+
+**请求**:
+```json
+{
+  "target_entity_id": "entity-uuid",
+  "feedback_type": "positive",
+  "rating": 5,
+  "comment": "交流很有价值，双方在AI算法方向高度互补",
+  "next_steps": [
+    {
+      "action": "schedule_followup",
+      "description": "安排下一次深度交流",
+      "due_date": "2026-06-15"
+    }
+  ],
+  "related_event_id": "event-uuid"
+}
+```
+
+**字段说明**:
+- `target_entity_id`: 目标人物实体ID（必填）
+- `feedback_type`: 反馈类型（必填）。枚举：`positive`（正面）、`neutral`（中性）、`negative`（负面）、`needs_attention`（需关注）
+- `rating`: 评分（可选，1-5分）
+- `comment`: 反馈内容（可选）
+- `next_steps`: 下一步行动列表（可选）
+  - `action`: 行动类型。枚举：`schedule_followup`（安排跟进）、`send_resource`（发送资源）、`make_introduction`（做引荐）、`update_stage`（更新阶段）
+  - `description`: 行动描述
+  - `due_date`: 计划日期（ISO 8601 date）
+- `related_event_id`: 关联事件ID（可选）
+
+**响应**: `201 Created`
+```json
+{
+  "id": "feedback-uuid",
+  "target_entity_id": "entity-uuid",
+  "target_entity_name": "张三",
+  "feedback_type": "positive",
+  "rating": 5,
+  "comment": "交流很有价值，双方在AI算法方向高度互补",
+  "next_steps": [
+    {
+      "action": "schedule_followup",
+      "description": "安排下一次深度交流",
+      "due_date": "2026-06-15"
+    }
+  ],
+  "generated_todos": [
+    {
+      "id": "todo-uuid",
+      "todo_type": "followup",
+      "description": "🟡 跟进：安排与张三的下次深度交流"
+    }
+  ],
+  "created_at": "2026-06-04T10:00:00Z"
+}
+```
+
+---
+
+### 3.11 日视图API（F-49, Phase 1, v2.0新增）
+
+**端点**: `GET /api/v1/dashboard/day-view?date=YYYY-MM-DD`
+
+**说明**: 按日期聚合展示当日所有会议分组、参与人、关联Todo和关键词摘要。用于日历视图和时间线展示。
+
+**查询参数**:
+- `date`: 查询日期（必填，格式 YYYY-MM-DD，默认今天）
+
+**响应**: `200 OK`
+```json
+{
+  "date": "2026-06-04",
+  "meeting_groups": [
+    {
+      "event_id": "event-uuid-1",
+      "title": "供应链优化方案讨论",
+      "time": "09:00-10:30",
+      "participants": [
+        {"entity_id": "uuid", "name": "张总", "avatar": null},
+        {"entity_id": "uuid", "name": "李总", "avatar": null}
+      ],
+      "todo_count": 2,
+      "key_topics": ["供应链", "成本优化"]
+    },
+    {
+      "event_id": "event-uuid-2",
+      "title": "AI算法合作方向探讨",
+      "time": "14:00-15:30",
+      "participants": [
+        {"entity_id": "uuid", "name": "王五", "avatar": null}
+      ],
+      "todo_count": 1,
+      "key_topics": ["AI算法", "联合创始人"]
+    }
+  ],
+  "total_meetings": 4,
+  "total_pending_todos": 7
+}
+```
+
+**实现要点**:
+- events 表按 `user_id + date(timestamp)` GROUP BY
+- 每个 event 关联 entities（通过 event_entities 中间表或 properties）
+- 每个 event 关联 todos（通过 event_id 外键）
+- key_topics 从 `event.title` + LLM 抽取的 topics 中获取
+- 复用现有 PaginatedResponse 格式
+
+---
+
+## 4. 安全策略（v2.0新增）
+
+### 4.1 PII脱敏API行为
+
+> **定位**: 所有涉及用户隐私信息的API端点，在返回响应前必须执行 `redact_pii_from_text()` 脱敏处理。
+
+**脱敏执行端点清单**:
+
+| 端点 | 脱敏字段 | 说明 |
+|------|---------|------|
+| `GET /api/v1/entities/{id}` | `properties.profile.phone`, `properties.profile.email`, `evidence_quote` | 实体详情中的联系方式和证据引用 |
+| `GET /api/v1/persons/{id}/relationship-brief` | `evidence_quote`, `need_insights[].insight` | 关系推进卡中的文本字段 |
+| `GET /api/v1/associations` | `evidence.matched_fields`, `evidence.method` | 关联关系中的证据文本 |
+| `GET /api/v1/todos` | `context.reason`, `description` | Todo中的上下文描述 |
+| `GET /api/v1/digest/morning` / `evening` | 所有文本字段 | 摘要中的所有内容 |
+| `GET /api/v1/mini/person/{id}` | `key_points`, `associations_summary` | 小程序人物速览 |
+| `GET /api/v1/data/export` | **全部PII字段** | 数据导出（CSV/JSON均适用） |
+
+**不执行脱敏的端点**:
+- `POST /api/v1/events` — 接收原始输入，存储前做 sanitize 清洗但不脱敏
+- `PATCH /api/v1/entities/{id}` — 用户主动编辑，不做脱敏
+- `POST /api/v1/contributions` — 用户主动提交，不做脱敏
+
+**PII检测与掩码规则**:
+
+| PII类型 | 正则模式 | 掩码规则 | 示例 |
+|---------|---------|---------|------|
+| 手机号(中国大陆) | `1[3-9]\d{9}` | 前3后4中间**** | 138****5678 |
+| 邮箱 | `[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}` | 用户名部分*** | ***@example.com |
+| 身份证号 | `\d{17}[\dXx]` | 前14后4中间****** | **************1234 |
+| 银行卡号 | `\d{16,19}` | 前4后4中间**** | **** **** **** 1234 |
+| 微信号 | `[a-zA-Z][-a-zA-Z0-9_]{5,19}` | 第2位后*** | w*** |
+
+**实现要点**:
+- 脱敏仅在 **API返回层** 执行，**存储层保留原文**（已加密）
+- 工具函数位置：`src/eventlink/core/text_utils.py → redact_pii_from_text()`
+- 单元测试必须覆盖每种PII类型
+- 导出功能(CSV/JSON)同样执行脱敏
+
+### 4.2 input_scope SC-01安全约束
+
+> **定位**: v2.4 新增的安全约束，防止客户端通过 input_scope 字段绕过服务端分类逻辑。
+
+**约束规则（SC-01）**:
+
+```
+POST /api/v1/events 的 input_scope 字段处理流程：
+
+1. 客户端传 "auto" 或不传 → 服务端调用 InputClassifier.classify() → 返回分类结果 ✅
+2. 客户端传具体枚举值 → 仅作为 hint，服务端仍以 classify() 结果为准 ⚠️
+3. 客户端传非法值（不在合法枚举内且非 "auto"）→ 返回 400 INVALID_INPUT_SCOPE ❌
+4. 核心原则：永远不以客户端传入值作为最终 scope
+```
+
+**合法枚举值（服务端内部使用，不接受客户端直接传入）**:
+
+```python
+VALID_SCOPES = {
+    "relationship_interaction",   # 关系互动
+    "identity_update",            # 身份更新
+    "meeting_minutes",            # 会议纪要
+    "partner_feedback",           # 合作方反馈（终止管线）
+    "internal_review",            # 内部回顾（终止管线）
+    "resource_inquiry",           # 资源咨询
+    "care_expression",            # 关怀表达
+    "cooperation_signal",         # 合作信号
+}
+```
+
+**校验伪代码**:
+
+```python
+def resolve_input_scope(client_scope: str | None, raw_text: str, event_type: str) -> dict:
+    # 非法值校验
+    if client_scope and client_scope not in VALID_SCOPES and client_scope != "auto":
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "INVALID_INPUT_SCOPE",
+                "code": "E1004",
+                "message": f"Invalid input_scope: {client_scope}",
+                "valid_values": ["auto"],
+                "hint": "仅接受 'auto' 或不传该字段"
+            }
+        )
+    # 永远以服务端classify()结果为准
+    result = InputClassifier.classify(raw_text, event_type)
+    return result  # {scope, confidence, reason}
+```
+
+### 4.3 数据导出API（GDPR数据携带权, Phase 1提前）
+
+**端点**: `GET /api/v1/data/export?format=json|csv`
+
+**说明**: 支持用户导出其全量个人数据，满足 GDPR 式"数据携带权"(Right to Data Portability)。原计划 Phase 2 实现，提前至 Phase 1。
+
+**查询参数**:
+- `format`: 导出格式（必填）。`json` — JSON格式；`csv` — CSV格式
+
+**认证**: 需要 Bearer Token（同其他端点）
+
+**响应**: `200 OK`
+
+**JSON格式**:
+```json
+{
+  "exported_at": "2026-06-04T10:00:00Z",
+  "user_id": "user-uuid",
+  "format": "json",
+  "data": {
+    "entities": [
+      {
+        "id": "entity-uuid",
+        "entity_type": "person",
+        "name": "张三",
+        "company": "AI公司",
+        "title": "CEO",
+        "relationship_stage": "understanding_needs",
+        "created_at": "2026-06-01T10:00:00Z"
+      }
+    ],
+    "events": [
+      {
+        "id": "event-uuid",
+        "event_type": "meeting",
+        "title": "供应链优化方案讨论",
+        "timestamp": "2026-06-04T09:00:00Z",
+        "created_at": "2026-06-04T09:05:00Z"
+      }
+    ],
+    "todos": [
+      {
+        "id": "todo-uuid",
+        "todo_type": "promise",
+        "status": "pending",
+        "description": "承诺下周介绍赵六给张三认识",
+        "created_at": "2026-06-03T10:00:00Z"
+      }
+    ],
+    "relationship_briefs": [
+      {
+        "id": "brief-uuid",
+        "person_id": "entity-uuid",
+        "current_stage": "understanding_needs",
+        "created_at": "2026-06-01T10:00:00Z"
+      }
+    ]
+  },
+  "pii_redacted": true,
+  "total_records": {
+    "entities": 15,
+    "events": 42,
+    "todos": 28,
+    "relationship_briefs": 12
+  }
+}
+```
+
+**CSV格式**: 多文件ZIP下载，每个实体类型一个CSV文件（entities.csv, events.csv, todos.csv, relationship_briefs.csv）
+
+**安全要求**:
+- **PII自动脱敏**：导出数据中所有PII字段均已执行 `redact_pii_from_text()`
+- 导出操作记录审计日志
+- 单次导出限制：最多导出最近2年数据
+- 限流：每用户每24小时最多3次导出请求
+
+---
+
+## 5. 错误码定义
+
+### 5.1 HTTP状态码
 
 | 状态码 | 说明 | 使用场景 |
 |--------|------|---------|
@@ -1280,7 +1891,7 @@ language: zh-CN
 | 500 | Internal Server Error | 服务器错误 |
 | 503 | Service Unavailable | 服务暂时不可用 |
 
-### 4.2 业务错误码
+### 5.2 业务错误码
 
 **统一错误响应格式**:
 ```json
@@ -1305,6 +1916,8 @@ language: zh-CN
 | E1001 | 资源不存在 | 404 |
 | E1002 | 重复资源 | 409 |
 | E1003 | 验证失败 | 422 |
+| E1004 | 无效的input_scope值 | 400 |
+| E1005 | 乐观锁冲突 | 409 |
 | E2000 | Token无效 | 401 |
 | E2001 | Token过期 | 401 |
 | E2002 | 权限不足 | 403 |
@@ -1313,11 +1926,55 @@ language: zh-CN
 | E4001 | 数据库异常 | 500 |
 | E5000 | 未知错误 | 500 |
 
+#### v2.0 新增错误码说明
+
+**E1004 — INVALID_INPUT_SCOPE（400 Bad Request）**
+
+当 `POST /api/v1/events` 的 `input_scope` 字段传入非法值时返回。合法值仅接受 `"auto"` 或不传该字段。
+
+```json
+{
+  "error": {
+    "code": "E1004",
+    "error_type": "INVALID_INPUT_SCOPE",
+    "message": "无效的 input_scope 值",
+    "details": {
+      "provided_value": "invalid_scope",
+      "valid_values": ["auto"],
+      "hint": "仅接受 'auto' 或不传该字段"
+    },
+    "timestamp": "2026-06-04T10:00:00Z",
+    "request_id": "req-uuid"
+  }
+}
+```
+
+**E1005 — OPTIMISTIC_LOCK_CONFLICT（409 Conflict）**
+
+当 `PATCH /api/v1/persons/{id}/relationship-brief/stage` 的乐观锁版本号不匹配时返回。客户端需重新获取最新 relationship-brief 后重试。
+
+```json
+{
+  "error": {
+    "code": "E1005",
+    "error_type": "OPTIMISTIC_LOCK_CONFLICT",
+    "message": "关系推进卡已被其他请求更新，请刷新后重试",
+    "details": {
+      "current_version": 5,
+      "client_version": 3,
+      "hint": "请重新获取最新 relationship-brief 后重试"
+    },
+    "timestamp": "2026-06-04T15:00:01Z",
+    "request_id": "req-uuid"
+  }
+}
+```
+
 ---
 
-## 5. 分页与排序
+## 6. 分页与排序
 
-### 5.1 分页参数
+### 6.1 分页参数
 
 **查询参数**:
 - `limit`: 每页数量（默认20，最大100）
@@ -1338,7 +1995,7 @@ language: zh-CN
 }
 ```
 
-### 5.2 排序参数
+### 6.2 排序参数
 
 **查询参数**:
 - `sort`: 排序字段（默认created_at）
@@ -1348,9 +2005,9 @@ language: zh-CN
 
 ---
 
-## 6. 限流策略
+## 7. 限流策略
 
-### 6.1 限流规则
+### 7.1 限流规则
 
 > **设计原则**: EventLink定位为AI驱动的个人商务关系经营助手，采用单用户模式，无RBAC/多租户/团队协作，因此限流策略为统一单用户限流。
 
@@ -1360,7 +2017,7 @@ language: zh-CN
 
 **PoC阶段说明**: PoC阶段限流可适当放宽，建议设置为200次/分钟，以便充分测试和验证功能。正式上线后恢复为100次/分钟。
 
-### 6.2 限流响应
+### 7.2 限流响应
 
 **响应头**:
 ```http
@@ -1382,14 +2039,16 @@ X-RateLimit-Reset: 1622620800
 
 ---
 
-## 7. OpenAPI 3.0规范（YAML）
+## 8. OpenAPI 3.0规范（YAML）
 
 ```yaml
 openapi: 3.0.3
 info:
   title: EventLink API
-  version: 1.2.0
-  description: EventLink AI驱动的个人商务关系经营助手API
+  version: 2.0.0
+  description: |
+    EventLink AI驱动的个人商务关系经营助手API
+    v2.0新增：关系推进卡API、Dashboard API、日视图API、贡献与反馈API、数据导出API、安全策略（PII脱敏/SC-01/JWT加固）
   contact:
     name: CarryMem团队
     email: support@carrymem.com
@@ -2124,11 +2783,11 @@ components:
 
 ---
 
-## 8. API版本管理策略
+## 9. API版本管理策略
 
 > **7角色架构评审共识**：API版本管理是P3 Gate的必要条件，必须在P8前确定。
 
-### 8.1 版本体系（三层版本号）
+### 9.1 版本体系（三层版本号）
 
 EventLink采用**语义化版本号（SemVer）**管理API演进：
 
@@ -2138,9 +2797,9 @@ EventLink采用**语义化版本号（SemVer）**管理API演进：
 | **次版本** | `X-API-Version: {N}.{M}` | 响应头声明，新增功能时递增 | `1.0` → `1.1` → `1.2` | 新增端点/新增字段/新增枚举值 |
 | **补丁版本** | `X-API-Patch: {N}.{M}.{P}` | 内部修复，客户端无感 | `1.2.0` → `1.2.1` | Bug修复/性能优化/文档修正 |
 
-**当前版本**：主版本v1，次版本1.2，补丁版本1.2.0
+**当前版本**：主版本v1，次版本2.0，补丁版本2.0.0
 
-### 8.2 版本协商机制
+### 9.2 版本协商机制
 
 客户端通过请求头声明期望版本，服务端通过响应头返回实际版本：
 
@@ -2164,7 +2823,7 @@ X-API-Deprecated: false     # 当前端点是否已废弃
 | 主版本不匹配 | v1 | v2 | 返回 `410 Gone` + 迁移指南URL |
 | 客户端版本过高 | 1.5 | 1.2 | 返回 `400 Bad Request` + 支持的最高版本 |
 
-### 8.3 兼容性规则
+### 9.3 兼容性规则
 
 **兼容变更（次版本递增，不升级主版本）**：
 
@@ -2205,7 +2864,7 @@ X-API-Deprecated: false     # 当前端点是否已废弃
 
 **总计**：从标记Deprecated到正式下线，给予**12个月**过渡期。
 
-### 8.5 多版本共存策略
+### 9.5 多版本共存策略
 
 **路由层实现**（FastAPI）：
 
@@ -2243,7 +2902,7 @@ app.include_router(v2_router)
 - 次版本通过代码分支管理，不部署独立服务
 - 旧版本共享同一数据库，通过Schema版本字段区分
 
-### 8.6 数据库Schema版本管理
+### 9.6 数据库Schema版本管理
 
 **Alembic迁移策略**：
 
@@ -2279,7 +2938,7 @@ alembic current
 - 破坏性Schema变更（删列/改类型）只能在新的API主版本中执行
 - PoC→Phase1迁移是一次性全量迁移，不走Alembic增量
 
-### 8.7 客户端SDK版本策略
+### 9.7 客户端SDK版本策略
 
 | 客户端 | 版本管理方式 | 最低支持版本 |
 |--------|------------|------------|
@@ -2307,7 +2966,7 @@ async function checkApiCompatibility() {
 }
 ```
 
-### 8.8 版本变更日志
+### 9.8 版本变更日志
 
 所有API版本变更必须记录在 `CHANGELOG.md` 和 API文档的版本历史章节中：
 
@@ -2328,9 +2987,9 @@ async function checkApiCompatibility() {
 
 ---
 
-## 9. 性能监控
+## 10. 性能监控
 
-### 9.1 响应时间目标
+### 10.1 响应时间目标
 
 | 端点类别 | P50 | P95 | P99 |
 |---------|-----|-----|-----|
@@ -2338,7 +2997,7 @@ async function checkApiCompatibility() {
 | 创建类（POST） | <100ms | <300ms | <1s |
 | 复杂查询（图谱） | <500ms | <2s | <5s |
 
-### 9.2 监控指标
+### 10.2 监控指标
 
 ```python
 # 响应头包含性能指标
@@ -2350,7 +3009,7 @@ X-Cache-Hit: true
 
 ---
 
-## 10. 版本历史
+## 11. 版本历史
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
@@ -2358,7 +3017,8 @@ X-Cache-Hit: true
 | v1.1 | 2026-06-03 | Todos类型扩展为6种（opportunity/risk/context/action/pending_confirm/resource_maint）；添加莫兰迪色系morandi_color字段；Entities API添加resource_sensitivity字段及sensitivity端点；新增Resources API（资源管理+六维匹配算法）；限流策略改为单用户统一限流（移除RBAC三级）；OpenAPI规范同步更新 |
 | v1.2 | 2026-06-03 | Todo类型重命名（opportunity→cooperation_signal, context→care, action→promise, pending_confirm→followup, resource_maint→help）；Entities API新增concern/promise/contribution字段及三个PATCH端点（concern/promise/contribution）；Todos API新增promise/care/cooperation_signal类型详细示例；新增§3.8 AI输出语言规则（confidence_level/is_ai_inference/requires_confirmation）；OpenAPI规范同步更新（TodoType枚举、新增Concern/Promise/Contribution/AIInferenceMarker schema） |
 | v1.3 | 2026-06-03 | §8 API版本管理策略全面补齐：三层版本号（SemVer）+ 版本协商机制 + 兼容性规则 + 废弃流程（12个月过渡期）+ 多版本共存（FastAPI路由层）+ Alembic数据库迁移策略 + 客户端SDK版本策略 + 版本变更日志规范 |
+| **v2.0** | **2026-06-04** | **v2.0大版本升级（参考 PRD v4.3 + 技术设计 v2.5 §7）：**<br/>**① D2-1** 版本头更新<br/>**② D2-2 新增6个P0 API端点**: GET relationship-brief / PATCH stage(乐观锁) / GET dashboard/today / GET todos?view=my-responses / POST contributions / POST feedbacks<br/>**③ D2-3 日视图API (F-49)**: GET /api/v1/dashboard/day-view<br/>**④ D2-4 现有端点变更**: POST /events增加input_scope字段 / PATCH /todos增加action_type+promisor_id+beneficiary_id / GET /entities返回值增加relationship_stage<br/>**⑤ D2-5 JWT认证加固**: Payload结构(sub/iat/exp/role) + 4项安全约束(Secret≥256/黑名单/Refresh旋转/CORS白名单)<br/>**⑥ D2-6 PII脱敏行为**: 标注7类端点执行redact_pii_from_text() + 5种PII掩码规则<br/>**⑦ D2-7 SC-01安全约束**: input_scope服务端强制校验，永远不以客户端值为准<br/>**⑧ D2-8 错误码扩展**: E1004 INVALID_INPUT_SCOPE(400) + E1005 OPTIMISTIC_LOCK_CONFLICT(409)<br/>**⑨ D2-9 数据导出API**: GET /api/v1/data/export?format=json\|csv（GDPR数据携带权，Phase 1提前）<br/>**⑩ D2-10 F-05暂停声明**: 商机匹配相关API标记Phase 2 |
 
 ---
 
-*最后更新: 2026-06-03*
+*最后更新: 2026-06-04*

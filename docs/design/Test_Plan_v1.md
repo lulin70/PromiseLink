@@ -1,10 +1,10 @@
 # EventLink 测试计划文档
 
-> **版本**: v1.2
-> **日期**: 2026-06-03
+> **版本**: v2.0
+> **日期**: 2026-06-04
 > **测试周期**: Week 1-3 (POC阶段)
 > **测试负责人**: QA团队
-> **参考**: PRD v3.6, 技术设计 v1.7
+> **参考**: PRD v4.3, 技术设计 v2.5
 
 ---
 
@@ -20,25 +20,33 @@
 - 验证callability维度打分与权重
 - 验证安全机制（JWT/ticket/PII加密/LLM消毒）
 - 验证真实用户场景的端到端流程
+- **[v2.0新增]** 验证input_scope分类器准确率≥95%（F-44）
+- **[v2.0新增]** 验证Promise双向动作模型识别准确率≥90%（F-45）
+- **[v2.0新增]** 验证Todo降噪规则生效，单场会议≤3条正式Todo（F-46）
+- **[v2.0新增]** 验证RelationshipBrief推进卡12模块数据完整+API<500ms（F-47）
+- **[v2.0新增]** 验证RelationshipStage阶段转换RS-01强制用户确认（F-48）
+- **[v2.0新增]** 验证日视图会议分组+排序+API<200ms（F-49）
 
 ### 1.2 测试范围
 
 | Week | 测试重点 | 覆盖率目标 |
 |------|---------|----------|
-| Week 1 | 数据接入层 | 单元测试≥70% |
-| Week 2 | 核心算法 + Todo类型 + 敏感度 + callability | 单元测试≥80%, 算法准确率≥85% |
-| Week 3 | 端到端集成 + 安全测试 + E2E真实场景 | E2E场景100%覆盖 |
+| Week 1 | 数据接入层 + F-44 input_scope分类器 + F-45 Promise双向动作 | 单元测试≥70% |
+| Week 2 | 核心算法 + Todo类型 + 敏感度 + callability + **F-46 Todo降噪 + F-47 RelationshipBrief + F-48 RelationshipStage** | 单元测试≥80%, 算法准确率≥85% |
+| Week 3 | 端到端集成 + 安全测试 + **F-49日视图** + E2E真实场景 + **回归测试** | E2E场景100%覆盖 |
 
 ### 1.3 测试分层
 
 ```
 E2E真实场景测试 (10%) ←─ 模拟真实用户完整业务流程
     ↓
-安全测试 (10%) ←─ JWT/ticket/PII/注入防护
+回归测试 (10%) [v2.0新增] ←─ F-44~F-49 P0功能Sprint级回归
     ↓
-集成测试 (25%) ←─ 模块间协作
+安全专项测试 (10%) ←─ JWT/ticket/PII/注入防护/input_scope越权/乐观锁
     ↓
-单元测试 (55%) ←─ 函数/类级别
+集成测试 (20%) ←─ 模块间协作（含F-47/F-48/F-49集成）
+    ↓
+单元测试 (50%) ←─ 函数/类级别（含F-44/F-45/F-46单元）
 ```
 
 ### 1.4 关键术语约定
@@ -50,6 +58,13 @@ E2E真实场景测试 (10%) ←─ 模拟真实用户完整业务流程
 | event_type | 枚举值: card_save/meeting/call/manual | ~~business_card/voice_note~~ |
 | source | 枚举值: iamhere/recording_r1/manual | ~~wechat_scan~~ |
 | sensitivity | 资源敏感度: matchable/no_match | — |
+| input_scope | 输入分类枚举: identity/relationship_interaction/meeting_minutes/partner_feedback/internal_review/intent_document | ~~category~~ |
+| action_type | Promise动作类型: my_promise/their_promise/my_followup/mutual_action/system_reminder/unclear | ~~promise_direction~~ |
+| promisor | 承诺责任方（我方/对方/共同/待确认） | ~~promise_owner~~ |
+| RelationshipBrief | 关系推进卡，整合12模块全貌视图 | ~~relationship_card~~ |
+| RelationshipStage | 关系阶段（7阶段枚举） | ~~relationship_phase~~ |
+| RS-01 | 阶段升级必须用户确认的硬编码规则 | — |
+| evidence_quote | 承诺证据引用（需PII脱敏） | ~~evidence_text~~ |
 
 ---
 
@@ -889,6 +904,568 @@ assert response.json()["items"][0]["todo_type"] == "cooperation_signal"
 
 ---
 
+## 3. [v2.0新增] P0功能测试 — F-44~F-48
+
+> **设计原则**: 覆盖PRD v4.3中F-44（input_scope分类器）、F-45（Promise双向动作）、F-46（Todo降噪）、F-47（RelationshipBrief推进卡）、F-48（RelationshipStage）五大P0功能的正向/异常/边界测试矩阵。每个功能至少2个正向用例+1个异常用例，满足C3回归测试策略要求。
+
+---
+
+### 3.1 F-44: input_scope输入分类器测试
+
+> **对应PRD**: F-44 input_scope输入分类器
+> **验收标准**: ① 输入分类准确率≥95% ② 产品反馈混入关系卡=0 ③ 内部评审进入关系Todo=0 ④ 客户端传入非枚举值时正确返回400错误 ⑤ 服务端分类结果100%覆盖客户端值
+
+---
+
+#### TC-F44-001: 正向 — 身份资料正确分类为identity
+**目标**: 验证名片类输入被正确分类为identity
+**输入数据**:
+```python
+test_cases = [
+    {"raw_content": "张三, XX科技, CEO, 138****1234, zhangsan@xx.com", "expected_scope": "identity"},
+    {"raw_content": "李四 YY集团 CTO 139****5678 lisi@yy.com", "expected_scope": "identity"},
+    {"raw_content": "王五, 装饰公司, 项目经理", "expected_scope": "identity"},
+]
+```
+**期望输出**:
+```python
+for tc in test_cases:
+    result = InputClassifier.classify(tc["raw_content"], event_type="card_save")
+    assert result["input_scope"] == tc["expected_scope"]
+    assert result["confidence"] >= 0.90
+```
+**验收标准**: 身份资料文本100%分类为identity，置信度≥0.90
+
+---
+
+#### TC-F44-002: 正向 — 会议记录正确分类为meeting_minutes
+**目标**: 验证会议纪要类输入被正确分类为meeting_minutes
+**输入数据**:
+```python
+test_cases = [
+    {"raw_content": "今天和张总开了产品对接会，讨论了Q3的交付计划，张总希望我们在9月底前完成第一版", "expected_scope": "meeting_minutes"},
+    {"raw_content": "会议纪要：参会人员：李总、王总、赵总。议题：供应链优化方案。决议：下周二前提交方案初稿。", "expected_scope": "meeting_minutes"},
+    {"raw_content": "刚才和客户开了一个小时的电话会议，确认了三个需求点", "expected_scope": "meeting_minutes"},
+]
+```
+**期望输出**: 全部正确分类为meeting_minutes，置信度≥0.85
+**验收标准**: 会议记录文本准确率≥95%
+
+---
+
+#### TC-F44-003: 正向 — 产品反馈正确分类为partner_feedback（不入关系卡）
+**目标**: 验证产品反馈类输入被正确路由到产品反馈管线（不入关系卡）
+**输入数据**:
+```python
+test_cases = [
+    {"raw_content": "我觉得这个App的搜索功能太慢了，希望能优化一下", "expected_scope": "partner_feedback"},
+    {"raw_content": "建议增加一个批量导入名片的的功能，现在一张张扫太麻烦", "expected_scope": "partner_feedback"},
+    {"raw_content": "你们这个AI提取不太准啊，上次把我的供应商名字搞错了", "expected_scope": "partner_feedback"},
+]
+```
+**期望输出**:
+```python
+for tc in test_cases:
+    result = InputClassifier.classify(tc["raw_content"])
+    assert result["input_scope"] == "partner_feedback"
+    # 关键验证：partner_feedback不入关系推进主流程
+    assert result["route_to_relationship_pipeline"] == False
+```
+**验收标准**: 产品反馈100%识别且不进入关系Todo生成流程
+
+---
+
+#### TC-F44-004: 异常 — 空文本处理
+**目标**: 验证空文本或纯空白输入的优雅降级
+**输入数据**:
+```python
+test_cases = [
+    {"raw_content": "", "event_type": "manual"},
+    {"raw_content": "   ", "event_type": "manual"},
+    {"raw_content": "\n\n\t", "event_type": "meeting"},
+]
+```
+**期望输出**:
+```python
+for tc in test_cases:
+    result = InputClassifier.classify(tc["raw_content"], event_type=tc["event_type"])
+    assert result["input_scope"] == "relationship_interaction"  # 默认值
+    assert result["confidence"] <= 0.50  # 低置信度标记
+```
+**验收标准**: 空文本不崩溃，返回低置信度的默认分类
+
+---
+
+#### TC-F44-005: 异常 — 超长文本(>10000字)处理
+**目标**: 验证超长输入文本的分类稳定性
+**输入数据**:
+```python
+long_text = "这是一段很长的会议纪要。" * 2000  # >10000字
+result = InputClassifier.classify(long_text, event_type="meeting")
+```
+**期望输出**:
+```python
+assert result["input_scope"] in ["meeting_minutes", "relationship_interaction"]
+assert result["processing_time_ms"] < 5000  # 分类延迟<5秒
+```
+**验收标准**: 超长文本不崩溃、不超时、返回合理分类结果
+
+---
+
+#### TC-F44-006: 异常 — 特殊字符注入
+**目标**: 验证含特殊字符/注入尝试的输入不被误分类
+**输入数据**:
+```python
+@pytest.mark.parametrize("injection_payload", [
+    "<script>alert('xss')</script>",
+    "{{7*7}}",
+    "'; DROP TABLE events; --",
+    "\x00\x01\x02\x03",
+    "🔥💯🎉🚀",
+])
+def test_f44_special_chars(injection_payload):
+    result = InputClassifier.classify(injection_payload)
+    assert result["input_scope"] in InputClassifier.VALID_SCOPES
+    assert isinstance(result["confidence"], float)
+```
+**验收标准**: 特殊字符输入不崩溃、不绕过分类逻辑
+
+---
+
+#### TC-F44-007: 边界 — 关键词边界模糊case
+**目标**: 验证同时包含多种分类关键词的模糊文本的正确处理
+**输入数据**:
+```python
+boundary_cases = [
+    {"raw_content": "张三是XX公司的CEO，今天我们开会讨论了下季度的合作方案",
+     "expected": "meeting_minutes", "reason": "会议内容占主导"},
+    {"raw_content": "李总说你们的App很好用，他还介绍了几个朋友给我认识",
+     "expected": "relationship_interaction", "reason": "关系互动占主导"},
+    {"raw_content": "内部复盘一下上个项目的执行情况，看看哪些地方可以改进",
+     "expected": "internal_review", "reason": "包含内部评审关键词"},
+]
+```
+**期望输出**: 混合内容按主导意图分类，置信度反映不确定性（0.60-0.80区间）
+**验收标准**: 边界case分类合理，置信度反映模糊程度
+
+---
+
+#### TC-F44-008: 服务端校验 — 客户端传入非枚举值返回400（BLK-2）
+**目标**: 验证BLK-2规则：客户端传入非枚举input_scope时返回400
+**输入数据**:
+```python
+@pytest.mark.parametrize("invalid_scope", [
+    "hacked_scope",
+    "identity_injection",
+    "meeting_minutes; DROP TABLE",
+])
+def test_f44_invalid_client_scope(invalid_scope):
+    payload = {
+        "event_type": "manual",
+        "raw_content": "测试内容",
+        "input_scope": invalid_scope
+    }
+    response = client.post("/api/v1/events", json=payload)
+    assert response.status_code == 400
+    assert response.json()["error_code"] == "INVALID_INPUT_SCOPE"
+```
+**验收标准**: 所有非法input_scope值返回400 + INVALID_INPUT_SCOPE错误码
+
+---
+
+#### TC-F44-009: 服务端覆盖 — 客户端hint不影响最终分类
+**目标**: 验证服务端强制使用InputClassifier结果覆盖客户端值
+**输入数据**:
+```python
+def test_f44_server_override():
+    payload = {
+        "event_type": "card_save",
+        "raw_content": "李四 YY集团 CTO",
+        "input_scope": "meeting_minutes"  # 错误的hint
+    }
+    response = client.post("/api/v1/events", json=payload)
+    assert response.status_code == 201
+    assert response.json()["input_scope"] == "identity"  # 服务端应覆盖为正确分类
+```
+**验收标准**: 服务端分类结果100%覆盖客户端传入值
+
+---
+
+#### TC-F44-010: 准确率评估 — 100条样本集准确率≥95%
+**测试方法**:
+```python
+def test_f44_accuracy_100_samples():
+    samples = load_test_samples("data/test_input_scope_samples.json")
+    correct = sum(1 for s in samples
+                  if InputClassifier.classify(s["raw_content"])["input_scope"] == s["expected_scope"])
+    accuracy = correct / len(samples)
+    assert accuracy >= 0.95, f"分类准确率{accuracy:.2%} < 95%目标"
+```
+**验收标准**: 总体准确率≥95%，各子类别准确率≥90%
+
+---
+
+### 3.2 F-45: Promise双向动作模型测试
+
+> **对应PRD**: F-45 Promise双向动作模型
+> **验收标准**: ① 承诺责任人识别准确率≥90% ② 未确认承诺(unclear)生成正式Todo=0 ③ evidence_quote脱敏覆盖率100% ④ evidence_quote不出现于搜索结果中
+
+---
+
+#### TC-F45-001: 正向 — "我承诺帮他做PoC" → my_promise, promisor=我
+**输入数据**:
+```python
+test_cases = [
+    {"raw_content": "我承诺下周一前帮他把PoC做完", "expected": {"action_type": "my_promise", "promisor": "self"}},
+    {"raw_content": "我跟他说了我来负责这件事", "expected": {"action_type": "my_promise", "promisor": "self"}},
+    {"raw_content": "我答应给他发一份产品介绍文档", "expected": {"action_type": "my_promise", "promisor": "self"}},
+]
+```
+**期望**: action_type=my_promise, promisor=self, generates_todo=True
+**验收标准**: 第一人称承诺100%识别为my_promise
+
+---
+
+#### TC-F45-002: 正向 — "他说下周给方案" → their_promise, promisor=对方
+**输入数据**:
+```python
+test_cases = [
+    {"raw_content": "他说下周三之前给我们出一份方案", "expected": {"action_type": "their_promise", "promisor": "other"}},
+    {"raw_content": "李总答应后天把合同发过来", "expected": {"action_type": "their_promise", "promisor": "other"}},
+    {"raw_content": "对方表示会在月底前完成部署", "expected": {"action_type": "their_promise", "promisor": "other"}},
+]
+```
+**期望**: action_type=their_promise, promisor=other, generates_todo=False, display_as="waiting_for_response"
+**验收标准**: 对方承诺不入Todo，显示"等待对方回应"
+
+---
+
+#### TC-F45-003: 正向 — mutual_action / my_followup 正确区分
+**输入数据**:
+```python
+test_cases = [
+    {"raw_content": "我们约定下周二一起去看场地", "expected": "mutual_action"},
+    {"raw_content": "双方同意在下个月启动试点项目", "expected": "mutual_action"},
+    {"raw_content": "我需要跟进一下他们那边的进度", "expected": "my_followup"},
+]
+```
+**验收标准**: 动作类型区分准确率≥90%
+
+---
+
+#### TC-F45-004: 异常 — 无法区分promisor时 → unclear
+**输入数据**:
+```python
+unclear_cases = [
+    {"raw_content": "说好了下周给方案"},       # 缺少主语
+    {"raw_content": "承诺周一前搞定这个问题"},   # 无明确责任方
+    {"raw_content": "到时候会把东西发过来"},     # 模糊指代
+]
+for case in unclear_cases:
+    result = PromiseAnalyzer.analyze(case["raw_content"])
+    assert result["action_type"] == "unclear"
+    assert result["generates_todo"] == False      # unclear不生成正式Todo
+    assert result["requires_user_confirmation"] == True
+```
+**验收标准**: 无法区分promisor时100%标记unclear，不生成正式Todo
+
+---
+
+#### TC-F45-005: 异常 — 缺少上下文时不误判
+**输入数据**:
+```python
+minimal_cases = ["好的", "收到", "嗯嗯", "OK"]
+for text in minimal_cases:
+    result = PromiseAnalyzer.analyze(text)
+    assert result.get("is_promise") != True  # 无承诺内容不误判
+```
+**验收标准**: 极短无承诺文本不误判为promise类型
+
+---
+
+#### TC-F45-006: PII脱敏 — evidence_quote手机号脱敏覆盖率100%
+```python
+def test_f45_evidence_phone_masking():
+    raw_content = "李总说13812345678这个号码随时可以联系他"
+    response = client.post("/api/v1/events", json={"event_type": "meeting", "raw_content": raw_content})
+    todos = get_generated_todos(response.json()["event_id"])
+    for todo in todos:
+        if todo.get("evidence_quote"):
+            assert "13812345678" not in todo["evidence_quote"]
+            assert "***" in todo["evidence_quote"] or "138****" in todo["evidence_quote"]
+```
+
+#### TC-F45-007: PII脱敏 — 邮箱/身份证号脱敏 + 不参与搜索索引
+```python
+@pytest.mark.parametrize("pii_text", ["zhangsan@example.com", "110101199001011234"])
+def test_f45_evidence_pii_not_searchable(pii_text):
+    raw_content = f"王总说{pii_text}是他的联系方式"
+    client.post("/api/v1/events", json={"event_type": "meeting", "raw_content": raw_content})
+    search_result = client.get(f"/api/v1/search?q={pii_text}")
+    assert search_result.json()["total"] == 0  # PII不可通过搜索检索
+```
+
+#### TC-F45-008: 准确率评估 — 100条样本准确率≥90%
+```python
+def test_f45_accuracy():
+    samples = load_test_samples("data/test_promise_samples.json")
+    accuracy = sum(1 for s in samples if PromiseAnalyzer.analyze(s["raw_content"])["action_type"] == s["expected"]) / len(samples)
+    assert accuracy >= 0.90
+```
+
+---
+
+### 3.3 F-46: Todo降噪规则测试
+
+> **对应PRD**: F-46 Todo降噪规则
+> **验收标准**: ① 单场会议正式Todo≤3条 ② 7事件输入输出Todo从24条降到≤10条 ③ 建议状态→正式Todo转化率可追踪
+
+---
+
+#### TC-F46-001: 正向 — 单场会议5个Promise → 输出≤3条Todo
+**输入数据**:
+```python
+meeting_event = {
+    "event_type": "meeting",
+    "raw_content": """
+    今天和张总开会：
+    1. 我承诺下周一发送产品白皮书
+    2. 张总承诺周三提供需求文档
+    3. 我们约定周五再同步
+    4. 我需要跟进技术团队排期
+    5. 张总建议先做PoC验证
+    """,
+    "source": "manual"
+}
+response = client.post("/api/v1/events", json=meeting_event)
+todos = get_todos_by_event(response.json()["event_id"])
+formal_todos = [t for t in todos if t["status"] not in ("suggested", "reference_only")]
+assert len(formal_todos) <= 3, f"生成了{len(formal_todos)}条正式Todo > 上限3"
+```
+**验收标准**: 单场会议正式Todo≤3条，按urgency截断
+
+---
+
+#### TC-F46-002: 正向 — Concern/NeedInsight/Contribution过滤后存入RelationshipBrief
+```python
+response = client.post("/api/v1/events", json={
+    "event_type": "meeting",
+    "raw_content": "- 李总看重稳定性(关注点)\n- 需求是降本(需求洞察)\n- 我建议增量升级(贡献建议)\n- 我承诺下周给方案(正式Promise)"
+})
+todos = get_todos_by_event(response.json()["event_id"])
+# 过滤类型不作为独立Todo出现
+brief = client.get(f"/api/v1/persons/{person_id}/relationship-brief").json()
+assert "concerns" in brief and len(brief["concerns"]) > 0   # 存入推进卡
+assert "need_insights" in brief                               # 存入推进卡
+```
+
+#### TC-F46-003: 正向 — 7事件输入→输出Todo≤10条
+```python
+total_before = count_all_todos()
+for i in range(7):
+    client.post("/api/v1/events", json={
+        "event_type": "meeting",
+        "raw_content": generate_meeting_text(count=3+i),
+        "source": "manual"
+    })
+time.sleep(15)  # 等待Pipeline处理
+assert count_all_todos() - total_before <= 10
+```
+
+#### TC-F46-004: 异常 — 单场会议0个Promise → 输出0条Todo（不崩溃）
+```python
+response = client.post("/api/v1/events", json={
+    "event_type": "meeting",
+    "raw_content": "今天和王总聊了行业趋势，没有具体行动计划",
+    "source": "manual"
+})
+todos = get_todos_by_event(response.json()["event_id"])
+formal_todos = [t for t in todos if t["status"] not in ("suggested", "reference_only")]
+assert len(formal_todos) == 0
+```
+
+#### TC-F46-005: 边界 — 刚好3个Promise时全部保留
+```python
+response = client.post("/api/v1/events", json={
+    "event_type": "meeting",
+    "raw_content": "1.我承诺发A方案 2.他承诺给B反馈 3.我们约定C时间见面",
+    "source": "manual"
+})
+formal_todos = [t for t in get_todos_by_event(response.json()["event_id"])
+                if t["status"] not in ("suggested", "reference_only")]
+assert len(formal_todos) == 3  # ≤3条不截断
+```
+
+#### TC-F46-006: 建议→正式转化可追踪
+```python
+# 创建建议状态Todo
+response = client.post("/api/v1/events", json={"event_type": "meeting", "raw_content": "建议先做试点"})
+suggested = [t for t in get_todos_by_event(response.json()["event_id"]) if t["status"] == "suggested"]
+# 用户一键确认
+client.put(f"/api/v1/todos/{suggested[0]['id']}/confirm")
+updated = client.get(f"/api/v1/todos/{suggested[0]['id']}").json()
+assert updated["status"] == "pending"
+assert updated["confirmed_at"] is not None
+```
+
+---
+
+### 3.4 F-47: RelationshipBrief关系推进卡测试
+
+> **对应PRD**: F-47 RelationshipBrief关系推进卡
+> **验收标准**: ① 推进卡API可用且响应<500ms ② 包含12个标准模块 ③ P0模块首屏渲染<300ms
+
+---
+
+#### TC-F47-001: 正向 — GET /persons/{id}/relationship-brief 返回12模块数据
+```python
+response = client.get(f"/api/v1/persons/{person_id}/relationship-brief")
+assert response.status_code == 200
+brief = response.json()
+required_modules = [
+    "current_stage", "recent_interaction_summary", "concerns", "need_insights",
+    "can_provide_help", "active_promises", "feedback_records", "next_natural_action",
+    "suggested_touchpoint", "relationship_health", "milestones", "notes",
+]
+for m in required_modules:
+    assert m in brief, f"推进卡缺少模块: {m}"
+```
+**验收标准**: 12个标准模块100%存在
+
+---
+
+#### TC-F47-002: 正向 — 数据聚合正确性（F-44+F-45+F-46+F-48整合）
+```python
+# F-44分类影响recent_interaction_summary
+create_event(raw_content="张三 XX科技 CEO", event_type="card_save")
+# F-45承诺影响active_promises
+create_event(raw_content="我承诺下周一发方案给张三", event_type="meeting")
+# F-46降噪后的关注点存入concerns
+create_event(raw_content="张总特别看重交付速度", event_type="meeting")
+# F-48阶段标记影响current_stage
+update_stage(person_id, "understanding_needs", confirmed_by_user=True)
+
+brief = client.get(f"/api/v1/persons/{person_id}/relationship-brief").json()
+assert brief["current_stage"] == "understanding_needs"
+assert len(brief["active_promises"]) >= 1
+assert any("交付速度" in c for c in brief.get("concerns", []))
+```
+
+#### TC-F47-003: 性能 — API响应P95 < 500ms
+```python
+latencies = []
+for _ in range(20):
+    start = time.time()
+    client.get(f"/api/v1/persons/{person_id}/relationship-brief")
+    latencies.append((time.time() - start) * 1000)
+p95 = sorted(latencies)[int(len(latencies) * 0.95)]
+assert p95 < 500, f"P95={p95:.0f}ms ≥ 500ms阈值"
+```
+
+#### TC-F47-004: 异常 — 无brief时返回404
+```python
+new_person = create_person(name="陌生人", company="未知")
+response = client.get(f"/api/v1/persons/{new_person['id']}/relationship-brief")
+assert response.status_code == 404
+```
+
+#### TC-F47-005: 异常 — 无权限时返回403
+```python
+token_b = generate_jwt(user_id="user_B")
+response = client.get(
+    f"/api/v1/persons/{person_a_id}/relationship-brief",
+    headers={"Authorization": f"Bearer {token_b}"}
+)
+assert response.status_code == 403
+```
+
+---
+
+### 3.5 F-48: RelationshipStage关系阶段测试
+
+> **对应PRD**: F-48 RelationshipStage关系阶段
+> **验收标准**: ① 7阶段枚举完整定义且文档化 ② 用户确认才能升级（自动化升级=0） ③ AI可建议但不自动推进（建议升级提示率≥80%）
+
+---
+
+#### TC-F48-001: 正向 — PATCH stage new_connection→understanding_needs 成功（用户确认后）
+```python
+response = client.patch(f"/api/v1/relationship-briefs/{brief_id}/stage", json={
+    "target_stage": "understanding_needs",
+    "confirmed_by_user": True,
+    "reason": "已完成初次沟通，了解基本需求"
+})
+assert response.status_code == 200
+assert response.json()["current_stage"] == "understanding_needs"
+assert response.json()["confirmed_by"] == "user"
+```
+**验收标准**: 用户确认后顺序升级成功
+
+---
+
+#### TC-F48-002: 正向 — AI建议升级提示率≥80%（但不自动改变阶段）
+```python
+# 模拟足够正向行为数据
+for i in range(5):
+    create_event(person_id=person_id, event_type="meeting", raw_content=f"第{i+1}次深入沟通")
+
+suggestions = client.get(f"/api/v1/persons/{person_id}/stage-suggestions").json()
+assert len(suggestions) >= 1
+assert suggestions[0]["suggested_stage"] == "understanding_needs"
+
+# RS-01: 阶段仍未变
+current = client.get(f"/api/v1/persons/{person_id}").json()
+assert current["relationship_stage"] == "new_connection"  # 未自动升级
+```
+
+#### TC-F48-003: 异常 — 跳阶段(new_connection→cooperation_exploration)被拒绝
+```python
+response = client.patch(f"/api/v1/relationship-briefs/{brief_id}/stage", json={
+    "target_stage": "cooperation_exploration",  # 跳阶段
+    "confirmed_by_user": True,
+})
+assert response.status_code in (400, 422)  # 跳阶段被拒绝
+```
+
+#### TC-F48-004: 异常 — AI尝试自动升级被RS-01阻止（核心！）
+```python
+# AI调用升级API但未带用户确认
+response = client.patch(f"/api/v1/relationship-briefs/{brief_id}/stage", json={
+    "target_stage": "understanding_needs",
+    "confirmed_by_user": False,  # 未确认
+})
+assert response.status_code in (400, 403)
+# 验证阶段确实未被改变
+current = client.get(f"/api/v1/persons/{person_id}").json()
+assert current["relationship_stage"] == "new_connection"
+```
+**验收标准**: RS-01强制用户确认，未确认的升级请求被拒绝，自动化升级计数=0
+
+---
+
+#### TC-F48-005: 边界 — 用户主动降级允许
+```python
+# 先升级再降级
+client.patch(f"/api/v1/relationship-briefs/{brief_id}/stage", json={
+    "target_stage": "understanding_needs", "confirmed_by_user": True})
+response = client.patch(f"/api/v1/relationship-briefs/{brief_id}/stage", json={
+    "target_stage": "new_connection", "confirmed_by_user": True, "reason": "重新评估"})
+assert response.status_code == 200
+assert response.json()["current_stage"] == "new_connection"
+```
+
+#### TC-F48-006: 7阶段枚举完整性 + PoC范围仅启用前3阶段
+```python
+expected_stages = ["new_connection","understanding_needs","value_response",
+                   "cooperation_exploration","intent_confirmed","execution","review"]
+stages = client.get("/api/v1/meta/relationship-stages").json()["stages"]
+assert all(s in [x["name"] for x in stages] for s in expected_stages)
+poc_enabled = [s for s in stages if s.get("enabled_in_poc")]
+assert len(poc_enabled) == 3
+```
+
+---
+
 ## 4. Week 3 测试用例（端到端集成）
 
 ### 4.1 完整业务流程测试
@@ -1630,7 +2207,810 @@ def test_input_willingness():
 
 ---
 
-## 5. 测试数据准备
+### 4.8 [v2.0新增] F-49: 日视图（今日议程）测试
+
+> **对应PRD**: F-49 日视图（今日议程）
+> **验收标准**: ① 同一天≥2场会议时正确分组显示 ② 每场会议独立卡片 ③ 按时间排序 ④ API响应<200ms
+
+---
+
+#### TC-F49-001: 正向 — 同一天2+场会议正确分组
+```python
+# 创建同一天的多场会议
+today = "2026-06-04"
+client.post("/api/v1/events", json={
+    "event_type": "meeting", "raw_content": "上午和张总开会",
+    "timestamp": f"{today}T09:00:00", "source": "manual"
+})
+client.post("/api/v1/events", json={
+    "event_type": "meeting", "raw_content": "下午和李总对接",
+    "timestamp": f"{today}T14:00:00", "source": "manual"
+})
+client.post("/api/v1/events", json={
+    "event_type": "call", "raw_content": "晚上和赵总电话沟通",
+    "timestamp": f"{today}T19:00:00", "source": "recording_r1"
+})
+
+response = client.get(f"/api/v1/dashboard/day-view?date={today}")
+assert response.status_code == 200
+data = response.json()
+assert len(data["groups"]) >= 2  # 至少2个时间分组
+assert all("meetings" in g for g in data["groups"])
+```
+**验收标准**: 同一天多场会议正确按时间段分组
+
+---
+
+#### TC-F49-002: 正向 — 每场会议独立卡片 + 关键信息完整
+```python
+response = client.get("/api/v1/dashboard/day-view?date=2026-06-04")
+for group in response.json()["groups"]:
+    for meeting in group["meetings"]:
+        assert "time" in meeting           # 时间
+        assert "title" in meeting          # 会议主题/标题
+        assert "participants" in meeting   # 参与人物头像
+        assert "todo_count" in meeting     # 关键Todo数
+        assert "event_id" in meeting       # 关联事件ID
+```
+
+#### TC-F49-003: 正向 — 按时间升序排列
+```python
+response = client.get("/api/v1/dashboard/day-view?date=2026-06-04")
+times = [m["time"] for g in response.json()["groups"] for m in g["meetings"]]
+assert times == sorted(times), "会议未按时间排序"
+```
+
+#### TC-F49-004: 性能 — API响应<200ms
+```python
+import time
+latencies = []
+for _ in range(20):
+    start = time.time()
+    client.get("/api/v1/dashboard/day-view?date=2026-06-04")
+    latencies.append((time.time() - start) * 1000)
+p95 = sorted(latencies)[int(len(latencies) * 0.95)]
+assert p95 < 200, f"P95={p95:.0f}ms ≥ 200ms阈值"
+```
+
+#### TC-F49-005: 异常 — 无会议日期返回空列表
+```python
+response = client.get("/api/v1/dashboard/day-view?date=2020-01-01")  # 无数据的日期
+assert response.status_code == 200
+assert len(response.json()["groups"]) == 0
+```
+
+#### TC-F49-006: 异常 — 非法日期格式返回400
+```python
+response = client.get("/api/v1/dashboard/day?date=not-a-date")
+assert response.status_code == 400
+```
+
+---
+
+## 5. [v2.0新增] Security专项测试
+
+> **设计原则**: 在原有安全测试（§4.4 JWT/Ticket/PII/LLM消毒）基础上，扩展覆盖F-44~F-48引入的新安全面：
+> - PII脱敏18用例（evidence_quote全类型PII脱敏验证）
+> - input_scope越权3用例（BLK-2服务端校验规则）
+> - JWT安全增强3用例（token篡改/重放/权限提升）
+> - 乐观锁冲突2用例（RelationshipBrief stage更新的并发控制）
+>
+> **总计**: 26个Security专项测试用例
+
+---
+
+### 5.1 PII脱敏专项（18用例）
+
+> **覆盖范围**: evidence_quote字段中手机号/邮箱/身份证号/银行卡号/地址等PII的存储加密、API返回脱敏、搜索索引排除
+
+---
+
+#### TC-SEC-PII-001~003: 手机号脱敏（3种格式）
+```python
+@pytest.mark.parametrize("phone,masked_pattern", [
+    ("13812345678", ["138****5678", "***"]),          # 11位手机号
+    ("021-12345678", ["021-******78"]),               # 座机
+    ("+86-138-1234-5678", ["+86-138****5678"]),       # 国际格式
+])
+def test_pii_phone_masking(phone, masked_pattern):
+    raw_content = f"联系方式是{phone}"
+    response = create_event_with_promise(raw_content)
+    evidence = extract_evidence_quote(response)
+    assert phone not in evidence
+    assert any(p in evidence for p in masked_pattern)
+```
+
+#### TC-SEC-PII-004~006: 邮箱脱敏（3种格式）
+```python
+@pytest.mark.parametrize("email,masked_pattern", [
+    ("zhangsan@example.com", ["z***@example.com", "***@***"]),
+    ("user_name@company.cn", ["***@company.cn"]),
+    ("admin@mail.co.uk", ["***@mail.co.uk"]),
+])
+def test_pii_email_masking(email, masked_pattern):
+    raw_content = f"邮箱{email}"
+    evidence = extract_evidence_quote(create_event_with_promise(raw_content))
+    assert email not in evidence
+```
+
+#### TC-SEC-PII-007~009: 身份证号脱敏（3种格式）
+```python
+@pytest.mark.parametrize("id_card", [
+    "110101199001011234",
+    "310115198512308876X",
+    "440305200001011234",
+])
+def test_pii_id_card_masking(id_card):
+    raw_content = f"身份证{id_card}"
+    evidence = extract_evidence_quote(create_event_with_promise(raw_content))
+    assert id_card not in evidence
+    assert "***" in evidence or "*" * 6 in evidence
+```
+
+#### TC-SEC-PII-010~012: 银行卡号脱敏
+```python
+@pytest.mark.parametrize("bank_card", [
+    "6222021234567890123",
+    "6217001234567890123",
+    "6228481234567890123",
+])
+def test_pii_bank_card_masking(bank_card):
+    raw_content = f"银行卡{bank_card}"
+    evidence = extract_evidence_quote(create_event_with_promise(raw_content))
+    assert bank_card not in evidence
+```
+
+#### SEC-PII-013~015: 地址信息脱敏
+```python
+@pytest.mark.parametrize("address", [
+    "北京市朝阳区建国路88号",
+    "上海市浦东新区陆家嘴环路1000号",
+    "深圳市南山区科技园南区",
+])
+def test_pii_address_masking(address):
+    raw_content = f"地址在{address}"
+    evidence = extract_evidence_quote(create_event_with_promise(raw_content))
+    # 地址应部分脱敏或标记为敏感
+    assert address not in evidence or "sensitive" in evidence.lower() or "***" in evidence
+```
+
+#### SEC-PII-016: PII混合文本脱敏
+```python
+def test_pii_mixed_content():
+    raw_content = "张三 13812345678 zhangsan@example.com 北京市朝阳区"
+    evidence = extract_evidence_quote(create_event_with_promise(raw_content))
+    assert "13812345678" not in evidence
+    assert "zhangsan@example.com" not in evidence
+    assert "朝阳区" not in evidence or "***" in evidence
+```
+
+#### SEC-PII-017: 数据库中PII存储为密文
+```python
+def test_pii_encrypted_at_rest():
+    create_event_with_promise("李总电话13987654321")
+    db_record = query_db("SELECT evidence_quote FROM todos WHERE id=?", [todo_id])
+    raw_db_value = db_record[0]["evidence_quote"]
+    assert "13987654321" not in raw_db_value  # DB中应为密文
+    assert raw_db_value.startswith("enc_") or is_encrypted(raw_db_value)
+```
+
+#### SEC-PII-018: PII不参与全文搜索索引
+```python
+@pytest.mark.parametrize("pii", [
+    "13812345678", "zhangsan@example.com", "110101199001011234",
+])
+def test_pii_not_in_search_index(pii):
+    create_event_with_promise(f"联系方式{pii}")
+    search_result = client.get(f"/api/v1/search?q={pii}")
+    assert search_result.json()["total"] == 0
+```
+
+---
+
+### 5.2 input_scope越权测试（3用例）
+
+> **覆盖BLK-2服务端校验规则：客户端不可直接传入确定值
+
+---
+
+#### TC-SEC-SCOPE-001: 客户端传入非枚举input_scope → 400
+```python
+@pytest.mark.parametrize("malicious_scope", [
+    "identity; DROP TABLE users; --",
+    "../../../etc/passwd",
+    '{"scope":"identity","admin":true}',
+    "<script>alert(1)</script>",
+])
+def test_scope_injection(malicious_scope):
+    response = client.post("/api/v1/events", json={
+        "event_type": "manual", "raw_content": "test",
+        "input_scope": malicious_scope
+    })
+    assert response.status_code == 400
+    assert response.json()["error_code"] == "INVALID_INPUT_SCOPE"
+```
+
+#### TC-SEC-SCOPE-002: 客户端尝试绕过分类强制指定scope → 被覆盖
+```python
+def test_scope_client_override_attempt():
+    # 尝试将产品反馈内容强制指定为relationship_interaction以绕过过滤
+    response = client.post("/api/v1/events", json={
+        "event_type": "manual",
+        "raw_content": "你们App搜索太慢了，希望能优化",  # 明显是partner_feedback
+        "input_scope": "relationship_interaction"  # 尝试绕过
+    })
+    assert response.status_code == 201
+    # 服务端必须覆盖为partner_feedback
+    assert response.json()["input_scope"] == "partner_feedback"
+    # 且不入关系Todo
+    todos = get_todos_by_event(response.json()["event_id"])
+    assert len(todos) == 0  # partner_feedback不生成关系Todo
+```
+
+#### TC-SEC-SCOPE-03: 空值/None/undefined处理
+```python
+@pytest.mark.parametrize("scope_val", [None, "", "null", "undefined"])
+def test_scope_null_handling(scope_val):
+    payload = {"event_type": "manual", "raw_content": "test"}
+    if scope_val is not None:
+        payload["input_scope"] = scope_val
+    response = client.post("/api/v1/events", json=payload)
+    assert response.status_code == 201
+    # 空值应触发自动分类
+    assert response.json()["input_scope"] in InputClassifier.VALID_SCOPES
+```
+
+---
+
+### 5.3 JWT安全增强测试（3用例）
+
+---
+
+#### TC-SEC-JWT-001: Token payload篡改检测
+```python
+def test_jwt_payload_tampering():
+    valid_token = generate_jwt(user_id="user_A", role="user")
+    # Base64解码payload段，修改role为admin
+    tampered = tamper_jwt_role(valid_token, new_role="admin")
+    response = client.get("/api/v1/admin/users",
+                          headers={"Authorization": f"Bearer {tampered}"})
+    assert response.status_code == 401  # 签名校验失败
+```
+
+#### SEC-JWT-002: Token重放攻击防护
+```python
+def test_jwt_replay_attack():
+    token = generate_jwt(user_id="user_A")
+    # 第一次使用成功
+    r1 = client.get("/api/v1/entities", headers={"Authorization": f"Bearer {token}"})
+    assert r1.status_code == 200
+    # 如果有refresh_token机制，旧token被撤销后应失效
+    # 或使用jti (JWT ID) 做一次性校验
+```
+
+#### SEC-JWT-003: 权限提升防护（普通用户→管理员接口）
+```python
+def test_jwt_privilege_escalation():
+    user_token = generate_jwt(user_id="normal_user", role="user")
+    admin_endpoints = [
+        "/api/v1/admin/users",
+        "/api/v1/admin/config",
+        "/api/v1/admin/metrics/raw",
+    ]
+    for endpoint in admin_endpoints:
+        response = client.get(endpoint,
+                              headers={"Authorization": f"Bearer {user_token}"})
+        assert response.status_code in (401, 403, 404), \
+            f"普通用户不应访问{endpoint}, 得到{response.status_code}"
+```
+
+---
+
+### 5.4 乐观锁冲突测试（2用例）
+
+> **覆盖RelationshipBrief PATCH /stage API的乐观锁并发控制
+
+---
+
+#### TC-SEC-OPTIMISTIC-001: 并发更新stage冲突检测
+```python
+def test_optimistic_lock_conflict():
+    brief = get_relationship_brief(person_id)
+    original_updated_at = brief["updated_at"]
+
+    # 用户A读取并准备更新
+    user_a_payload = {
+        "target_stage": "understanding_needs",
+        "confirmed_by_user": True,
+        "updated_at": original_updated_at  # 乐观锁版本号
+    }
+
+    # 用户B先更新了
+    client.patch(f"/api/v1/relationship-briefs/{brief['id']}/stage", json={
+        "target_stage": "understanding_needs",
+        "confirmed_by_user": True,
+        "updated_at": original_updated_at
+    })
+
+    # 用户A再提交（此时updated_at已过时）
+    response = client.patch(
+        f"/api/v1/relationship-briefs/{brief['id']}/stage",
+        json=user_a_payload
+    )
+    assert response.status_code == 409  # Conflict
+    assert "conflict" in response.json()["detail"].lower() or \
+           "stale" in response.json()["detail"].lower()
+```
+
+#### SEC-OPTIMISTIC-002: 乐观锁正确处理后重试成功
+```python
+def test_optimistic_lock_retry():
+    brief = get_relationship_brief(person_id)
+    old_version = brief["updated_at"]
+
+    # 触发一次冲突
+    conflict_response = try_update_stage(brief["id"], old_version)
+    assert conflict_response.status_code == 409
+
+    # 获取最新版本后重试
+    latest_brief = get_relationship_brief(person_id)
+    retry_response = client.patch(
+        f"/api/v1/relationship-briefs/{brief['id']}/stage",
+        json={
+            "target_stage": "understanding_needs",
+            "confirmed_by_user": True,
+            "updated_at": latest_brief["updated_at"]  # 使用最新版本
+        }
+    )
+    assert retry_response.status_code == 200
+```
+
+---
+
+## 6. [v2.0新增] 回归测试策略
+
+> **对应PRD C3 [Tester意见]**: 每个P0功能（F-44~F-49）必须满足：① 至少2个正向用例+1个异常用例 ② E2E场景：完整事件输入→Pipeline输出→推进卡更新 ③ 回归测试在每个Sprint结束前执行，阻塞发布
+
+---
+
+### 6.1 E2E完整链路回归矩阵
+
+| 回归链路 | 覆盖功能 | 用例数 | 执行频率 | 阻塞发布 |
+|---------|---------|--------|---------|---------|
+| 事件输入→input_scope分类→管线路由 | F-44 | 3 | 每Sprint | ✅ |
+| 事件输入→Promise解析→Todo生成→evidence_quote脱敏 | F-45 | 3 | 每Sprint | ✅ |
+| 多Promise输入→降噪截断→正式Todo≤3 | F-46 | 2 | 每Sprint | ✅ |
+| 事件累积→RelationshipBrief聚合→12模块完整性 | F-47 | 2 | 每Sprint | ✅ |
+| 行为数据→AI建议升级→RS-01阻止→用户确认→阶段变更 | F-48 | 2 | 每Sprint | ✅ |
+| 多事件→日视图分组→排序→渲染 | F-49 | 2 | 每Sprint | ✅ |
+
+---
+
+### 6.2 Sprint阻塞发布机制
+
+```
+Sprint结束前72小时触发回归测试
+    ↓
+运行全部E2E链路回归用例（14条）
+    ↓
+├─ 全部通过 → 允许发布 ✅
+│
+├─ 存在P0失败 → 阻塞发布 ❌
+│   ├─ 开发修复 → 重跑失败用例
+│   └─ 最多允许1次修复重跑窗口（24h）
+│
+└─ 存在P1失败 → 有条件发布 ⚠️
+    └─ 必须记录已知问题 + 修复计划（下Sprint必修）
+```
+
+**执行规则**:
+1. 回归测试必须在Sprint最后3天内完成
+2. P0功能任一回归失败 = 阻塞发布（无例外）
+3. 每次回归结果记录到 `tests/regression/report_{sprint}_{date}.json`
+4. 连续2个Sprint同一P0功能回归失败 → 触发技术复盘
+
+---
+
+### 6.3 E2E回归用例示例
+
+#### REG-001: 完整链路 — 事件输入→F-44分类→F-45 Promise→F-46降噪→F-47 Brief更新
+```python
+def test_e2e_full_pipeline():
+    """完整Pipeline回归：一个meeting事件经过全部P0处理"""
+    # Step 1: 输入事件
+    response = client.post("/api/v1/events", json={
+        "event_type": "meeting",
+        "raw_content": """
+        今天和张总(XX科技CEO)开了产品对接会：
+        1. 我承诺下周一发送产品白皮书给张总(my_promise)
+        2. 张总承诺周三提供需求文档(their_promise)
+        3. 张总特别看重交付速度和团队稳定性(concern)
+        4. 我们约定周五再开一次同步会(mutual_action)
+        """,
+        "source": "manual"
+    })
+    event_id = response.json()["event_id"]
+    assert response.json()["input_scope"] == "meeting_minutes"  # F-44 ✓
+
+    # Step 2: 等待Pipeline处理
+    time.sleep(10)
+
+    # Step 3: 验证F-45 Promise双向识别
+    todos = get_todos_by_event(event_id)
+    my_promises = [t for t in todos if t.get("action_type") == "my_promise"]
+    their_promises = [t for t in todos if t.get("action_type") == "their_promise"]
+    assert len(my_promises) >= 1   # F-45 ✓
+    assert len(their_promises) >= 1  # F-45 ✓
+    assert all(t["generates_todo"] for t in my_promises)
+    assert all(not t["generates_todo"] for t in their_promises)
+
+    # Step 4: 验证F-46降噪（≤3条正式Todo）
+    formal_todos = [t for t in todos if t["status"] not in ("suggested", "reference_only")]
+    assert len(formal_todos) <= 3  # F-46 ✓
+
+    # Step 5: 验证F-47 RelationshipBrief更新
+    person_id = find_person_by_name("张总")
+    brief = client.get(f"/api/v1/persons/{person_id}/relationship-brief").json()
+    assert len(brief["active_promises"]) >= 1      # F-47 ✓
+    assert any("交付速度" in c for c in brief.get("concerns", []))  # F-47 ✓
+
+    # Step 6: 验证PII脱敏
+    for todo in todos:
+        if todo.get("evidence_quote"):
+            assert "138" not in todo["evidence_quote"] or "***" in todo["evidence_quote"]
+```
+
+#### REG-002: RS-01回归 — AI不可自动升级阶段
+```python
+def test_rs01_regression():
+    """每次回归都必须验证RS-01未被绕过"""
+    person_id = create_person(name="回归测试用户", company="TestCo")
+
+    # 模拟多次正向交互
+    for i in range(10):
+        create_event(person_id=person_id, event_type="meeting",
+                     raw_content=f"第{i+1}次深入讨论合作方案")
+
+    # 尝试不带确认的升级（模拟AI自动调用）
+    brief = get_or_create_brief(person_id)
+    response = client.patch(
+        f"/api/v1/relationship-briefs/{brief['id']}/stage",
+        json={"target_stage": "understanding_needs", "confirmed_by_user": False}
+    )
+
+    # RS-01核心断言：未确认的升级必须被拒绝
+    assert response.status_code in (400, 403), \
+        f"RS-01被绕过！未确认升级返回{response.status_code}"
+
+    current = client.get(f"/api/v1/persons/{person_id}").json()
+    assert current["relationship_stage"] == "new_connection"
+```
+
+---
+
+## 7. [v2.0新增] 测试方法学文档
+
+> **对应PRD C1 [PM意见]**: PoC退出条件的测试方法学规范
+
+---
+
+### 7.1 测试方法学框架
+
+| 维度 | 说明 |
+|------|------|
+| **测试责任人** | 产品经理(PM)主导，开发(Dev)配合执行 |
+| **测试数据** | 100条真实会议记录（脱敏后），涵盖身份资料/会议纪要/产品反馈/内部评审等各类型 |
+| **通过标准** | PM + Architect双签确认（两人均签字/审批后才算通过） |
+| **时间窗口** | Sprint 2结束前必须完成（PoC第2周内） |
+| **样本分布** | identity(15)/relationship_interaction(30)/meeting_minutes(25)/partner_feedback(15)/internal_review(10)/intent_document(5) |
+
+---
+
+### 7.2 双签流程
+
+```
+PM执行测试 → 收集结果 → 生成测试报告
+    ↓
+PM初审 → 通过？ → 提交Arch审核
+    │              ↓
+    │         Arch复审 → 通过？
+    │              ↓
+    │         双签通过 → 记录到退出条件检查表 ✅
+    │
+    └→ 不通过 → 反馈Dev修复 → 重测 → 回到PM初审
+```
+
+**双签检查项**:
+1. F-44 input_scope分类准确率 ≥ 95%（基于100条样本）
+2. F-45 Promise责任人识别准确率 ≥ 90%（基于100条样本）
+3. F-46 单场会议Todo ≤ 3条（基于10场典型会议）
+4. F-47 RelationshipBrief 12模块完整 + API < 500ms
+5. F-48 RS-01 强制用户确认（自动化升级 = 0）
+6. F-49 日视图分组/排序/API < 200ms
+7. 安全专项26用例全部通过
+8. E2E回归14用例全部通过
+
+---
+
+## 8. [v2.0新增] CI/CD集成测试配置
+
+---
+
+### 8.1 CI Pipeline更新（含F-44~F-49）
+
+```yaml
+# .github/workflows/test.yml (v2.0更新)
+name: EventLink Test Pipeline v2.0
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run unit tests (含F-44/F-45/F-46单元测试)
+        run: |
+          pip install -e .[dev]
+          pytest tests/unit/ -v --cov=src --cov-report=xml
+          pytest tests/unit/test_input_classifier.py -v       # F-44单元
+          pytest tests/unit/test_promise_analyzer.py -v       # F-45单元
+          pytest tests/unit/test_todo_denoiser.py -v          # F-46单元
+
+  integration-test:
+    runs-on: ubuntu-latest
+    needs: unit-test
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run integration tests (含F-47/F-48/F-49集成)
+        run: |
+          pytest tests/integration/ -v
+          pytest tests/integration/test_relationship_brief.py -v   # F-47集成
+          pytest tests/integration/test_relationship_stage.py -v   # F-48集成
+          pytest tests/integration/test_day_view.py -v             # F-49集成
+
+  security-test:
+    runs-on: ubuntu-latest
+    needs: unit-test
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run security tests (26专项用例)
+        run: |
+          pytest tests/security/ -v
+          pytest tests/security/test_pii_masking.py -v              # PII脱敏18用例
+          pytest tests/security/test_input_scope_authz.py -v        # 越权3用例
+          pytest tests/security/test_jwt_enhanced.py -v             # JWT增强3用例
+          pytest tests/security/test_optimistic_lock.py -v          # 乐观锁2用例
+      - name: Bandit security scan
+        run: bandit -r src/ -ll --skip B101
+
+  regression-test:
+    runs-on: ubuntu-latest
+    needs: [integration-test, security-test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run E2E regression suite (14链路)
+        run: |
+          pytest tests/regression/ -v --regression-report=report.json
+      - name: Upload regression report
+        uses: actions/upload-artifact@v3
+        with:
+          name: regression-report
+          path: report.json
+```
+
+### 8.2 本地快速验证命令
+
+```bash
+# 运行F-44~F-49全部P0测试
+pytest tests/ -k "f44 or f45 or f46 or f47 or f48 or f49" -v
+
+# 仅运行Security专项
+pytest tests/security/ -v
+
+# 仅运行E2E回归
+pytest tests/regression/ -v --regression
+
+# 全量测试（含覆盖率）
+pytest tests/ --cov=src --cov-report=html
+```
+
+---
+
+## 9. [v2.0新增] 监控指标验证
+
+> **对应PRD监控章节**: 6项P0业务指标的验证方法
+
+---
+
+### 9.1 P0监控指标验证矩阵
+
+| # | 监控指标 | 目标值 | 告警阈值 | 对应功能 | 验证方法 |
+|---|---------|--------|---------|---------|---------|
+| M1 | input_scope分类延迟 P50 | < 200ms | > 500ms告警 | F-44 | 压测1000次分类请求，测量P50/P95/P99延迟 |
+| M2 | Todo生成数量分布 | 单场≤5条 | >5条告警 | F-46 | 创建10场多行动项会议，统计每场Todo数量分布 |
+| M3 | RelationshipBrief查询延迟 P95 | < 500ms | > 1000ms告警 | F-47 | 并发50用户查询不同person的推进卡，测量P95延迟 |
+| M4 | RelationshipStage变更频率 | 基线追踪 | 日变更率>50%异常 | F-48 | 模拟正常使用7天，统计日均阶段变更次数 |
+| M5 | evidence_quote脱敏覆盖率 | 100% | < 100%告警 | F-45 | 创建含各类PII的事件，扫描所有evidence_quote字段验证脱敏 |
+| M6 | API层400错误率(INVALID_INPUT_SCOPE) | 基线追踪 | 突增>10%/h告警 | F-44(BLK-2) | 发送包含非法input_scope的请求，验证400错误率和错误码正确性 |
+
+---
+
+### 9.2 各指标详细验证方法
+
+#### M1验证: input_scope分类延迟
+```python
+def test_m1_classification_latency():
+    """压测1000次分类请求，验证P50<200ms"""
+    import statistics
+    latencies = []
+    samples = load_test_samples("data/test_input_scope_samples.json")
+
+    for _ in range(100):  # 每样本重复10次 = 1000次
+        for s in samples:
+            start = time.perf_counter()
+            InputClassifier.classify(s["raw_content"], event_type=s.get("event_type"))
+            elapsed_ms = (time.perf_counter() - start) * 1000
+            latencies.append(elapsed_ms)
+
+    p50 = sorted(latencies)[int(len(latencies) * 0.50)]
+    p95 = sorted(latencies)[int(len(latencies) * 0.95)]
+    p99 = sorted(latencies)[int(len(latencies) * 0.99)]
+
+    assert p50 < 200, f"M1 FAIL: P50={p50:.1f}ms ≥ 200ms"
+    assert p95 < 500, f"M1 WARN: P95={p95:.1f}ms ≥ 500ms"
+    print(f"M1 PASS: P50={p50:.1f}ms, P95={p95:.1f}ms, P99={p99:.1f}ms")
+```
+
+#### M2验证: Todo降噪效果
+```python
+def test_m2_todo_distribution():
+    """创建10场会议，验证每场Todo≤5条"""
+    for i in range(10):
+        promise_count = random.randint(3, 8)  # 每场3-8个承诺
+        create_meeting_event(promise_count=promise_count)
+    time.sleep(30)  # 等待Pipeline处理
+
+    distributions = []
+    for event_id in recent_event_ids:
+        todos = get_todos_by_event(event_id)
+        formal_count = len([t for t in todos if t["status"] not in ("suggested",)])
+        distributions.append(formal_count)
+
+    max_todos = max(distributions)
+    avg_todos = sum(distributions) / len(distributions)
+
+    assert max_todos <= 5, f"M2 FAIL: 最大Todo数={max_todos} > 5"
+    assert avg_todos <= 3, f"M2 WARN: 平均Todo数={avg_todos:.1f} > 3（降噪不足）"
+    print(f"M2 PASS: 分布={distributions}, max={max_todos}, avg={avg_todos:.1f}")
+```
+
+#### M3验证: RelationshipBrief查询性能
+```python
+def test_m3_brief_query_latency():
+    """并发50用户查询推进卡"""
+    import concurrent.futures
+
+    def query_brief(person_id):
+        start = time.perf_counter()
+        resp = client.get(f"/api/v1/persons/{person_id}/relationship-brief")
+        return (time.perf_counter() - start) * 1000
+
+    person_ids = [p["id"] for p in get_all_persons(limit=50)]
+    latencies = []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(query_brief, pid) for pid in person_ids]
+        for f in concurrent.futures.as_completed(futures):
+            latencies.append(f.result())
+
+    p95 = sorted(latencies)[int(len(latencies) * 0.95)]
+    assert p95 < 500, f"M3 FAIL: P95={p95:.1f}ms ≥ 500ms"
+    print(f"M3 PASS: P95={p95:.1f}ms, requests={len(latencies)}")
+```
+
+#### M4验证: RelationshipStage变更健康度
+```python
+def test_m4_stage_change_frequency():
+    """模拟7天正常使用，验证阶段变更频率合理"""
+    daily_changes = []
+    for day in range(7):
+        change_count = 0
+        # 模拟每天的正常交互
+        for i in range(random.randint(2, 5)):
+            create_event(person_id=target_person, event_type="meeting",
+                         raw_content=f"Day{day} 第{i+1}次沟通")
+
+        # AI可能建议升级（但不会自动升级）
+        suggestions = client.get(f"/api/v1/persons/{target_person}/stage-suggestions").json()
+
+        # 用户可能确认升级（每天最多1次合理升级）
+        if suggestions and random.random() > 0.7:  # 30%概率用户确认
+            client.patch(f"/api/v1/relationship-briefs/{brief_id}/stage", json={
+                "target_stage": suggestions[0]["suggested_stage"],
+                "confirmed_by_user": True
+            })
+            change_count += 1
+
+        daily_changes.append(change_count)
+
+    avg_changes = sum(daily_changes) / len(daily_changes)
+    max_daily = max(daily_changes)
+
+    assert max_daily <= 3, f"M4 WARN: 日最大变更次数={max_daily} > 3（异常活跃）"
+    assert avg_changes <= 1.0, f"M4 INFO: 日均变更={avg_changes:.1f}（基线参考）"
+    print(f"M4 PASS: 日变更分布={daily_changes}, avg={avg_changes:.1f}")
+```
+
+#### M5验证: evidence_quote脱敏覆盖率
+```python
+def test_m5_pii_coverage():
+    """扫描所有生成的evidence_quote，验证PII脱敏100%覆盖"""
+    pii_patterns = {
+        "phone": re.compile(r'1[3-9]\d{9}'),
+        "email": re.compile(r'[\w.-]+@[\w.-]+\.\w+'),
+        "id_card": re.compile(r'\d{17}[\dXx]'),
+        "bank_card": re.compile(r'\d{16,19}'),
+    }
+
+    total_evidences = 0
+    leaked_count = 0
+
+    # 创建含各类PII的测试事件
+    pii_test_cases = [
+        "李总电话13812345678邮箱zhang@test.com",
+        "王总身份证110101199001011234银行卡6222021234567890123",
+        "赵总地址北京市朝阳区建国路88号座机010-12345678",
+    ]
+
+    for text in pii_test_cases:
+        response = create_event_with_promise(text)
+        todos = get_generated_todos(response.json()["event_id"])
+        for todo in todos:
+            evidence = todo.get("evidence_quote", "")
+            if evidence:
+                total_evidences += 1
+                for pii_type, pattern in pii_patterns.items():
+                    matches = pattern.findall(evidence)
+                    if matches:
+                        leaked_count += 1
+                        print(f"PII LEAK: {pii_type}={matches[0]} in evidence")
+
+    coverage = ((total_evidences - leaked_count) / total_evidences * 100) if total_evidences > 0 else 100
+    assert coverage == 100.0, f"M5 FAIL: 脱敏覆盖率={coverage:.1f}% < 100%"
+    print(f"M5 PASS: 脱敏覆盖率={coverage:.0f}% ({total_evidences}条证据)")
+```
+
+#### M6验证: BLK-2 INVALID_INPUT_SCOPE错误率
+```python
+def test_m6_invalid_scope_error_rate():
+    """验证非法input_scope返回正确的400+错误码"""
+    invalid_scopes = [
+        "hacked", "injection', 'identity', '--", "null", "{{7*7}}",
+        "<script>", "\x00\x01", "partner_feedback; DROP TABLE",
+    ]
+
+    correct_errors = 0
+    for scope in invalid_scopes:
+        response = client.post("/api/v1/events", json={
+            "event_type": "manual", "raw_content": "test",
+            "input_scope": scope
+        })
+        if response.status_code == 400 and response.json().get("error_code") == "INVALID_INPUT_SCOPE":
+            correct_errors += 1
+
+    error_rate = correct_errors / len(invalid_scopes) * 100
+    assert error_rate == 100.0, f"M6 FAIL: 错误处理正确率={error_rate:.1f}%"
+    print(f"M6 PASS: INVALID_INPUT_SCOPE错误处理正确率={error_rate:.0f}%")
+```
+
+---
+
+## 10. 测试数据准备
 
 ### 5.1 名片测试数据（10张）
 ```
@@ -1692,9 +3072,9 @@ def generate_sensitivity_test_data():
 
 ---
 
-## 6. 验收标准
+## 11. 验收标准
 
-### 6.1 功能验收检查表
+### 11.1 功能验收检查表（v2.0更新）
 
 | 功能模块 | 测试用例数 | 通过标准 | 状态 |
 |---------|----------|---------|------|
@@ -1711,6 +3091,12 @@ def generate_sensitivity_test_data():
 | Todo类型 — followup | 1 | 100%通过 | ⏳ |
 | Todo类型 — help | 1 | 100%通过 | ⏳ |
 | Todo状态机 | 4 | 100%通过 | ⏳ |
+| **[v2.0] F-44 input_scope分类器** | **10** | **准确率≥95%, BLK-2校验100%** | **⏳** |
+| **[v2.0] F-45 Promise双向动作** | **8** | **识别准确率≥90%, PII脱敏100%** | **⏳** |
+| **[v2.0] F-46 Todo降噪** | **6** | **单场≤3条, 7事件≤10条** | **⏳** |
+| **[v2.0] F-47 RelationshipBrief** | **5** | **12模块完整, API<500ms** | **⏳** |
+| **[v2.0] F-48 RelationshipStage** | **6** | **RS-01强制确认, 7阶段完整** | **⏳** |
+| **[v2.0] F-49 日视图** | **6** | **分组正确, API<200ms** | **⏳** |
 | 端到端流程 | 2 | 100%通过 | ⏳ |
 | 小程序集成 | 2 | 100%通过 | ⏳ |
 | 安全测试 — JWT认证 | 3 | 100%通过 | ⏳ |
@@ -1719,6 +3105,10 @@ def generate_sensitivity_test_data():
 | 安全测试 — LLM消毒 | 1 | 100%通过 | ⏳ |
 | 安全测试 — API限流 | 1 | 100%通过 | ⏳ |
 | 安全测试 — 数据隔离 | 1 | 100%通过 | ⏳ |
+| **[v2.0] Security专项 — PII脱敏** | **18** | **覆盖率100%** | **⏳** |
+| **[v2.0] Security专项 — input_scope越权** | **3** | **BLK-2 400拦截率100%** | **⏳** |
+| **[v2.0] Security专项 — JWT增强** | **3** | **篡改/提升/重放全部拦截** | **⏳** |
+| **[v2.0] Security专项 — 乐观锁** | **2** | **冲突检测+重试成功** | **⏳** |
 | E2E真实场景 — 许总杀手场景 | 1 | 9步全通过 | ⏳ |
 | E2E真实场景 — BD日常 | 1 | 9步全通过 | ⏳ |
 | E2E真实场景 — 投资人关联 | 1 | 8步全通过 | ⏳ |
@@ -1730,8 +3120,10 @@ def generate_sensitivity_test_data():
 | 产品指标 — 关注点确认率 | 1 | ≥70% | ⏳ |
 | 产品指标 — 4周留存 | 1 | ≥60% | ⏳ |
 | 产品指标 — 录入意愿 | 1 | ≥70% | ⏳ |
+| **[v2.0] 回归测试 — E2E链路** | **14** | **每Sprint 100%通过** | **⏳** |
+| **[v2.0] 监控指标M1~M6** | **6** | **6项P0指标全部达标** | **⏳** |
 
-### 6.2 性能指标
+### 11.2 性能指标（v2.0更新）
 
 | 指标 | 目标值 | 测量方法 |
 |------|--------|---------|
@@ -1741,8 +3133,11 @@ def generate_sensitivity_test_data():
 | 并发QPS | ≥100 | Locust压测 |
 | E2E场景响应时间(P95) | <3s | 真实场景计时 |
 | 关联发现响应时间(P95) | <5s | 真实场景计时 |
+| **[v2.0] input_scope分类延迟P50** | **<200ms** | **1000次分类请求压测** |
+| **[v2.0] RelationshipBrief查询延迟P95** | **<500ms** | **50并发查询推进卡** |
+| **[v2.0] 日视图API响应时间** | **<200ms** | **20次请求测量P95** |
 
-### 6.3 质量指标
+### 11.3 质量指标（v2.0更新）
 
 | 指标 | 目标值 | 测量方法 |
 |------|--------|---------|
@@ -1751,13 +3146,16 @@ def generate_sensitivity_test_data():
 | 安全漏洞扫描 | 0 high/critical | bandit |
 | 6种Todo类型覆盖 | 100% | 逐类型验证 |
 | 安全测试通过率 | 100% | 逐项验证 |
+| **[v2.0] Security专项26用例通过率** | **100%** | **PII/越权/JWT/乐观锁逐项** |
 | E2E真实场景通过率 | 100% | 逐场景验证 |
+| **[v2.0] 回归测试14链路通过率** | **100%** | **每Sprint执行** |
+| **[v2.0] PM+Arch双签** | **✅ 已签署** | **Sprint 2窗口内** |
 
 ---
 
-## 7. 测试环境
+## 12. 测试环境
 
-### 7.1 测试环境配置
+### 12.1 测试环境配置
 ```yaml
 # .env.test
 DATABASE_URL=postgresql://test:test@localhost:5432/eventlink_test
@@ -1770,9 +3168,10 @@ PII_ENCRYPTION_KEY=test_encryption_key_32bytes!!
 RATE_LIMIT_PER_MINUTE=60
 ```
 
-### 7.2 CI/CD集成
+### 12.2 CI/CD集成（基础配置，完整Pipeline见§8）
+
 ```yaml
-# .github/workflows/test.yml
+# .github/workflows/test.yml (v1.2基础版，v2.0完整版见§8)
 name: Test
 on: [push, pull_request]
 jobs:
@@ -1790,7 +3189,7 @@ jobs:
 
 ---
 
-## 8. 风险与应对
+## 13. 风险与应对（v2.0更新）
 
 | 风险 | 可能性 | 影响 | 应对措施 |
 |------|-------|------|---------|
@@ -1803,17 +3202,21 @@ jobs:
 | PII加密影响查询性能 | 低 | 中 | 加密索引+缓存 |
 | Prompt注入攻击 | 中 | 高 | 输入消毒+输出过滤+沙箱执行 |
 | 敏感度切换缓存残留 | 低 | 中 | 切换后主动刷新缓存 |
+| **[v2.0] F-44分类准确率不达95%** | **中** | **高** | **增加训练样本+调整分类阈值** |
+| **[v2.0] F-45 Promise识别准确率<90%** | **中** | **高** | **优化prompt模板+增加few-shot示例** |
+| **[v2.0] RS-01被绕过（自动升级）** | **低** | **P0阻塞** | **硬编码校验+回归用例REG-002每Sprint必跑** |
+| **[v2.0] 乐观锁并发冲突频繁** | **低** | **中** | **增加重试指数退避+前端防抖** |
 
 ---
 
-## 9. 测试报告模板
+## 14. 测试报告模板（v2.0更新）
 
 ```markdown
-# EventLink Week X 测试报告
+# EventLink Sprint X 测试报告（v2.0模板）
 
 ## 测试概况
 - 测试时间: YYYY-MM-DD
-- 测试用例总数: XX
+- 测试用例总数: XX（含v2.0新增F-44~F-49: XX条）
 - 通过: XX
 - 失败: XX
 - 阻塞: XX
@@ -1822,8 +3225,13 @@ jobs:
 1. [P0] XXX功能存在XX问题
 2. [P1] 性能不达标：XXX
 
-## 详细结果
-（附pytest HTML报告）
+## P0功能测试结果（v2.0新增）
+- F-44 input_scope分类器: ✅/❌ (准确率: XX%)
+- F-45 Promise双向动作: ✅/❌ (识别率: XX%, PII脱敏: XX%)
+- F-46 Todo降噪: ✅/❌ (单场最大Todo数: X)
+- F-47 RelationshipBrief: ✅/❌ (API延迟P95: XXms)
+- F-48 RelationshipStage: ✅/❌ (RS-01通过: ✅/❌)
+- F-49 日视图: ✅/❌ (API延迟P95: XXms)
 
 ## 安全测试结果
 - JWT认证: ✅/❌
@@ -1832,12 +3240,29 @@ jobs:
 - LLM消毒: ✅/❌
 - API限流: ✅/❌
 - 数据隔离: ✅/❌
+- **[v2.0] PII脱敏专项(18用例)**: **✅/❌ (覆盖率: XX%)**
+- **[v2.0] input_scope越权(3用例)**: **✅/❌**
+- **[v2.0] JWT增强(3用例)**: **✅/❌**
+- **[v2.0] 乐观锁(2用例)**: **✅/❌**
+
+## 回归测试结果（v2.0新增）
+- REG-001 完整Pipeline链路: ✅/❌
+- REG-002 RS-01回归: ✅/❌
+- 总体回归通过率: XX%
 
 ## E2E真实场景结果
 - 许总杀手场景: ✅/❌ (X/10步通过)
 - BD日常场景: ✅/❌ (X/9步通过)
 - 投资人关联场景: ✅/❌ (X/8步通过)
 - 创业者风险场景: ✅/❌ (X/9步通过)
+
+## 监控指标验证（v2.0新增）
+- M1 input_scope分类延迟P50: XXms (目标<200ms) ✅/❌
+- M2 Todo生成数量分布: max=X (目标≤5) ✅/❌
+- M3 RelationshipBrief查询P95: XXms (目标<500ms) ✅/❌
+- M4 Stage变更频率: 日均X次 ✅/❌
+- M5 evidence_quote脱敏覆盖率: XX% (目标100%) ✅/❌
+- M6 INVALID_INPUT_SCOPE错误率: XX% ✅/❌
 
 ## 下周计划
 1. 修复P0/P1问题
@@ -1898,4 +3323,65 @@ jobs:
 
 ---
 
-*本测试计划v1.2更新于2026-06-03，主要变更：Todo类型重命名（opportunity→cooperation_signal, context→care, action→promise, pending_confirm→followup, resource_maint→help）、6种Todo类型测试更新、新增AI输出语言规则测试（§4.5）、E2E场景更新为承诺兑现视角、新增首次体验4屏流程和承诺兑现闭环E2E测试、新增产品指标测试（§4.7：承诺完成率/关注点确认率/4周留存/录入意愿）*
+## 附录D: [v2.0新增] PoC退出条件检查表
+
+> **对应PRD**: PoC退出条件（全部满足才进入Phase 1）
+> **测试方法学**: 见§7 测试方法学文档
+
+### 原有退出条件（11项）
+
+| # | 退出条件 | 目标值 | 验证方法 | 状态 |
+|---|---------|--------|---------|------|
+| 1 | LLM实体抽取准确率 | ≥90%（100条样本） | 人工标注100条样本对比 | ⏳ |
+| 2 | 实体归一误合并率 | <5% | 抽检100条归一结果 | ⏳ |
+| 3 | 关联发现F1值 | >0.65 | 人工评估关联质量 | ⏳ |
+| 4 | 端到端延迟：名片→Todo | <5秒 | 端到端计时 | ⏳ |
+| 5 | 端到端延迟：会议→Todo | <60秒 | 端到端计时 | ⏳ |
+| 6 | 许总团队确认"方向对" | ✅ | 用户访谈确认 | ⏳ |
+| 7 | 承诺兑现闭环验证率 | ≥50% | E2E场景TC-W3-050/055验证 | ⏳ |
+| 8 | 4周持续使用率 | ≥60% | 种子用户活跃统计 | ⏳ |
+| **9** | **[v2.0] input_scope分类准确率** | **≥95%** | **TC-F44-010, 100条样本** | **⏳** |
+| **10** | **[v2.0] Promise责任人识别准确率** | **≥90%** | **TC-F45-008, 100条样本** | **⏳** |
+
+### [v2.0] 新增产品指标退出条件（4项，总计14项）
+
+| # | 退出条件 | 目标值 | 验证方法 | 对应测试用例 | 状态 |
+|---|---------|--------|---------|-------------|------|
+| **11** | **F-46 Todo降噪生效** | **单场会议≤3条正式Todo** | **TC-F46-001, 10场典型会议** | **§3.3 F-46** | **⏳** |
+| **12** | **RelationshipBrief可用性** | **API<500ms + 12模块完整** | **TC-F47-001~003** | **§3.4 F-47** | **⏳** |
+| **13** | **RS-01强制确认有效** | **自动化升级=0（100次尝试）** | **TC-F48-004 + REG-002回归** | **§3.5 F-48** | **⏳** |
+| **14** | **Security专项全通过** | **26/26用例通过** | **§5 Security专项全部** | **§5 全章节** | **⏳** |
+
+### 退出条件检查流程
+
+```
+Sprint 2结束前触发
+    ↓
+PM执行100条样本测试（F-44/F-45）
+    ↓
+PM初审 → 通过？ → 提交Arch复审
+    ↓              ↓
+           Arch复审 → 双签？
+                      ↓
+                 更新本表状态
+                      ↓
+            全部14项✅？ → 进入Phase 1 🚀
+                ↓ 否
+            阻塞发布 → 制定补救计划 → 延长PoC或调整范围
+```
+
+**注意**: 第13项（RS-01）为P0阻塞项，即使其他13项全部通过，若RS-01被绕过则不得进入Phase 1。
+
+---
+
+*本测试计划v2.0更新于2026-06-04，主要变更：*
+*① 版本号v1.2→v2.0，参考更新为PRD v4.3/技术设计v2.5*
+*② 新增§3 P0功能测试：F-44(10用例) + F-45(8用例) + F-46(6用例) + F-47(5用例) + F-48(6用例) = 35个P0功能测试用例*
+*③ 新增§4.8 F-49日视图测试（6用例）*
+*④ 新增§5 Security专项测试26用例（PII脱敏18 + input_scope越权3 + JWT增强3 + 乐观锁2）*
+*⑤ 新增§6 回归测试策略（6链路E2E矩阵 + Sprint阻塞发布机制）*
+*⑥ 新增§7 测试方法学文档（PM主导/100条数据/PM+Arch双签/Sprint 2窗口）*
+*⑦ 新增§8 CI/CD集成测试配置（4阶段Pipeline）*
+*⑧ 新增§9 监控指标验证（6项P0指标M1~M6详细验证方法）*
+*⑨ 退出条件从11项扩展至14项（新增4项产品指标）*
+*⑩ 风险表新增4项v2.0风险、验收标准表新增15行、测试报告模板全面升级*

@@ -1,8 +1,8 @@
 # EventLink LLM Prompt模板库
 
-> **版本**: v1.2
-> **最后更新**: 2026-06-03
-> **来源**: Integration_Design_v1.md §3.2-3.6 提取
+> **版本**: v2.0
+> **最后更新**: 2026-06-04
+> **来源**: Integration_Design_v2.5 §3.2-3.6 + PRD_v4.3 prompts/ 目录提取
 > **用途**: P8实现LLM集成时的直接参考文档，开发者无需翻阅2564行集成设计文档
 
 ---
@@ -21,7 +21,7 @@ llm = LLMClient(config)
 # 调用模板1：名片信息提取
 result = await llm.call(
     prompt=TEMPLATE_1_CARD_EXTRACTION.format(ocr_text=raw_ocr_text),
-    model="gpt-3.5-turbo",
+    model="moka/claude-sonnet-4-6",
     temperature=0.3,
 )
 ```
@@ -30,18 +30,21 @@ result = await llm.call(
 
 | 模板 | 推荐模型 | 原因 |
 |------|---------|------|
-| 模板1 名片提取 | gpt-3.5-turbo | 结构化提取，简单任务 |
-| 模板2 语音实体抽取 | gpt-4 | 需要理解上下文 |
-| 模板3 Todo生成 | gpt-4 | 需要理解6种类型策略 |
-| 模板4 商机优化 | gpt-3.5-turbo | 文本优化，中等任务 |
-| 模板5 实体归一 | gpt-4 | 需要推理判断 |
-| 模板6 关系发现 | gpt-4 | 需要综合分析 |
-| 模板7 资源识别 | gpt-4 | 需要深度理解 |
-| 模板8 需求提取 | gpt-4 | 需要深度理解 |
-| 模板9 敏感度判断 | gpt-4 | 需要安全判断 |
-| 模板10 关系维护 | gpt-3.5-turbo | 基于规则+模板生成 |
-| 模板11 承诺提取 | gpt-4 | 需要理解承诺语义 |
-| 模板12 关注点提取 | gpt-4 | 需要理解关注意图 |
+| 模板1 名片提取 | moka/claude-sonnet-4-6 | 结构化提取，简单任务 |
+| 模板0 input_scope分类 | moka/claude-sonnet-4-6 | 分类任务，需要理解scope语义 |
+| 模板2 语音实体抽取 | moka/claude-sonnet-4-6 | 需要理解上下文 |
+| 模板3 Todo生成 | moka/claude-sonnet-4-6 | 需要理解6种action_type策略+降噪规则 |
+| 模板4 商机优化 | moka/claude-sonnet-4-6 | 文本优化，中等任务 |
+| 模板5 实体归一 | moka/claude-sonnet-4-6 | 需要推理判断 |
+| 模板6 关系发现 | moka/claude-sonnet-4-6 | 需要综合分析 |
+| 模板7 资源识别 | moka/claude-sonnet-4-6 | 需要深度理解 |
+| 模板8 需求提取 | moka/claude-sonnet-4-6 | 需要深度理解 |
+| 模板9 敏感度判断 | moka/claude-sonnet-4-6 | 需要安全判断 |
+| 模板10 关系维护 | moka/claude-sonnet-4-6 | 基于规则+模板生成 |
+| 模板11 承诺提取 | moka/claude-sonnet-4-6 | 需要理解承诺语义 |
+| 模板12 关注点提取 | moka/claude-sonnet-4-6 | 需要理解关注意图 |
+| 模板13 RelationshipBrief生成 | moka/claude-sonnet-4-6 | 12模块结构化填充 |
+| 模板14 RelationshipStage推进建议 | moka/claude-sonnet-4-6 | 关系阶段分析推理 |
 
 ### AI输出语言规则（所有模板必须遵守）
 
@@ -73,6 +76,89 @@ result = await llm.call(
 2. 专业术语可保留原文，但必须附带中文解释
 3. 日期格式统一使用ISO 8601
 4. 数值不带单位时使用国际单位制
+```
+
+---
+
+## 0. 模板0：Input Scope 分类
+
+**用途**: 对用户输入进行语义分类，确定输入属于哪种scope，以便路由到正确的处理管线
+
+**输入变量**:
+
+| 变量 | 类型 | 说明 |
+|------|------|------|
+| user_input | string | 用户原始输入文本 |
+| context_hint | string | 上下文提示（可选，如来源渠道） |
+
+**8种Scope定义**:
+
+| Scope | 说明 | 关键词特征 | 示例 |
+|-------|------|-----------|------|
+| `card` | 名片信息 | 名片、OCR、姓名+公司+职位、电话、邮箱 | "扫了张总的名片" |
+| `meeting` | 会议纪要 | 会议、纪要、讨论、参会人、议程、决议 | "今天开了产品评审会" |
+| `call` | 电话记录 | 电话、通话、沟通、聊了、对方说 | "刚跟李总通了电话" |
+| `manual` | 手动补全 | 补充、添加、手动录入、自由文本 | "补充一下王明的信息" |
+| `todo_input` | Todo创建 | 待办、提醒、记得、别忘了、跟进 | "提醒我下周联系张总" |
+| `relationship` | 关系维护 | 关系、人脉、维护、多久没联系 | "跟李总好久没联系了" |
+| `business_opportunity` | 商机线索 | 商机、合作、项目机会、投资、对接 | "李总那边有个AI项目的机会" |
+| `query` | 信息查询 | 查找、搜索、谁认识、有没有资源 | "谁认识做NLP的？" |
+
+**Prompt**:
+```
+你是一个EventLink输入分类器。请判断以下用户输入属于哪种scope。
+
+8种scope定义：
+1. card（名片）：名片扫描/OCR识别结果，包含姓名、公司、职位、联系方式等结构化或半结构化信息
+2. meeting（会议）：会议纪要、讨论记录，包含参会人、议题、决议等
+3. call（电话）：通话记录、沟通摘要，包含对话双方及交流要点
+4. manual（手动补全）：用户主动补充的信息录入，自由文本形式
+5. todo_input（Todo创建）：待办事项、提醒、跟进任务创建请求
+6. relationship（关系维护）：关于人际关系经营、人脉维护的查询或操作
+7. business_opportunity（商机线索）：商业合作机会、项目对接、投资意向等
+8. query（信息查询）：查找特定人物、资源、关系的查询请求
+
+分类规则：
+1. 优先匹配最具体的scope（如同时满足card和manual，选card）
+2. 如果输入包含多个scope特征，选择置信度最高的主scope
+3. 如果无法明确判断，返回query作为默认值
+4. 输出secondary_scopes数组，列出其他可能匹配的scope（置信度>0.3）
+
+用户输入：
+{user_input}
+
+上下文提示：
+{context_hint}
+
+输出JSON格式：
+{{
+  "primary_scope": "scope名称",
+  "scope_confidence": 0.0-1.0,
+  "secondary_scopes": [
+    {{"scope": "scope名称", "confidence": 0.0-1.0}}
+  ],
+  "reasoning": "分类理由",
+  "suggested_pipeline": "推荐处理管线",
+  "is_ai_inference": false,
+  "confidence_level": "confirmed",
+  "requires_confirmation": false
+}}
+```
+
+**输出示例**:
+```json
+{
+  "primary_scope": "card",
+  "scope_confidence": 0.95,
+  "secondary_scopes": [
+    {"scope": "manual", "confidence": 0.3}
+  ],
+  "reasoning": "输入包含完整的姓名、公司、职位、联系方式字段，符合名片OCR输出特征",
+  "suggested_pipeline": "card_save",
+  "is_ai_inference": false,
+  "confidence_level": "confirmed",
+  "requires_confirmation": false
+}
 ```
 
 ---
@@ -148,7 +234,7 @@ OCR文本：
 
 ## 2. 模板2：语音实体抽取
 
-**用途**: 从语音转写文本中提取人物实体、事件和资源信息
+**用途**: 从语音转写文本中提取人物实体、事件和资源信息，包含关系阶段初始化
 
 **输入变量**:
 
@@ -156,6 +242,19 @@ OCR文本：
 |------|------|------|
 | transcript | string | ASR转写的对话文本 |
 | language | string | 语言代码（zh-CN/en-US） |
+
+**relationship_stage 初始值规则**:
+- 首次提取的实体，`relationship_stage` 默认设为 `"initial"`（初始接触）
+- 如果对话中明确提到已有合作/认识历史，可设为 `"awareness"`（相互了解）
+- 不可自动设置为更高级别（如 `exploration`、`negotiation` 等），需用户后续确认
+
+**entities properties 结构更新**:
+- 每个person entity新增 `relationship_stage` 字段
+- 每个person entity新增 `properties` 对象，包含：
+  - `interaction_count`: 交互次数（首次=1）
+  - `last_contact_date`: 最近联系日期（如提及）
+  - `trust_level`: 信任等级（"low"|"medium"|"high"，默认"low"）
+  - `tags`: 标签数组（从对话中提取的关键标签）
 
 **Prompt**:
 ```
@@ -168,6 +267,8 @@ OCR文本：
 4. 需求识别：识别每个人物表达的需求
 5. 关键词：提取业务相关词汇
 6. 如果信息不足以判断，对应字段设为null
+7. relationship_stage初始化：首次提取默认"initial"，如有明确历史可设"awareness"
+8. properties结构：包含interaction_count、last_contact_date、trust_level、tags
 
 输出语言规则：
 1. 输出语言必须与输入语言一致
@@ -186,7 +287,14 @@ OCR文本：
       "company": "公司（如提及）",
       "title": "职位（如提及）",
       "resource": ["此人的能力/人脉/渠道"],
-      "demand": ["此人表达的需求"]
+      "demand": ["此人表达的需求"],
+      "relationship_stage": "initial|awareness",
+      "properties": {{
+        "interaction_count": 1,
+        "last_contact_date": "ISO 8601日期或null",
+        "trust_level": "low|medium|high",
+        "tags": ["标签1", "标签2"]
+      }}
     }}
   ],
   "events": [
@@ -214,14 +322,28 @@ OCR文本：
       "company": "盛恒资本",
       "title": "投资总监",
       "resource": ["早期项目投资渠道（来源：对话原文）", "AI领域投资经验（来源：对话原文）"],
-      "demand": ["寻找AI赛道优质项目（来源：对话原文）"]
+      "demand": ["寻找AI赛道优质项目（来源：对话原文）"],
+      "relationship_stage": "awareness",
+      "properties": {
+        "interaction_count": 1,
+        "last_contact_date": "2026-06-04",
+        "trust_level": "medium",
+        "tags": ["投资", "AI", "早期项目"]
+      }
     },
     {
       "name": "王明",
       "company": null,
       "title": null,
       "resource": ["推荐了3个AI项目（来源：对话原文）"],
-      "demand": []
+      "demand": [],
+      "relationship_stage": "initial",
+      "properties": {
+        "interaction_count": 1,
+        "last_contact_date": null,
+        "trust_level": "low",
+        "tags": []
+      }
     }
   ],
   "events": [
@@ -242,9 +364,9 @@ OCR文本：
 
 ---
 
-## 3. 模板3：Todo生成（含todo_type）
+## 3. 模板3：Todo生成（含todo_type + action_type）
 
-**用途**: 根据对话内容和上下文生成待办事项，必须指定todo_type
+**用途**: 根据对话内容和上下文生成待办事项，必须指定todo_type和action_type
 
 **输入变量**:
 
@@ -266,9 +388,28 @@ OCR文本：
 | cooperation_signal | 合作信号 | 识别合作信号，发现资源互补和合作可能 | high |
 | risk | 风险 | 识别潜在风险，强调预警和规避措施 | high |
 
+**6种action_type及识别规则**:
+
+| action_type | 说明 | 触发关键词示例 |
+|-------------|------|---------------|
+| `contact` | 联系触达 | 联系、打电话、发微信、约见面、沟通、对接 |
+| `send` | 发送资料 | 发送、分享、转发、邮件、资料、文档、案例 |
+| `research` | 调研分析 | 查一下、调研、了解、分析、评估、对比 |
+| `prepare` | 准备工作 | 准备、整理、汇总、梳理、草拟、方案 |
+| `decide` | 决策确认 | 确认、决定、选择、审批、同意、反馈 |
+| `monitor` | 监控跟踪 | 关注、跟踪、监控、观察、留意、跟进进展 |
+
+**降噪规则**:
+1. 排除纯寒暄内容（"你好"、"谢谢"、"再见"等）
+2. 排除重复信息（同一事项不重复生成Todo）
+3. 排除过于模糊的表述（"以后再说"、"有空聊聊"等无明确行动项的内容）
+4. 排除已完成的动作（"已经发了"、"已经联系了"等过去完成时）
+5. 单次对话最多生成3条Todo，按优先级排序
+6. 所有生成的Todo默认 `confirmation: "pending"`，需用户确认后才变为 `confirmed`
+
 **Prompt**:
 ```
-你是一个个人商务关系经营助手。请根据以下信息生成一条待办事项。
+你是一个个人商务关系经营助手。请根据以下信息生成待办事项。
 
 Todo类型：{todo_type}
 - promise（承诺）：提取"我答应过什么"，给出兑现承诺的行动步骤和截止时间
@@ -277,6 +418,21 @@ Todo类型：{todo_type}
 - followup（跟进）：标记需跟进的事项，列出待确认点和下一步行动
 - cooperation_signal（合作信号）：识别合作信号，发现资源互补和合作可能
 - risk（风险）：识别潜在风险，给出预警和规避措施
+
+Action类型（必须从6种中选择最匹配的一种）：
+- contact（联系触达）：联系、打电话、发微信、约见面、沟通、对接
+- send（发送资料）：发送、分享、转发、邮件、资料、文档、案例
+- research（调研分析）：查一下、调研、了解、分析、评估、对比
+- prepare（准备工作）：准备、整理、汇总、梳理、草拟、方案
+- decide（决策确认）：确认、决定、选择、审批、同意、反馈
+- monitor（监控跟踪）：关注、跟踪、监控、观察、留意、跟进进展
+
+降噪规则：
+1. 排除纯寒暄内容（"你好"、"谢谢"、"再见"等）
+2. 排除重复信息（同一事项不重复生成）
+3. 排除过于模糊的表述（"以后再说"、"有空聊聊"等无明确行动项）
+4. 排除已完成的动作（"已经发了"、"已经联系了"等过去完成时）
+5. 单次对话最多生成3条Todo，按优先级排序
 
 对话内容：
 {conversation}
@@ -293,6 +449,8 @@ Todo类型：{todo_type}
 3. priority必须与todo_type匹配
 4. due_date建议：promise/cooperation_signal=3天内，risk=1天内，care/followup=7天内，help=5天内
 5. context字段必须包含生成此Todo的原因
+6. action_type必须从6种中选择最匹配的一种
+7. confirmation默认为"pending"，表示待用户确认
 
 输出语言规则：
 1. 输出语言必须与输入语言一致
@@ -303,9 +461,11 @@ Todo类型：{todo_type}
 输出JSON格式：
 {{
   "todo_type": "{todo_type}",
+  "action_type": "contact|send|research|prepare|decide|monitor",
   "description": "Todo描述",
   "priority": "high|medium|low",
   "due_date_suggestion": "建议截止时间（ISO 8601）",
+  "confirmation": "pending",
   "context": {{
     "reason": "生成原因",
     "suggested_action": "建议行动",
@@ -313,7 +473,7 @@ Todo类型：{todo_type}
   }},
   "is_ai_inference": true,
   "confidence_level": "confirmed|inferred|speculated",
-  "requires_confirmation": false
+  "requires_confirmation": true
 }}
 ```
 
@@ -321,9 +481,11 @@ Todo类型：{todo_type}
 ```json
 {
   "todo_type": "cooperation_signal",
+  "action_type": "contact",
   "description": "⚪ 合作信号：李总寻找AI项目，王明有3个推荐项目可对接",
   "priority": "high",
   "due_date_suggestion": "2026-06-06T00:00:00Z",
+  "confirmation": "pending",
   "context": {
     "reason": "李总（盛恒资本投资总监）正在寻找AI赛道项目，与王明推荐的3个项目高度匹配，存在合作可能",
     "suggested_action": "联系王明获取项目详情，安排与李总的路演对接",
@@ -339,9 +501,11 @@ Todo类型：{todo_type}
 ```json
 {
   "todo_type": "help",
+  "action_type": "send",
   "description": "🟢 帮助：张总最近在关注AI大模型落地，你可以分享相关案例",
   "priority": "medium",
   "due_date_suggestion": "2026-06-08T00:00:00Z",
+  "confirmation": "pending",
   "context": {
     "reason": "张总（AI公司CEO）正在研究大模型落地场景，你有相关行业案例可以分享",
     "suggested_action": "整理2-3个大模型落地案例，微信发给张总参考",
@@ -1050,6 +1214,373 @@ Todo类型：{todo_type}
 
 ---
 
+## 13. 模板13：RelationshipBrief 生成
+
+**用途**: 根据已有的关系数据生成结构化的 RelationshipBrief，包含12个模块的完整填充
+
+**输入变量**:
+
+| 变量 | 类型 | 说明 |
+|------|------|------|
+| person_info | string | 目标人物信息（JSON） |
+| interaction_history | string | 历史交互记录摘要 |
+| existing_data | string | 已有的关系数据（JSON，可选） |
+
+**12模块定义**:
+
+| # | 模块名称 | 说明 | 数据来源 |
+|---|---------|------|---------|
+| 1 | basic_profile | 基础画像（姓名、公司、职位等） | 实体抽取 + 手动补充 |
+| 2 | resource_capability | 资源与能力清单 | 资源识别结果 |
+| 3 | demand_analysis | 需求分析 | 需求提取结果 |
+| 4 | relationship_stage | 关系阶段 | 当前阶段 + 推进建议 |
+| 5 | interaction_history | 交互历史 | 时间线形式的交互记录 |
+| 6 | trust_assessment | 信任评估 | 基于交互频次和质量 |
+| 7 | cooperation_potential | 合作潜力评估 | 资源-需求匹配度分析 |
+| 8 | risk_factors | 风险因素 | 已识别的风险点 |
+| 9 | maintenance_strategy | 维护策略 | 建议的维护方式和频次 |
+| 10 | next_actions | 下一步行动建议 | 具体可执行的行动项 |
+| 11 | network_position | 网络位置 | 在用户人脉网络中的定位 |
+| 12 | value_score | 价值评分 | 综合价值量化评分 |
+
+**Prompt**:
+```
+你是一个EventLink关系分析专家。请根据以下信息生成完整的RelationshipBrief。
+
+目标人物：
+{person_info}
+
+历史交互记录：
+{interaction_history}
+
+已有关系数据：
+{existing_data}
+
+规则：
+1. 逐个填充12个模块，每个模块必须包含具体内容
+2. 如果某个模块信息不足，标注"待补充"并说明缺少什么
+3. 所有推测内容必须标记来源和置信度
+4. relationship_stage不可自动升级，仅基于已有证据判断
+5. value_score基于多维度加权计算（资源稀缺性×0.3 + 合作潜力×0.3 + 信任度×0.2 + 网络价值×0.2）
+6. next_actions最多3条，按优先级排序
+7. 输出语言与输入语言一致
+
+输出JSON格式：
+{{
+  "relationship_brief": {{
+    "basic_profile": {{
+      "name": "姓名",
+      "company": "公司",
+      "title": "职位",
+      "industry": "行业",
+      "city": "城市",
+      "contact_methods": ["联系方式"],
+      "source": "信息来源"
+    }},
+    "resource_capability": {{
+      "core_resources": ["核心资源列表"],
+      "scarcity_level": "high|medium|low",
+      "accessibility": "high|medium|low"
+    }},
+    "demand_analysis": {{
+      "current_demands": ["当前需求"],
+      "urgency": "high|medium|low",
+      "match_with_user_resources": "匹配度说明"
+    }},
+    "relationship_stage": {{
+      "current_stage": "initial|awareness|exploration|negotiation|collaboration|maintenance",
+      "stage_since": "ISO 8601日期",
+      "evidence": "当前阶段的证据"
+    }},
+    "interaction_history": [
+      {{"date": "日期", "type": "meeting|call|message", "summary": "摘要"}}
+    ],
+    "trust_assessment": {{
+      "level": "low|medium|high",
+      "score": 0.0-1.0,
+      "factors": ["评分因素"]
+    }},
+    "cooperation_potential": {{
+      "score": 0.0-1.0,
+      "areas": ["合作领域"],
+      "barriers": ["障碍"]
+    }},
+    "risk_factors": [
+      {{"type": "风险类型", "description": "描述", "severity": "high|medium|low"}}
+    ],
+    "maintenance_strategy": {{
+      "recommended_frequency": "频次建议",
+      "preferred_channels": ["渠道"],
+      "key_topics": ["话题"]
+    }},
+    "next_actions": [
+      {{"action": "行动", "priority": "high|medium|low", "deadline": "建议时间"}}
+    ],
+    "network_position": {{
+      "role": "hub|connector|specialist|peripheral",
+      "connections_count": 数字,
+      "strategic_value": "高|中|低"
+    }},
+    "value_score": {{
+      "total": 0.0-100,
+      "breakdown": {{
+        "resource_scarcity": 0-30,
+        "cooperation_potential": 0-30,
+        "trust": 0-20,
+        "network_value": 0-20
+      }}
+    }}
+  }},
+  "is_ai_inference": true,
+  "confidence_level": "confirmed|inferred|speculated",
+  "requires_confirmation": true
+}}
+```
+
+**输出示例**:
+```json
+{
+  "relationship_brief": {
+    "basic_profile": {
+      "name": "李总",
+      "company": "盛恒资本",
+      "title": "投资总监",
+      "industry": "投资/金融",
+      "city": "北京",
+      "contact_methods": ["微信"],
+      "source": "会议纪要+名片扫描"
+    },
+    "resource_capability": {
+      "core_resources": ["AI领域早期项目投资渠道（500万-2000万预算）", "5年AI投资经验", "盛恒资本投资决策影响力"],
+      "scarcity_level": "high",
+      "accessibility": "medium"
+    },
+    "demand_analysis": {
+      "current_demands": ["寻找AI赛道优质早期项目（CV/NLP方向）"],
+      "urgency": "high",
+      "match_with_user_resources": "用户认识多个AI创业者，可推荐项目"
+    },
+    "relationship_stage": {
+      "current_stage": "awareness",
+      "stage_since": "2026-06-04",
+      "evidence": "已参加一次投资对接会，双方有初步了解"
+    },
+    "interaction_history": [
+      {"date": "2026-06-04", "type": "meeting", "summary": "参加AI项目路演"}
+    ],
+    "trust_assessment": {
+      "level": "medium",
+      "score": 0.55,
+      "factors": ["有1次正式交互", "对方表达过明确需求", "尚未深度合作"]
+    },
+    "cooperation_potential": {
+      "score": 0.78,
+      "areas": ["AI项目对接", "行业信息共享"],
+      "barriers": ["需通过中间人引荐", "投资决策周期较长"]
+    },
+    "risk_factors": [],
+    "maintenance_strategy": {
+      "recommended_frequency": "每2周",
+      "preferred_channels": ["微信", "线下活动"],
+      "key_topics": ["AI行业趋势", "项目进展"]
+    },
+    "next_actions": [
+      {"action": "整理AI项目资料发送给李总", "priority": "high", "deadline": "2026-06-07"},
+      {"action": "邀请参加下次AI创业者沙龙", "priority": "medium", "deadline": "2026-06-15"},
+      {"action": "分享AI投资趋势报告", "priority": "low", "deadline": "2026-06-21"}
+    ],
+    "network_position": {
+      "role": "connector",
+      "connections_count": 3,
+      "strategic_value": "高"
+    },
+    "value_score": {
+      "total": 78,
+      "breakdown": {
+        "resource_scarcity": 25,
+        "cooperation_potential": 24,
+        "trust": 11,
+        "network_value": 18
+      }
+    }
+  },
+  "is_ai_inference": true,
+  "confidence_level": "inferred",
+  "requires_confirmation": true
+}
+```
+
+---
+
+## 14. 模板14：RelationshipStage 推进建议
+
+**用途**: AI分析关系是否可以推进到下一阶段，提供推进建议（不自动升级）
+
+**输入变量**:
+
+| 变量 | 类型 | 说明 |
+|------|------|------|
+| current_relationship_data | string | 当前关系数据（RelationshipBrief JSON） |
+| recent_interactions | string | 最近交互记录 |
+| user_goal | string | 用户期望的关系目标（可选） |
+
+**关系阶段定义**:
+
+| 阶段 | 英文标识 | 说明 | 进入条件 |
+|------|---------|------|---------|
+| 初始接触 | `initial` | 首次认识/录入系统 | 名片扫描/首次提及 |
+| 相互了解 | `awareness` | 双方有基本了解 | 有过至少1次有效交互 |
+| 探索合作 | `exploration` | 开始探讨合作可能性 | 有明确的合作意向表达 |
+| 商务谈判 | `negotiation` | 具体的商务条款讨论 | 进入实质性的合作洽谈 |
+| 正式合作 | `collaboration` | 已建立合作关系 | 有签约或实际合作行为 |
+| 维护期 | `maintenance` | 长期合作关系维护 | 合作稳定后的持续维护 |
+
+**Prompt**:
+```
+你是一个EventLink关系阶段分析师。请分析以下关系是否可以推进到下一阶段。
+
+重要原则：
+1. 仅提供建议，不自动升级关系阶段
+2. 必须基于客观证据判断，不推测
+3. 如果证据不足，明确指出缺少什么
+4. 推进建议必须是用户可执行的具体行动
+5. 不建议跳级推进（如从initial直接到negotiation）
+
+当前关系数据：
+{current_relationship_data}
+
+最近交互记录：
+{recent_interactions}
+
+用户目标：
+{user_goal}
+
+输出JSON格式：
+{{
+  "analysis": {{
+    "current_stage": "当前阶段",
+    "next_possible_stage": "可能的下一阶段",
+    "can_advance": true|false,
+    "advance_confidence": 0.0-1.0,
+    "evidence_for": ["支持推进的证据"],
+    "evidence_against": ["不支持推进的证据或风险"],
+    "missing_conditions": ["缺少的条件（如无法推进）"]
+  }},
+  "recommendation": {{
+    "should_advance": "yes|no|wait",
+    "reason": "建议理由",
+    "suggested_actions": [
+      {{"action": "具体行动", "priority": "high|medium|low", "expected_outcome": "预期效果"}}
+    ],
+    "timeline_estimate": "预计所需时间",
+    "risk_warning": "风险提示（如有）"
+  }},
+  "stage_requirements": {{
+    "target_stage": "目标阶段",
+    "requirements": ["进入该阶段需要的条件"],
+    "which_met": ["已满足的条件"],
+    "which_not_met": ["未满足的条件"]
+  }},
+  "is_ai_inference": true,
+  "confidence_level": "confirmed|inferred|speculated",
+  "requires_confirmation": true
+}}
+```
+
+**输出示例（可以推进）**:
+```json
+{
+  "analysis": {
+    "current_stage": "awareness",
+    "next_possible_stage": "exploration",
+    "can_advance": true,
+    "advance_confidence": 0.72,
+    "evidence_for": [
+      "李总在路演中表达了寻找AI项目的明确需求",
+      "已通过王明成功引荐",
+      "李总主动询问了更多项目详情"
+    ],
+    "evidence_against": [
+      "尚未进行一对一深入沟通",
+      "李总的投资决策流程较长"
+    ],
+    "missing_conditions": []
+  },
+  "recommendation": {
+    "should_advance": "yes",
+    "reason": "双方已有初步了解且有明确的合作意向，具备进入探索合作阶段的条件",
+    "suggested_actions": [
+      {"action": "预约与李总的一对一沟通，深入了解其投资偏好", "priority": "high", "expected_outcome": "获得更详细的投资需求"},
+      {"action": "准备2-3个匹配度高的AI项目简介", "priority": "high", "expected_outcome": "展示合作价值"},
+      {"action": "邀请李总参加AI创业者闭门会", "priority": "medium", "expected_outface": "增加非正式交流机会"}
+    ],
+    "timeline_estimate": "2-4周",
+    "risk_warning": "李总可能同时接触其他项目源，需保持跟进频率"
+  },
+  "stage_requirements": {
+    "target_stage": "exploration",
+    "requirements": [
+      "双方有基本了解",
+      "有明确的合作意向表达",
+      "开始交换具体需求和资源信息"
+    ],
+    "which_met": ["双方有基本了解", "有明确的合作意向表达"],
+    "which_not_met": ["尚未深入交换具体需求和资源信息"]
+  },
+  "is_ai_inference": true,
+  "confidence_level": "inferred",
+  "requires_confirmation": true
+}
+```
+
+**输出示例（暂不建议推进）**:
+```json
+{
+  "analysis": {
+    "current_stage": "initial",
+    "next_possible_stage": "awareness",
+    "can_advance": false,
+    "advance_confidence": 0.35,
+    "evidence_for": [
+      "已获取名片信息"
+    ],
+    "evidence_against": [
+      "仅有1次简短接触",
+      "对方未表达任何进一步交流意愿",
+      "缺乏共同话题或利益点"
+    ],
+    "missing_conditions": [
+      "需要至少1次有效对话",
+      "需要找到共同的兴趣点或合作点"
+    ]
+  },
+  "recommendation": {
+    "should_advance": "wait",
+    "reason": "目前仅有基础联系信息，缺乏足够的互动来支撑关系推进",
+    "suggested_actions": [
+      {"action": "等待合适的社交场合再次接触", "priority": "medium", "expected_outcome": "创造自然交流机会"},
+      {"action": "关注对方的公开动态（如朋友圈、行业活动）", "priority": "low", "expected_outcome": "找到共同话题"}
+    ],
+    "timeline_estimate": "1-2个月",
+    "risk_warning": "过于主动可能造成反感，建议保持自然节奏"
+  },
+  "stage_requirements": {
+    "target_stage": "awareness",
+    "requirements": [
+      "有过至少1次有效交互",
+      "双方对彼此有基本认知"
+    ],
+    "which_met": [],
+    "which_not_met": ["有过至少1次有效交互", "双方对彼此有基本认知"]
+  },
+  "is_ai_inference": false,
+  "confidence_level": "confirmed",
+  "requires_confirmation": false
+}
+```
+
+---
+
 ## 附录A：重试与降级策略
 
 | 参数 | 值 | 说明 |
@@ -1057,7 +1588,7 @@ Todo类型：{todo_type}
 | 最大重试次数 | 3 | 超过3次返回错误 |
 | 退避策略 | 指数退避 | 1s → 2s → 4s |
 | 超时时间 | 30s | 单次请求超时 |
-| 降级策略 | Provider切换 | OpenAI → Claude → 通义千问 → 规则降级 |
+| 降级策略 | Provider切换 | Moka AI → 规则降级 |
 
 ```python
 import asyncio
@@ -1068,7 +1599,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
     wait=wait_exponential(multiplier=1, min=1, max=4),
     retry=retry_if_exception_type((LLMTimeoutError, LLMRateLimitError)),
 )
-async def call_with_retry(prompt: str, model: str = "gpt-4") -> str:
+async def call_with_retry(prompt: str, model: str = "moka/claude-sonnet-4-6") -> str:
     return await llm_client.call(prompt, model=model)
 ```
 
@@ -1076,9 +1607,9 @@ async def call_with_retry(prompt: str, model: str = "gpt-4") -> str:
 
 | 参数 | 值 | 说明 |
 |------|---|------|
-| 单次请求Token上限 | 2000 | 防止过长prompt |
+| 单次请求Token上限 | 4000 | 防止过长prompt（v2.0提升以支持12模块填充） |
 | 每日Token配额 | 10万 | 控制日成本 |
-| 模型选择策略 | 按场景选模型 | 简单提取用gpt-3.5，复杂推理用gpt-4 |
+| 模型选择策略 | 统一使用Moka AI | moka/claude-sonnet-4-6 |
 | 缓存策略 | 相同prompt缓存24h | 避免重复调用 |
 
 ## 附录C：LLM错误类型

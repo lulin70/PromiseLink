@@ -1,9 +1,10 @@
 # EventLink 数据库设计文档
 
-> **版本**: v1.2
-> **日期**: 2026-06-03  
-> **设计师**: 架构师团队  
-> **参考**: PRD v3.6, 技术设计 v1.7
+> **版本**: v2.0
+> **日期**: 2026-06-04
+> **设计师**: 架构师团队
+> **参考**: PRD v4.3, 技术设计 v2.5 §3.1
+> **状态**: 李总v1.2+许总POC反馈融合修订
 
 ---
 
@@ -30,7 +31,8 @@ erDiagram
     USERS ||--o{ EVENTS : creates
     USERS ||--o{ ENTITIES : owns
     USERS ||--o{ TODOS : has
-    
+    USERS ||--o{ RELATIONSHIP_BRIEFS : tracks
+
     EVENTS ||--o{ ENTITIES : extracts
     EVENTS {
         uuid id PK
@@ -40,24 +42,26 @@ erDiagram
         timestamptz timestamp
         text raw_text
         jsonb metadata
+        varchar input_scope "输入分类（v2.0新增）"
+        float input_scope_confidence "分类置信度（v2.0新增）"
         uuid user_id FK
         timestamptz created_at
     }
-    
+
     ENTITIES ||--o{ ASSOCIATIONS : "source/target"
     ENTITIES {
         uuid id PK
         varchar entity_type "person|organization|technology|project|attribute"
         varchar name
         text_array aliases
-        jsonb properties "concern|promise|contribution|resource|demand|profile|resource_sensitivity"
+        jsonb properties "concern|promise|contribution|resource|demand|profile|resource_sensitivity|relationship_stage"
         varchar company "高频查询列"
         varchar title "高频查询列"
         uuid user_id FK
         timestamptz created_at
         timestamptz updated_at
     }
-    
+
     ASSOCIATIONS {
         uuid id PK
         uuid source_entity_id FK
@@ -68,7 +72,31 @@ erDiagram
         uuid user_id FK
         timestamptz created_at
     }
-    
+
+    RELATIONSHIP_BRIEFS }o--|| ENTITIES : "about_person"
+    RELATIONSHIP_BRIEFS }o--o{ EVENTS : "latest_interaction"
+    RELATIONSHIP_BRIEFS {
+        uuid id PK
+        uuid user_id FK
+        uuid person_id FK "→entities(id)"
+        varchar current_stage "7阶段枚举"
+        text stage_reason
+        uuid latest_interaction_id FK "→events(id)"
+        text next_node
+        text next_node_condition
+        text paused_reason
+        boolean confirmed_by_user
+        integer version "乐观锁"
+        jsonb concerns
+        jsonb need_insights
+        jsonb contributions
+        jsonb pending_promises
+        jsonb feedback_records
+        text cooperation_direction_candidate
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
     ENTITIES ||--o{ TODOS : "about"
     TODOS {
         uuid id PK
@@ -78,6 +106,12 @@ erDiagram
         text description
         uuid related_entity_id FK
         uuid source_event_id FK
+        varchar action_type "6种动作类型（v2.0新增）"
+        uuid promisor_id FK "承诺人（v2.0新增）"
+        uuid beneficiary_id FK "受益人（v2.0新增）"
+        varchar confirmation_status "确认状态（v2.0新增）"
+        text evidence_quote "证据原文（v2.0新增）"
+        uuid evidence_event_id FK "证据来源（v2.0新增）"
         jsonb context
         timestamptz due_date
         timestamptz snooze_until
@@ -85,7 +119,7 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
     }
-    
+
     USERS {
         uuid id PK
         varchar username
@@ -113,6 +147,8 @@ erDiagram
 | timestamp | TIMESTAMPTZ | NOT NULL | - | 事件发生时间 |
 | raw_text | TEXT | NOT NULL | - | 原始文本内容 |
 | metadata | JSONB | - | '{}' | 扩展元数据（会议类型/地点等） |
+| input_scope | VARCHAR(30) | - | 'relationship_interaction' | 输入分类（F-44，v2.0新增） |
+| input_scope_confidence | FLOAT | - | 1.0 | 分类置信度（F-44，v2.0新增） |
 | user_id | UUID | NOT NULL, FK(users.id) | - | 用户ID |
 | created_at | TIMESTAMPTZ | NOT NULL | NOW() | 创建时间 |
 
@@ -121,6 +157,7 @@ erDiagram
 CREATE INDEX idx_events_user_timestamp ON events(user_id, timestamp DESC);
 CREATE INDEX idx_events_type ON events(event_type);
 CREATE INDEX idx_events_source ON events(source);
+CREATE INDEX idx_events_input_scope ON events(input_scope) WHERE input_scope IS NOT NULL;  -- v2.0新增
 ```
 
 **JSONB metadata结构**:
@@ -147,7 +184,7 @@ CREATE INDEX idx_events_source ON events(source);
 | entity_type | VARCHAR(20) | NOT NULL | - | person\|organization\|technology\|project\|attribute |
 | name | VARCHAR(100) | NOT NULL | - | 实体名称 |
 | aliases | TEXT[] | - | '{}' | 别名数组 |
-| properties | JSONB | - | '{}' | 扩展画像（concern/promise/contribution/resource/demand/profile） |
+| properties | JSONB | - | '{}' | 扩展画像（concern/promise/contribution/resource/demand/profile/relationship_stage） |
 | company | VARCHAR(100) | - | NULL | 公司（高频查询列） |
 | title | VARCHAR(100) | - | NULL | 职位（高频查询列） |
 | city | VARCHAR(50) | - | NULL | 城市（高频查询列） |
@@ -174,6 +211,15 @@ CREATE UNIQUE INDEX idx_entities_user_name_company
 ```json
 {
   "resource_sensitivity": "matchable",
+  "relationship_stage": "new_connection",
+  "relationship": {
+    "stage": "new_connection",
+    "stage_reason": "首次记录互动",
+    "paused_reason": null,
+    "confirmed_by_user": false,
+    "next_node": "了解对方核心需求",
+    "next_node_condition": "完成首次深入交流"
+  },
   "concern": [
     {
       "topic": "寻找AI方向技术合伙人",
@@ -300,6 +346,101 @@ CREATE UNIQUE INDEX idx_assoc_unique
 
 ---
 
+### 3.3b RelationshipBriefs表（关系推进卡表）
+
+**用途**: 为重点联系人生成全貌视图卡片，整合关注点、需求洞察、承诺、反馈、关系阶段等关键信息（F-47，P0必须，v2.0新增）
+
+| 字段名 | 类型 | 约束 | 默认值 | 说明 |
+|--------|------|------|--------|------|
+| id | UUID | PRIMARY KEY | gen_random_uuid() | 主键 |
+| user_id | UUID | NOT NULL | - | 用户ID |
+| person_id | UUID | NOT NULL, FK(entities.id) | - | 关联人物实体ID |
+| current_stage | VARCHAR(30) | NOT NULL | 'new_connection' | 当前关系阶段（7阶段枚举） |
+| stage_reason | TEXT | - | NULL | 阶段原因说明 |
+| latest_interaction_id | UUID | FK(events.id) | NULL | 最近互动事件ID |
+| next_node | TEXT | - | NULL | 下一推进节点 |
+| next_node_condition | TEXT | - | NULL | 节点触发条件 |
+| paused_reason | TEXT | - | NULL | 暂停原因 |
+| confirmed_by_user | BOOLEAN | - | FALSE | 用户是否确认阶段变更 |
+| version | INTEGER | NOT NULL | 1 | 乐观锁版本号 |
+| concerns | JSONB | - | '[]' | 关注点列表 |
+| need_insights | JSONB | - | '[]' | 需求洞察列表 |
+| contributions | JSONB | - | '[]' | 贡献记录列表 |
+| pending_promises | JSONB | - | '[]' | 待兑现承诺列表 |
+| feedback_records | JSONB | - | '[]' | 反馈记录列表 |
+| cooperation_direction_candidate | TEXT | - | NULL | 合作方向候选 |
+| created_at | TIMESTAMPTZ | - | NOW() | 创建时间 |
+| updated_at | TIMESTAMPTZ | - | NOW() | 更新时间 |
+
+**索引**:
+```sql
+CREATE INDEX idx_briefs_user ON relationship_briefs(user_id);
+CREATE INDEX idx_briefs_person ON relationship_briefs(person_id);
+CREATE UNIQUE INDEX idx_briefs_user_person ON relationship_briefs(user_id, person_id);
+```
+
+**current_stage 7阶段枚举（F-48）**:
+
+| 阶段值 | 中文名 | 说明 | PoC范围 |
+|--------|--------|------|---------|
+| `new_connection` | 新连接 | 首次建立联系 | ✅ 启用 |
+| `understanding_needs` | 了解需求 | 深入了解对方需求 | ✅ 启用 |
+| `value_response` | 价值回应 | 提供价值回应对方 | ✅ 启用 |
+| `cooperation_exploration` | 合作探索 | 探讨合作可能性 | 保留枚举，UI不展示 |
+| `intent_confirmed` | 意图确认 | 双方合作意图已确认 | 保留枚举，UI不展示 |
+| `execution` | 执行中 | 合作正在执行 | 保留枚举，UI不展示 |
+| `review` | 回顾复盘 | 阶段性回顾复盘 | 保留枚举，UI不展示 |
+
+> **关键规则 RS-01**: 阶段不可仅由AI自动升级，必须用户确认。AI可基于行为数据建议升级，但最终升级操作需用户在推进卡上主动确认。
+
+**JSONB字段结构示例**:
+
+```json
+{
+  "concerns": [
+    {
+      "topic": "寻找AI方向技术合伙人",
+      "source_event_id": "uuid-of-event",
+      "created_at": "2026-06-03T10:00:00Z"
+    }
+  ],
+  "need_insights": [
+    {
+      "content": "对方团队急需前端开发资源",
+      "confidence": 0.85,
+      "source_event_id": "uuid-of-event",
+      "created_at": "2026-06-03T10:00:00Z"
+    }
+  ],
+  "contributions": [
+    {
+      "content": "介绍了李四给张三认识",
+      "date": "2026-06-01",
+      "created_at": "2026-06-01T10:00:00Z"
+    }
+  ],
+  "pending_promises": [
+    {
+      "content": "下周发一份AI算法团队介绍资料",
+      "due_at": "2026-06-10T00:00:00Z",
+      "promisor_type": "my_promise",
+      "source_event_id": "uuid-of-event",
+      "status": "pending",
+      "created_at": "2026-06-03T10:00:00Z"
+    }
+  ],
+  "feedback_records": [
+    {
+      "type": "stage_confirmation",
+      "content": "用户确认从new_connection升级到understanding_needs",
+      "created_at": "2026-06-04T15:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
 ### 3.4 Todos表（待办表）
 
 **用途**: 存储AI生成的待办事项及用户追踪
@@ -313,12 +454,35 @@ CREATE UNIQUE INDEX idx_assoc_unique
 | description | TEXT | NOT NULL | - | Todo描述 |
 | related_entity_id | UUID | FK(entities.id) | NULL | 关联实体ID |
 | source_event_id | UUID | FK(events.id) | NULL | 来源事件ID |
+| action_type | VARCHAR(25) | - | 'my_promise' | 动作类型6种枚举（F-45，v2.0新增） |
+| promisor_id | UUID | FK(entities.id) | NULL | 承诺人ID（F-45，v2.0新增） |
+| beneficiary_id | UUID | FK(entities.id) | NULL | 受益人ID（F-45，v2.0新增） |
+| confirmation_status | VARCHAR(15) | - | 'pending' | 确认状态（F-45，v2.0新增） |
+| evidence_quote | TEXT | - | NULL | 证据原文（F-45 BLK-1，v2.0新增） |
+| evidence_event_id | UUID | FK(events.id) | NULL | 证据来源事件ID（F-45，v2.0新增） |
 | context | JSONB | - | '{}' | 上下文信息 |
 | due_date | TIMESTAMPTZ | - | NULL | 截止时间 |
 | snooze_until | TIMESTAMPTZ | - | NULL | 延迟到某时间 |
 | user_id | UUID | NOT NULL, FK(users.id) | - | 用户ID |
 | created_at | TIMESTAMPTZ | NOT NULL | NOW() | 创建时间 |
 | updated_at | TIMESTAMPTZ | NOT NULL | NOW() | 更新时间 |
+
+**CHECK约束（v2.0新增）**:
+```sql
+ALTER TABLE todos ADD CONSTRAINT todo_action_type_check
+    CHECK (action_type IN ('my_promise','their_promise','my_followup','mutual_action','system_reminder','unclear'));
+```
+
+**action_type枚举说明（F-45，v2.0新增）**:
+
+| action_type | 中文名 | 行为规则 |
+|-------------|--------|---------|
+| `my_promise` | 我的承诺 | 进入我的Todo列表，需跟进兑现 |
+| `their_promise` | 对方承诺 | 显示"等待对方回应"，不入Todo |
+| `my_followup` | 我的跟进 | 生成跟进型Todo |
+| `mutual_action` | 共同行动 | 双方各生成一条Todo |
+| `system_reminder` | 系统提醒 | 系统自动生成提醒型Todo |
+| `unclear` | 待确认 | 标记为待确认，需用户手动确认后生成Todo |
 
 **索引**:
 ```sql
@@ -553,6 +717,167 @@ def convert_create_table(sqlite_sql):
     
     return sqlite_sql
 ```
+
+### 5.3 Alembic增量迁移策略（v2.0新增）
+
+**策略概述**: 从v1.2升级到v2.0采用Alembic增量迁移，确保生产数据零丢失、可回滚。
+
+**迁移文件**: `alembic/versions/v120_v200_relationship_upgrade.py`
+
+**迁移步骤**:
+
+```python
+"""v1.2 → v2.0: relationship_briefs表 + events/todos扩展字段
+
+Revision ID: v120_v200
+Revises: v110_v120
+Create Date: 2026-06-04
+
+迁移内容:
+1. 新增 relationship_briefs 表（D1-1）
+2. events 表追加 input_scope + input_scope_confidence 字段（D1-2）
+3. todos 表追加 6个字段 + CHECK约束（D1-3）
+4. entities.properties JSONB结构扩展（D1-4，应用层处理）
+"""
+from alembic import op
+import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
+
+def upgrade():
+    # === D1-1: 新增 relationship_briefs 表 ===
+    op.create_table(
+        'relationship_briefs',
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True,
+                  server_default=sa.text('gen_random_uuid()')),
+        sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('person_id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('current_stage', sa.String(30), nullable=False,
+                  server_default='new_connection'),
+        sa.Column('stage_reason', sa.Text(), nullable=True),
+        sa.Column('latest_interaction_id', postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column('next_node', sa.Text(), nullable=True),
+        sa.Column('next_node_condition', sa.Text(), nullable=True),
+        sa.Column('paused_reason', sa.Text(), nullable=True),
+        sa.Column('confirmed_by_user', sa.Boolean(), server_default=sa.text('FALSE')),
+        sa.Column('version', sa.Integer(), nullable=False, server_default='1'),
+        sa.Column('concerns', postgresql.JSONB(), server_default=sa.text("'[]'::jsonb")),
+        sa.Column('need_insights', postgresql.JSONB(), server_default=sa.text("'[]'::jsonb")),
+        sa.Column('contributions', postgresql.JSONB(), server_default=sa.text("'[]'::jsonb")),
+        sa.Column('pending_promises', postgresql.JSONB(), server_default=sa.text("'[]'::jsonb")),
+        sa.Column('feedback_records', postgresql.JSONB(), server_default=sa.text("'[]'::jsonb")),
+        sa.Column('cooperation_direction_candidate', sa.Text(), nullable=True),
+        sa.Column('created_at', sa.TIMESTAMPTZ(), server_default=sa.text('NOW()')),
+        sa.Column('updated_at', sa.TIMESTAMPTZ(), server_default=sa.text('NOW()')),
+    )
+    op.create_index('idx_briefs_user', 'relationship_briefs', ['user_id'])
+    op.create_index('idx_briefs_person', 'relationship_briefs', ['person_id'])
+    op.create_index('idx_briefs_user_person', 'relationship_briefs',
+                    ['user_id', 'person_id'], unique=True)
+    op.create_foreign_key('fk_briefs_person', 'relationship_briefs', 'entities',
+                          ['person_id'], ['id'])
+    op.create_foreign_key('fk_briefs_interaction', 'relationship_briefs', 'events',
+                          ['latest_interaction_id'], ['id'])
+
+    # === D1-2: events 表追加字段 ===
+    op.add_column('events', sa.Column('input_scope', sa.String(30),
+                   server_default='relationship_interaction'))
+    op.add_column('events', sa.Column('input_scope_confidence', sa.Float(),
+                   server_default='1.0'))
+    op.create_index('idx_events_input_scope', 'events', ['input_scope'],
+                    postgresql_where=sa.text('input_scope IS NOT NULL'))
+
+    # === D1-3: todos 表追加字段 ===
+    op.add_column('todos', sa.Column('action_type', sa.String(25),
+                   server_default='my_promise'))
+    op.add_column('todos', sa.Column('promisor_id', postgresql.UUID(as_uuid=True)))
+    op.add_column('todos', sa.Column('beneficiary_id', postgresql.UUID(as_uuid=True)))
+    op.add_column('todos', sa.Column('confirmation_status', sa.String(15),
+                   server_default='pending'))
+    op.add_column('todos', sa.Column('evidence_quote', sa.Text()))
+    op.add_column('todos', sa.Column('evidence_event_id', postgresql.UUID(as_uuid=True)))
+
+    # 添加外键约束
+    op.create_foreign_key('todos_promisor_id_fkey', 'todos', 'entities',
+                          ['promisor_id'], ['id'])
+    op.create_foreign_key('todos_beneficiary_id_fkey', 'todos', 'entities',
+                          ['beneficiary_id'], ['id'])
+    op.create_foreign_key('todos_evidence_event_id_fkey', 'todos', 'events',
+                          ['evidence_event_id'], ['id'])
+
+    # 添加CHECK约束
+    op.execute("""
+        ALTER TABLE todos ADD CONSTRAINT todo_action_type_check
+            CHECK (action_type IN (
+                'my_promise','their_promise','my_followup',
+                'mutual_action','system_reminder','unclear'
+            ))
+    """)
+
+    # === D1-4: entities.properties JSONB扩展（应用层处理）===
+    # 注意：JSONB内部结构变更无需DDL，由应用层ORM模型负责兼容读写
+    # 建议执行数据回填：为现有person实体补充 relationship_stage 字段
+    op.execute("""
+        UPDATE entities e
+        SET properties = jsonb_set(
+            COALESCE(e.properties, '{}'::jsonb),
+            '{relationship_stage}',
+            '"new_connection"'::jsonb
+        )
+        WHERE e.entity_type = 'person'
+          AND e.properties->>'relationship_stage' IS NULL
+    """)
+
+
+def downgrade():
+    # 回滚顺序与upgrade相反
+    op.drop_constraint('todo_action_type_check', 'todos', type_='check')
+    op.drop_constraint('todos_evidence_event_id_fkey', 'todos', type_='foreignkey')
+    op.drop_constraint('todos_beneficiary_id_fkey', 'todos', type_='foreignkey')
+    op.drop_constraint('todos_promisor_id_fkey', 'todos', type_='foreignkey')
+
+    op.drop_column('todos', 'evidence_event_id')
+    op.drop_column('todos', 'evidence_quote')
+    op.drop_column('todos', 'confirmation_status')
+    op.drop_column('todos', 'beneficiary_id')
+    op.drop_column('todos', 'promisor_id')
+    op.drop_column('todos', 'action_type')
+
+    op.drop_index('idx_events_input_scope', table_name='events')
+    op.drop_column('events', 'input_scope_confidence')
+    op.drop_column('events', 'input_scope')
+
+    op.drop_constraint('fk_briefs_interaction', 'relationship_briefs', type_='foreignkey')
+    op.drop_constraint('fk_briefs_person', 'relationship_briefs', type_='foreignkey')
+    op.drop_index('idx_briefs_user_person', table_name='relationship_briefs')
+    op.drop_index('idx_briefs_person', table_name='relationship_briefs')
+    op.drop_index('idx_briefs_user', table_name='relationship_briefs')
+    op.drop_table('relationship_briefs')
+```
+
+**迁移执行命令**:
+```bash
+# 生成迁移文件（如需手动调整）
+alembic revision --autogenerate -m "v120_v200_relationship_upgrade"
+
+# 执行升级
+alembic upgrade head
+
+# 验证升级结果
+alembic current
+alembic history --verbose
+
+# 如需回滚
+alembic downgrade -1
+```
+
+**迁移验证清单**:
+| 验证项 | 方法 | 预期结果 |
+|--------|------|---------|
+| relationship_briefs表创建 | `\d relationship_briefs` | 20个字段，3个索引，2个FK |
+| events新字段存在 | `SELECT column_name FROM information_schema.columns WHERE table_name='events'` | 包含input_scope, input_scope_confidence |
+| todos新字段+CHECK | `\d todos` | 6个新字段 + todo_action_type_check约束 |
+| 现有数据完整性 | `SELECT COUNT(*) FROM events` + `SELECT COUNT(*) FROM todos` | 数据量不变 |
+| 回滚可用性 | `alembic downgrade -1` 后检查 | 恢复到v1.2 schema |
 
 ---
 
@@ -949,8 +1274,9 @@ LIMIT 5;
 | v1.0 | 2026-06-02 | 初始版本，4张核心表 |
 | v1.1 | 2026-06-03 | Todo类型修正（6种：opportunity/risk/context/action/pending_confirm/resource_maint）；移除RLS改为应用层过滤；添加resource_sensitivity字段；添加莫兰迪色映射；添加数据主权章节；Entities properties结构细化 |
 | v1.2 | 2026-06-03 | Todo类型重命名（opportunity→cooperation_signal, context→care, action→promise, pending_confirm→followup, resource_maint→help）；莫兰迪色映射更新；Entities properties新增concern/promise/contribution字段；resource/demand标注Phase2；Todos context按类型分类定义 |
-| v1.3 | TBD | 添加用户反馈表 |
+| **v2.0** | **2026-06-04** | **李总v1.2+许总POC反馈融合修订（共识清单D1-1~D1-7）：①新增relationship_briefs关系推进卡表（F-47 P0，20字段+3索引+唯一约束+7阶段枚举）②events表追加input_scope/input_scope_confidence字段及索引（F-44）③todos表追加6字段（action_type/promisor_id/beneficiary_id/confirmation_status/evidence_quote/evidence_event_id）+CHECK约束+枚举说明（F-45）④entities.properties JSONB扩展relationship_stage+完整relationship对象结构（F-48）⑤ER图新增RELATIONSHIP_BRIEFS节点及与EVENTS/ENTITIES关系线⑥新增§5.3 Alembic增量迁移策略（含upgrade/downgrade完整代码+验证清单）⑦参考基线对齐PRD v4.3 + 技术设计v2.5 §3.1** |
+| v2.1 | TBD | 添加用户反馈表 |
 
 ---
 
-*最后更新: 2026-06-03*
+*最后更新: 2026-06-04*

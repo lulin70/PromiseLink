@@ -1,9 +1,9 @@
 # EventLink 算法设计文档
 
-> **版本**: v1.2
-> **日期**: 2026-06-03
+> **版本**: v2.0
+> **日期**: 2026-06-04
 > **定位**: AI驱动的**个人商务关系经营助手**（非"资源匹配平台"）
-> **参考**: 技术设计 v1.7 §4
+> **参考**: 技术设计 v2.5 §4
 > **状态**: ✅ 独立完整版，含详细算法与Python实现
 
 ---
@@ -13,7 +13,7 @@
 | # | 决策 | 说明 |
 |---|------|------|
 | 1 | 产品定位 | AI驱动的**个人商务关系经营助手** |
-| 2 | Todo类型 | 6种：cooperation_signal/risk/care/promise/followup/help |
+| 2 | Todo类型 | 6种：cooperation_signal/risk/care/promise/followup/help；action_type 6种(my_promise/their_promise/my_followup/mutual_action/system_reminder/unclear) |
 | 3 | 莫兰迪色系 | 雾白#B8C4C0/烟粉#C4A7A0/雾蓝#A0B0C4/雾绿#A0C4A8/雾金#C4C0A0/雾紫#B0A0C4 |
 | 4 | 匹配算法 | 六维：keyword(25%)+industry(20%)+topic(15%)+llm(10%)+history(10%)+callability(20%) |
 | 5 | 敏感度 | 2级：matchable/no_match |
@@ -762,6 +762,11 @@ class OpportunityMatcher:
 
 ### 2.9 权重调优策略
 
+> ⚠️ **F-05 商机匹配暂停（PoC阶段）**：
+> L1/L2/L3匹配引擎在PoC阶段默认关闭，通过`feature_flag`控制启用。
+> PoC阶段匹配结果仅用于promise类型Todo的关联推荐，不作为独立功能暴露。
+> Phase1启用care维度后逐步开放完整六维匹配。
+
 | 阶段 | 策略 | 说明 |
 |------|------|------|
 | PoC | 固定权重 | 使用上述默认权重，收集匹配结果反馈 |
@@ -943,10 +948,159 @@ class SensitivityFilter:
 
 **触发条件**: 从会议记录/通话摘要/聊天记录中提取出用户做出的承诺
 
-**生成规则**:
-1. LLM分析事件内容，识别用户（第一人称）做出的承诺性表述
-2. 承诺性表述模式："我会…"、"我来…"、"我负责…"、"保证…"、"下周给你…" 等
-3. 提取承诺内容、承诺对象、截止时间（如有）
+#### 4.2a Promise 双向动作识别算法（v2.0 新增）
+
+> **v2.0重大改造**：Promise从单向"我的承诺"升级为**双向动作识别模型**，区分动作方向、承诺人、受益人。
+
+**6种action_type定义**:
+
+| action_type | 方向 | 含义 | 是否进入用户Todo列表 |
+|-------------|------|------|---------------------|
+| `my_promise` | 我→对方 | 用户做出的承诺 | ✅ 是 |
+| `their_promise` | 对方→我 | 对方做出的承诺 | ❌ 否（存入relationship_briefs.pending_promises） |
+| `my_followup` | 我→对方 | 用户需要跟进的事项 | ✅ 是 |
+| `mutual_action` | 双方共同 | 双方约定共同完成的事 | ✅ 是 |
+| `system_reminder` | 系统→用户 | 系统自动生成的提醒（如Snooze到期） | ✅ 是 |
+| `unclear` | 不明确 | AI无法确定方向或内容 | ❌ 否（置信度<0.7兜底） |
+
+**promisor vs beneficiary 区分方法**:
+1. **主语分析**: 第一人称("我"、"我们") → promisor=用户；第二/三人称("他"、"张总") → promisor=对方
+2. **动词方向**: "我会给你" → my_promise；"他说会帮我" → their_promise
+3. **上下文角色**: 会议中发言人与被提及人的关系推断
+
+**confirmation_status默认值**: `pending`（所有新生成的Promise均为pending，需用户确认后才变为confirmed/rejected）
+
+**confidence阈值兜底**: LLM返回的置信度<0.7时，强制标记为`action_type=unclear`
+
+**evidence_quote提取**: 从原文中截取包含承诺表述的连续片段（≤200字符），经PII脱敏后存储
+
+```python
+from enum import Enum
+
+
+class PromiseActionType(str, Enum):
+    """Promise双向动作6种类型"""
+    MY_PROMISE = "my_promise"           # 我的承诺
+    THEIR_PROMISE = "their_promise"     # 对方的承诺
+    MY_FOLLOWUP = "my_followup"         # 我的跟进事项
+    MUTUAL_ACTION = "mutual_action"     # 共同行动
+    SYSTEM_REMINDER = "system_reminder" # 系统提醒
+    UNCLEAR = "unclear"                 # 不明确
+
+
+class PromiseExtractor:
+    """Promise双向动作识别器"""
+
+    CONFIDENCE_THRESHOLD = 0.7  # 低于此值标记为unclear
+
+    # 主语→方向映射
+    SUBJECT_MAP = {
+        # 第一人称 → my_*
+        "我": "self", "我们": "self", "本人": "self",
+        # 第二人称 → their_
+        "你": "other", "你们": "other", "贵司": "other",
+        # 第三人称 → their_
+        "他": "other", "她": "other", "他们": "other",
+        "张总": "other", "李总": "other", "王总": "other",
+    }
+
+    async def _extract_promises(self, event, entities) -> list:
+        """
+        从互动中提取双向Promise
+        返回: [PromiseRecord, ...]
+        """
+        prompt = (
+            f"从以下互动记录中提取所有承诺性表述：\n"
+            f"{event.raw_text}\n\n"
+            f"对每条承诺，请判断：\n"
+            f"1. action_type: my_promise/their_promise/my_followup/mutual_action/system_reminder\n"
+            f"2. promisor: 谁做出承诺（'user'或具体人名）\n"
+            f"3. beneficiary: 承诺对象（'user'或具体人名）\n"
+            f"4. content: 承诺内容\n"
+            f"5. confidence: 0.0~1.0\n"
+            f"6. evidence_quote: 原文证据片段（≤200字）\n\n"
+            f"仅返回JSON数组。"
+        )
+        result = await self.llm.generate(prompt, max_tokens=1500)
+        raw_promises = self._parse_promises(result)
+
+        promises = []
+        for rp in raw_promises:
+            action_type = self._determine_action_type(rp)
+            confidence = float(rp.get("confidence", 0.5))
+
+            # confidence阈值兜底：<0.7 → unclear
+            if confidence < self.CONFIDENCE_THRESHOLD:
+                action_type = PromiseActionType.UNCLEAR
+
+            promise = {
+                "action_type": action_type.value,
+                "content": rp.get("content", ""),
+                "promisor_id": self._resolve_entity_id(rp.get("promisor"), entities),
+                "beneficiary_id": self._resolve_entity_id(rp.get("beneficiary"), entities),
+                "confirmation_status": "pending",  # 默认值
+                "confidence": confidence,
+                "evidence_quote": self._extract_evidence_quote(
+                    event.raw_text, rp.get("content", "")
+                ),
+                "source_event_id": str(event.id),
+            }
+            promises.append(promise)
+
+        return promises
+
+    def _determine_action_type(self, raw_promise: dict) -> PromiseActionType:
+        """根据LLM输出+规则校验确定最终action_type"""
+        raw_type = raw_promise.get("action_type", "unclear")
+        promisor = raw_promise.get("promisor", "")
+
+        # 规则覆盖：根据promisor修正方向
+        if promisor in ["我", "我们", "本人"]:
+            if raw_type == "my_followup":
+                return PromiseActionType.MY_FOLLOWUP
+            return PromiseActionType.MY_PROMISE
+        elif promisor in ["你", "你们", "贵司"] or any(
+            kw in promisor for kw in ["总", "经理", "总监"]
+        ):
+            return PromiseActionType.THEIR_PROMISE
+        elif "共同" in raw_promise.get("content", "") or "一起" in raw_promise.get("content", ""):
+            return PromiseActionType.MUTUAL_ACTION
+
+        # 尝试直接映射枚举
+        try:
+            return PromiseActionType(raw_type)
+        except ValueError:
+            return PromiseActionType.UNCLEAR
+
+    def _resolve_entity_id(self, name: str, entities: list) -> str | None:
+        """将名称解析为entity ID"""
+        if not name or name in ["user", "我", "我们", "本人"]:
+            return None  # 当前用户不对应实体
+        for e in entities:
+            if name in [e.name] + (e.aliases or []):
+                return str(e.id)
+        return None
+
+    def _extract_evidence_quote(self, raw_text: str, content: str) -> str | None:
+        """从原文中提取证据引用片段"""
+        if not content:
+            return None
+        # 查找content在raw_text中的位置，取前后扩展至200字符
+        idx = raw_text.find(content[:20])
+        if idx >= 0:
+            start = max(0, idx - 50)
+            end = min(len(raw_text), idx + len(content) + 150)
+            return raw_text[start:end]
+        return content[:200]  # 兜底：截取content前200字符
+```
+
+**生成规则**（v2.0更新版）:
+1. LLM分析事件内容，识别所有承诺性表述（不再限于第一人称）
+2. 对每条承诺判定action_type（6选1）
+3. 提取promisor/beneficiary并解析为entity ID
+4. **对方承诺(their_promise)** → 不进入用户Todo列表，存入`relationship_briefs.pending_promises`
+5. **unclear类型** → 不生成任何Todo，仅记录供人工review
+6. 所有Promise默认`confirmation_status=pending`
 
 **优先级计算**（基于到期时间）:
 - 已过期 → priority=1（最高）
@@ -1343,6 +1497,98 @@ class AIOutputFilter:
         return todo_dict
 ```
 
+### 4.9 Todo 降噪算法（v2.0 新增）
+
+> **核心目标**：控制单场事件生成的Todo数量，避免信息过载，确保首页展示高质量可执行项。
+
+#### 4.9.1 单场会议截断规则
+
+| 规则 | 阈值 | 说明 |
+|------|------|------|
+| 单场会议正式Todo上限 | **≤3条** | 按urgency排序后截断，超出部分降级为relationship_briefs记录 |
+| 截断排序依据 | urgency降序 | 已过期(1) > 3天内(2) > 7天内(3) > 无截止日(4) > 远期(5) |
+| 被截断的Todo去向 | `relationship_briefs` | 存入对应person的briefs中，不进入用户Todo列表 |
+
+```python
+class TodoNoiseReducer:
+    """Todo降噪器"""
+
+    MAX_TODOS_PER_EVENT = 3  # 单场会议默认上限
+
+    # 不生成正式Todo的类型（存入relationship_briefs）
+    BRIEF_ONLY_TYPES = {"care", "concern", "need_insight", "contribution"}
+
+    def reduce(self, todos: list, event_type: str = None) -> tuple:
+        """
+        降噪处理
+        返回: (formal_todos: list, brief_records: list)
+        """
+        formal_todos = []
+        brief_records = []
+
+        # Step 1: 过滤不生成正式Todo的类型
+        for todo in todos:
+            todo_type = todo.get("todo_type", "")
+            if todo_type in self.BRIEF_ONLY_TYPES or todo.get("is_concern_derived"):
+                # Concern/NeedInsight/Contribution → 存入relationship_briefs
+                brief_records.append(self._convert_to_brief(todo))
+            else:
+                formal_todos.append(todo)
+
+        # Step 2: 按urgency排序
+        formal_todos.sort(key=lambda t: t.get("priority", 99))
+
+        # Step 3: 截断至上限
+        if len(formal_todos) > self.MAX_TODOS_PER_EVENT:
+            truncated = formal_todos[self.MAX_TODOS_PER_EVENT:]
+            formal_todos = formal_todos[:self.MAX_TODOS_PER_EVENT]
+            # 被截断的也存入briefs
+            for t in truncated:
+                brief_records.append(self._convert_to_brief(t))
+
+        return formal_todos, brief_records
+
+    def _convert_to_brief(self, todo: dict) -> dict:
+        """将Todo转换为relationship_brief记录"""
+        return {
+            "source": "truncated_todo",
+            "original_todo_type": todo.get("todo_type"),
+            "title": todo.get("title"),
+            "priority": todo.get("priority"),
+            "related_entity_id": todo.get("related_entity_id"),
+            "source_event_id": todo.get("source_event_id"),
+            "created_at": datetime.utcnow().isoformat(),
+        }
+```
+
+#### 4.9.2 Concern/NeedInsight/Contribution 不生成正式Todo
+
+| 原始类型 | 处理方式 | 存储位置 | 说明 |
+|---------|---------|---------|------|
+| `care`（关心） | → brief记录 | `relationship_briefs.concerns` | 对方关注点存入关系卡 |
+| `concern`（关注点衍生） | → brief记录 | `relationship_briefs.concerns` | 同上 |
+| `need_insight`（需求洞察） | → brief记录 | `relationship_briefs.need_insights` | 对方需求分析 |
+| `contribution`（贡献记录） | → brief记录 | `relationship_briefs.contributions` | 用户已提供的价值 |
+
+**设计理由**: care/concern类型反映的是"对方的状态"而非"我需要做的事"，放入关系推进卡比放入Todo列表更合适。
+
+#### 4.9.3 首页优先Todo生成条件
+
+> 仅用户确认后的Promise才生成首页优先Todo。
+
+```python
+def should_create_homepage_todo(promise: dict) -> bool:
+    """判断是否应生成首页优先Todo"""
+    # 必须同时满足：
+    # 1. confirmation_status == 'confirmed'（用户已确认）
+    # 2. action_type in ('my_promise', 'my_followup', 'mutual_action')（需用户执行的）
+    confirmed_actions = {"my_promise", "my_followup", "mutual_action"}
+    return (
+        promise.get("confirmation_status") == "confirmed"
+        and promise.get("action_type") in confirmed_actions
+    )
+```
+
 ---
 
 ## 5. Todo状态机
@@ -1499,7 +1745,181 @@ class TodoStateMachine:
 
 ---
 
-## 6. 关联发现8种类型
+## 6. RelationshipStage 状态机（v2.0 新增）
+
+### 6.1 核心原则
+
+> **RS-01硬编码规则**：关系阶段不可仅由AI自动升级，**必须用户确认**。`can_auto_advance()` 永远返回 `False`。
+
+### 6.2 7阶段枚举定义
+
+| 阶段 | 枚举值 | 含义 | 莫兰迪色 |
+|------|--------|------|----------|
+| 新认识 | `new_connection` | 初次接触，基础信息建立 | 雾白 #B8C4C0 |
+| 了解需求 | `understanding_needs` | 已了解对方核心需求与痛点 | 雾蓝 #A0B0C4 |
+| 价值回应 | `value_response` | 已提供有价值的回应或方案 | 雾绿 #A0C4A8 |
+| 合作探索 | `cooperation_exploration` | 双方探讨具体合作方向 | 雾金 #C4C0A0 |
+| 意向确认 | `intent_confirmed` | 合作意向已明确确认 | 雾紫 #B0A0C4 |
+| 执行合作 | `execution` | 正在执行具体合作项目 | 雾绿 #A0C4A8 |
+| 复盘回顾 | `review` | 合作完成后的复盘总结（终态） | 烟粉 #C4A7A0 |
+
+### 6.3 STAGE_TRANSITIONS 字典
+
+```python
+from enum import Enum
+
+
+class RelationshipStage(str, Enum):
+    """关系推进卡7阶段枚举"""
+    NEW_CONNECTION = "new_connection"
+    UNDERSTANDING_NEEDS = "understanding_needs"
+    VALUE_RESPONSE = "value_response"
+    COOPERATION_EXPLORATION = "cooperation_exploration"
+    INTENT_CONFIRMED = "intent_confirmed"
+    EXECUTION = "execution"
+    REVIEW = "review"  # 终态
+
+
+STAGE_TRANSITIONS = {
+    # PoC启用的前3阶段
+    "new_connection": ["understanding_needs"],
+    "understanding_needs": ["value_response", "new_connection"],       # 可退回
+    "value_response": ["cooperation_exploration", "understanding_needs"],
+    # 后续阶段（PoC不启用但定义完整）
+    "cooperation_exploration": ["intent_confirmed", "value_response"],
+    "intent_confirmed": ["execution", "cooperation_exploration"],
+    "execution": ["review", "intent_confirmed"],
+    "review": [],  # 终态，不可转移
+}
+```
+
+> **可退回路径设计**：`understanding_needs → new_connection`、`value_response → understanding_needs` 等，
+> 支持关系降温场景（如对方需求变更、合作暂停）。
+
+### 6.4 RS-01 硬编码规则
+
+```python
+# RS-01硬编码规则：用户确认强制
+def can_auto_advance(stage: str) -> bool:
+    """阶段不可仅由AI自动升级，必须用户确认"""
+    return False  # 永远返回False，强制用户确认
+```
+
+**设计理由**: 关系推进是高度敏感的业务判断，AI可以分析并给出建议，但最终决策权必须属于用户。
+
+### 6.5 推进建议逻辑
+
+AI分析但不自动升级——系统根据以下信号生成推进建议：
+
+| 当前阶段 | 升级条件（建议信号） | 建议目标阶段 |
+|---------|-------------------|-------------|
+| `new_connection` | 已获取对方2个以上关注点/需求 | `understanding_needs` |
+| `understanding_needs` | 已提供针对性方案/帮助且获正面反馈 | `value_response` |
+| `value_response` | 对方表达进一步合作兴趣 | `cooperation_exploration` |
+| `cooperation_exploration` | 双方确认合作方向和范围 | `intent_confirmed` |
+| `intent_confirmed` | 已启动具体项目/合同签署 | `execution` |
+| `execution` | 项目交付完成 | `review` |
+
+```python
+class RelationshipStageStateMachine:
+    """关系阶段状态机（复用todo_state_machine.py的VALID_TRANSITIONS模式）"""
+
+    def __init__(self, brief_id: str):
+        self.brief_id = brief_id
+        self.current_stage = RelationshipStage.NEW_CONNECTION
+
+    def can_transition_to(self, target_stage: RelationshipStage) -> tuple[bool, str]:
+        """检查是否可以转移到目标阶段"""
+        allowed = STAGE_TRANSITIONS.get(self.current_stage.value, [])
+        if target_stage.value in allowed:
+            return True, f"允许从 {self.current_stage.value} 转移到 {target_stage.value}"
+        return False, f"不允许从 {self.current_stage.value} 转移到 {target_stage.value}"
+
+    def transition(self, target_stage: RelationshipStage, confirmed_by_user: bool = False) -> dict:
+        """
+        执行阶段转移
+        - confirmed_by_user=True：用户主动确认，允许转移
+        - confirmed_by_user=False：AI建议，需检查can_auto_advance
+        """
+        if not confirmed_by_user and not can_auto_advance(self.current_stage.value):
+            raise ValueError(f"阶段 {self.current_stage.value} 需要用户确认才能升级")
+
+        can, reason = self.can_transition_to(target_stage)
+        if not can:
+            raise ValueError(reason)
+
+        old_stage = self.current_stage
+        self.current_stage = target_stage
+        return {
+            "brief_id": self.brief_id,
+            "old_stage": old_stage.value,
+            "new_stage": target_stage.value,
+            "confirmed_by_user": confirmed_by_user,
+            "transitioned_at": datetime.utcnow().isoformat(),
+        }
+
+    def suggest_advancement(self, interaction_summary: dict) -> dict | None:
+        """AI分析后生成推进建议（不自动执行）"""
+        current = self.current_stage.value
+        # 根据当前阶段和互动摘要判断是否满足升级条件
+        signals = self._analyze_signals(interaction_summary)
+        if signals.get("ready_to_advance"):
+            next_candidates = STAGE_TRANSITIONS.get(current, [])
+            # 过滤掉退回路径，只建议前进
+            forward_candidates = [s for s in next_candidates if self._is_forward(current, s)]
+            if forward_candidates:
+                return {
+                    "current_stage": current,
+                    "suggested_stage": forward_candidates[0],
+                    "confidence": signals.get("confidence", 0.5),
+                    "reason": signals.get("reason"),
+                    "requires_user_confirmation": True,  # 永远需要用户确认
+                }
+        return None
+
+    def _is_forward(self, from_stage: str, to_stage: str) -> bool:
+        """判断是否为前进（非退回）"""
+        stage_order = [
+            "new_connection", "understanding_needs", "value_response",
+            "cooperation_exploration", "intent_confirmed", "execution", "review",
+        ]
+        try:
+            return stage_order.index(to_stage) > stage_order.index(from_stage)
+        except ValueError:
+            return False
+
+    def _analyze_signals(self, summary: dict) -> dict:
+        """分析互动信号（占位实现）"""
+        # 实际实现中基于concerns数量、promise兑现率、interaction频率等维度
+        return {"ready_to_advance": False}
+```
+
+### 6.6 PATCH /stage 乐观锁实现
+
+```python
+# StageUpdateRequest schema（含version字段用于乐观锁）
+class StageUpdateRequest:
+    stage: str           # 目标阶段
+    reason: str | None   # 变更原因
+    version: int         # 乐观锁版本号（客户端读取时携带）
+
+# 乐观锁校验伪代码
+def update_stage(brief, req: StageUpdateRequest):
+    if brief.version != req.version:
+        raise ConflictError(
+            error="OPTIMISTIC_LOCK_CONFLICT",
+            message="关系推进卡已被其他请求更新，请刷新后重试",
+            current_version=brief.version,
+        )
+    # 更新阶段 + version自增
+    brief.stage = req.stage
+    brief.version += 1
+    brief.updated_at = datetime.utcnow()
+```
+
+---
+
+## 7. 关联发现8种类型
 
 ### 6.1 关联类型总览
 
@@ -1674,7 +2094,7 @@ def discover_supply_chain(self, person_a, person_b) -> tuple:
     return 0.0, {}
 ```
 
-### 6.3 置信度计算通用方法
+### 7.3 置信度计算通用方法
 
 ```python
 class AssociationDiscoveryEngine:
@@ -1712,7 +2132,7 @@ class AssociationDiscoveryEngine:
         return results
 ```
 
-### 6.4 证据链构建
+### 7.4 证据链构建
 
 每条关联记录的`properties`字段存储证据链：
 
@@ -1722,7 +2142,7 @@ class AssociationDiscoveryEngine:
     "source": "alumni",
     "common_schools": ["清华大学"],
     "common_majors": ["计算机科学"],
-    "discovered_at": "2026-06-03T10:00:00Z",
+    "discovered_at": "2026-06-04T10:00:00Z",
     "discovered_by": "AssociationDiscoveryEngine"
   },
   "confidence": 0.95,
@@ -1730,9 +2150,81 @@ class AssociationDiscoveryEngine:
 }
 ```
 
+### 7.5 关联发现冷热分离（v2.0 更新）
+
+> **HOT/COLD分离策略**：将关联发现结果按时效性和活跃度分为两层，优化计算资源和展示优先级。
+
+| 分层 | 定义 | 发现时机 | 展示位置 | 示例 |
+|------|------|---------|---------|------|
+| **HOT（热关联）** | 近30天内有事件触发的关联 | 每次事件处理时实时计算 | 首页/人物详情页置顶 | 同事件共现、近期合作信号 |
+| **COLD（冷关联）** | 历史积累的结构性关联 | 定时任务批量计算（每日/每周） | 人物详情页"潜在关联"区域 | 校友、前同事、同城 |
+
+**HOT关联发现算法**（实时，Step 4 + Step 7）:
+```python
+class HotAssociationDiscoverer:
+    """热关联发现器——每次事件处理时触发"""
+
+    HOT_TYPES = {"co_occurrence", "recent_collaboration", "active_signal"}
+
+    async def discover_hot(self, event: Event, entities: List[Entity]) -> List[Association]:
+        """基于当前事件的实时关联发现"""
+        associations = []
+        for entity in entities:
+            existing = self._find_recently_related(entity, days=30)
+            for related in existing:
+                # 同事件共现 → strength +0.1
+                score = self._calculate_strength(entity, related, event)
+                if score > 0:
+                    associations.append(Association(
+                        source_entity=entity.id,
+                        target_entity=related.id,
+                        relation_type=self._infer_relation(entity, related),
+                        strength=score,
+                        tier="hot",  # 标记为热关联
+                        evidence=[event.id],
+                    ))
+        return associations
+```
+
+**COLD关联发现算法**（批量，定时任务）:
+```python
+class ColdAssociationDiscoverer:
+    """冷关联发现器——定时批量计算"""
+
+    COLD_TYPES = {"alumni", "ex_colleague", "same_city", "competitor",
+                  "tech_overlap", "supply_chain"}
+
+    def discover_cold_batch(self, persons: List[Entity]) -> List[Association]:
+        """全量扫描发现结构性关联"""
+        results = []
+        for i, pa in enumerate(persons):
+            for pb in persons[i+1:]:
+                for assoc_type in self.COLD_TYPES:
+                    confidence, evidence = self._discoverers[assoc_type](pa, pb)
+                    if confidence > 0:
+                        status = "confirmed" if confidence >= 0.70 else "provisional"
+                        results.append({
+                            "association_type": assoc_type,
+                            "confidence": confidence,
+                            "evidence": evidence,
+                            "status": status,
+                            "tier": "cold",  # 标记为冷关联
+                        })
+        return results
+```
+
+**分层展示规则**:
+
+| 场景 | 展示策略 |
+|------|---------|
+| 首页人物卡片 | 仅显示HOT关联（≤3条，按strength排序） |
+| 人物详情页-关联区 | HOT置顶 + COLD折叠展示 |
+| 关系推进卡 | 仅引用HOT关联作为推进依据 |
+| 匹配推荐 | HOT权重×1.5, COLD权重×0.8 |
+
 ---
 
-## 7. 算法性能基准
+## 8. 算法性能基准
 
 ### 7.1 时间复杂度
 
@@ -1755,7 +2247,7 @@ class AssociationDiscoveryEngine:
 | Todo生成 | ≤500ms/事件 | 单事件处理 |
 | Snooze恢复 | ≤100ms/次 | 定时任务 |
 
-### 7.3 Phase1阶段性能目标
+### 8.3 Phase1阶段性能目标
 
 | 指标 | 目标 | 说明 |
 |------|------|------|
@@ -1767,7 +2259,71 @@ class AssociationDiscoveryEngine:
 
 ---
 
-## 8. PoC vs Phase1 vs Phase2算法差异对比
+## 9. 事件处理管线（v2.0 更新）
+
+```
+Event Ingest Pipeline (v2.0):
+  Input(raw_text, event_type, source)
+    │
+    ├─ Step 0: input_scope分类 【v2.0新增，最前面插入】
+    │   └─ InputClassifier.classify(raw_text, event_type)
+    │       返回 {scope, confidence, reason}
+    │       规则兜底：特定关键词触发默认分类
+    │       partner_feedback/internal_review → 终止（不进入后续管线）
+    │
+    │   **安全约束 SC-01**：
+    │   - 客户端传 "auto" 或不传 → 服务端调用 classify()
+    │   - 客户端传具体值 → 仅作为 hint
+    │   - 客户端传非法值 → 返回 400 Bad Request
+    │   - **永远不以客户端传入值作为最终 scope**
+    │
+    ├─ Step 1: 语义路由（接收scope参数）
+    │   └─ 根据(event_type + input_scope)选择处理管线
+    │       identity → 只更新人物基础信息（不抽取关注/承诺）
+    │       relationship_interaction → 完整管线
+    │       meeting_minutes → 完整管线（承诺证据来源）
+    │
+    ├─ Step 2: LLM实体抽取
+    │   └─ 从raw_text中抽取Person/Organization/Topic/Project
+    │
+    ├─ Step 3: 实体归一（5步算法）
+    │   └─ exact → alias → fuzzy → context → llm_reasoning
+    │
+    ├─ Step 4: 关联发现（HOT层——实时计算）
+    │   └─ 共现分析 + 类型推断 + 角色标签推荐
+    │
+    ├─ Step 5: Todo生成 【v2.0重大改造】
+    │   ├─ 接收scope参数，按规则过滤：
+    │   │   partner_feedback/internal_review → 不生成Todo
+    │   │   单场会议 ≤3条（按urgency排序截断）【降噪】
+    │   ├─ Concern/NeedInsight/Contribution → 不生成正式Todo
+    │   │   （存入relationship_briefs对应字段）【降噪】
+    │   ├─ Promise 双向解析（action_type/promisor/beneficiary）
+    │   │   ├─ my_promise/my_followup/mutual_action → 用户Todo
+    │   │   ├─ their_promise → 存入pending_promises（不入Todo列表）
+    │   │   └─ unclear(confidence<0.7) → 不生成
+    │   └─ 仅用户确认后的Promise才生成首页优先Todo
+    │
+    ├─ Step 6: 存储
+    │
+    ├─ Step 7: 关联发现（COLD层——可异步批量计算）
+    │
+    └─ Step 8: 更新RelationshipBrief 【v2.0新增，最后面追加】
+        └─ 创建或更新关系推进卡
+            - 更新current_stage（AI建议+用户确认）
+            - 追加concerns/need_insights/contributions
+            - 记录latest_interaction_id
+            - pending_promises追加对方承诺
+```
+
+> **管线要点**：
+> - Step 0 在最前面执行，决定整条管线的走向
+> - Step 5 集成了双向Promise识别 + 降噪逻辑
+> - Step 8 在所有处理完成后更新关系推进卡
+
+---
+
+## 10. PoC vs Phase1 vs Phase2算法差异对比
 
 | 特性 | PoC | Phase1 | Phase2 |
 |------|-----|--------|--------|
@@ -1804,4 +2360,4 @@ class AssociationDiscoveryEngine:
 
 ---
 
-*本文档为EventLink算法设计的独立完整版。所有算法均与8条铁律保持一致，字段名使用todo_type（非todo_nature）、callability（非availability），敏感度为2级（matchable/no_match），明确排除RBAC/多租户/团队协作/他人资源匹配/原生APP。*
+*本文档为EventLink算法设计v2.0完整版。所有算法与8条铁律保持一致，字段名使用todo_type（非todo_nature）、callability（非availability），敏感度为2级（matchable/no_match），明确排除RBAC/多租户/团队协作/他人资源匹配/原生APP。v2.0新增：InputScope分类器(§0)、Promise双向动作识别(§4.2a)、Todo降噪(§4.9)、RelationshipStage状态机(§6)、Pipeline Step0/8(§9)、关联发现HOT/COLD分离(§7.5)。参考基线：技术设计v2.5 §4。*
