@@ -350,14 +350,24 @@ class NLUIntentClassifier:
                     slots["person"] = matched
 
         elif intent == VoiceIntent.TODO_CREATE:
-            # Extract reminder content after keywords
-            for kw in ("帮我记", "提醒我", "记一下", "加个提醒", "设个提醒"):
+            # Extract reminder content after keywords.
+            # Longer/more specific keywords first to avoid capturing filler words
+            # e.g. "帮我记一下..." → match "记一下" not "帮我记"
+            for kw in ("记一下", "加个提醒", "设个提醒", "提醒我", "帮我记"):
                 idx = text.find(kw)
                 if idx != -1:
                     content = text[idx + len(kw):].strip()
                     if content:
                         slots["content"] = content
                         break
+
+            # Clean common spoken filler from content
+            content = slots.get("content", "")
+            for filler in ("一下", "一个", "这个", "那个"):
+                if content.startswith(filler):
+                    content = content[len(filler):].strip()
+                    slots["content"] = content
+                    break
 
             # Also extract person name from content
             content = slots.get("content", text)
