@@ -144,8 +144,8 @@ class PromiseBidirectionalHandler:
             title=todo.title[:50],
         )
 
-        # Step 1: Try rule-based analysis
-        analysis = self._rule_analyze(todo)
+        # Step 1: Try rule-based analysis (include event raw_text for better matching)
+        analysis = self._rule_analyze(todo, event)
 
         if analysis is not None and analysis.confidence >= 0.80:
             logger.info(
@@ -190,20 +190,27 @@ class PromiseBidirectionalHandler:
 
         return analysis
 
-    def _rule_analyze(self, todo: Todo) -> PromiseAnalysis | None:
+    def _rule_analyze(self, todo: Todo, event: Event | None = None) -> PromiseAnalysis | None:
         """Rule-based promise direction analysis.
 
-        Checks todo title and description against predefined patterns.
-        Returns None if no pattern matches or all matches have low confidence.
+        Checks todo title, description, AND original event text against
+        predefined patterns. Event raw_text is included because LLM-generated
+        todo titles often lose key directionality words like "我答应".
 
         Args:
             todo: The todo item to analyze.
+            event: Optional source event for raw text matching.
 
         Returns:
             PromiseAnalysis if a high-confidence rule matches, else None.
         """
-        # Combine title and description for matching
+        # Combine title + description for matching
         text = f"{todo.title} {(todo.description or '')}"
+
+        # Also include event raw_text — LLM-generated titles often drop
+        # directionality keywords ("我答应", "对方说") that exist in source
+        if event and event.raw_text:
+            text = f"{text} {event.raw_text}"
 
         best_match: PromiseAnalysis | None = None
         best_confidence = 0.0
