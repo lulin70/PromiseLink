@@ -1,5 +1,5 @@
 """API v1 routes."""
 
-from eventlink.api.v1 import entities, events, health, todos
+from eventlink.api.v1 import associations, auth, dashboard, entities, events, health, relationship_briefs, todos, voice
 
-__all__ = ["entities", "events", "health", "todos"]
+__all__ = ["associations", "auth", "dashboard", "entities", "events", "health", "relationship_briefs", "todos", "voice"]

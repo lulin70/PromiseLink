@@ -70,6 +70,27 @@ class Todo(Base):
         UUID(as_uuid=True) if not IS_SQLITE else String(36),
         nullable=False,
     )
+
+    # F-45: Promise bidirectional model (v4.4)
+    action_type: Mapped[str | None] = mapped_column(
+        String(30),
+        nullable=True,
+        index=True,
+    )
+    promisor_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        ForeignKey("entities.id", ondelete="SET NULL"),
+    )
+    beneficiary_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        ForeignKey("entities.id", ondelete="SET NULL"),
+    )
+    confirmation_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    evidence_quote: Mapped[str | None] = mapped_column(Text, nullable=True)
+    evidence_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        nullable=True,
+    )
     
     # Feedback
     feedback: Mapped[str | None] = mapped_column(String(50))  # useful, not_useful, or custom

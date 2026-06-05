@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from eventlink.api.v1 import associations, auth, entities, events, health, todos
+from eventlink.api.v1 import associations, auth, dashboard, entities, events, health, relationship_briefs, todos, voice
 from eventlink.config import get_settings
 from eventlink.core.exceptions import BusinessError, EventLinkError, LLMError
 from eventlink.database import close_db, init_db
@@ -130,6 +130,9 @@ app.include_router(events.router, prefix=settings.api_prefix, tags=["Events"])
 app.include_router(entities.router, prefix=settings.api_prefix, tags=["Entities"])
 app.include_router(associations.router, prefix=settings.api_prefix, tags=["Associations"])
 app.include_router(todos.router, prefix=settings.api_prefix, tags=["Todos"])
+app.include_router(dashboard.router, prefix=settings.api_prefix, tags=["Dashboard"])
+app.include_router(relationship_briefs.router, prefix=settings.api_prefix, tags=["RelationshipBriefs"])
+app.include_router(voice.router, prefix=settings.api_prefix, tags=["Voice"])
 
 
 @app.get("/")

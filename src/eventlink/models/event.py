@@ -59,6 +59,14 @@ class Event(Base):
         index=True,
     )
     pipeline: Mapped[str | None] = mapped_column(String(50))
+
+    # F-44: Input scope classification (v4.4)
+    input_scope: Mapped[str | None] = mapped_column(
+        String(30),
+        nullable=True,
+        index=True,
+    )
+    input_scope_confidence: Mapped[float | None] = mapped_column(nullable=True)
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(nullable=False, default=func.now())
