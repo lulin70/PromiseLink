@@ -21,11 +21,9 @@ Each step opens its own session/transaction, commits, and releases the lock.
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Any
+from datetime import datetime, timezone
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from eventlink.core.logging import get_logger
 from eventlink.models.entity import Entity
@@ -35,11 +33,7 @@ from eventlink.services.association_discovery import AssociationDiscoveryEngine
 from eventlink.services.entity_extractor import EntityExtractor, ExtractionResult
 from eventlink.services.entity_resolution import EntityResolutionEngine
 from eventlink.services.llm_client import LLMClient
-from eventlink.services.memory_provider import (
-    MemoryProvider,
-    NullMemoryProvider,
-    create_memory_provider,
-)
+from eventlink.services.memory_provider import create_memory_provider
 from eventlink.services.todo_generator import TodoGenerator
 
 logger = get_logger("eventlink.pipeline")
@@ -91,7 +85,7 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
 
     result = PipelineResult(
         event_id=str(event_id),
-        started_at=datetime.utcnow(),
+        started_at=datetime.now(timezone.utc),
     )
 
     try:
@@ -386,10 +380,10 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
                 event = db_result.scalar_one_or_none()
                 if event:
                     event.status = "completed"
-                    event.processed_at = datetime.utcnow()
+                    event.processed_at = datetime.now(timezone.utc)
 
         result.status = "completed"
-        result.completed_at = datetime.utcnow()
+        result.completed_at = datetime.now(timezone.utc)
 
         logger.info(
             "pipeline_completed",
@@ -402,7 +396,7 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
         logger.exception("pipeline_error", event_id=str(event_id), error=str(e))
         result.status = "failed"
         result.error = str(e)
-        result.completed_at = datetime.utcnow()
+        result.completed_at = datetime.now(timezone.utc)
 
         # Try to mark event as failed
         try:
@@ -414,7 +408,7 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
                     event = db_result.scalar_one_or_none()
                     if event and event.status == "processing":
                         event.status = "failed"
-                        event.processed_at = datetime.utcnow()
+                        event.processed_at = datetime.now(timezone.utc)
         except Exception:
             logger.error("pipeline_failed_to_mark_failed", event_id=str(event_id))
 
