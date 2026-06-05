@@ -161,7 +161,7 @@ class NLUIntentClassifier:
                 )
 
         # ── action_suggestion: 行动建议 ──
-        action_keywords = ("建议", "该做什么", "下一步", "怎么推进", "我该怎么办", "该联系")
+        action_keywords = ("建议", "该做什么", "下一步", "怎么推进", "我该怎么办", "该联系", "联系谁", "主动联系", "怎么做")
         for kw in action_keywords:
             if kw in text_lower:
                 return NLUResult(
