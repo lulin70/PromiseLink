@@ -61,6 +61,7 @@ class InputScopeClassifier:
 
     def __init__(self, llm_client: LLMClient) -> None:
         self.llm = llm_client
+        self._rule_cache: dict[tuple[str, str], ClassificationResult] = {}  # (event_type, source) → result
 
     async def classify(self, event: Event) -> ClassificationResult:
         """Classify an event's input scope.
@@ -79,9 +80,22 @@ class InputScopeClassifier:
             title=event.title[:50],
         )
 
+        # Check rule cache first (rule-based results are deterministic)
+        cache_key = (event.event_type, event.source or "")
+        if cache_key in self._rule_cache:
+            cached = self._rule_cache[cache_key]
+            logger.debug("classify_cache_hit",
+                scope=cached.scope.value,
+                method="cached_rule",
+                confidence=cached.confidence,
+            )
+            return cached
+
         # Step 1: Try rule-based classification
         rule_result = self._rule_classify(event)
         if rule_result is not None and rule_result.confidence >= self.RULE_CONFIDENCE_THRESHOLD:
+            # Cache rule-based results (deterministic — safe to reuse)
+            self._rule_cache[cache_key] = rule_result
             logger.info(
                 "classify_rule_hit",
                 event_id=str(event.id),

@@ -14,6 +14,7 @@ Uses 3 LLM prompts:
 - Template 12: Care extraction (other party's concerns)
 """
 
+import asyncio
 import json
 import re
 from dataclasses import dataclass, field
@@ -149,28 +150,43 @@ class TodoGenerator:
 
         all_generated: list[GeneratedTodo] = []
 
-        # Step 1 & 2: Always extract promises and cares (Templates 11 & 12)
-        promises = await self._extract_promises(conversation, persons)
-        all_generated.extend(promises)
+        # Step 1 & 2: Parallel extract promises and cares (Templates 11 & 12)
+        promise_care_results = await asyncio.gather(
+            self._extract_promises(conversation, persons),
+            self._extract_cares(conversation, persons),
+            return_exceptions=True,
+        )
 
-        cares = await self._extract_cares(conversation, persons)
+        promises = promise_care_results[0] if not isinstance(promise_care_results[0], Exception) else []
+        cares = promise_care_results[1] if not isinstance(promise_care_results[1], Exception) else []
+        all_generated.extend(promises)
         all_generated.extend(cares)
 
-        # Step 3: Event-type-specific generation
-        if event.event_type in ("meeting", "call"):
-            for extra_type in ("cooperation_signal", "risk"):
-                gen_todo = await self._generate_typed_todo(
-                    todo_type=extra_type,
-                    conversation=conversation,
-                    persons=persons,
-                    user_context=user_context,
-                )
-                if gen_todo:
-                    all_generated.append(gen_todo)
+        for i, r in enumerate(promise_care_results):
+            if isinstance(r, Exception):
+                logger.warning("parallel_todo_extraction_failed",
+                    type=["promises", "cares"][i], error=str(r))
 
-        elif event.event_type == "card_save":
-            # card_save already handled by promise/care above; skip extras
-            pass
+        # Step 3: Event-type-specific generation (parallel where possible)
+        if event.event_type in ("meeting", "call"):
+            extra_results = await asyncio.gather(
+                *[
+                    self._generate_typed_todo(
+                        todo_type=extra_type,
+                        conversation=conversation,
+                        persons=persons,
+                        user_context=user_context,
+                    )
+                    for extra_type in ("cooperation_signal", "risk")
+                ],
+                return_exceptions=True,
+            )
+            for gen_todo in extra_results:
+                if isinstance(gen_todo, Exception):
+                    logger.warning("parallel_typed_todo_failed",
+                        todo_type="unknown", error=str(gen_todo))
+                elif gen_todo is not None:
+                    all_generated.append(gen_todo)
 
         elif event.event_type == "manual":
             gen_followup = await self._generate_typed_todo(
@@ -229,6 +245,14 @@ class TodoGenerator:
         deduplicator = TodoDeduplicator()
         dedup_result = deduplicator.deduplicate(persisted_todos, user_id=str(event.user_id))
         persisted_todos = dedup_result.todos
+
+        # F-46b: DB-level deletion of duplicates
+        if hasattr(dedup_result, 'pending_deletions') and dedup_result.pending_deletions:
+            from sqlalchemy import delete as sql_delete
+            await self.session.execute(
+                sql_delete(Todo).where(Todo.id.in_(dedup_result.pending_deletions))
+            )
+            logger.info("todo_dedup_db_deletion", deleted_ids=len(dedup_result.pending_deletions))
 
         if dedup_result.removed_count > 0:
             logger.info(

@@ -20,6 +20,8 @@ Uses short transactions to avoid holding SQLite write locks during slow LLM call
 Each step opens its own session/transaction, commits, and releases the lock.
 """
 
+import asyncio
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -51,6 +53,7 @@ class PipelineResult:
     error: str | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
+    step_timings: dict[str, float] = field(default_factory=dict)  # step_name → elapsed seconds
 
     @property
     def success(self) -> bool:
@@ -138,7 +141,9 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
                     return result
 
                 # Classify input scope
+                _t0 = time.monotonic()
                 scope_result = await scope_classifier.classify(event)
+                result.step_timings["step0_input_scope"] = time.monotonic() - _t0
                 event.input_scope = scope_result.scope.value
                 event.input_scope_confidence = scope_result.confidence
 
@@ -174,7 +179,9 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
                 result.error = "Event not found during extraction"
                 return result
 
+            _t3 = time.monotonic()
             extraction = await extractor.extract_from_event(event)
+            result.step_timings["step3_extraction"] = time.monotonic() - _t3
             entities = extraction.persisted_entities
             if not entities:
                 entities = list(
@@ -216,10 +223,12 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
             if not db_entities and entities:
                 db_entities = entities
 
+            _t4 = time.monotonic()
             todos = await generator.generate_todos(
                 event=event,
                 entities=db_entities,
             )
+            result.step_timings["step4_todos"] = time.monotonic() - _t4
             await session.commit()
 
         result.todos = todos
@@ -255,13 +264,24 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
             )
             fresh_entities = list(ent_result.scalars().all())
 
-            for todo in fresh_todos:
+            # Parallel promise bidirectional analysis for all todos
+            _t5 = time.monotonic()
+            analysis_tasks = [
+                promise_handler.analyze_todo(
+                    todo=todo,
+                    event=current_event,
+                    entities=fresh_entities,
+                )
+                for todo in fresh_todos
+            ]
+            analysis_results = await asyncio.gather(*analysis_tasks, return_exceptions=True)
+
+            for todo, analysis in zip(fresh_todos, analysis_results):
+                if isinstance(analysis, Exception):
+                    logger.warning("pipeline_promise_analysis_failed",
+                        todo_id=str(todo.id), error=str(analysis))
+                    continue
                 try:
-                    analysis = await promise_handler.analyze_todo(
-                        todo=todo,
-                        event=current_event,
-                        entities=fresh_entities,
-                    )
                     # Apply analysis to todo
                     todo.action_type = analysis.action_type.value
                     todo.promisor_id = analysis.promisor_entity_id
@@ -269,9 +289,11 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
                     todo.confirmation_status = analysis.confirmation_status.value
                     todo.evidence_quote = analysis.evidence_quote
                     todo.evidence_event_id = str(current_event.id) if analysis.evidence_quote else None
-                except Exception as promise_err:
-                    logger.warning("pipeline_promise_analysis_failed",
-                        todo_id=str(todo.id), error=str(promise_err))
+                except Exception as apply_err:
+                    logger.warning("pipeline_promise_apply_failed",
+                        todo_id=str(todo.id), error=str(apply_err))
+
+            result.step_timings["step5_promise_analysis"] = time.monotonic() - _t5
 
             await session.commit()
 
@@ -313,6 +335,7 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
             )
 
         # Step 6: Discover associations (incremental — only new/merged entities)
+        _t6 = time.monotonic()
         async with AsyncSessionLocal() as session:
             async with session.begin():
                 discovery = AssociationDiscoveryEngine(session=session)
@@ -334,8 +357,10 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
                         user_id=str(event.user_id),
                         event_id=str(event_id),
                     )
+        result.step_timings["step6_associations"] = time.monotonic() - _t6
 
         # ── NEW Step 8: Relationship Brief Update (F-47 + F-48) ──
+        _t8 = time.monotonic()
         try:
             from eventlink.services.relationship_brief_service import RelationshipBriefService
 
@@ -370,6 +395,7 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
             logger.debug("pipeline_step8_skipped_relationship_brief_not_available")
         except Exception as step8_err:
             logger.warning("pipeline_step8_error", error=str(step8_err))
+        result.step_timings["step8_briefs"] = time.monotonic() - _t8
 
         # Step 7: Mark event as completed (short transaction)
         async with AsyncSessionLocal() as session:

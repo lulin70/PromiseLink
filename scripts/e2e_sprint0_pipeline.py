@@ -91,6 +91,28 @@ async def run_e2e_validation():
     print(f"  Error:    {result.error or 'None'}")
     print(f"  Success:  {result.success}")
 
+    # Timing breakdown
+    if result.step_timings:
+        print(f"\n  ── TIMING BREAKDOWN ──")
+        step_labels = {
+            "step0_input_scope": "Step 0 (input_scope)",
+            "step3_extraction": "Step 3 (extraction)",
+            "step4_todos": "Step 4 (todo generation)",
+            "step5_promise_analysis": "Step 5 (promise analysis)",
+            "step6_associations": "Step 6 (associations)",
+            "step8_briefs": "Step 8 (briefs)",
+        }
+        for key, label in step_labels.items():
+            val = result.step_timings.get(key)
+            if val is not None:
+                print(f"    {label:30s} {val:7.1f}s")
+        llm_total = sum(
+            v for k, v in result.step_timings.items()
+            if k in ("step0_input_scope", "step3_extraction", "step4_todos", "step5_promise_analysis", "step8_briefs")
+        )
+        print(f"    {'LLM-heavy steps total':30s} {llm_total:7.1f}s")
+        print(f"    {'Total pipeline':30s} {elapsed:7.1f}s")
+
     if result.entities:
         print(f"\n  ── Step 3: Entity Extraction ({len(result.entities)} entities) ──")
         for i, entity in enumerate(result.entities):
@@ -147,7 +169,7 @@ async def run_e2e_validation():
         ("InputScope classified", evt.input_scope is not None),
         ("Todos have action_type", any(t.action_type for t in result.todos)),
         ("No errors", result.error is None),
-        ("Reasonable time", elapsed < 120),  # Should complete within 2min
+        ("Reasonable time", elapsed < 120),  # Should complete within 2min (target <40s after optimization)
     ]
 
     all_pass = True

@@ -416,3 +416,105 @@ class TestMaxTodosPerEventConstant:
     def test_similarity_threshold_value(self):
         """SIMILARITY_THRESHOLD should be 0.6."""
         assert TodoDeduplicator.SIMILARITY_THRESHOLD == 0.6
+
+
+# ── Test: pending_deletions (F-46b: DB-level deletion) ──
+
+
+class TestPendingDeletions:
+    """Test pending_deletions field for DB-level deletion support."""
+
+    def test_pending_deletions_exists_on_result(self):
+        """DeduplicationResult always has pending_deletions attribute."""
+        dedup = TodoDeduplicator()
+        todo = _make_todo()
+        result = dedup.deduplicate([todo], user_id="user-1")
+
+        assert hasattr(result, "pending_deletions")
+        assert isinstance(result.pending_deletions, list)
+
+    def test_empty_list_has_empty_pending_deletions(self):
+        """Empty input → empty pending_deletions."""
+        dedup = TodoDeduplicator()
+        result = dedup.deduplicate([], user_id="user-1")
+
+        assert result.pending_deletions == []
+        assert len(result.pending_deletions) == 0
+
+    def test_no_removals_has_empty_pending_deletions(self):
+        """No todos removed → empty pending_deletions."""
+        dedup = TodoDeduplicator()
+        todos = _make_todos_same_event_distinct(2)
+        result = dedup.deduplicate(todos, user_id="user-1")
+
+        assert result.removed_count == 0
+        assert result.pending_deletions == []
+
+    def test_per_event_cap_collects_ids_with_persistent_todos(self):
+        """per_event_cap removes todos with IDs → pending_deletions contains those IDs."""
+        dedup = TodoDeduplicator()
+        # 4 todos same event, priorities 1-4 → priority 4 gets capped
+        todos = _make_todos_same_event_distinct(4, priorities=[1, 2, 3, 4])
+        # All have IDs assigned by _make_todo
+        removed_todo = todos[3]  # priority=4, will be capped
+        removed_id = removed_todo.id
+
+        result = dedup.deduplicate(todos, user_id="user-1")
+
+        assert result.removed_count == 1
+        assert len(result.pending_deletions) == 1
+        assert removed_id in result.pending_deletions
+
+    def test_similarity_dedup_collects_ids(self):
+        """Similarity dedup removes todo with ID → pending_deletions contains that ID."""
+        dedup = TodoDeduplicator()
+
+        existing = [_make_todo(title="发送AI项目资料给李总", priority=1)]
+        new_todo = _make_todo(title="发送AI项目资料给李总", priority=5)
+        new_id = new_todo.id
+
+        result = dedup.deduplicate([new_todo], user_id="user-1", existing_todos=existing)
+
+        assert result.removed_count == 1
+        assert len(result.pending_deletions) == 1
+        assert new_id in result.pending_deletions
+
+    def test_within_batch_dedup_collects_ids(self):
+        """Within-batch dedup removes todo with ID → pending_deletions contains that ID."""
+        dedup = TodoDeduplicator()
+
+        todo_high = _make_todo(title="发送AI资料给李总", priority=1)
+        todo_low = _make_todo(title="发送AI项目资料给李总", priority=3, source_event_id=str(uuid.uuid4()))
+        low_id = todo_low.id
+
+        result = dedup.deduplicate([todo_high, todo_low], user_id="user-1")
+
+        assert result.removed_count == 1
+        assert len(result.pending_deletions) == 1
+        assert low_id in result.pending_deletions
+
+    def test_multiple_removals_collect_all_ids(self):
+        """Multiple removals across different rules → all IDs in pending_deletions."""
+        dedup = TodoDeduplicator()
+
+        # Same event, 5 distinct-title todos → cap removes 2 (priority 4 and 5)
+        # Use titles with minimal token overlap to avoid triggering within-batch similarity
+        event_id = str(uuid.uuid4())
+        distinct_titles = [
+            "发送项目资料给合作方",
+            "安排下周团队建设活动",
+            "准备季度汇报PPT",
+            "更新客户联系信息",
+            "审核合同条款细节",
+        ]
+        todos = [
+            _make_todo(title=distinct_titles[i], priority=i + 1, source_event_id=event_id)
+            for i in range(5)
+        ]
+        capped_ids = {todos[3].id, todos[4].id}  # priority 4, 5 get capped
+
+        result = dedup.deduplicate(todos, user_id="user-1")
+
+        assert result.removed_count == 2
+        assert len(result.pending_deletions) == 2
+        assert set(result.pending_deletions) == capped_ids

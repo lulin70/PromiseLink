@@ -681,3 +681,294 @@ class TestSyncOpenPromisesExcludesDone:
         assert "待完成" in titles
         assert "已做完" not in titles
         assert "已忽略" not in titles
+
+
+# ── Aggregated View API Tests ──────────────────────────────────
+
+
+class TestAPIAggregatedBrief:
+    """Tests for GET /persons/{id}/relationship-brief/aggregated."""
+
+    @pytest.mark.asyncio
+    async def test_aggregated_returns_12_modules(
+        self, api_client, db_session: AsyncSession
+    ):
+        """Aggregated endpoint returns 12 structured modules."""
+        user_id = TEST_USER_ID
+
+        event = Event(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            event_type="manual",
+            source="test",
+            title="dummy",
+            status="completed",
+        )
+        db_session.add(event)
+        await db_session.flush()
+
+        person_entity = Entity(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            entity_type="person",
+            name="王五",
+            canonical_name="王五",
+            properties={"basic": {"company": "YY公司"}},
+            source_event_id=str(event.id),
+        )
+        db_session.add(person_entity)
+        await db_session.flush()
+
+        brief = RelationshipBrief(
+            user_id=user_id,
+            person_entity_id=str(person_entity.id),
+            relationship_stage="understanding_needs",
+            brief_data={
+                "strength_score": 55,
+                "basic_info": {"name": "王五"},
+                "open_promises": {
+                    "my_promises": [{"title": "发送方案"}],
+                    "their_promises": [],
+                },
+                "their_concerns": ["成本问题"],
+                "next_actions": [
+                    {"action": "深入了解需求", "priority": "high"},
+                    {"action": "发送报价单", "priority": "medium"},
+                ],
+                "interaction_freq": {"total_count": 5, "last_30_days": 2},
+                "notes": "重要客户",
+            },
+            version=3,
+        )
+        db_session.add(brief)
+        await db_session.commit()
+
+        response = await api_client.get(
+            f"/api/v1/persons/{person_entity.id}/relationship-brief/aggregated"
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Must have exactly 12 modules
+        modules = data["modules"]
+        assert len(modules) == 12
+
+        module_names = [m["module_name"] for m in modules]
+        for key in [
+            "basic_info", "relationship_stage", "last_interaction",
+            "interaction_freq", "open_promises", "their_concerns",
+            "my_contributions", "cooperation_signals", "risk_flags",
+            "next_actions", "strength_score", "notes",
+        ]:
+            assert key in module_names, f"Missing module: {key}"
+
+    @pytest.mark.asyncio
+    async def test_aggregated_resolves_person_name_and_company(
+        self, api_client, db_session: AsyncSession
+    ):
+        """person_name and person_company resolved from entity."""
+        user_id = TEST_USER_ID
+
+        event = Event(
+            id=str(uuid.uuid4()), user_id=user_id, event_type="manual",
+            source="test", title="dummy", status="completed",
+        )
+        db_session.add(event)
+        await db_session.flush()
+
+        person_entity = Entity(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            entity_type="person",
+            name="赵六",
+            canonical_name="赵六",
+            properties={"company": "ZZ集团"},
+            source_event_id=str(event.id),
+        )
+        db_session.add(person_entity)
+        await db_session.flush()
+
+        brief = RelationshipBrief(
+            user_id=user_id,
+            person_entity_id=str(person_entity.id),
+            relationship_stage="new_connection",
+            brief_data={},
+            version=1,
+        )
+        db_session.add(brief)
+        await db_session.commit()
+
+        response = await api_client.get(
+            f"/api/v1/persons/{person_entity.id}/relationship-brief/aggregated"
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["person_name"] == "赵六"
+        assert data["person_company"] == "ZZ集团"
+
+    @pytest.mark.asyncio
+    async def test_aggregated_strength_score_mapping(
+        self, api_client, db_session: AsyncSession
+    ):
+        """Strength score correctly maps to label."""
+        user_id = TEST_USER_ID
+
+        event = Event(
+            id=str(uuid.uuid4()), user_id=user_id, event_type="manual",
+            source="test", title="dummy", status="completed",
+        )
+        db_session.add(event)
+        await db_session.flush()
+
+        person_entity = Entity(
+            id=str(uuid.uuid4()),
+            user_id=user_id, entity_type="person", name="测试人",
+            canonical_name="测试人", source_event_id=str(event.id),
+        )
+        db_session.add(person_entity)
+        await db_session.flush()
+
+        # Score >= 80 → 关系稳固
+        brief = RelationshipBrief(
+            user_id=user_id,
+            person_entity_id=str(person_entity.id),
+            relationship_stage="deep_trust",
+            brief_data={"strength_score": 85},
+            version=1,
+        )
+        db_session.add(brief)
+        await db_session.commit()
+
+        response = await api_client.get(
+            f"/api/v1/persons/{person_entity.id}/relationship-brief/aggregated"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["strength_label"] == "关系稳固"
+
+        # Update to low score → 刚建立联系
+        from sqlalchemy.orm.attributes import flag_modified
+        brief.brief_data["strength_score"] = 5
+        flag_modified(brief, "brief_data")
+        await db_session.commit()
+        await db_session.refresh(brief)
+
+        response2 = await api_client.get(
+            f"/api/v1/persons/{person_entity.id}/relationship-brief/aggregated"
+        )
+        assert response2.status_code == 200
+        data2 = response2.json()
+        assert data2["strength_label"] == "刚建立联系"
+
+    @pytest.mark.asyncio
+    async def test_aggregated_open_promises_high_priority(
+        self, api_client, db_session: AsyncSession
+    ):
+        """When open_promises has data, its priority is 'high'."""
+        user_id = TEST_USER_ID
+
+        event = Event(
+            id=str(uuid.uuid4()), user_id=user_id, event_type="manual",
+            source="test", title="dummy", status="completed",
+        )
+        db_session.add(event)
+        await db_session.flush()
+
+        person_entity = Entity(
+            id=str(uuid.uuid4()),
+            user_id=user_id, entity_type="person", name="钱七",
+            canonical_name="钱七", source_event_id=str(event.id),
+        )
+        db_session.add(person_entity)
+        await db_session.flush()
+
+        brief = RelationshipBrief(
+            user_id=user_id,
+            person_entity_id=str(person_entity.id),
+            relationship_stage="value_response",
+            brief_data={
+                "open_promises": {
+                    "my_promises": [{"title": "发送合同"}],
+                    "their_promises": [],
+                },
+            },
+            version=1,
+        )
+        db_session.add(brief)
+        await db_session.commit()
+
+        response = await api_client.get(
+            f"/api/v1/persons/{person_entity.id}/relationship-brief/aggregated"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        op_module = next(m for m in data["modules"] if m["module_name"] == "open_promises")
+        assert op_module["priority"] == "high"
+        assert op_module["has_data"] is True
+
+    @pytest.mark.asyncio
+    async def test_aggregated_empty_module_has_data_false(
+        self, api_client, db_session: AsyncSession
+    ):
+        """Modules with no meaningful data have has_data=False."""
+        user_id = TEST_USER_ID
+
+        event = Event(
+            id=str(uuid.uuid4()), user_id=user_id, event_type="manual",
+            source="test", title="dummy", status="completed",
+        )
+        db_session.add(event)
+        await db_session.flush()
+
+        person_entity = Entity(
+            id=str(uuid.uuid4()),
+            user_id=user_id, entity_type="person", name="孙八",
+            canonical_name="孙八", source_event_id=str(event.id),
+        )
+        db_session.add(person_entity)
+        await db_session.flush()
+
+        # Minimal brief with almost empty data
+        brief = RelationshipBrief(
+            user_id=user_id,
+            person_entity_id=str(person_entity.id),
+            relationship_stage="new_connection",
+            brief_data={
+                "open_promises": {"my_promises": [], "their_promises": []},
+                "their_concerns": [],
+                "my_contributions": [],
+                "risk_flags": [],
+                "next_actions": [],
+                "interaction_freq": {},
+                "last_interaction": {},
+            },
+            version=1,
+        )
+        db_session.add(brief)
+        await db_session.commit()
+
+        response = await api_client.get(
+            f"/api/v1/persons/{person_entity.id}/relationship-brief/aggregated"
+        )
+        assert response.status_code == 200
+        data = response.json()
+
+        # Check empty modules have has_data=False
+        for module in data["modules"]:
+            key = module["module_name"]
+            if key in ("open_promises", "their_concerns", "risk_flags"):
+                assert module["has_data"] is False, (
+                    f"{key} should have has_data=False when empty"
+                )
+                assert module["summary"] == "暂无数据"
+
+    @pytest.mark.asyncio
+    async def test_aggregated_not_found_404(self, api_client):
+        """GET aggregated returns 404 when brief does not exist."""
+        fake_id = str(uuid.uuid4())
+        response = await api_client.get(
+            f"/api/v1/persons/{fake_id}/relationship-brief/aggregated"
+        )
+        assert response.status_code == 404

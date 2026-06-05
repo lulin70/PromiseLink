@@ -8,6 +8,7 @@ Rules (PRD v4.4 F-46 + Algorithm_Design §4.9):
 """
 
 import re
+import uuid
 from dataclasses import dataclass, field
 
 from eventlink.models.todo import Todo
@@ -21,6 +22,7 @@ class DeduplicationResult:
     original_count: int
     removed_count: int
     duplicates: list[dict]  # [{removed_todo, kept_todo, similarity}]
+    pending_deletions: list[uuid.UUID] = field(default_factory=list)  # IDs of persisted todos to delete from DB
 
 
 class TodoDeduplicator:
@@ -69,9 +71,11 @@ class TodoDeduplicator:
                 original_count=0,
                 removed_count=0,
                 duplicates=[],
+                pending_deletions=[],
             )
 
         all_duplicates: list[dict] = []
+        pending_deletions: list[uuid.UUID] = []
 
         # Step 1: Per-event cap
         todos, removed_cap = self._apply_per_event_cap(todos)
@@ -81,15 +85,25 @@ class TodoDeduplicator:
                 "kept_todo": None,
                 "reason": "per_event_cap",
             })
+            if r.id is not None:
+                pending_deletions.append(r.id)
 
         # Step 2: Similarity check against existing todos
         if existing_todos:
             todos, dup_info = self._apply_similarity_dedup(todos, existing_todos)
             all_duplicates.extend(dup_info)
+            for d in dup_info:
+                removed_todo = d.get("removed_todo")
+                if removed_todo is not None and removed_todo.id is not None:
+                    pending_deletions.append(removed_todo.id)
 
         # Step 3: Within-batch similarity dedup
         todos, within_dup_info = self._within_batch_dedup(todos)
         all_duplicates.extend(within_dup_info)
+        for d in within_dup_info:
+            removed_todo = d.get("removed_todo")
+            if removed_todo is not None and removed_todo.id is not None:
+                pending_deletions.append(removed_todo.id)
 
         # Step 4: Sort by priority (ascending: 1=highest first)
         todos.sort(key=lambda t: t.priority)
@@ -99,6 +113,7 @@ class TodoDeduplicator:
             original_count=original_count,
             removed_count=original_count - len(todos),
             duplicates=all_duplicates,
+            pending_deletions=pending_deletions,
         )
 
     def _apply_per_event_cap(self, todos: list[Todo]) -> tuple[list[Todo], list[Todo]]:
