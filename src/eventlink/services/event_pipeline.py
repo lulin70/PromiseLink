@@ -391,6 +391,8 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
                             entity_id=str(entity.id),
                             error=str(brief_err),
                         )
+
+                await session.commit()
         except ImportError:
             logger.debug("pipeline_step8_skipped_relationship_brief_not_available")
         except Exception as step8_err:
