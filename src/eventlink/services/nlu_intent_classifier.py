@@ -148,7 +148,7 @@ class NLUIntentClassifier:
                 )
 
         # ── relationship_status: 关系状态 ──
-        relationship_keywords = ("关系", "进展", "到哪步了", "怎么样", "最近如何", "联系情况")
+        relationship_keywords = ("关系", "进展", "到哪步了", "到哪一步了", "怎么样", "最近如何", "联系情况")
         for kw in relationship_keywords:
             if kw in text_lower:
                 slots = self._extract_slots(query_text, VoiceIntent.RELATIONSHIP_STATUS)
