@@ -223,6 +223,21 @@ class TodoGenerator:
             persisted=len(persisted_todos),
         )
 
+        # F-46: Apply deduplication (v4.4)
+        from eventlink.services.todo_deduplicator import TodoDeduplicator
+
+        deduplicator = TodoDeduplicator()
+        dedup_result = deduplicator.deduplicate(persisted_todos, user_id=str(event.user_id))
+        persisted_todos = dedup_result.todos
+
+        if dedup_result.removed_count > 0:
+            logger.info(
+                "todo_deduplication_applied",
+                original=dedup_result.original_count,
+                final=len(persisted_todos),
+                removed=dedup_result.removed_count,
+            )
+
         return persisted_todos
 
     async def _extract_promises(

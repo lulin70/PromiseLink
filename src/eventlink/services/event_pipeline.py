@@ -1,14 +1,20 @@
 """Event Processing Pipeline — orchestrates the core EventLink loop.
 
-Core loop: 互动记录 → 实体抽取 → Todo生成 → 原始数据存储 → 关联发现 → 状态机
+Core loop: 互动记录 → InputScope分类 → 实体抽取 → Todo生成 → Promise双向分析 → 通知 → 原始数据存储 → 关联发现 → RelationshipBrief更新 → 状态机
 Implements the full processing pipeline from event ingestion to todo generation.
 
-Pipeline stages:
-  1. Entity extraction (EntityExtractor) — extract persons from raw text
-  2. Todo generation (TodoGenerator) — generate action items from event + entities
-  3. Raw data storage (MemoryProvider) — store original text for traceability
-  4. Association discovery (AssociationDiscoveryEngine) — find relationships
-  5. Status update — mark event as completed
+Pipeline stages (9 steps):
+  1. Quick check — verify event exists and is pending
+  2. Status update — mark event as processing
+  3. Input Scope Classification (InputScopeClassifier) — F-44 classify input scope
+  4. Entity extraction (EntityExtractor) — extract persons from raw text
+  5. Todo generation (TodoGenerator) — generate action items from event + entities
+  6. Promise Bidirectional Analysis (PromiseBidirectionalHandler) — F-45+F-46 enrich todos
+  7. Notification — send notifications for new todos
+  8. Raw data storage (MemoryProvider) — store original text for traceability
+  9. Association discovery (AssociationDiscoveryEngine) — find relationships
+ 10. Relationship Brief Update (RelationshipBriefService) — F-47+F-48 update person briefs
+ 11. Status update — mark event as completed
 
 Uses short transactions to avoid holding SQLite write locks during slow LLM calls.
 Each step opens its own session/transaction, commits, and releases the lock.
@@ -124,6 +130,31 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
                 event.status = "processing"
                 event.pipeline = "full"
 
+        # ── NEW Step 0: Input Scope Classification (F-44) ──
+        from eventlink.services.input_scope_classifier import InputScopeClassifier
+
+        scope_classifier = InputScopeClassifier(llm_client=llm_client)
+        async with AsyncSessionLocal() as session:
+            async with session.begin():
+                db_event = await session.execute(select(Event).where(Event.id == str(event_id)))
+                event = db_event.scalar_one_or_none()
+                if not event:
+                    result.status = "failed"
+                    result.error = "Event not found"
+                    return result
+
+                # Classify input scope
+                scope_result = await scope_classifier.classify(event)
+                event.input_scope = scope_result.scope.value
+                event.input_scope_confidence = scope_result.confidence
+
+        logger.info("pipeline_step0_input_scope",
+            event_id=str(event_id),
+            scope=scope_result.scope.value,
+            confidence=scope_result.confidence,
+            method=scope_result.method,
+        )
+
         # Step 3: Entity extraction (LLM call + persist + commit)
         extraction = None
         entities: list[Entity] = []
@@ -205,10 +236,62 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
             todos_generated=len(todos),
         )
 
+        # ── NEW Step 5: Promise Bidirectional Analysis + Deduplication (F-45 + F-46) ──
+        # Note: F-46 dedup is already integrated inside TodoGenerator.generate_todos()
+        # Here we add F-45 promise bidirectional analysis for each generated todo
+        from eventlink.services.promise_bidirectional import PromiseBidirectionalHandler
+
+        promise_handler = PromiseBidirectionalHandler(llm_client=llm_client)
+        async with AsyncSessionLocal() as session:
+            # Re-fetch todos that were just generated
+            todo_result = await session.execute(
+                select(Todo).where(Todo.source_event_id == str(event_id))
+            )
+            fresh_todos = list(todo_result.scalars().all())
+
+            # Re-fetch event for evidence extraction
+            evt_result = await session.execute(
+                select(Event).where(Event.id == str(event_id))
+            )
+            current_event = evt_result.scalar_one()
+
+            # Re-fetch entities for entity mapping
+            ent_result = await session.execute(
+                select(Entity).where(Entity.source_event_id == str(event_id))
+            )
+            fresh_entities = list(ent_result.scalars().all())
+
+            for todo in fresh_todos:
+                try:
+                    analysis = await promise_handler.analyze_todo(
+                        todo=todo,
+                        event=current_event,
+                        entities=fresh_entities,
+                    )
+                    # Apply analysis to todo
+                    todo.action_type = analysis.action_type.value
+                    todo.promisor_id = analysis.promisor_entity_id
+                    todo.beneficiary_id = analysis.beneficiary_entity_id
+                    todo.confirmation_status = analysis.confirmation_status.value
+                    todo.evidence_quote = analysis.evidence_quote
+                    todo.evidence_event_id = str(current_event.id) if analysis.evidence_quote else None
+                except Exception as promise_err:
+                    logger.warning("pipeline_promise_analysis_failed",
+                        todo_id=str(todo.id), error=str(promise_err))
+
+            await session.commit()
+
+        result.todos = fresh_todos  # Update result with enriched todos
+
+        logger.info("pipeline_step5_promise_bidirectional",
+            event_id=str(event_id),
+            todos_enriched=len(fresh_todos),
+        )
+
         # Step 4.5: Send notifications for new todos
         try:
             from eventlink.services.notification_service import notification_service
-            for todo in todos:
+            for todo in result.todos:
                 await notification_service.notify_todo_created(
                     user_id=str(event.user_id),
                     todo_title=todo.title,
@@ -258,6 +341,42 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
                         event_id=str(event_id),
                     )
 
+        # ── NEW Step 8: Relationship Brief Update (F-47 + F-48) ──
+        try:
+            from eventlink.services.relationship_brief_service import RelationshipBriefService
+
+            async with AsyncSessionLocal() as session:
+                brief_service = RelationshipBriefService(session=session, llm_client=llm_client)
+
+                # For each person entity extracted from this event, update their brief
+                for entity in entities:
+                    if entity.entity_type != "person":
+                        continue
+
+                    try:
+                        brief_result = await brief_service.update_brief_from_event(
+                            user_id=str(event.user_id),
+                            person_entity_id=str(entity.id),
+                            event=event,
+                            entities=entities,
+                            todos=result.todos,
+                        )
+                        if brief_result.is_new or brief_result.modules_updated:
+                            logger.info("pipeline_step8_brief_updated",
+                                entity_id=str(entity.id),
+                                is_new=brief_result.is_new,
+                                modules=brief_result.modules_updated,
+                            )
+                    except Exception as brief_err:
+                        logger.warning("pipeline_brief_update_failed",
+                            entity_id=str(entity.id),
+                            error=str(brief_err),
+                        )
+        except ImportError:
+            logger.debug("pipeline_step8_skipped_relationship_brief_not_available")
+        except Exception as step8_err:
+            logger.warning("pipeline_step8_error", error=str(step8_err))
+
         # Step 7: Mark event as completed (short transaction)
         async with AsyncSessionLocal() as session:
             async with session.begin():
@@ -276,7 +395,7 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
             "pipeline_completed",
             event_id=str(event_id),
             entity_count=len(entities),
-            todo_count=len(todos),
+            todo_count=len(result.todos),
         )
 
     except Exception as e:
