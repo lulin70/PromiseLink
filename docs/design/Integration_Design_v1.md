@@ -1,7 +1,7 @@
-# EventLink集成设计文档 0.2.0
+# EventLink集成设计文档 0.2.1
 
-> **版本**: 0.2.0（POC阶段）
-> **日期**: 2026-06-04
+> **版本**: 0.2.1（POC阶段 — Voice Service 详细集成规格）
+> **日期**: 2026-06-05
 > **设计师**: 架构师团队
 > **参考**: PRD v4.3, 技术设计 v2.5, API设计 v1.0, 数据库设计 v2.0, LLM_Prompt_Templates v2.0
 > **状态**: POC阶段 — 共识清单D7-1~D7-11融合修订
@@ -32,7 +32,7 @@
 |---|---------|--------|------|
 | 1 | IAMHERE小程序集成 | P0 | ✅ 设计完成（[D7-4] 微信OAuth code2session流程不变） |
 | 2 | LLM集成设计 | P0 | ✅ 0.2.0更新（Moka AI + 模板0/3更新 + action_type） |
-| 3 | TTS/ASR集成设计 | P0 | ✅ 0.2.0更新（Phase 1：Whisper/Azure Edge-TTS/Mock） |
+| 3 | TTS/ASR集成设计 | P0 | ✅ 0.2.1详细化（ASR:微信同声传译+Whisper+Protocol抽象层 / TTS:Edge-TTS+缓存策略+Protocol抽象层+PII脱敏 / Voice Orchestrator+NLG） |
 | 4 | 微信服务号推送 | P1 | ✅ 设计完成（[D7-7] 模板消息/订阅消息框架不变） |
 | 5 | CarryMem集成设计 | P1 | ✅ 0.2.0更新（三阶段路径：PoC→Phase1→Phase2） |
 | 6 | 数字名片API对接 | P1 | 🔶 接口预留中（[D7-6] 陈宇欣团队+自建备选） |
@@ -1783,7 +1783,11 @@ class MockTTSClient(TTSClient):
 | `todo_remind` | "您有一条待办即将到期" | male_professional | Todo提醒 |
 | `person_brief` | "以下是XX的简要信息" | female_neutral | 人物速览 |
 
-### 4.2 ASR（语音识别）详细设计
+### 4.2 ASR（语音识别）详细设计 [0.2.1详细化]
+
+> **Phase 1.1 首选方案**: 微信小程序同声传译插件（零额外依赖）
+> **Phase 1.2 备选方案**: Whisper local（Taro自建小程序场景）
+> **始终可用 Fallback**: 用户手动文字输入
 
 #### 4.2.1 录音转写流程
 
@@ -1935,7 +1939,407 @@ eventSource.onmessage = (event) => {
 }
 ```
 
-### 4.3 TTS（语音合成）详细设计
+#### 4.2.4 微信小程序同声传译插件（首选, Phase 1.1） [0.2.1新增]
+
+> **定位**: IAMHERE微信小程序内置ASR方案，零额外SDK依赖。
+
+**插件集成方式**:
+
+| 项目 | 说明 |
+|------|------|
+| 录音API | `wx.getRecorderManager()` — 微信原生录音管理器 |
+| 识别插件 | 微信同声传译插件（`wx.getRealtimeSpeechRecognition` 或同声传译插件） |
+| 额外依赖 | 无需引入第三方SDK |
+| 支持格式 | mp3 / tempFile（临时文件路径） |
+| 识别模式 | 实时流式返回 + final result on stop |
+
+**插件配置**:
+```json
+{
+  "plugin": {
+    "weixinSpeechRecognizer": {
+      "version": "2.x",
+      "lang": "zh_CN",
+      "timeout": 15000,
+      "maxDuration": 30000
+    }
+  },
+  "requiredBackgroundModes": ["audioRecord"]
+}
+```
+
+**小程序端集成代码**:
+```javascript
+// 小程序端 — 微信同声传译插件集成
+const plugin = requirePlugin('WechatSI')  // 同声传译插件
+const manager = plugin.getRecordRecognitionManager()
+
+// 开始录音识别
+function startVoiceInput() {
+  manager.onStart(() => {
+    console.log('录音开始')
+    wx.showLoading({ title: '正在聆听...' })
+  })
+
+  manager.onRecognize((res) => {
+    // 中间结果（实时返回文字流）
+    console.log('中间结果:', res.result)
+    updateTranscriptionDisplay(res.result)
+  })
+
+  manager.onStop((res) => {
+    // 最终结果（录音停止时返回）
+    wx.hideLoading()
+    const finalText = res.result
+    console.log('最终转写:', finalText)
+    submitToAPI(finalText)
+  })
+
+  manager.onError((err) => {
+    console.error('识别错误:', err)
+    wx.showToast({ title: '识别失败，请重试', icon: 'none' })
+    // Fallback: 引导用户手动输入
+    showManualInputFallback()
+  })
+
+  // 启动录音（最长30秒）
+  manager.start({
+    lang: 'zh_CN',
+    duration: 30000,
+  })
+}
+
+function stopVoiceInput() {
+  manager.stop()
+}
+
+// 提交转写文本到EventLink API
+async function submitToAPI(text) {
+  const token = wx.getStorageSync('eventlink_token')
+  wx.request({
+    url: `${API_BASE}/api/v1/mini/voice-input`,
+    method: 'POST',
+    header: { 'Authorization': `Bearer ${token}` },
+    data: {
+      transcription: text,
+      source: 'wechat_plugin',  // 标识ASR来源
+      language: 'zh-CN'
+    },
+    success: (res) => {
+      // 跳转到处理结果页
+      handleVoiceResult(res.data)
+    }
+  })
+}
+```
+
+**局限与约束**:
+
+| 局限 | 影响 | 缓解措施 |
+|------|------|---------|
+| 仅微信内可用 | 无法在H5/浏览器使用 | H5端使用Whisper local或引导跳转小程序 |
+| 需要网络连接 | 离线环境不可用 | 提供手动文字输入Fallback |
+| 不支持离线识别 | 弱网场景延迟高 | 增加超时提示 + 自动降级到文字输入 |
+| 单次最长30秒 | 长语音需分段 | UI提示"请分段录制，每段不超过30秒" |
+| 插件版本依赖 | 微信基础库版本要求 | 检测`wx.canIUse`做兼容性降级 |
+
+**Fallback策略**:
+```javascript
+// ASR可用性检测 + Fallback链
+function checkASRAvailability() {
+  if (typeof plugin === 'undefined' || !plugin.getRecordRecognitionManager) {
+    // 插件不可用 → 直接显示手动输入
+    return 'manual_input'
+  }
+
+  // 检查网络状态
+  const networkInfo = wx.getNetworkType()
+  if (networkInfo.networkType === 'none') {
+    return 'manual_input'  // 无网络 → 手动输入
+  }
+
+  return 'voice_input'  // 正常 → 语音录入
+}
+```
+
+#### 4.2.5 Whisper Local（备选, Phase 1.2） [0.2.1新增]
+
+> **定位**: 自建Taro小程序或非微信端场景的ASR备选方案。
+> 服务端部署，支持离线推理（模型加载后无需网络）。
+
+**技术选型**:
+
+| 项目 | 选择 | 说明 |
+|------|------|------|
+| 模型 | `whisper-base` 或 `whisper-small`（中文优化版） | 不选whisper-large（太大，延迟高） |
+| 推理框架 | `faster-whisper`（CTranslate2后端） | 比原始whisper快4x+，内存占用更低 |
+| 运行时 | Python 3.10+ / torch + faster-whisper | 服务端部署 |
+| 延迟目标 | ~1-3s（取决于模型大小和硬件） | base≈1s, small≈2-3s |
+| 部署方式 | 与EventLink后端同容器 或 独立微服务 | PoC阶段同容器即可 |
+
+**服务端实现**:
+```python
+import asyncio
+from faster_whisper import WhisperModel
+from dataclasses import dataclass
+from typing import Optional
+import logging
+
+logger = logging.getLogger(__name__)
+
+@dataclass
+class WhisperConfig:
+    model_size: str = "base"        # base | small | medium (不选large)
+    device: str = "cpu"             # cpu | cuda | auto
+    compute_type: str = "int8"      # int8(快) | float16(准)
+    language: str = "zh"            # 默认中文
+    beam_size: int = 5              # 搜索宽度
+
+
+class WhisperASRProvider:
+    """Whisper Local ASR Provider — Phase 1.2 备选方案"""
+
+    def __init__(self, config: WhisperConfig):
+        self.config = config
+        self._model: Optional[WhisperModel] = None
+
+    async def _load_model(self) -> WhisperModel:
+        """懒加载模型（异步包装同步操作）"""
+        if self._model is None:
+            logger.info(f"[WhisperASR] 加载模型: {self.config.model_size}")
+            loop = asyncio.get_event_loop()
+            self._model = await loop.run_in_executor(
+                None,
+                lambda: WhisperModel(
+                    self.config.model_size,
+                    device=self.config.device,
+                    compute_type=self.config.compute_type,
+                )
+            )
+            logger.info("[WhisperASR] 模型加载完成")
+        return self._model
+
+    async def transcribe(
+        self,
+        audio_bytes: bytes,
+        format: str = "wav",
+        language: Optional[str] = None,
+    ) -> ASRResult:
+        """音频转写 — 输入音频字节，返回结构化结果"""
+        model = await self._load_model()
+
+        # 将字节写入临时文件（faster-whisper需要文件路径）
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=f".{format}", delete=False) as f:
+            f.write(audio_bytes)
+            temp_path = f.name
+
+        try:
+            loop = asyncio.get_event_loop()
+            segments, info = await loop.run_in_executor(
+                None,
+                lambda: model.transcribe(
+                    temp_path,
+                    language=language or self.config.language,
+                    beam_size=self.config.beam_size,
+                )
+            )
+
+            # 组装完整转写文本
+            full_text = "".join(segment.text for segment in segments).strip()
+            duration = info.duration
+            language_detected = info.language
+            probability = info.language_probability
+
+            return ASRResult(
+                text=full_text,
+                duration=duration,
+                language=language_detected,
+                confidence=float(probability),
+                segments=[
+                    {
+                        "text": seg.text.strip(),
+                        "start": round(seg.start, 2),
+                        "end": round(seg.end, 2),
+                    }
+                    for seg in segments
+                ],
+                words=[],  # whisper-base默认不输出word-level timestamps
+            )
+        finally:
+            import os
+            os.unlink(temp_path)
+
+    def health_check(self) -> dict:
+        """健康检查"""
+        return {
+            "provider": "whisper_local",
+            "model_loaded": self._model is not None,
+            "model_size": self.config.model_size,
+            "device": self.config.device,
+        }
+```
+
+**模型选择对比**:
+
+| 模型 | 参数量 | 内存占用 | 延迟(CPU) | 中文准确率 | 推荐场景 |
+|------|--------|---------|-----------|-----------|---------|
+| whisper-tiny | 39M | ~150MB | <0.5s | ~82% | 极低资源/PoC验证 |
+| **whisper-base** | **74M** | **~300MB** | **~1s** | **~88%** | ✅ **PoC首选** |
+| **whisper-small** | **244M** | **~900MB** | **~2-3s** | **~92%** | ✅ **Phase 1.2推荐** |
+| whisper-medium | 769M | ~2.8GB | ~5-8s | ~94% | Phase 2考虑 |
+| whisper-large-v3 | 1550M | ~5.5GB | ~15s+ | ~96% | ❌ 不选（太慢） |
+
+#### 4.2.6 ASR Client 抽象层 [0.2.1新增]
+
+> **设计原则**: Protocol接口 + 多Provider实现 + Mock测试用。
+> 所有ASR调用通过抽象层路由，业务代码不直接依赖具体Provider。
+
+```python
+from typing import Protocol, runtime_checkable
+from dataclasses import dataclass
+from enum import Enum
+
+class ASRProviderType(str, Enum):
+    WECHAT_PLUGIN = "wechat_plugin"
+    WHISPER_LOCAL = "whisper_local"
+    MOCK = "mock"
+
+@dataclass
+class ASRResult:
+    """ASR转写统一结果"""
+    text: str                    # 转写文本
+    duration: float              # 音频时长（秒）
+    language: str                # 检测到的语言
+    confidence: float            # 整体置信度 0.0-1.0
+    segments: list[dict]         # 分段结果 [{"text", "start", "end"}]
+    words: list[dict]            # 词级时间戳 [{"word", "start", "end"}]
+    provider: str = ""           # 来源provider标识
+
+@runtime_checkable
+class ASRProvider(Protocol):
+    """ASR Provider 协议接口"""
+
+    async def transcribe(self, audio_bytes: bytes, format: str = "wav") -> ASRResult:
+        """离线/文件转写"""
+        ...
+
+    @property
+    def provider_type(self) -> ASRProviderType:
+        """Provider类型标识"""
+        ...
+
+
+class WechatASRProvider:
+    """微信同声传译插件 ASR Provider
+
+    注意：此Provider主要在小程序端运行，
+    后端仅负责接收小程序已转写的文本并封装为ASRResult。
+    """
+
+    def __init__(self, config: dict):
+        self.lang = config.get("lang", "zh_CN")
+        self.timeout = config.get("timeout", 15000)
+        self.max_duration = config.get("maxDuration", 30000)
+
+    @property
+    def provider_type(self) -> ASRProviderType:
+        return ASRProviderType.WECHAT_PLUGIN
+
+    async def transcribe(self, audio_bytes: bytes, format: str = "mp3") -> ASRResult:
+        # 微信端的实际转写在小程序侧完成（通过插件）
+        # 此方法用于后端对小程序上传的音频做二次确认/日志记录
+        # 正常流程中，小程序直接提交转写文本
+        raise NotImplementedError(
+            "WechatASRProvider: 转写由小程序端插件完成，"
+            "后端通过 /api/v1/mini/voice-input 接收已转写文本"
+        )
+
+    @staticmethod
+    def from_wechat_payload(payload: dict) -> ASRResult:
+        """从小程序端提交的payload构建ASRResult"""
+        return ASRResult(
+            text=payload.get("transcription", ""),
+            duration=payload.get("duration", 0.0),
+            language=payload.get("language", "zh-CN"),
+            confidence=payload.get("confidence", 0.9),
+            segments=payload.get("segments", []),
+            words=[],
+            provider="wechat_plugin",
+        )
+
+
+class WhisperASRProviderWrapper:
+    """Whisper Local ASR Provider 包装器（适配Protocol接口）"""
+
+    def __init__(self, inner: "WhisperASRProvider"):
+        self._inner = inner
+
+    @property
+    def provider_type(self) -> ASRProviderType:
+        return ASRProviderType.WHISPER_LOCAL
+
+    async def transcribe(self, audio_bytes: bytes, format: str = "wav") -> ASRResult:
+        result = await self._inner.transcribe(audio_bytes, format=format)
+        result.provider = "whisper_local"
+        return result
+
+
+class MockASRProvider:
+    """Mock ASR Provider — 测试用，返回固定转写文本"""
+
+    def __init__(self, mock_text: str = "今天见了张总，讨论了AI项目的合作"):
+        self._mock_text = mock_text
+
+    @property
+    def provider_type(self) -> ASRProviderType:
+        return ASRProviderType.MOCK
+
+    async def transcribe(self, audio_bytes: bytes, format: str = "wav") -> ASRResult:
+        import logging
+        logging.getLogger(__name__).info(
+            f"[MockASR] transcribe: received {len(audio_bytes)} bytes, "
+            f"returning mock text"
+        )
+        return ASRResult(
+            text=self._mock_text,
+            duration=3.0,
+            language="zh-CN",
+            confidence=1.0,
+            segments=[
+                {"text": self._mock_text, "start": 0.0, "end": 3.0}
+            ],
+            words=[],
+            provider="mock",
+        )
+
+
+def create_asr_provider(config: dict) -> ASRProvider:
+    """工厂方法：根据配置创建ASR Provider"""
+    provider_type = config.get("provider", "mock")
+
+    if provider_type == "wechat_plugin":
+        return WechatASRProvider(config.get("wechat", {}))
+    elif provider_type == "whisper_local":
+        whisper_config = WhisperConfig(**config.get("whisper", {}))
+        inner = WhisperASRProvider(whisper_config)
+        return WhisperASRProviderWrapper(inner)
+    else:
+        return MockASRProvider()
+
+
+# 使用示例
+asr_provider = create_asr_provider({
+    "provider": "whisper_local",
+    "whisper": {"model_size": "base", "device": "cpu"}
+})
+```
+
+### 4.3 TTS（语音合成）详细设计 [0.2.1详细化]
+
+> **Phase 1.1 首选方案**: Azure Edge-TTS（免费、高质量、低延迟）
+> **性能优化**: 高频固定回答预合成MP3缓存
+> **安全要求**: TTS输入必须经过PII脱敏处理
 
 #### 4.3.1 TTS接口封装
 
@@ -1990,6 +2394,471 @@ class AliyunTTSClient(TTSClient):
 | 今日简报 | GET /api/v1/digest/morning/tts | female_warm | 摘要模板 |
 | Todo提醒 | 推送触发 | male_professional | Todo描述 |
 
+#### 4.3.3 Azure Edge-TTS（首选, Phase 1.1） [0.2.1新增]
+
+> **定位**: Microsoft Edge在线TTS引擎，免费无限制，高质量中文语音合成。
+> Python包: `pip install edge-tts`
+
+**技术特性**:
+
+| 项目 | 说明 |
+|------|------|
+| SDK | `edge-tts` — Microsoft Edge Read Aloud API的异步Python封装 |
+| 费用 | **完全免费**，无API Key，无调用限额 |
+| 延迟 | ~200-800ms（取决于文本长度和网络） |
+| 音质 | Neural级别，接近Azure Cognitive Services付费版 |
+| SSML支持 | ✅ 完整SSML标记（语速、音调、停顿、多角色） |
+| 离线使用 | ❌ 需要网络连接 |
+| 商用授权 | ⚠️ 个人学习用途OK，生产环境需确认Microsoft授权 |
+
+**中文声音推荐**:
+
+| 声音ID | 性别 | 风格 | 适用场景 |
+|--------|------|------|---------|
+| `zh-CN-XiaoxiaoNeural` | 女性 | 温柔清晰，年轻活力 | 信息播报、日常交互（**默认推荐**） |
+| `zh-CN-YunxiNeural` | 男性 | 沉稳专业，成熟稳重 | 商务播报、正式通知 |
+| `zh-CN-XiaoyiNeural` | 女性 | 活泼亲切，童声感 | 轻松提醒 |
+| `zh-CN-YunjianNeural` | 男性 | 温暖磁性，叙事感强 | 故事化内容 |
+
+**服务端实现**:
+```python
+import edge_tts
+import asyncio
+import logging
+import hashlib
+from pathlib import Path
+from typing import Optional
+from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
+
+# 默认TTS配置
+DEFAULT_VOICE = "zh-CN-XiaoxiaoNeural"
+DEFAULT_RATE = "-10%"       # 稍慢，适合信息播报
+TTS_CACHE_DIR = Path("/var/cache/eventlink/tts")
+
+
+@dataclass
+class EdgeTTSConfig:
+    voice: str = DEFAULT_VOICE
+    rate: str = DEFAULT_RATE      # 语速: "+10%"(快) / "-10%"(慢) / "+0%"(正常)
+    volume: str = "+0%"           # 音量
+    pitch: str = "+0Hz"           # 音调
+
+
+class EdgeTTSProvider:
+    """Azure Edge-TTS Provider — Phase 1.1 首选方案"""
+
+    def __init__(self, config: EdgeTTSConfig = None):
+        self.config = config or EdgeTTSConfig()
+        self._ensure_cache_dir()
+
+    def _ensure_cache_dir(self):
+        """确保缓存目录存在"""
+        TTS_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+    async def synthesize(self, text: str, voice: str = None,
+                         rate: str = None) -> bytes:
+        """文本转语音 → 返回音频字节"""
+        communicate = edge_tts.Communicate(
+            text,
+            voice=voice or self.config.voice,
+            rate=rate or self.config.rate,
+            volume=self.config.volume,
+            pitch=self.config.pitch,
+        )
+
+        audio_bytes = b""
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                audio_bytes += chunk["data"]
+
+        logger.info(
+            f"[EdgeTTS] synthesize: {len(text)}字 → {len(audio_bytes)} bytes"
+        )
+        return audio_bytes
+
+    async def synthesize_to_file(self, text: str, output_path: str,
+                                  voice: str = None, rate: str = None) -> str:
+        """文本转语音 → 保存到文件 → 返回文件路径"""
+        audio_bytes = await self.synthesize(text, voice, rate)
+
+        path = Path(output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(audio_bytes)
+
+        logger.info(f"[EdgeTTS] saved to: {output_path} ({len(audio_bytes)} bytes)")
+        return output_path
+
+    @staticmethod
+    def list_voices() -> list[dict]:
+        """列出所有可用声音"""
+        # edge-tts 支持通过 --list-voices 获取完整列表
+        # 此处返回常用中文声音子集
+        return [
+            {"id": "zh-CN-XiaoxiaoNeural", "gender": "Female", "locale": "zh-CN"},
+            {"id": "zh-CN-YunxiNeural", "gender": "Male", "locale": "zh-CN"},
+            {"id": "zh-CN-XiaoyiNeural", "gender": "Female", "locale": "zh-CN"},
+            {"id": "zh-CN-YunjianNeural", "gender": "Male", "locale": "zh-CN"},
+        ]
+```
+
+**SSML高级用法示例**:
+```xml
+<!-- 使用SSML控制语速、停顿和强调 -->
+<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-CN">
+    <voice name="zh-CN-XiaoxiaoNeural">
+        <prosody rate="-10%">
+            您今天有<emphasis level="strong">3条</emphasis>待办需要处理。
+            <break time="300ms"/>
+            第一条是关于张总的项目跟进，截止日期是明天。
+        </prosody>
+    </voice>
+</speak>
+```
+
+#### 4.3.4 预合成MP3缓存策略（性能优化） [0.2.1新增]
+
+> **核心思路**: 高频固定回答预合成MP3存本地缓存/CDN，避免重复TTS调用。
+> 动态回答走实时TTS。
+
+**缓存架构**:
+```mermaid
+graph LR
+    A[TTS请求] --> B{缓存Key命中?}
+    B -->|是| C[返回缓存MP3 URL]
+    B -->|否| D{是否高频固定文案?}
+    D -->|是| E[Edge-TTS合成]
+    E --> F[写入缓存<br/>TTL=24h]
+    F --> C
+    D -->|否| G[实时Edge-TTS合成]
+    G --> H[返回临时URL<br/>不缓存]
+```
+
+**缓存策略详情**:
+
+| 项目 | 说明 |
+|------|------|
+| 缓存Key | `MD5(answer_text + voice_name + rate)` |
+| 缓存TTL | 24小时（固定回答不会频繁变化） |
+| 存储位置 | `/var/cache/eventlink/tts/`（Docker Volume挂载） |
+| 文件命名 | `{md5_hash}.mp3` |
+| 缓存淘汰 | LRU + TTL过期自动清理 |
+| 访问方式 | 通过静态文件服务或CDN返回MP3 URL |
+
+**高频固定回答列表（建议预合成）**:
+
+| 缓存Key前缀 | 文案示例 | 触发场景 |
+|-------------|---------|---------|
+| `no_meeting_` | "您今天没有安排会议" | 日程查询-空结果 |
+| `no_todo_` | "您当前没有待办事项" | Todo查询-空结果 |
+| `greeting_morning_` | "早上好，今天是X月X日" | 每日简报开头 |
+| `error_asr_` | "抱歉，没有听清，请再说一次" | ASR识别失败 |
+| `confirm_todo_` | "好的，已为您记录" | Todo创建确认 |
+| `person_not_found_` | "未找到该联系人的信息" | 人物查询-无结果 |
+
+**缓存实现**:
+```python
+import hashlib
+import os
+from datetime import datetime, timedelta
+
+
+class CachedTTSProvider:
+    """TTS缓存装饰器 — 包装任意TTSProvider增加缓存层"""
+
+    def __init__(self, inner_provider, cache_dir: Path = TTS_CACHE_DIR,
+                 ttl_hours: int = 24):
+        self._inner = inner_provider
+        self.cache_dir = cache_dir
+        self.ttl = timedelta(hours=ttl_hours)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
+    def _cache_key(self, text: str, voice: str, rate: str) -> str:
+        """生成缓存Key: MD5(text + voice + rate)"""
+        raw = f"{text}|{voice}|{rate}"
+        return hashlib.md5(raw.encode()).hexdigest()
+
+    def _cached_path(self, cache_key: str) -> Path:
+        return self.cache_dir / f"{cache_key}.mp3"
+
+    def _is_valid_cache(self, path: Path) -> bool:
+        """检查缓存是否未过期"""
+        if not path.exists():
+            return False
+        age = datetime.now().timestamp() - path.stat().st_mtime
+        return age < self.ttl.total_seconds()
+
+    async def synthesize(self, text: str, voice: str = None,
+                         rate: str = None) -> bytes:
+        """带缓存的TTS合成"""
+        voice = voice or DEFAULT_VOICE
+        rate = rate or DEFAULT_RATE
+        key = self._cache_key(text, voice, rate)
+        cached_file = self._cached_path(key)
+
+        # 1. 缓存命中且未过期 → 直接返回
+        if self._is_valid_cache(cached_file):
+            logger.debug(f"[CachedTTS] cache hit: {key[:8]}...")
+            return cached_file.read_bytes()
+
+        # 2. 缓存未命中 → 调用底层Provider合成
+        audio_bytes = await self._inner.synthesize(text, voice, rate)
+
+        # 3. 写入缓存（仅对较短文本缓存，避免存储爆炸）
+        if len(text) <= 200:
+            cached_file.write_bytes(audio_bytes)
+            logger.info(f"[CachedTTS] cached: {key[:8]}... ({len(audio_bytes)} bytes)")
+
+        return audio_bytes
+
+    async def synthesize_and_cache(self, text: str, session_id: str = "",
+                                    voice: str = None, rate: str = None) -> str:
+        """合成并返回可访问的URL（供VoiceOrchestrator使用）"""
+        audio_bytes = await self.synthesize(text, voice, rate)
+        voice = voice or DEFAULT_VOICE
+        rate = rate or DEFAULT_RATE
+        key = self._cache_key(text, voice, rate)
+        cached_file = self._cached_path(key)
+
+        # 确保文件已写入
+        if not cached_file.exists():
+            cached_file.write_bytes(audio_bytes)
+
+        # 返回访问URL（静态文件服务路径）
+        return f"/static/tts/cache/{key}.mp3"
+
+    def clear_expired(self) -> int:
+        """清理过期缓存，返回清理数量"""
+        cleared = 0
+        now = datetime.now().timestamp()
+        for f in self.cache_dir.glob("*.mp3"):
+            if now - f.stat().st_mtime > self.ttl.total_seconds():
+                f.unlink()
+                cleared += 1
+        if cleared:
+            logger.info(f"[CachedTTS] cleared {expired} expired files")
+        return cleared
+```
+
+#### 4.3.5 TTS Client 抽象层 [0.2.1新增]
+
+> **设计原则**: Protocol接口 + 多实现 + Mock测试 + 缓存装饰器。
+
+```python
+from typing import Protocol, runtime_checkable
+from enum import Enum
+
+class TTSProviderType(str, Enum):
+    EDGE_TTS = "edge_tts"
+    MOCK = "mock"
+    CACHED = "cached"          # 装饰器包装
+    PRESET_MP3 = "preset_mp3"  # 静态预合成
+
+@runtime_checkable
+class TTSProvider(Protocol):
+    """TTS Provider 协议接口"""
+
+    async def synthesize(self, text: str, voice: str = "", rate: str = "") -> bytes:
+        """文本转语音 → 返回音频字节"""
+        ...
+
+    async def synthesize_to_file(self, text: str, output_path: str) -> str:
+        """文本转语音 → 保存到文件 → 返回路径"""
+        ...
+
+    @property
+    def provider_type(self) -> TTSProviderType:
+        """Provider类型标识"""
+        ...
+
+
+class EdgeTTSProviderWrapper:
+    """Edge-TTS Provider（适配Protocol接口）"""
+
+    def __init__(self, inner: "EdgeTTSProvider"):
+        self._inner = inner
+
+    @property
+    def provider_type(self) -> TTSProviderType:
+        return TTSProviderType.EDGE_TTS
+
+    async def synthesize(self, text: str, voice: str = "",
+                         rate: str = "") -> bytes:
+        return await self._inner.synthesize(text, voice or None, rate or None)
+
+    async def synthesize_to_file(self, text: str, output_path: str) -> str:
+        return await self._inner.synthesize_to_file(text, output_path)
+
+
+class MockTTSProvider:
+    """Mock TTS Provider — 测试用，返回固定音频数据"""
+
+    # 返回一个有效的MP3文件头（最小有效MP3帧）
+    _MOCK_MP3_BYTES: bytes = bytes([
+        0xFF, 0xFB, 0x90, 0x00,  # MP3 frame header (MPEG1 Layer3)
+        0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+        0xFF, 0xFB, 0x90, 0x00,
+    ] * 256  # 重复以模拟 ~4KB 音频数据
+    )
+
+    @property
+    def provider_type(self) -> TTSProviderType:
+        return TTSProviderType.MOCK
+
+    async def synthesize(self, text: str, voice: str = "",
+                         rate: str = "") -> bytes:
+        import logging
+        logging.getLogger(__name__).info(
+            f"[MockTTS] synthesize: text='{text[:30]}...' "
+            f"→ returning mock MP3 ({len(self._MOCK_MP3_BYTES)} bytes)"
+        )
+        return self._MOCK_MP3_BYTES
+
+    async def synthesize_to_file(self, text: str, output_path: str) -> str:
+        from pathlib import Path
+        data = await self.synthesize(text)
+        p = Path(output_path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(data)
+        return output_path
+
+
+class CachedTTSProviderWrapper:
+    """缓存TTS Provider 装饰器（适配Protocol接口）"""
+
+    def __init__(self, inner: TTSProvider, cache_dir: Path = TTS_CACHE_DIR):
+        self._inner = inner
+        self._cache = CachedTTSProvider(inner, cache_dir=cache_dir)
+
+    @property
+    def provider_type(self) -> TTSProviderType:
+        return TTSProviderType.CACHED
+
+    async def synthesize(self, text: str, voice: str = "",
+                         rate: str = "") -> bytes:
+        return await self._cache.synthesize(text, voice, rate)
+
+    async def synthesize_to_file(self, text: str, output_path: str) -> str:
+        return await self._cache.synthesize_to_file(text, output_path)
+
+    async def synthesize_and_cache(self, text: str, session_id: str = "") -> str:
+        """返回可访问的URL"""
+        return await self._cache.synthesize_and_cache(text, session_id)
+
+
+def create_tts_provider(config: dict) -> TTSProvider:
+    """工厂方法：根据配置创建TTS Provider"""
+    provider_type = config.get("provider", "mock")
+
+    if provider_type == "edge_tts":
+        tts_config = EdgeTTSConfig(**config.get("edge_tts", {}))
+        inner = EdgeTTSProvider(tts_config)
+        base = EdgeTTSProviderWrapper(inner)
+        # 默认启用缓存包装
+        if config.get("enable_cache", True):
+            return CachedTTSProviderWrapper(base)
+        return base
+    else:
+        return MockTTSProvider()
+
+
+# 使用示例
+tts_provider = create_tts_provider({
+    "provider": "edge_tts",
+    "edge_tts": {"voice": "zh-CN-XiaoxiaoNeural", "rate": "-10%"},
+    "enable_cache": True,
+})
+```
+
+#### 4.3.6 TTS 输出安全（PII脱敏） [0.2.1新增]
+
+> **安全要求**: TTS输入文本必须经过 PII 脱敏处理，防止敏感信息通过语音泄露。
+> 规则复用 §6.6 数据导出中的 `redact_pii_from_text()` 函数。
+
+**脱敏规则**:
+
+| PII类型 | 正则模式 | 脱敏示例 | 风险等级 |
+|---------|---------|---------|---------|
+| 手机号 | `(\d{3})\d{4}(\d{4})` | `138****1234` | 🔴 高 |
+| 邮箱 | `(\w)\w*(@)` | `u***@example.com` | 🟡 中 |
+| 微信ID | `(wxid_\w{3})\w+` | `wxid_***` | 🟡 中 |
+| 身份证号 | `(\d{6})\d{8}(\d{4})` | `110********1234` | 🔴 高 |
+| 金额模糊化 | `(\d+(?:\.\d+)?)\s*元` | `约XX元`（泛化） | 🟡 中 |
+| 地址泛化 | 具体地址匹配 | `某地` / `某小区` | 🟡 中 |
+
+**安全中间件**:
+```python
+import re
+from functools import wraps
+from typing import Callable, Awaitable
+
+# 复用Security_Design中的6种PII正则规则
+PII_PATTERNS = [
+    ("phone",     r'(\d{3})\d{4}(\d{4})',        r'\1****\2'),
+    ("email",     r'(\w)\w*(@)',                   r'\1***\2'),
+    ("wechat_id", r'(wxid_\w{3})\w+',              r'\1***'),
+    ("id_card",   r'(\d{6})\d{8}(\d{4})',          r'\1********\2'),
+    ("amount",    r'(\d+(?:\.\d+)?)\s*(?:元|块)',  r'约XX元'),
+    ("address",   r'(北京市\w+区)\w+[号栋]',         r'\1某地'),
+]
+
+
+def redact_pii_from_text(text: str) -> str:
+    """对文本进行PII脱敏处理 [复用§6.6]"""
+    result = text
+    for pattern_name, pattern, replacement in PII_PATTERNS:
+        result = re.sub(pattern, replacement, result)
+    return result
+
+
+class TTSSecurityMiddleware:
+    """TTS安全中间件 — 自动对所有TTS输入进行PII脱敏"""
+
+    def __init__(self, tts_provider: TTSProvider):
+        self._provider = tts_provider
+
+    async def safe_synthesize(self, text: str, voice: str = "",
+                               rate: str = "") -> tuple[bytes, dict]:
+        """安全TTS合成：先脱敏，再合成，返回审计日志"""
+        original_text = text
+        redacted_text = redact_pii_from_text(text)
+
+        audit_log = {
+            "original_length": len(original_text),
+            "redacted_length": len(redacted_text),
+            "pii_detected": original_text != redacted_text,
+            "pii_types_found": [],
+        }
+
+        # 检测哪些PII类型被触发了
+        for pattern_name, pattern, _ in PII_PATTERNS:
+            if re.search(pattern, original_text):
+                audit_log["pii_types_found"].append(pattern_name)
+
+        if audit_log["pii_detected"]:
+            import logging
+            logging.getLogger(__name__).warning(
+                f"[TTSSecurity] PII detected and redacted in TTS input: "
+                f"types={audit_log['pii_types_found']}"
+            )
+
+        # 用脱敏后的文本进行TTS合成
+        audio_bytes = await self._provider.synthesize(redacted_text, voice, rate)
+        return audio_bytes, audit_log
+
+
+# 使用示例
+secure_tts = TTSSecurityMiddleware(tts_provider)
+audio_bytes, audit = await secure_tts.safe_synthesize(
+    "张总的电话是13812345678，住在北京朝阳区望京某某小区",
+    voice="zh-CN-XiaoxiaoNeural"
+)
+# audit: {"pii_detected": True, "pii_types_found": ["phone", "address"]}
+# 实际TTS输入: "张总的电话是138****1234，住在北京朝阳区某地"
+```
+
 ### 4.4 多语言支持
 
 | 语言 | ASR | TTS | 说明 |
@@ -2027,6 +2896,650 @@ def detect_language(text: str) -> str:
 | ASR API超时 | 重试2次 | "语音识别超时，请稍后重试" |
 | TTS合成失败 | 降级到文字展示 | "语音播报暂时不可用" |
 | 语言不支持 | 降级到中文 | "暂不支持该语言的语音识别" |
+
+---
+
+## 4.6 Voice Orchestrator — 语音问答流程编排器 [0.2.1新增]
+
+> **定位**: 将 ASR → NLU → API调用 → NLG → TTS 串联为完整语音问答 Pipeline。
+> 复用现有 LLM 基础设施（Moka AI）和 Query Orchestrator。
+
+### 4.6.1 架构总览
+
+```mermaid
+graph TB
+    A[用户语音输入] --> B[ASR: 转写文本]
+    B --> C[NLU: 意图识别+槽位填充]
+    C --> D{意图是否清晰?}
+    D -->|UNCLEAR| E[澄清回复 NLG]
+    D -->|清晰| F[Query Orchestrator<br/>调用现有API]
+    F --> G[结构化数据]
+    G --> H[NLG: 自然语言生成]
+    H --> I[TTS: 文本转语音]
+    I --> J[VoiceResponse<br/>音频URL + 文本]
+
+    E --> K[TTSSecurityMiddleware<br/>PII脱敏]
+    I --> K
+    K --> J
+
+    style A fill:#B0A0C4
+    style J fill:#A0C4A8
+    style K fill:#C4A7A0
+```
+
+**Pipeline 5步流程**:
+
+| 步骤 | 组件 | 输入 | 输出 | 复用模块 |
+|------|------|------|------|---------|
+| Step 1 | NLU 意图识别 | 用户查询文本 | IntentResult（意图+置信度） | InputClassifier 扩展 |
+| Step 2 | 槽位填充 | IntentResult + 原文 | Slots（参数映射） | SlotFiller（LLM模板） |
+| Step 3 | API 调用 | Intent + Slots + UserID | 结构化数据 | QueryOrchestrator（现有） |
+| Step 4 | NLG 回答生成 | Intent + Data + Slots | 自然语言回答文本 | Moka AI LLM（新Prompt） |
+| Step 5 | TTS 音频生成 | 回答文本 | 音频URL | Edge-TTS / CachedTTS |
+
+### 4.6.2 核心实现
+
+```python
+import uuid
+import logging
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Optional, Any
+
+logger = logging.getLogger(__name__)
+
+
+# ====== 数据模型 ======
+
+class VoiceIntent(str, Enum):
+    """语音问答支持的意图类型"""
+    SCHEDULE_QUERY = "schedule_query"       # 日程查询
+    TODO_QUERY = "todo_query"               # 待办查询
+    PERSON_QUERY = "person_query"           # 人物信息查询
+    DIGEST_MORNING = "digest_morning"       # 今日简报
+    CREATE_TODO = "create_todo"             # 创建待办
+    UNCLEAR = "unclear"                     # 意图不清晰
+    GREETING = "greeting"                   # 打招呼
+
+
+@dataclass
+class IntentResult:
+    """NLU 意图识别结果"""
+    intent: VoiceIntent
+    confidence: float            # 0.0-1.0
+    raw_query: str              # 原始查询文本
+    slots: dict = field(default_factory=dict)   # 已提取的槽位
+    reasoning: str = ""         # 识别理由
+
+
+@dataclass
+class VoiceResponse:
+    """语音问答最终响应"""
+    session_id: str
+    intent: VoiceIntent
+    answer_text: str            # 回答文本（已脱敏）
+    tts_url: str                # TTS音频访问URL
+    source_data: Optional[dict] = None  # 原始API返回数据
+    pii_redacted: bool = False  # 是否经过了PII脱敏
+    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+
+
+# ====== Voice Orchestrator 主类 ======
+
+class VoiceOrchestrator:
+    """语音问答流程编排器 [0.2.1新增]
+
+    职责：
+    1. 串联 ASR→NLU→API→NLG→TTS 完整Pipeline
+    2. 协调各组件间的数据流转
+    3. 处理异常和降级策略
+    4. 确保TTS输出经过PII脱敏
+    """
+
+    def __init__(
+        self,
+        nlu_classifier,          # NLU分类器（复用InputClassifier扩展）
+        slot_filler,             # 槽位填充器
+        query_orchestrator,      # Query Orchestrator（现有API编排）
+        nlg_generator,           # NLG生成器
+        tts_service,             # TTS服务（带缓存）
+        tts_security,            # TTS安全中间件（PII脱敏）
+        config: dict = None,
+    ):
+        self.nlu = nlu_classifier
+        self.slot_filler = slot_filler
+        self.query_orchestrator = query_orchestrator
+        self.nlg = nlg_generator
+        self.tts = tts_service
+        self.tts_security = tts_security
+        self.config = config or {}
+
+    async def process(
+        self,
+        query_text: str,
+        user_id: str,
+        session_id: str = None,
+    ) -> VoiceResponse:
+        """处理一次完整的语音问答请求
+
+        Args:
+            query_text: ASR转写的用户查询文本
+            user_id: 用户ID
+            session_id: 会话ID（可选，不传则自动生成）
+
+        Returns:
+            VoiceResponse: 包含回答文本、TTS URL、原始数据等
+        """
+        session_id = session_id or str(uuid.uuid4())
+        logger.info(f"[VoiceOrch] session={session_id[:8]}... query='{query_text[:50]}'")
+
+        # ========== Step 1: NLU 意图识别 ==========
+        try:
+            intent_result = await self.nlu.classify(query_text)
+            logger.info(
+                f"[VoiceOrch] Step1 NLU: intent={intent_result.intent.value} "
+                f"conf={intent_result.confidence:.2f}"
+            )
+        except Exception as e:
+            logger.error(f"[VoiceOrch] NLU失败: {e}, 降级为UNCLEAR")
+            intent_result = IntentResult(
+                intent=VoiceIntent.UNCLEAR,
+                confidence=0.0,
+                raw_query=query_text,
+                reasoning="NLU service error",
+            )
+
+        # ---------- 意图不清晰 → 返回澄清回复 ----------
+        if intent_result.intent == VoiceIntent.UNCLEAR:
+            return await self._unclear_response(intent_result, session_id)
+
+        # ========== Step 2: 槽位填充 + 参数映射 ==========
+        try:
+            slots = await self.slot_filler.fill(intent_result, query_text)
+            logger.info(f"[VoiceOrch] Step2 Slots: {slots}")
+        except Exception as e:
+            logger.warning(f"[VoiceOrch] 槽位填充失败: {e}, 使用空slots")
+            slots = intent_result.slots or {}
+
+        # ========== Step 3: 调用现有API (Query Orchestrator) ==========
+        try:
+            api_result = await self.query_orchestrator.execute(
+                intent=intent_result.intent,
+                slots=slots,
+                user_id=user_id,
+            )
+            logger.info(f"[VoiceOrch] Step3 API: OK")
+        except Exception as e:
+            logger.error(f"[VoiceOrch] API调用失败: {e}")
+            # API失败时生成错误回复
+            return await self._error_response(
+                intent_result, session_id, error=str(e)
+            )
+
+        # ========== Step 4: NLG 回答生成 ==========
+        try:
+            answer_text = await self.nlg.generate(
+                intent=intent_result.intent,
+                data=api_result,
+                slots=slots,
+            )
+            logger.info(f"[VoiceOrch] Step4 NLG: '{answer_text[:50]}...'")
+        except Exception as e:
+            logger.error(f"[VoiceOrch] NLG失败: {e}, 使用默认回复")
+            answer_text = self._default_answer(intent_result.intent, api_result)
+
+        # ========== Step 5: TTS 音频生成（经过PII脱敏） ==========
+        try:
+            tts_url = await self.tts_security.safe_synthesize_to_url(
+                text=answer_text,
+                voice=self.config.get("tts_voice", "zh-CN-XiaoxiaoNeural"),
+                rate=self.config.get("tts_rate", "-10%"),
+            )
+            logger.info(f"[VoiceOrch] Step5 TTS: url={tts_url}")
+        except Exception as e:
+            logger.error(f"[VoiceOrch] TTS失败: {e}")
+            tts_url = ""  # TTS失败时仅返回文字
+
+        return VoiceResponse(
+            session_id=session_id,
+            intent=intent_result.intent,
+            answer_text=answer_text,
+            tts_url=tts_url,
+            source_data=getattr(api_result, 'raw', api_result) if api_result else None,
+            pii_redacted=True,  # TTSSecurityMiddleware保证
+        )
+
+    # ========== 内部方法 ==========
+
+    async def _unclear_response(
+        self, intent_result: IntentResult, session_id: str
+    ) -> VoiceResponse:
+        """意图不清晰时的回复"""
+        unclear_text = (
+            "抱歉，我不太确定您想问什么。您可以试试问我：\n"
+            '"今天有什么安排？" 或 "张总的联系方式是什么？"'
+        )
+        tts_url = ""
+        try:
+            tts_url = await self.tts_security.safe_synthesize_to_url(text=unclear_text)
+        except Exception:
+            pass
+
+        return VoiceResponse(
+            session_id=session_id,
+            intent=VoiceIntent.UNCLEAR,
+            answer_text=unclear_text,
+            tts_url=tts_url,
+        )
+
+    async def _error_response(
+        self, intent_result: IntentResult, session_id: str, error: str
+    ) -> VoiceResponse:
+        """API调用失败时的回复"""
+        error_text = "抱歉，暂时无法获取该信息，请稍后再试。"
+        tts_url = ""
+        try:
+            tts_url = await self.tts_security.safe_synthesize_to_url(text=error_text)
+        except Exception:
+            pass
+
+        return VoiceResponse(
+            session_id=session_id,
+            intent=intent_result.intent,
+            answer_text=error_text,
+            tts_url=tts_url,
+        )
+
+    @staticmethod
+    def _default_answer(intent: VoiceIntent, data: Any) -> str:
+        """NLG降级：基于意图类型的默认文字回复"""
+        defaults = {
+            VoiceIntent.SCHEDULE_QUERY: "日程信息已获取。",
+            VoiceIntent.TODO_QUERY: "待办信息已获取。",
+            VoiceIntent.PERSON_QUERY: "人物信息已获取。",
+            VoiceIntent.DIGEST_MORNING: "今日简报已准备就绪。",
+            VoiceIntent.CREATE_TODO: "待办事项已记录。",
+        }
+        return defaults.get(intent, "好的，已为您处理。")
+```
+
+### 4.6.3 API端点设计
+
+**端点**: `POST /api/v1/voice/query`
+
+**请求**:
+```json
+{
+  "query_text": "我今天有什么会议",
+  "user_id": "uuid-of-user",
+  "session_id": "optional-existing-session",
+  "source": "wechat_plugin",
+  "language": "zh-CN"
+}
+```
+
+**响应**:
+```json
+{
+  "session_id": "sess_abc123",
+  "intent": "schedule_query",
+  "answer_text": "您今天有2个会议：上午10点产品评审会，下午3点与张总的项目对接会。",
+  "tts_url": "/static/tts/cache/a1b2c3d4.mp3",
+  "pii_redacted": true,
+  "source_data": {
+    "meetings": [
+      {"title": "产品评审会", "time": "10:00", "duration": "2h"},
+      {"title": "项目对接会", "time": "15:00", "participant": "张总"}
+    ]
+  },
+  "created_at": "2026-06-05T10:30:00Z"
+}
+```
+
+**错误响应**:
+
+| 错误码 | 说明 | HTTP状态码 |
+|--------|------|-----------|
+| E4001 | 查询文本为空 | 400 |
+| E4002 | ASR转写结果过长(>200字) | 400 |
+| E4003 | 用户未认证 | 401 |
+| E5001 | NLU服务不可用 | 503 |
+| E5002 | TTS合成失败 | 503 |
+
+### 4.6.4 降级策略
+
+```mermaid
+graph TD
+    A[Voice Query] --> B{Step1 NLU}
+    B -->|失败| C[UNCLEAR意图 → 固定澄清文案]
+    B -->|成功| D{Step3 API}
+    D -->|失败| E[固定错误文案]
+    D -->|成功| F{Step4 NLG}
+    F -->|失败| G[_default_answer降级]
+    F -->|成功| H{Step5 TTS}
+    H -->|失败| I[仅返回文字<br/>tts_url为空]
+    H -->|成功| J[完整VoiceResponse]
+
+    style C fill:#C4A7A0
+    style E fill:#C4A7A0
+    style G fill:#B8C4C0
+    style I fill:#B8C4C0
+    style J fill:#A0C4A8
+```
+
+| 失败步骤 | 降级行为 | 用户体验影响 |
+|---------|---------|------------|
+| Step 1 NLU | 返回UNCLEAR固定文案 + TTS | 中等（可引导用户重新提问） |
+| Step 3 API | 返回错误提示 + TTS | 低（告知稍后重试） |
+| Step 4 NLG | 使用 `_default_answer()` 降级 | 低（信息量减少但可用） |
+| Step 5 TTS | 仅返回文字（`tts_url=""`） | 低（前端展示文字即可） |
+
+---
+
+## 4.7 NLG（Natural Language Generation）— 自然语言生成 [0.2.1新增]
+
+> **策略**: Prompt-based NLG（非训练模型）。
+> 使用 Moka AI LLM 将结构化数据转换为自然语言口语化回答。
+> **每种意图一个 NLG Prompt 模板**，无需训练数据，灵活可调。
+
+### 4.7.1 设计原则
+
+| 原则 | 说明 |
+|------|------|
+| Prompt驱动 | 不训练NLG模型，使用LLM +精心设计的Prompt模板 |
+| 口语化输出 | 生成的文本适合TTS播报（短句、无markdown、无特殊格式） |
+| 一意图一模板 | 每种VoiceIntent对应独立的NLG Prompt |
+| 长度控制 | 回答控制在50字以内（适合语音播报） |
+| PII感知 | 输出文本会经过TTS安全中间件的PII脱敏 |
+| 可调试 | 每次NLG调用记录prompt和原始输出，便于迭代优化 |
+
+### 4.7.2 NLG Prompt模板库
+
+#### 日程查询（schedule_query）
+
+```
+你是一个商务助手的语音回答生成器。根据以下日程数据，生成简洁自然的口语化中文回答（适合TTS播报）。
+
+要求：
+- 控制在50字以内
+- 包含时间和关键信息
+- 无会议时友好告知
+- 不要用markdown或特殊格式
+- 用"您"称呼用户
+
+日程数据：{api_result_json}
+
+生成回答：
+```
+
+**输出示例**:
+- 有会议: `"您今天有2个会议：上午10点产品评审会，下午3点与张总的项目对接会。"`
+- 无会议: `"您今天没有安排会议，可以好好休息一下。"`
+
+#### 待办查询（todo_query）
+
+```
+你是一个商务助手的语音回答生成器。根据以下待办数据，生成简洁自然的口语化中文回答（适合TTS播报）。
+
+要求：
+- 控制在50字以内
+- 按优先级排序提及（高优先级先说）
+- 无待办时正向表达
+- 不要用markdown或特殊格式
+
+待办数据：{api_result_json}
+
+生成回答：
+```
+
+**输出示例**:
+- 有待办: `"您有3条待办需要处理：最重要的是明天前给李总发资料，还有跟进王明的AI项目。"`
+- 无待办: `"太棒了！您当前没有待办事项，一切井井有条。"`
+
+#### 人物查询（person_query）
+
+```
+你是一个商务助手的语音回答生成器。根据以下人物信息，生成简洁自然的口语化中文回答（适合TTS播报）。
+
+要求：
+- 控制在50字以内
+- 包含姓名、公司、职位等关键信息
+- 未找到时友好告知
+- 敏感信息（电话、地址）不要直接说出
+- 不要用markdown或特殊格式
+
+人物数据：{api_result_json}
+
+生成回答：
+```
+
+**输出示例**:
+- 找到了: `"张三是智源AI科技的CEO，主要做人工智能方向，你们上次讨论过合作事宜。"`
+- 未找到: `"抱歉，没有找到这位联系人的信息。"`
+
+#### 今日简报（digest_morning）
+
+```
+你是一个商务助手的语音回答生成器。根据以下今日简报数据，生成温暖自然的晨间口语中文（适合TTS播报）。
+
+要求：
+- 控制在80字以内（简报内容较多）
+- 以问候语开头（如"早上好"）
+- 正向积极的语气
+- 包含关键数字（几个待办、几个提醒）
+- 不要用markdown或特殊格式
+
+简报数据：{api_result_json}
+
+生成回答：
+```
+
+**输出示例**: `"早上好！今天是6月5日星期五。您今天有2个会议和3条待办需要处理，另外李总的项目跟进今天到期，记得关注哦。"`
+
+#### 创建待办确认（create_todo）
+
+```
+你是一个商务助手的语音回答生成器。根据以下新建待办数据，生成简洁自然的确认性口语中文（适合TTS播报）。
+
+要求：
+- 控制在30字以内
+- 确认语气（让用户知道已记录）
+- 提及关键信息（什么待办、什么时候）
+- 不要用markdown或特殊格式
+
+待办数据：{api_result_json}
+
+生成回答：
+```
+
+**输出示例**: `"好的，已为您记录：明天前给李总发送AI项目资料。"`
+
+### 4.7.3 NLG Generator 实现
+
+```python
+from typing import Optional
+from enum import Enum
+
+
+class NLGTemplate(Enum):
+    """NLG Prompt模板枚举"""
+    SCHEDULE_QUERY = "schedule_query"
+    TODO_QUERY = "todo_query"
+    PERSON_QUERY = "person_query"
+    DIGEST_MORNING = "digest_morning"
+    CREATE_TODO = "create_todo"
+
+
+# Prompt模板注册表
+NLG_PROMPTS: dict[NLGTemplate, str] = {
+    NLGTemplate.SCHEDULE_QUERY: """你是一个商务助手的语音回答生成器。根据以下日程数据，生成简洁自然的口语化中文回答（适合TTS播报）。
+要求：
+- 控制在50字以内
+- 包含时间和关键信息
+- 无会议时友好告知
+- 不要用markdown或特殊格式
+- 用"您"称呼用户
+
+日程数据：{data}
+
+生成回答：""",
+
+    NLGTemplate.TODO_QUERY: """你是一个商务助手的语音回答生成器。根据以下待办数据，生成简洁自然的口语化中文回答（适合TTS播报）。
+要求：
+- 控制在50字以内
+- 按优先级排序提及（高优先级先说）
+- 无待办时正向表达
+- 不要用markdown或特殊格式
+
+待办数据：{data}
+
+生成回答：""",
+
+    NLGTemplate.PERSON_QUERY: """你是一个商务助手的语音回答生成器。根据以下人物信息，生成简洁自然的口语化中文回答（适合TTS播报）。
+要求：
+- 控制在50字以内
+- 包含姓名、公司、职位等关键信息
+- 未找到时友好告知
+- 敏感信息（电话、地址）不要直接说出
+- 不要用markdown或特殊格式
+
+人物数据：{data}
+
+生成回答：""",
+
+    NLGTemplate.DIGEST_MORNING: """你是一个商务助手的语音回答生成器。根据以下今日简报数据，生成温暖自然的晨间口语中文（适合TTS播报）。
+要求：
+- 控制在80字以内
+- 以问候语开头（如"早上好"）
+- 正向积极的语气
+- 包含关键数字（几个待办、几个提醒）
+- 不要用markdown或特殊格式
+
+简报数据：{data}
+
+生成回答：""",
+
+    NLGTemplate.CREATE_TODO: """你是一个商务助手的语音回答生成器。根据以下新建待办数据，生成简洁自然的确认性口语中文（适合TTS播报）。
+要求：
+- 控制在30字以内
+- 确认语气（让用户知道已记录）
+- 提及关键信息（什么待办、什么时候）
+- 不要用markdown或特殊格式
+
+待办数据：{data}
+
+生成回答：""",
+}
+
+
+class NLGGenerator:
+    """自然语言生成器 — Prompt-based NLG [0.2.1新增]
+
+    复用 Moka AI LLM Client，通过精心设计的Prompt模板
+    将结构化API数据转换为口语化中文回答。
+    """
+
+    def __init__(self, llm_client, config: dict = None):
+        """
+        Args:
+            llm_client: Moka AI LLMClient 实例（复用现有基础设施）
+            config: NLG配置（temperature, max_tokens等）
+        """
+        self.llm = llm_client
+        self.config = config or {
+            "temperature": 0.3,     # 低温度保证一致性
+            "max_tokens": 200,      # 足够生成50-80字中文
+        }
+
+    def _resolve_template(self, intent: VoiceIntent) -> str:
+        """根据意图类型选择Prompt模板"""
+        mapping = {
+            VoiceIntent.SCHEDULE_QUERY: NLGTemplate.SCHEDULE_QUERY,
+            VoiceIntent.TODO_QUERY: NLGTemplate.TODO_QUERY,
+            VoiceIntent.PERSON_QUERY: NLGTemplate.PERSON_QUERY,
+            VoiceIntent.DIGEST_MORNING: NLGTemplate.DIGEST_MORNING,
+            VoiceIntent.CREATE_TODO: NLGTemplate.CREATE_TODO,
+        }
+        template = mapping.get(intent)
+        if not template:
+            raise ValueError(f"No NLG template for intent: {intent.value}")
+        return NLG_PROMPTS[template]
+
+    async def generate(
+        self,
+        intent: VoiceIntent,
+        data: Any,
+        slots: dict = None,
+    ) -> str:
+        """生成自然语言回答
+
+        Args:
+            intent: 语音意图类型
+            data: 结构化数据（来自Query Orchestrator的API返回）
+            slots: 槽位填充结果（可选上下文）
+
+        Returns:
+            生成的口语化中文回答文本
+        """
+        import json
+
+        # 1. 选择Prompt模板
+        template = self._resolve_template(intent)
+
+        # 2. 序列化数据为JSON
+        if isinstance(data, dict):
+            data_json = json.dumps(data, ensure_ascii=False, default=str)
+        else:
+            data_json = str(data)
+
+        # 3. 填充Prompt
+        prompt = template.format(data=data_json)
+        if slots:
+            prompt += f"\n\n额外上下文（槽位）：{json.dumps(slots, ensure_ascii=False)}"
+
+        # 4. 调用Moka AI LLM生成
+        try:
+            result = await self.llm.call(
+                prompt=prompt,
+                temperature=self.config["temperature"],
+                max_tokens=self.config["max_tokens"],
+            )
+            # 清理输出（去除可能的引号包裹）
+            answer = result.strip().strip('"').strip("'")
+            logger.info(
+                f"[NLG] intent={intent.value} → {len(answer)}字: '{answer[:50]}...'"
+            )
+            return answer
+        except Exception as e:
+            logger.error(f"[NLG] 生成失败: {e}")
+            raise
+
+    @staticmethod
+    def validate_output(text: str) -> bool:
+        """验证NLG输出质量"""
+        if not text or len(text) < 2:
+            return False
+        if len(text) > 150:
+            logger.warning(f"[NLG] 输出过长: {len(text)}字，可能需要截断")
+        # 检查是否包含markdown标记
+        forbidden = ["#", "*", "`", "|", "{"]
+        for marker in forbidden:
+            if marker in text:
+                logger.warning(f"[NLG] 输出包含禁止字符: {marker}")
+        return True
+```
+
+### 4.7.4 NLG与现有LLM模板的关系
+
+| 维度 | 现有LLM模板（§3.2） | NLG模板（§4.7） |
+|------|-------------------|---------------|
+| 目的 | 结构化数据提取/分析 | 自然语言回答生成 |
+| 输入 | 原始文本（OCR/语音/对话） | 结构化JSON数据 |
+| 输出 | JSON（实体/Todo/资源） | 纯文本（口语化中文） |
+| 使用场景 | 后台数据处理 | 前端语音交互 |
+| 复用关系 | NLG的输入常来自LLM模板的输出 | NLG是下游消费方 |
+| LLM Provider | Moka AI moka/claude-sonnet-4-6 | ✅ 同一Provider |
 
 ---
 
@@ -3264,7 +4777,8 @@ groups:
 | v1.1 | 2026-06-03 | 全面重构：Ticket模式替代明文Token；10个完整Prompt模板；ASR实时转写；3通道推送+6种Todo模板；CarryMem集成；集成测试策略 |
 | v1.2 | 2026-06-03 | Todo类型重命名（opportunity→cooperation_signal, context→care, action→promise, pending_confirm→followup, resource_maint→help）；新增模板11承诺提取和模板12关注点提取；新增§3.6 AI输出语言规则（语言约束/禁止判定对方资源/禁止建议索取资源/推测标记）；微信推送模板更新为6种新类型对应文案 |
 | **0.2.0** | **2026-06-04** | **POC阶段融合修订（D7-1~D7-11）：①D7-1模板3全面升级（6种action_type+Promise双向识别+promisor/beneficiary+confirmation强制+降噪5条+evidence_quote）②D7-2新增模板0 Input Scope分类（8种scope+9条关键词触发+fallback=manual_input）③D7-3 CarryMem三阶段路径（PoC NullProvider→Phase1基础记忆→Phase2全量7种记忆+遗忘曲线）④D7-5 TTS/ASR Phase1方案（微信同声传译/Whisper local + Azure Edge-TTS/预合成MP3 + MockTTSClient验证端点）⑤D7-6数字名片API对接预留（陈宇欣团队接口+MockDigitalCardClient+超3周自建备选）⑥D7-9数据导出集成（GET /data/export + HMAC-SHA256签名 + PII脱敏redact_pii_from_text/sanitize_evidence_quote）⑦D7-10关键决策9条铁律（#2补充action_type 6种 #4标注F-05暂停 #9新增Moka AI）⑧LLM Provider统一Moka AI (moka/claude-sonnet-4-6) ⑨集成模块扩展至10个 ⑩参考基线对齐PRD v4.3 + 技术设计v2.5 + 数据库v2.0 + LLM_Prompt_Templates v2.0** |
+| **0.2.1** | **2026-06-05** | **Voice Service 集成规格详细化：①§4.2 ASR详细化[0.2.1] — 新增4.2.4微信同声传译插件(Phase1.1首选,含小程序端集成代码+局限/Fallback策略) + 4.2.5 Whisper Local备选(Phase1.2, faster-whisper+模型对比表base/small/medium) + 4.2.6 ASR Client抽象层(Protocol接口+WechatASRProvider+WhisperASRProviderWrapper+MockASRProvider+工厂方法) ②§4.3 TTS详细化[0.2.1] — 新增4.3.3 Azure Edge-TTS(免费Neural音质+4种中文声音推荐+SSML支持+EdgeTTSProvider实现) + 4.3.4预合成MP3缓存策略(MD5 Key+24h TTL+CachedTTSProvider装饰器+高频文案列表) + 4.3.5 TTS Client抽象层(Protocol接口+EdgeTTSWrapper+MockTTSProvider+CachedTTSWrapper+工厂方法) + 4.3.6 TTS输出安全PII脱敏(TTSSecurityMiddleware+6种PII正则复用§6.6+审计日志) ③§4.6 Voice Orchestrator[0.2.1新增] — 5步Pipeline架构(ASR→NLU→API→NLG→TTS) + VoiceOrchestrator核心类(VoiceIntent枚举+VoiceResponse数据模型+完整process()方法+降级策略) + API端点POST /api/v1/voice/query + 4级降级行为表 ④§4.7 NLG[0.2.1新增] — Prompt-based NLG策略(非训练模型) + 5个意图Prompt模板(schedule/todo/person/digest/create_todo含输出示例) + NLGGenerator实现(复用Moka AI+模板注册表+输出验证) + 与现有LLM模板关系对比表** |
 
 ---
 
-*0.2.0 完成于2026-06-04 — POC阶段*
+*0.2.1 完成于2026-06-05 — Voice Service 详细集成规格*

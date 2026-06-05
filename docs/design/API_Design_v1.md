@@ -579,6 +579,10 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 - `type`: cooperation_signal\|risk\|care\|promise\|followup\|help
 - `priority`: high\|medium\|low
 - `due_before`: 截止时间筛选（ISO 8601）
+- **[0.2.1更新] `summary_level`**: 摘要级别（可选）。枚举值：
+  - `brief` — （默认）标准Todo列表格式，适合Dashboard展示
+  - `detail` — 完整信息，包含完整context和关联数据
+  - `voice` — 自然语言摘要，适合TTS语音输出。当 `summary_level=voice` 时响应额外返回 `voice_summary` 字段（已格式化的自然语言回答文本）
 
 **Todo类型与莫兰迪色系映射**:
 
@@ -709,6 +713,15 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
       "created_at": "2026-06-03T10:00:00Z"
     }
   ]
+}
+```
+
+> **[0.2.1更新]** 当 `summary_level=voice` 时，响应额外返回 `voice_summary` 字段（已PII脱敏的自然语言摘要文本，可直接用于TTS合成）：
+```json
+{
+  "total": 6,
+  "items": [...],
+  "voice_summary": "您目前有6项待办需要处理。高优先级的有3项：张三寻找AI算法专家的合作信号、李四公司融资困难的风险预警、以及建议联系赵六介绍给张三的承诺跟踪。此外还有3项中低优先级的事项。"
 }
 ```
 
@@ -1347,6 +1360,12 @@ language: zh-CN
 **路径参数**:
 - `id`: 人物实体ID（UUID）
 
+**[0.2.1更新] 查询参数**:
+- `summary_level`: 摘要级别（可选）。枚举值：
+  - `brief` — （默认）完整12模块详情，适合关系推进卡页面展示
+  - `detail` — 扩展信息，包含更多历史交互数据
+  - `voice` — 自然语言摘要，适合TTS语音输出。当 `summary_level=voice` 时响应额外返回 `voice_summary` 字段
+
 **响应**: `200 OK`
 ```json
 {
@@ -1395,9 +1414,12 @@ language: zh-CN
   "cooperation_direction_candidate": null,
   "version": 3,
   "created_at": "2026-06-01T10:00:00Z",
-  "updated_at": "2026-06-04T12:00:00Z"
+  "updated_at": "2026-06-04T12:00:00Z",
+  "voice_summary": "张总目前处于了解需求阶段。您最近一次交流是6月3日，讨论了AI算法合作方向。张总当前关注融资进展，正在寻找联合创始人。您已帮助对接了AI算法团队。还有一个待兑现承诺：下周介绍赵六给张总认识，截止日期是6月10日。"
 }
 ```
+
+> **[0.2.1更新]** `voice_summary` 字段仅在 `summary_level=voice` 时返回，为已PII脱敏的自然语言摘要文本，可直接用于TTS合成。
 
 #### 3.9.2 用户确认阶段变更（含乐观锁）
 
@@ -1663,6 +1685,11 @@ language: zh-CN
 
 **查询参数**:
 - `date`: 查询日期（必填，格式 YYYY-MM-DD，默认今天）
+- **[0.2.1更新] `summary_level`**: 摘要级别（可选）。枚举值：
+  - `brief` — （默认）一句话摘要，适合Dashboard卡片展示
+  - `detail` — 完整列表，适合日历详情页
+  - `voice` — 自然语言段落，适合TTS语音输出。当 `summary_level=voice` 时响应额外返回 `answer_paragraph` 字段（已格式化的自然语言回答文本）
+- **[0.2.1更新] `natural_date`**: 自然语言日期（可选）。NLU解析后的自然语言日期表达，服务端转为具体date值。枚举值：`"今天"` | `"明天"` | `"后天"` | `"本周"` | `"下周"`
 
 **响应**: `200 OK`
 ```json
@@ -1692,9 +1719,12 @@ language: zh-CN
     }
   ],
   "total_meetings": 4,
-  "total_pending_todos": 7
+  "total_pending_todos": 7,
+  "answer_paragraph": "您今天一共有4场会议。上午9点到10点半，您和张总、李总讨论供应链优化方案；下午2点到3点半，和王五探讨AI算法合作方向。此外您还有7项待办需要处理。"
 }
 ```
+
+> **[0.2.1更新]** `answer_paragraph` 字段仅在 `summary_level=voice` 时返回，为已PII脱敏的自然语言段落文本，可直接用于TTS合成。
 
 **实现要点**:
 - events 表按 `user_id + date(timestamp)` GROUP BY
@@ -1702,6 +1732,218 @@ language: zh-CN
 - 每个 event 关联 todos（通过 event_id 外键）
 - key_topics 从 `event.title` + LLM 抽取的 topics 中获取
 - 复用现有 PaginatedResponse 格式
+
+---
+
+### 3.12 Voice Assistant API（F-50, Phase 1.1, v0.2.1新增）
+
+> **[F-50新增] 定位**: 语音问答交互层，接收ASR识别后的文本，经NLU意图识别后调用对应业务API，返回自然语言答案+预生成TTS音频URL。Phase 1.1为一次性会话模式（无多轮对话）。
+> **关键约束**: 不存储原始音频；TTS输出需PII脱敏（复用 `redact_pii_from_text()`）；所有端点需JWT认证。
+
+#### 3.12.1 NLU意图枚举定义
+
+> **[F-50新增]** 语音助手支持的自然语言理解（NLU）意图类型，按优先级分阶段交付。
+
+```python
+class VoiceIntent(str, Enum):
+    # Phase 1.1 核心 (P0)
+    SCHEDULE_QUERY = "schedule_query"          # 日程查询("今天有什么会")
+    PROMISE_TRACKER = "promise_tracker"        # 承诺追踪("我答应谁什么还没做")
+    RELATIONSHIP_STATUS = "relationship_status" # 关系推进("张总到哪步了")
+
+    # Phase 1.2 扩展 (P1)
+    SCHEDULE_RANGE = "schedule_range"          # 范围日程("明后天有什么安排")
+    ACTION_SUGGESTION = "action_suggestion"    # 行动建议("该联系谁")
+
+    # Phase 2 (P2)
+    CONVERSATION_REVIEW = "conversation_review" # 交流回顾("聊了什么主题")
+    KNOWLEDGE_RETRIEVAL = "knowledge_retrieval" # 知识检索("物流方面的新知识")
+
+    # 系统级
+    UNCLEAR = "unclear"                        # 无法识别
+```
+
+**意图与业务API映射**:
+
+| 意图 | 调用API | summary_level |
+|------|---------|---------------|
+| `schedule_query` | `GET /api/v1/dashboard/day-view?summary_level=voice` | voice |
+| `promise_tracker` | `GET /api/v1/todos?todo_type=promise&status=pending&summary_level=voice` | voice |
+| `relationship_status` | `GET /api/v1/persons/{id}/relationship-brief?summary_level=voice` | voice |
+
+#### 3.12.2 Voice Session 数据模型
+
+> **[F-50新增]** 语音会话的请求/响应数据结构定义。
+
+**VoiceSessionCreate — 请求体**:
+
+```python
+class VoiceSessionCreate(BaseModel):
+    query_text: str = Field(..., min_length=1, max_length=500, description="ASR识别后的文字")
+    asr_confidence: float = Field(None, ge=0.0, le=1.0, description="ASR置信度")
+    voice_input: bool = Field(True, description="标记来源为语音")
+    client_timestamp: datetime = Field(..., description="客户端时间戳(ISO 8601)")
+```
+
+**VoiceSessionResponse — 响应体**:
+
+```python
+class VoiceSessionResponse(BaseModel):
+    session_id: str = Field(..., description="会话唯一标识")
+    intent: VoiceIntent = Field(..., description="NLU识别的意图")
+    intent_confidence: float = Field(..., ge=0.0, le=1.0, description="意图识别置信度")
+    answer_text: str = Field(..., description="自然语言回答文本(已PII脱敏)")
+    tts_url: Optional[str] = Field(None, description="预生成的TTS音频URL")
+    source_data: dict = Field(..., description="原始数据引用(用于前端展示详情)")
+    processing_time_ms: int = Field(..., description="服务端处理耗时(ms)")
+    suggest_questions: Optional[List[str]] = Field(None, description="当intent=unclear时提供建议问题")
+```
+
+#### 3.12.3 创建语音问答会话
+
+**[F-50新增] 端点**: `POST /api/v1/voice/session`
+
+**说明**: 创建一次性语音问答会话。接收ASR识别后的文本，执行NLU意图识别，调用对应业务API获取数据，生成自然语言回答并预生成TTS音频。
+
+**请求**:
+```json
+{
+  "query_text": "我今天的会议是什么",
+  "asr_confidence": 0.95,
+  "voice_input": true,
+  "client_timestamp": "2026-06-05T10:30:00Z"
+}
+```
+
+**字段说明**:
+- `query_text`: ASR识别后的文字（必填，1-500字符）
+- `asr_confidence`: ASR引擎返回的置信度（可选，0.0-1.0）
+- `voice_input`: 标记来源为语音（可选，默认true）
+- `client_timestamp`: 客户端发起请求的时间戳（必填，ISO 8601）
+
+**响应**: `200 OK`
+```json
+{
+  "session_id": "sess_abc123",
+  "intent": "schedule_query",
+  "intent_confidence": 0.92,
+  "answer_text": "您今天有2场会议。下午2点和张总讨论项目进度，下午4点参加周会。",
+  "tts_url": "/api/v1/voice/tts/sess_abc123.mp3",
+  "source_data": {
+    "type": "day_view",
+    "date": "2026-06-05",
+    "event_count": 2
+  },
+  "processing_time_ms": 1850
+}
+```
+
+**响应 — NLU无法识别意图 (422)**:
+```json
+{
+  "session_id": "sess_def456",
+  "intent": "unclear",
+  "intent_confidence": 0.35,
+  "answer_text": "抱歉，我没有完全理解您的意思。您可以试试问我以下问题：",
+  "tts_url": "/api/v1/voice/tts/sess_def456.mp3",
+  "source_data": null,
+  "processing_time_ms": 420,
+  "suggest_questions": [
+    "我今天有什么会议？",
+    "我答应过谁什么事情？",
+    "张总的关系到哪一步了？"
+  ]
+}
+```
+
+**错误响应**:
+
+| HTTP状态码 | 错误码 | 场景 |
+|-----------|--------|------|
+| 400 | E1000 | query_text为空或超长 |
+| 401 | E2000 | 未提供JWT Token或Token无效 |
+| 422 | E1003 | NLU无法识别意图（返回suggest_questions） |
+
+**处理流程**:
+
+```
+1. 接收 ASR 文本 → 校验 query_text 非空
+2. NLU 意图识别 → 提取 intent + entities (日期/人名)
+3. 根据 intent 调用对应业务API (带 summary_level=voice)
+4. LLM 生成自然语言回答 → PII脱敏 (redact_pii_from_text)
+5. TTS 引擎生成音频 → 存储到临时缓存 (TTL=5分钟)
+6. 返回 session_id + answer_text + tts_url + source_data
+```
+
+#### 3.12.4 获取TTS音频
+
+**[F-50新增] 端点**: `GET /api/v1/voice/tts/{session_id}`
+
+**说明**: 获取指定语音会话预生成的TTS音频文件（MP3格式）。音频文件在服务端临时缓存，5分钟后自动清理。
+
+**路径参数**:
+- `session_id`: 语音会话ID（由 POST /voice/session 返回）
+
+**响应**: `200 OK`
+```
+Content-Type: audio/mpeg
+Content-Length: 45678
+Cache-Control: private, max-age=300
+```
+
+**响应体**: MP3二进制音频流
+
+**错误响应**:
+
+| HTTP状态码 | 场景 |
+|-----------|------|
+| 401 | 未认证 |
+| 404 | session_id不存在或TTS音频已过期(TTL=5分钟) |
+
+**安全约束**:
+- 需要JWT认证（防止未授权访问音频内容）
+- Cache-Control设为private（不经过共享缓存）
+- 音频文件不持久化存储，TTL过期后自动删除
+
+#### 3.12.5 语音回答质量反馈
+
+**[F-50新增] 端点**: `POST /api/v1/voice/feedback`
+
+**说明**: 用户对语音回答的质量反馈，用于NLU模型持续优化和答案质量监控。
+
+**请求**:
+```json
+{
+  "session_id": "sess_abc123",
+  "rating": "helpful",
+  "comment": "回答对了但太长了"
+}
+```
+
+**字段说明**:
+- `session_id`: 语音会话ID（必填）
+- `rating`: 反馈评级（必填）。枚举值：
+  - `helpful` — 有帮助
+  - `not_helpful` — 没有帮助
+  - `wrong_intent` — 意图识别错误
+  - `unclear` — 回答不清晰
+- `comment`: 补充说明（可选，最大200字符）
+
+**响应**: `200 OK`
+```json
+{
+  "message": "感谢反馈，已记录",
+  "session_id": "sess_abc123"
+}
+```
+
+**错误响应**:
+
+| HTTP状态码 | 错误码 | 场景 |
+|-----------|--------|------|
+| 400 | E1000 | 缺少session_id或rating |
+| 401 | E2000 | 未认证 |
+| 404 | E1001 | session_id不存在 |
 
 ---
 
@@ -1722,6 +1964,8 @@ language: zh-CN
 | `GET /api/v1/digest/morning` / `evening` | 所有文本字段 | 摘要中的所有内容 |
 | `GET /api/v1/mini/person/{id}` | `key_points`, `associations_summary` | 小程序人物速览 |
 | `GET /api/v1/data/export` | **全部PII字段** | 数据导出（CSV/JSON均适用） |
+| **[0.2.1新增]** `POST /api/v1/voice/session` | `answer_text` | 语音回答文本（TTS合成前脱敏） |
+| **[0.2.1新增]** `GET /api/v1/voice/tts/{session_id}` | 音频内容 | TTS音频（合成源文本已脱敏） |
 
 **不执行脱敏的端点**:
 - `POST /api/v1/events` — 接收原始输入，存储前做 sanitize 清洗但不脱敏
@@ -2349,6 +2593,86 @@ paths:
               schema:
                 $ref: '#/components/schemas/ResourceMatchResult'
 
+  /voice/session:
+    post:
+      summary: 创建语音问答会话（F-50）
+      description: |
+        接收ASR识别后的文本，经NLU意图识别后调用对应业务API，返回自然语言答案+预生成TTS音频URL。
+        Phase 1.1为一次性会话模式（无多轮对话）。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoiceSessionCreate'
+      responses:
+        '200':
+          description: 语音问答成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoiceSessionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: NLU无法识别意图
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoiceSessionResponse'
+
+  /voice/tts/{session_id}:
+    get:
+      summary: 获取TTS音频（F-50）
+      description: 获取指定语音会话预生成的TTS音频文件（MP3格式）。音频文件5分钟后自动清理。
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: MP3音频流
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: session_id不存在或TTS音频已过期
+
+  /voice/feedback:
+    post:
+      summary: 语音回答质量反馈（F-50）
+      description: 用户对语音回答的质量反馈，用于NLU模型持续优化和答案质量监控。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoiceFeedbackCreate'
+      responses:
+        '200':
+          description: 反馈记录成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  session_id:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
 components:
   securitySchemes:
     BearerAuth:
@@ -2748,6 +3072,110 @@ components:
           type: boolean
           description: 是否需要用户确认（敏感结论必标）
 
+    VoiceIntent:
+      type: string
+      enum: [schedule_query, promise_tracker, relationship_status, schedule_range, action_suggestion, conversation_review, knowledge_retrieval, unclear]
+      description: |
+        语音助手NLU意图枚举（F-50）：
+        - schedule_query: 日程查询(P0)
+        - promise_tracker: 承诺追踪(P0)
+        - relationship_status: 关系推进(P0)
+        - schedule_range: 范围日程(P1)
+        - action_suggestion: 行动建议(P1)
+        - conversation_review: 交流回顾(P2)
+        - knowledge_retrieval: 知识检索(P2)
+        - unclear: 无法识别
+
+    VoiceSessionCreate:
+      type: object
+      required: [query_text, client_timestamp]
+      properties:
+        query_text:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: ASR识别后的文字
+        asr_confidence:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          description: ASR置信度
+        voice_input:
+          type: boolean
+          default: true
+          description: 标记来源为语音
+        client_timestamp:
+          type: string
+          format: date-time
+          description: 客户端时间戳(ISO 8601)
+
+    VoiceSessionResponse:
+      type: object
+      required: [session_id, intent, intent_confidence, answer_text, source_data, processing_time_ms]
+      properties:
+        session_id:
+          type: string
+          description: 会话唯一标识
+        intent:
+          $ref: '#/components/schemas/VoiceIntent'
+        intent_confidence:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          description: 意图识别置信度
+        answer_text:
+          type: string
+          description: 自然语言回答文本(已PII脱敏)
+        tts_url:
+          type: string
+          nullable: true
+          description: 预生成的TTS音频URL
+        source_data:
+          type: object
+          description: 原始数据引用(用于前端展示详情)
+          properties:
+            type:
+              type: string
+            date:
+              type: string
+              format: date
+            event_count:
+              type: integer
+        processing_time_ms:
+          type: integer
+          description: 服务端处理耗时(ms)
+        suggest_questions:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: 当intent=unclear时提供建议问题
+
+    VoiceFeedbackCreate:
+      type: object
+      required: [session_id, rating]
+      properties:
+        session_id:
+          type: string
+          description: 语音会话ID
+        rating:
+          type: string
+          enum: [helpful, not_helpful, wrong_intent, unclear]
+          description: 反馈评级
+        comment:
+          type: string
+          maxLength: 200
+          description: 补充说明
+
+    SummaryLevel:
+      type: string
+      enum: [brief, detail, voice]
+      description: |
+        摘要级别枚举（F-50新增，用于voice API调用下游端点时）：
+        - brief: 一句话摘要，适合Dashboard卡片展示（默认）
+        - detail: 完整列表，适合详情页
+        - voice: 自然语言段落，适合TTS语音输出
+
     Error:
       type: object
       properties:
@@ -3019,7 +3447,8 @@ X-Cache-Hit: true
 | v1.2 | 2026-06-03 | Todo类型重命名（opportunity→cooperation_signal, context→care, action→promise, pending_confirm→followup, resource_maint→help）；Entities API新增concern/promise/contribution字段及三个PATCH端点（concern/promise/contribution）；Todos API新增promise/care/cooperation_signal类型详细示例；新增§3.8 AI输出语言规则（confidence_level/is_ai_inference/requires_confirmation）；OpenAPI规范同步更新（TodoType枚举、新增Concern/Promise/Contribution/AIInferenceMarker schema） |
 | v1.3 | 2026-06-03 | §8 API版本管理策略全面补齐：三层版本号（SemVer）+ 版本协商机制 + 兼容性规则 + 废弃流程（12个月过渡期）+ 多版本共存（FastAPI路由层）+ Alembic数据库迁移策略 + 客户端SDK版本策略 + 版本变更日志规范 |
 | **v2.0** | **2026-06-04** | **v2.0大版本升级（参考 PRD v4.3 + 技术设计 v2.5 §7）：**<br/>**① D2-1** 版本头更新<br/>**② D2-2 新增6个P0 API端点**: GET relationship-brief / PATCH stage(乐观锁) / GET dashboard/today / GET todos?view=my-responses / POST contributions / POST feedbacks<br/>**③ D2-3 日视图API (F-49)**: GET /api/v1/dashboard/day-view<br/>**④ D2-4 现有端点变更**: POST /events增加input_scope字段 / PATCH /todos增加action_type+promisor_id+beneficiary_id / GET /entities返回值增加relationship_stage<br/>**⑤ D2-5 JWT认证加固**: Payload结构(sub/iat/exp/role) + 4项安全约束(Secret≥256/黑名单/Refresh旋转/CORS白名单)<br/>**⑥ D2-6 PII脱敏行为**: 标注7类端点执行redact_pii_from_text() + 5种PII掩码规则<br/>**⑦ D2-7 SC-01安全约束**: input_scope服务端强制校验，永远不以客户端值为准<br/>**⑧ D2-8 错误码扩展**: E1004 INVALID_INPUT_SCOPE(400) + E1005 OPTIMISTIC_LOCK_CONFLICT(409)<br/>**⑨ D2-9 数据导出API**: GET /api/v1/data/export?format=json\|csv（GDPR数据携带权，Phase 1提前）<br/>**⑩ D2-10 F-05暂停声明**: 商机匹配相关API标记Phase 2 |
+| **v0.2.1** | **2026-06-05** | **[F-50新增] 语音助手API (Voice Assistant, Phase 1.1)：**<br/>**① F50-1 新增§3.12 Voice Assistant API章节**:<br/>　- POST /api/v1/voice/session — 创建语音问答会话(NLU意图识别→业务API调用→自然语言回答→TTS预生成)<br/>　- GET /api/v1/voice/tts/{session_id} — 获取预生成TTS音频(MP3流, Cache-Control private max-age=300)<br/>　- POST /api/v1/voice/feedback — 语音回答质量反馈(NLU模型优化用)<br/>**② F50-2 NLU意图枚举 VoiceIntent**: schedule_query/promise_tracker/relationship_status(P0) + schedule_range/action_suggestion(P1) + conversation_review/knowledge_retrieval(P2) + unclear<br/>**③ F50-3 VoiceSessionCreate/VoiceSessionResponse 数据模型定义**<br/>**④ F50-4 现有端点变更** — summary_level参数(三档: brief/detail/voice):<br/>　- GET /api/v1/dashboard/day-view(F-49) + natural_date参数("今天"|"明天"|"后天"|"本周"|"下游") → answer_paragraph字段<br/>　- GET /api/v1/persons/{id}/relationship-brief(F-47) → voice_summary字段<br/>　- GET /api/v1/todos → voice_summary字段<br/>**⑤ F50-5 PII脱敏清单扩展**: POST /voice/session(answer_text) + GET /voice/tts(音频内容)<br/>**关键约束**: 不存储原始音频; TTS输出PII脱敏; 所有端点JWT认证; TTL=5分钟音频缓存 |
 
 ---
 
-*最后更新: 2026-06-04*
+*最后更新: 2026-06-05*

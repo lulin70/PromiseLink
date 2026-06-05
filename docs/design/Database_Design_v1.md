@@ -129,6 +129,59 @@ erDiagram
         jsonb preferences
         timestamptz created_at
     }
+
+    USERS ||--o{ VOICE_SESSIONS : "initiates"
+    VOICE_SESSIONS ||--o{ VOICE_TURNS : "has"
+    VOICE_SESSIONS }o--|| ENTITIES : "references(in slots)"
+    VOICE_SESSIONS {
+        uuid id PK
+        uuid user_id FK
+        varchar query_text "ASR识别文字(max 500)"
+        float asr_confidence "ASR置信度0-1"
+        boolean is_voice_input
+        inet client_ip
+        varchar intent "识别意图"
+        float intent_confidence "意图置信度"
+        jsonb slots "槽位填充结果"
+        varchar target_api "目标API路径"
+        jsonb api_params "API请求参数"
+        text answer_text "回答文字(max 2000)"
+        varchar answer_source "template|nlg|fallback"
+        boolean tts_cached
+        varchar user_rating "反馈评分"
+        text feedback_comment
+        integer processing_time_ms "端到端耗时"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    VOICE_TURNS {
+        uuid id PK
+        uuid session_id FK
+        integer turn_number "第几轮(从1开始)"
+        varchar role "user|system|clarification"
+        text content "文本内容"
+        varchar turn_type "question|answer|error|follow_up|suggestion"
+        varchar intent "仅user turn有"
+        integer tokens_used "LLM token消耗"
+        timestamptz created_at
+    }
+
+    VOICE_ANALYTICS {
+        uuid id PK
+        date date "聚合日期"
+        uuid user_id FK
+        varchar intent "意图"
+        integer total_queries "总查询数"
+        float avg_confidence "平均意图置信度"
+        float unclear_rate "不确定率"
+        float avg_processing_ms "平均处理时长"
+        float helpful_rate "有帮助率"
+        float tts_hit_rate "TTS缓存命中率"
+        float asr_error_rate "ASR错误率"
+        timestamptz created_at
+        timestamptz updated_at
+    }
 ```
 
 ---
@@ -610,6 +663,188 @@ CREATE UNIQUE INDEX idx_users_email ON users(email) WHERE email IS NOT NULL;
 
 ---
 
+### 3.6 VoiceSessions表（语音会话表）[F-50新增]
+
+**用途**: 存储语音助手每次交互的完整会话记录（ASR→NLU→API→NLG→TTS全链路）
+
+> **隐私原则**: 不存储原始音频文件，仅存储ASR识别后的文字及处理元数据。
+
+| 字段名 | 类型 | 约束 | 默认值 | 说明 |
+|--------|------|------|--------|------|
+| id | UUID | PRIMARY KEY | gen_random_uuid() | 主键 |
+| user_id | UUID | NOT NULL, FK(users.id) | - | 用户ID |
+| query_text | VARCHAR(500) | NOT NULL | - | ASR识别后的文字（最大500字符） |
+| asr_confidence | FLOAT | - | NULL | ASR置信度（0-1） |
+| is_voice_input | BOOLEAN | - | TRUE | 是否语音输入（FALSE=手动文字输入） |
+| client_ip | INET | - | NULL | 客户端IP（安全审计用） |
+| intent | VARCHAR(30) | NOT NULL | - | 识别的意图（schedule_query/promise_tracker/etc） |
+| intent_confidence | FLOAT | NOT NULL | - | 意图识别置信度（0-1） |
+| slots | JSONB | - | '{}' | 槽位填充结果 |
+| target_api | VARCHAR(100) | - | NULL | 调用的目标API路径 |
+| api_params | JSONB | - | NULL | API请求参数 |
+| answer_text | VARCHAR(2000) | - | NULL | 生成的回答文字（最大2000字符） |
+| answer_source | VARCHAR(20) | - | NULL | 回答来源：template / nlg / fallback |
+| tts_cached | BOOLEAN | - | FALSE | TTS是否已缓存 |
+| user_rating | VARCHAR(20) | - | NULL | 用户反馈：helpful / not_helpful / wrong_intent / unclear |
+| feedback_comment | TEXT | - | NULL | 反馈评论 |
+| processing_time_ms | INTEGER | - | NULL | 端到端处理耗时（毫秒） |
+| created_at | TIMESTAMPTZ | NOT NULL | NOW() | 创建时间 |
+| updated_at | TIMESTAMPTZ | NOT NULL | NOW() | 更新时间 |
+
+**索引**:
+```sql
+CREATE INDEX idx_voice_sessions_user_created ON voice_sessions(user_id, created_at DESC);
+CREATE INDEX idx_voice_sessions_intent ON voice_sessions(intent);
+CREATE INDEX idx_voice_sessions_created ON voice_sessions(created_at);
+```
+
+**slots JSONB结构示例**:
+```json
+{
+  "date": "2026-06-05",
+  "person": "张总",
+  "time_range": "下午",
+  "topic": "合作方案"
+}
+```
+
+**intent枚举说明**:
+
+| intent值 | 中文名 | 说明 |
+|----------|--------|------|
+| `schedule_query` | 日程查询 | 查询某人的日程安排 |
+| `promise_tracker` | 承诺追踪 | 追踪承诺兑现情况 |
+| `entity_search` | 实体搜索 | 搜索联系人/公司信息 |
+| `relationship_overview` | 关系概览 | 查看关系阶段和推进建议 |
+| `todo_query` | 待办查询 | 查询待办事项状态 |
+| `general_qa` | 通用问答 | 其他通用问题 |
+| `unclear` | 意图不明 | 无法识别用户意图 |
+
+**answer_source枚举说明**:
+
+| 值 | 说明 |
+|----|------|
+| `template` | 模板回答（固定场景，无需LLM） |
+| `nlg` | NLG生成（LLM动态生成回答） |
+| `fallback` | 兜底回答（无法理解时返回的默认回复） |
+
+---
+
+### 3.7 VoiceTurns表（多轮对话轮次表）[F-50新增，Phase 1.2启用]
+
+**用途**: 存储多轮对话中的每一轮交互内容，支持上下文延续和澄清追问。
+
+> **⚠️ Phase说明**: 此表在 **Phase 1.1** 不创建（单轮问答模式）。**Phase 1.2** 启用多轮对话后激活。POC阶段如使用SQLite，JSONB字段以TEXT存储JSON格式。
+
+| 字段名 | 类型 | 约束 | 默认值 | 说明 |
+|--------|------|------|--------|------|
+| id | UUID | PRIMARY KEY | gen_random_uuid() | 主键 |
+| session_id | UUID | NOT NULL, FK(voice_sessions.id), CASCADE | - | 所属会话ID |
+| turn_number | INTEGER | NOT NULL | - | 第几轮（从1开始） |
+| role | VARCHAR(10) | NOT NULL | - | 角色：user / system / clarification |
+| content | TEXT | NOT NULL | - | 文本内容 |
+| turn_type | VARCHAR(20) | - | NULL | 轮次类型：question / answer / error / follow_up / suggestion |
+| intent | VARCHAR(30) | - | NULL | 意图（仅user turn有值） |
+| tokens_used | INTEGER | - | NULL | LLM token消耗（成本核算） |
+| created_at | TIMESTAMPTZ | NOT NULL | NOW() | 创建时间 |
+
+**唯一约束**:
+```sql
+CREATE UNIQUE INDEX idx_voice_turns_session_turn ON voice_turns(session_id, turn_number);
+```
+
+**索引**:
+```sql
+CREATE INDEX idx_voice_turns_session ON voice_turns(session_id);
+```
+
+**role枚举说明**:
+
+| role值 | 说明 | 典型场景 |
+|--------|------|---------|
+| `user` | 用户输入 | 用户提问或陈述 |
+| `system` | 系统回答 | 助手返回结果 |
+| `clarification` | 澄清追问 | 系统向用户确认槽位信息 |
+
+**turn_type枚举说明**:
+
+| turn_type值 | 说明 |
+|-------------|------|
+| `question` | 问题（用户提问或系统反问） |
+| `answer` | 回答（系统给出答案） |
+| `error` | 错误（处理异常时的响应） |
+| `follow_up` | 追问（基于前一轮的后续问题） |
+| `suggestion` | 建议（系统主动给出的推荐） |
+
+---
+
+### 3.8 VoiceAnalytics表（语音分析聚合表）[F-50新增]
+
+**用途**: 按日期+用户+意图维度聚合语音会话数据，用于监控仪表盘和模型优化分析。
+
+> **写入策略**: 由定时任务每日聚合 `voice_sessions` 数据写入，**不实时写入**（分析型数据）。业务代码不应直接操作此表。
+
+| 字段名 | 类型 | 约束 | 默认值 | 说明 |
+|--------|------|------|--------|------|
+| id | UUID | PRIMARY KEY | gen_random_uuid() | 主键 |
+| date | DATE | NOT NULL | - | 聚合日期 |
+| user_id | UUID | FK(users.id) | NULL | 用户ID（NULL=全用户聚合） |
+| intent | VARCHAR(30) | NOT NULL | - | 意图维度 |
+| total_queries | INTEGER | - | 0 | 总查询数 |
+| avg_confidence | FLOAT | - | NULL | 平均意图置信度 |
+| unclear_rate | FLOAT | - | NULL | 不确定率 = unclear数 / 总数 |
+| avg_processing_ms | FLOAT | - | NULL | 平均处理时长（毫秒） |
+| helpful_rate | FLOAT | - | NULL | 有帮助率 = helpful评价数 / 已评价总数 |
+| tts_hit_rate | FLOAT | - | NULL | TTS缓存命中率 |
+| asr_error_rate | FLOAT | - | NULL | ASR错误率（识别失败/重试率） |
+| created_at | TIMESTAMPTZ | NOT NULL | NOW() | 创建时间 |
+| updated_at | TIMESTAMPTZ | NOT NULL | NOW() | 更新时间 |
+
+**唯一约束**:
+```sql
+CREATE UNIQUE INDEX idx_voice_analytics_unique ON voice_analytics(date, user_id, intent);
+```
+
+**索引**:
+```sql
+CREATE INDEX idx_voice_analytics_date ON voice_analytics(date);
+```
+
+**聚合SQL示例**（定时任务参考）:
+```sql
+-- 每日聚合任务：从voice_sessions聚合到voice_analytics
+INSERT INTO voice_analytics (date, user_id, intent, total_queries, avg_confidence,
+    unclear_rate, avg_processing_ms, helpful_rate, tts_hit_rate, asr_error_rate)
+SELECT
+    CURRENT_DATE - INTERVAL '1 day'::DATE AS date,
+    vs.user_id,
+    vs.intent,
+    COUNT(*) AS total_queries,
+    AVG(vs.intent_confidence) AS avg_confidence,
+    COUNT(*) FILTER (WHERE vs.intent = 'unclear')::FLOAT / COUNT(*) AS unclear_rate,
+    AVG(vs.processing_time_ms) AS avg_processing_ms,
+    COUNT(*) FILTER (WHERE vs.user_rating = 'helpful')::FLOAT /
+        COUNT(*) FILTER (WHERE vs.user_rating IS NOT NULL) AS helpful_rate,
+    COUNT(*) FILTER (WHERE vs.tts_cached = TRUE)::FLOAT / COUNT(*) AS tts_hit_rate,
+    COUNT(*) FILTER (WHERE vs.asr_confidence < 0.5 OR vs.asr_confidence IS NULL)::FLOAT / COUNT(*) AS asr_error_rate
+FROM voice_sessions vs
+WHERE vs.created_at >= CURRENT_DATE - INTERVAL '1 day'
+  AND vs.created_at < CURRENT_DATE
+GROUP BY vs.user_id, vs.intent
+ON CONFLICT (date, user_id, intent)
+DO UPDATE SET
+    total_queries = EXCLUDED.total_queries,
+    avg_confidence = EXCLUDED.avg_confidence,
+    unclear_rate = EXCLUDED.unclear_rate,
+    avg_processing_ms = EXCLUDED.avg_processing_ms,
+    helpful_rate = EXCLUDED.helpful_rate,
+    tts_hit_rate = EXCLUDED.tts_hit_rate,
+    asr_error_rate = EXCLUDED.asr_error_rate,
+    updated_at = NOW();
+```
+
+---
+
 ## 4. 索引策略
 
 ### 4.1 索引设计原则
@@ -879,6 +1114,167 @@ alembic downgrade -1
 | todos新字段+CHECK | `\d todos` | 6个新字段 + todo_action_type_check约束 |
 | 现有数据完整性 | `SELECT COUNT(*) FROM events` + `SELECT COUNT(*) FROM todos` | 数据量不变 |
 | 回滚可用性 | `alembic downgrade -1` 后检查 | 恢复到v1.2 schema |
+
+### 5.4 F-50语音助手表迁移（[0.2.1新增]）
+
+**迁移文件**: `alembic/versions/xxx_add_voice_tables.py`
+
+**生成命令**:
+```bash
+alembic revision --autogenerate -m "add F-50 voice assistant tables"
+# 生成: xxx_add_voice_tables.py
+```
+
+**迁移内容**:
+| 项目 | 详情 |
+|------|------|
+| 新增表 | `voice_sessions`, `voice_turns`, `voice_analytics` |
+| 索引 | 3个（voice_sessions）+ 1个（voice_turns）+ 1个（voice_analytics）= **5个** |
+| 唯一约束 | 1个（voice_turns: session_id + turn_number）+ 1个（voice_analytics: date + user_id + intent）= **2个** |
+| 外键 | voice_sessions.user_id → users.id, voice_turns.session_id → voice_sessions.id (CASCADE), voice_analytics.user_id → users.id = **3个** |
+| Phase说明 | voice_turns表在Phase 1.2启用，Phase 1.1可跳过创建 |
+
+**Alembic迁移代码**:
+```python
+"""F-50: 新增语音助手3张表
+
+Revision ID: v200_f50_voice
+Revises: v120_v200
+Create Date: 2026-06-05
+
+迁移内容:
+1. 新增 voice_sessions 表（语音会话，18字段+3索引）
+2. 新增 voice_turns 表（多轮对话轮次，9字段+唯一约束，Phase 1.2启用）
+3. 新增 voice_analytics 表（分析聚合表，12字段+唯一约束）
+4. 共计: 3张表 + 5个索引 + 2个唯一约束 + 3个外键
+
+注意:
+- SQLite兼容: JSONB→TEXT(JSON格式存储)，INET→VARCHAR(45)
+- voice_turns在Phase 1.1不使用，但建议提前建表以简化后续迁移
+- voice_analytics为聚合表，由定时任务写入，业务代码不直接操作
+"""
+from alembic import op
+import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
+
+def upgrade():
+    # === 1. voice_sessions 表 ===
+    op.create_table(
+        'voice_sessions',
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True,
+                  server_default=sa.text('gen_random_uuid()')),
+        sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('query_text', sa.String(500), nullable=False),
+        sa.Column('asr_confidence', sa.Float(), nullable=True),
+        sa.Column('is_voice_input', sa.Boolean(), server_default=sa.text('TRUE')),
+        sa.Column('client_ip', postgresql.INET(), nullable=True),
+        sa.Column('intent', sa.String(30), nullable=False),
+        sa.Column('intent_confidence', sa.Float(), nullable=False),
+        sa.Column('slots', postgresql.JSONB(), server_default=sa.text("'{}'::jsonb")),
+        sa.Column('target_api', sa.String(100), nullable=True),
+        sa.Column('api_params', postgresql.JSONB(), nullable=True),
+        sa.Column('answer_text', sa.String(2000), nullable=True),
+        sa.Column('answer_source', sa.String(20), nullable=True),
+        sa.Column('tts_cached', sa.Boolean(), server_default=sa.text('FALSE')),
+        sa.Column('user_rating', sa.String(20), nullable=True),
+        sa.Column('feedback_comment', sa.Text(), nullable=True),
+        sa.Column('processing_time_ms', sa.Integer(), nullable=True),
+        sa.Column('created_at', sa.TIMESTAMPTZ(), server_default=sa.text('NOW()')),
+        sa.Column('updated_at', sa.TIMESTAMPTZ(), server_default=sa.text('NOW()')),
+    )
+    op.create_index('idx_voice_sessions_user_created', 'voice_sessions',
+                    ['user_id', 'created_at'])
+    op.create_index('idx_voice_sessions_intent', 'voice_sessions', ['intent'])
+    op.create_index('idx_voice_sessions_created', 'voice_sessions', ['created_at'])
+    op.create_foreign_key('fk_voice_sessions_user', 'voice_sessions', 'users',
+                          ['user_id'], ['id'])
+
+    # === 2. voice_turns 表（Phase 1.2启用） ===
+    op.create_table(
+        'voice_turns',
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True,
+                  server_default=sa.text('gen_random_uuid()')),
+        sa.Column('session_id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('turn_number', sa.Integer(), nullable=False),
+        sa.Column('role', sa.String(10), nullable=False),
+        sa.Column('content', sa.Text(), nullable=False),
+        sa.Column('turn_type', sa.String(20), nullable=True),
+        sa.Column('intent', sa.String(30), nullable=True),
+        sa.Column('tokens_used', sa.Integer(), nullable=True),
+        sa.Column('created_at', sa.TIMESTAMPTZ(), server_default=sa.text('NOW()')),
+    )
+    op.create_index('idx_voice_turns_session_turn', 'voice_turns',
+                    ['session_id', 'turn_number'], unique=True)
+    op.create_index('idx_voice_turns_session', 'voice_turns', ['session_id'])
+    op.create_foreign_key('fk_voice_turns_session', 'voice_turns', 'voice_sessions',
+                          ['session_id'], ['id'],
+                          ondelete='CASCADE')
+
+    # === 3. voice_analytics 表（聚合表，定时任务写入） ===
+    op.create_table(
+        'voice_analytics',
+        sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True,
+                  server_default=sa.text('gen_random_uuid()')),
+        sa.Column('date', sa.Date(), nullable=False),
+        sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column('intent', sa.String(30), nullable=False),
+        sa.Column('total_queries', sa.Integer(), server_default='0'),
+        sa.Column('avg_confidence', sa.Float(), nullable=True),
+        sa.Column('unclear_rate', sa.Float(), nullable=True),
+        sa.Column('avg_processing_ms', sa.Float(), nullable=True),
+        sa.Column('helpful_rate', sa.Float(), nullable=True),
+        sa.Column('tts_hit_rate', sa.Float(), nullable=True),
+        sa.Column('asr_error_rate', sa.Float(), nullable=True),
+        sa.Column('created_at', sa.TIMESTAMPTZ(), server_default=sa.text('NOW()')),
+        sa.Column('updated_at', sa.TIMESTAMPTZ(), server_default=sa.text('NOW()')),
+    )
+    op.create_index('idx_voice_analytics_unique', 'voice_analytics',
+                    ['date', 'user_id', 'intent'], unique=True)
+    op.create_index('idx_voice_analytics_date', 'voice_analytics', ['date'])
+    op.create_foreign_key('fk_voice_analytics_user', 'voice_analytics', 'users',
+                          ['user_id'], ['id'])
+
+
+def downgrade():
+    # 按依赖顺序逆序删除
+    op.drop_constraint('fk_voice_analytics_user', 'voice_analytics', type_='foreignkey')
+    op.drop_index('idx_voice_analytics_date', table_name='voice_analytics')
+    op.drop_index('idx_voice_analytics_unique', table_name='voice_analytics')
+    op.drop_table('voice_analytics')
+
+    op.drop_constraint('fk_voice_turns_session', 'voice_turns', type_='foreignkey')
+    op.drop_index('idx_voice_turns_session', table_name='voice_turns')
+    op.drop_index('idx_voice_turns_session_turn', table_name='voice_turns')
+    op.drop_table('voice_turns')
+
+    op.drop_constraint('fk_voice_sessions_user', 'voice_sessions', type_='foreignkey')
+    op.drop_index('idx_voice_sessions_created', table_name='voice_sessions')
+    op.drop_index('idx_voice_sessions_intent', table_name='voice_sessions')
+    op.drop_index('idx_voice_sessions_user_created', table_name='voice_sessions')
+    op.drop_table('voice_sessions')
+```
+
+**SQLite兼容说明（POC阶段）**:
+
+| PostgreSQL类型 | SQLite替代 | 说明 |
+|---------------|-----------|------|
+| `UUID` | `TEXT` | 存储UUID字符串 |
+| `JSONB` | `TEXT` | 存储JSON格式文本，应用层解析 |
+| `INET` | `VARCHAR(45)` | IPv4/IPv6地址字符串 |
+| `TIMESTAMPTZ` | `TEXT` | ISO8601格式时间戳 |
+| `gen_random_uuid()` | 应用层生成 | Python `uuid.uuid4()` |
+| `CASCADE`外键 | 应用层级联 | ORM delete cascade |
+| `GIN索引` | 不支持 | JSON查询走全表扫描（POC数据量可接受） |
+
+**迁移验证清单**:
+| 验证项 | 方法 | 预期结果 |
+|--------|------|---------|
+| voice_sessions表创建 | `\d voice_sessions` | 18个字段，3个索引，1个FK→users |
+| voice_turns表创建 | `\d voice_turns` | 9个字段，2个索引（含UNIQUE），1个FK→voice_sessions(CASCADE) |
+| voice_analytics表创建 | `\d voice_analytics` | 12个字段，2个索引（含UNIQUE），1个FK→users |
+| 外键级联删除 | 删除voice_session后查voice_turns | 关联turns自动清除 |
+| 聚合表唯一约束 | INSERT重复date+user_id+intent | ON CONFLICT DO UPDATE生效 |
+| 回滚可用性 | `alembic downgrade -1` 后检查 | 3张表全部移除，无残留 |
 
 ---
 
@@ -1276,8 +1672,9 @@ LIMIT 5;
 | v1.1 | 2026-06-03 | Todo类型修正（6种：opportunity/risk/context/action/pending_confirm/resource_maint）；移除RLS改为应用层过滤；添加resource_sensitivity字段；添加莫兰迪色映射；添加数据主权章节；Entities properties结构细化 |
 | v1.2 | 2026-06-03 | Todo类型重命名（opportunity→cooperation_signal, context→care, action→promise, pending_confirm→followup, resource_maint→help）；莫兰迪色映射更新；Entities properties新增concern/promise/contribution字段；resource/demand标注Phase2；Todos context按类型分类定义 |
 | **v2.0** | **2026-06-04** | **李总v1.2+许总POC反馈融合修订（共识清单D1-1~D1-7）：①新增relationship_briefs关系推进卡表（F-47 P0，20字段+3索引+唯一约束+7阶段枚举）②events表追加input_scope/input_scope_confidence字段及索引（F-44）③todos表追加6字段（action_type/promisor_id/beneficiary_id/confirmation_status/evidence_quote/evidence_event_id）+CHECK约束+枚举说明（F-45）④entities.properties JSONB扩展relationship_stage+完整relationship对象结构（F-48）⑤ER图新增RELATIONSHIP_BRIEFS节点及与EVENTS/ENTITIES关系线⑥新增§5.3 Alembic增量迁移策略（含upgrade/downgrade完整代码+验证清单）⑦参考基线对齐PRD v4.3 + 技术设计v2.5 §3.1** |
+| **[0.2.1新增]** | **2026-06-05** | **F-50语音助手数据表（3张）：①voice_sessions语音会话表（18字段+3索引，ASR→NLU→API→NLG→TTS全链路记录，不存原始音频，query_text max500/answer_text max2000，含intent/answer_source枚举说明+slots JSONB结构示例）②voice_turns多轮对话轮次表（9字段+唯一约束+CASCADE外键，Phase 1.2启用标注，含role/turn_type枚举说明）③voice_analytics分析聚合表（12字段+唯一约束，定时任务聚合写入，含UPSERT聚合SQL示例）④ER图新增VOICE_SESSIONS/VOICE_TURNS/VOICE_ANALYTICS三节点及users→sessions/sessions→turns/sessions→entities关系线⑤§5.4新增Alembic迁移代码（upgrade/downgrade完整实现+SQLite兼容映射表+6项验证清单）⑥版本保持0.2.0不变（增量更新）** |
 | v2.1 | TBD | 添加用户反馈表 |
 
 ---
 
-*最后更新: 2026-06-04*
+*最后更新: 2026-06-05*

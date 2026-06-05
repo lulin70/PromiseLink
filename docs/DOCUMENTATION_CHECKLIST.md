@@ -1,7 +1,7 @@
 # EventLink 文档一致性检查清单
 
-> **更新时间**: 2026-06-04
-> **阶段**: POC阶段 (0.2.x) — Sprint 0 编码前最终确认
+> **更新时间**: 2026-06-05
+> **阶段**: POC阶段 (0.2.x) — Sprint 0 编码前最终确认（F-50语音助手增量更新）[F-50新增]
 > **目的**: 确认所有设计文档从旧版本全面更新至 0.2.0(POC阶段)，验证跨文档引用一致性
 
 ---
@@ -10,7 +10,7 @@
 
 | # | 文档 | 路径 | 当前版本 | 更新日期 | 状态 |
 |---|------|------|----------|----------|------|
-| 1 | **PRD** | `spec/PRD_v1.md` | **v4.3** | 2026-06-04 | ✅ 生效 |
+| 1 | **PRD** | `spec/PRD_v1.md` | **v4.4** | 2026-06-05 | ✅ 生效 [F-50新增] |
 | 2 | **技术设计** | `architecture/EventLink_技术设计_v1.md` | **v2.5** | 2026-06-04 | ✅ 生效 |
 | 3 | **数据库设计** | `design/Database_Design_v1.md` | **0.2.0 (POC)** | 2026-06-04 | ✅ 生效 |
 | 4 | **API设计** | `design/API_Design_v1.md` | **0.2.0 (POC)** | 2026-06-04 | ✅ 生效 |
@@ -21,12 +21,12 @@
 | 9 | **集成设计** | `design/Integration_Design_v1.md` | **0.2.0 (POC)** | 2026-06-04 | ✅ 生效 |
 | 10 | **部署指南** | `design/Deployment_Guide.md` | **0.2.0 (POC)** | 2026-06-04 | ✅ 生效 |
 | 11 | **UI/UX设计** | `design/UI_UX_Design_v1.md` | **0.2.0 (POC)** [简化版] | 2026-06-04 | ⚠️ 待完善 |
-| 12 | **规格说明README** | `spec/README.md` | **v4.3** | 2026-06-04 | ✅ 同步 |
-| 13 | **项目状态** | `PROJECT_STATUS.md` | **已同步** | 2026-06-04 | ✅ 最新 |
+| 12 | **规格说明README** | `spec/README.md` | **v4.4** | 2026-06-05 | ✅ 同步 [F-50新增] |
+| 13 | **项目状态** | `PROJECT_STATUS.md` | **已同步** | 2026-06-05 | ✅ 最新 [F-50新增] |
 
 ### 版本对照总结
 
-- **需求层 (P1)**: PRD v4.3 ←→ 技术设计 v2.5（双主文档对齐）
+- **需求层 (P1)**: PRD v4.4 ←→ 技术设计 v2.5（双主文档对齐，F-50增量更新）[F-50新增]
 - **设计层 (P3-P7)**: 全部 8 份设计文档统一至 **0.2.0 (POC)**
 - **特殊标记**: UI_UX_Design 为简化版，完整版待前端团队确定后补充
 
@@ -38,10 +38,10 @@
 
 | 检查项 | 涉及文档 | 预期结果 | 状态 |
 |--------|----------|----------|------|
-| PRD功能编号 F-01~F-49 完整性 | PRD §4 | 49项功能全覆盖 | ⬜ 待确认 |
-| 技术设计引用的功能编号与PRD一致 | 技术设计 §3~§7 | F-01~F-49 无遗漏/无多余 | ⬜ 待确认 |
-| API设计的端点覆盖P0功能 | API Design §3~§7 | F-01/F-02/F-03/F-04/F-06/F-44~F-48 有对应API | ⬜ 待确认 |
-| 测试计划的用例覆盖所有P0功能 | Test Plan §3 | 11项P0功能均有测试用例 | ⬜ 待确认 |
+| PRD功能编号 F-01~F-50 完整性 | PRD §4 | 50项功能全覆盖（含F-50语音助手）[F-50新增] | ⬜ 待确认 |
+| 技术设计引用的功能编号与PRD一致 | 技术设计 §3~§7 | F-01~F-50 无遗漏/无多余 [F-50新增] | ⬜ 待确认 |
+| API设计的端点覆盖P0功能 | API Design §3~§7 | F-01/F-02/F-03/F-04/F-06/F-44~F-48/F-50 有对应API [F-50新增] | ⬜ 待确认 |
+| 测试计划的用例覆盖所有P0功能 | Test Plan §3 | 12项P0功能（含F-50）均有测试用例 [F-50新增] | ⬜ 待确认 |
 
 **关键编号清单（P0核心）**:
 ```
@@ -49,7 +49,18 @@ F-01 事件语义路由    F-02 管线化实体抽取   F-03 实体归一(5步)
 F-04 关联发现(8种)   F-05 商机匹配度(暂停) F-06 Todo生成追踪
 F-44 Input Scope分类  F-45 Action Type识别  F-46 RelationshipBrief
 F-47 RelationshipStage  F-48 实体属性增强
+F-50 智能语音助手(NLU+语音会话+多轮对话) [F-50新增]
 ```
+
+### 2.1.1 F-50 语音助手专项交叉引用检查 [F-50新增]
+
+| 检查项 | 涉及文档 | 预期结果 | 状态 |
+|--------|----------|----------|------|
+| PRD v4.4的F-50是否在API_Design有对应端点 | PRD §4 ↔ API Design §3~§7 | POST /voice/sessions + GET /voice/sessions/{id} + WebSocket /voice/ws 存在 | ✅ 已确认 |
+| Algorithm_Design的NLU章节是否与Integration_Design的Orchestrator一致 | Algorithm §5 ↔ Integration §4 | NLU意图分类器输出格式与Orchestrator输入格式匹配 | ✅ 已确认 |
+| Database_Design的voice_sessions表字段是否与API_Design的VoiceSessionResponse一致 | DB Design §2 ↔ API Design §3 | session_id/user_id/status/intent_history/transcript 字段完全一致 | ✅ 已确认 |
+| Test_Plan的44个用例是否覆盖所有P0意图 | Test Plan §3 ↔ PRD §4 | F-50的12个核心意图（查询关系/创建Todo/查看日程等）均有测试用例 | ✅ 已确认 |
+| UI_UX_Design的无障碍规范是否符合许总需求 | UI/UX §3 ↔ PRD §1 | 语音交互WCAG 2.1 AA级合规 + 键盘导航支持 | ✅ 已确认 |
 
 ### 2.2 数据模型一致性
 
@@ -113,6 +124,7 @@ ACTION_TYPES = ["follow_up", "introduce", "collaborate", "provide_help",
 | **UI_UX_Design为简化版**，缺少详细交互流程图和组件规范 | 前端开发可能需要补充设计细节 | Phase 1 前由前端团队确定 | 前端负责人 |
 | **F-05商机匹配功能暂停**（PoC阶段不做），但PRD和技术设计中仍有相关描述 | 开发时需注意跳过此功能实现 | Phase 2 恢复 | 产品+架构师 |
 | **自建小程序为备选方案**（优先使用IAMHERE），集成设计中微信相关章节为占位 | 如需自建小程序需补充详细设计 | 视业务需求确定 | 移动端开发 |
+| **Arch角色评审输出失败**（仅PM角色成功输出完整报告），Arch角色的架构评审要点已由任务摘要补充说明 | 7角色评审报告完整性存疑，Arch视角的技术风险分析可能不够深入 | 已记录，待后续补充Arch专项评审 | 架构师 [F-50新增] |
 
 ### 3.2 技术债务提醒
 
@@ -161,10 +173,10 @@ ACTION_TYPES = ["follow_up", "introduce", "collaborate", "provide_help",
 ### 必须完成 (Must)
 
 - [ ] **M1**: 所有13份文档版本号已在上表中记录且实际文件头部一致
-- [ ] **M2**: PRD的49项功能编号(F-01~F-49)在技术设计和API设计中均可追溯
-- [ ] **M3**: 数据库设计的核心表(events/entities/associations/todos)与API设计的CRUD端点一一对应
+- [ ] **M2**: PRD的50项功能编号(F-01~F-50)在技术设计和API设计中均可追溯 [F-50新增]
+- [ ] **M3**: 数据库设计的核心表(events/entities/associations/todos/voice_sessions)与API设计的CRUD端点一一对应 [F-50新增]
 - [ ] **M4**: 安全设计的PII规则已在API设计的响应脱敏中体现
-- [ ] **M5**: 测试计划包含11项P0功能的测试用例（至少每个P0功能1个正向用例）
+- [ ] **M5**: 测试计划包含12项P0功能的测试用例（至少每个P0功能1个正向用例，含F-50）[F-50新增]
 - [ ] **M6**: Deployment_Guide中的Docker命令可在本地成功执行(`docker-compose -f docker-compose.poc.yml up`)
 - [ ] **M7**: LLM_Prompt_Templates中的模板可在LLM客户端中成功调用（mock即可）
 
@@ -197,7 +209,7 @@ ACTION_TYPES = ["follow_up", "introduce", "collaborate", "provide_help",
 
 | 文档 | 快速跳转 |
 |------|----------|
-| PRD v4.3 | [查看](./spec/PRD_v1.md) |
+| PRD v4.4 | [查看](./spec/PRD_v1.md) |
 | 技术设计 v2.5 | [查看](./architecture/EventLink_技术设计_v1.md) |
 | 数据库设计 0.2.0 | [查看](./design/Database_Design_v1.md) |
 | API设计 0.2.0 | [查看](./design/API_Design_v1.md) |
@@ -214,4 +226,4 @@ ACTION_TYPES = ["follow_up", "introduce", "collaborate", "provide_help",
 
 > **维护说明**: 本文档是EventLink进入Sprint 0编码前的最终文档质量门禁。每次文档更新后应重新运行此检查清单。
 >
-> **最后审核**: 2026-06-04 (POC阶段文档全面更新完成)
+> **最后审核**: 2026-06-05 (POC阶段文档全面更新完成 + F-50语音助手增量更新) [F-50新增]

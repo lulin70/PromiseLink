@@ -2361,4 +2361,491 @@ Event Ingest Pipeline (v2.0):
 
 ---
 
-*本文档为EventLink算法设计v2.0完整版。所有算法与8条铁律保持一致，字段名使用todo_type（非todo_nature）、callability（非availability），敏感度为2级（matchable/no_match），明确排除RBAC/多租户/团队协作/他人资源匹配/原生APP。v2.0新增：InputScope分类器(§0)、Promise双向动作识别(§4.2a)、Todo降噪(§4.9)、RelationshipStage状态机(§6)、Pipeline Step0/8(§9)、关联发现HOT/COLD分离(§7.5)。参考基线：技术设计v2.5 §4。*
+*本文档为EventLink算法设计v2.0完整版。所有算法与8条铁律保持一致，字段名使用todo_type（非todo_nature）、callability（非availability），敏感度为2级（matchable/no_match），明确排除RBAC/多租户/团队协作/他人资源匹配/原生APP。v2.0新增：InputScope分类器(§0)、Promise双向动作识别(§4.2a)、Todo降噪(§4.9)、RelationshipStage状态机(§6)、Pipeline Step0/8(§9)、关联发现HOT/COLD分离(§7.5)。[0.2.1新增]：NLU意图识别引擎(§11, F-50)。参考基线：技术设计v2.5 §4。*
+
+---
+
+## 11. NLU 意图识别引擎 (F-50) [0.2.1新增]
+
+### 11.1 概述
+
+NLU（Natural Language Understanding）意图识别引擎是 F-50 智能语音助手的核心组件。负责将用户的自然语言问询映射到结构化的系统操作。
+
+**设计原则**：
+
+1. **LLM主导 + 规则回退**（双重保障）
+2. **低延迟优先**（目标 P95 < 500ms）
+3. **可解释性**（每个意图判定必须有 confidence + evidence）
+
+**核心类**: `IntentClassifier`
+
+### 11.2 意图分类体系 (Intent Taxonomy)
+
+**5类核心意图（Phase 1.1）**：
+
+| Intent ID | 名称 | 关键词特征 | 映射API | 复杂度 |
+|-----------|------|-----------|---------|--------|
+| `schedule_query` | 日程查询 | 今天/明天/会议/安排/日程/有啥会/几点 | GET /dashboard/day-view?summary_level=voice | 低 |
+| `promise_tracker` | 承诺追踪 | 答应/承诺/还没做/待办/欠/该做什么 | GET /todos?view=my-responses&status=pending | 低 |
+| `relationship_status` | 关系推进 | 到哪步了/进展/怎么样/最近联系/关系 | GET /persons/{id}/relationship-brief?summary_level=voice | 中 |
+| `todo_create` | 待办创建 | 提醒/记得/别忘了/帮我记 | POST /todos (Phase 1.2) | 中 |
+| `unclear` | 无法识别 | 其他 | → suggest_questions | — |
+
+**扩展意图（Phase 1.2+）**：
+
+- `schedule_range`: 明后天/这周/下周/下个月
+- `action_suggestion`: 该联系谁/推荐/建议
+- `conversation_review`: 聊了什么/说了什么/上次谈了
+- `knowledge_retrieval`: 新知识/学到/关于XX
+
+### 11.3 两阶段识别算法
+
+#### Stage 1: 规则快速匹配（< 50ms）
+
+```python
+import re
+from typing import Optional, Tuple
+
+
+RULE_PATTERNS = {
+    "schedule_query": [
+        r"今天.{0,5}(会议|安排|日程|有啥|什么)",
+        r"(今天).{0,3}(有|没)(什么|啥)",
+        r"今天.*几(点|时)",
+        r"今天的?(日程|计划|agenda)",
+    ],
+    "promise_tracker": [
+        r"(答应|承诺|说好|该做|欠|还没).*?(做|办|完成)",
+        r".*?(待办|todo|未完成)",
+        r"我.*(答应谁|承诺什么)",
+    ],
+    "relationship_status": [
+        r".*?(到哪|进展|怎样|怎么样|什么阶段|第几步)",
+        r"(张总|李总|王总|陈总).{0,5}(怎么样|如何|近况)",
+    ],
+}
+
+
+def rule_match(query: str) -> Tuple[Optional[str], float]:
+    """规则匹配, 返回(intent, confidence)"""
+    for intent, patterns in RULE_PATTERNS.items():
+        for pattern in patterns:
+            if re.search(pattern, query):
+                return intent, 0.85  # 规则匹配置信度
+    return None, 0.0
+```
+
+#### Stage 2: LLM 精确识别（200-500ms）
+
+当规则匹配 confidence < 0.8 或规则未命中时，调用 LLM 进行精确分类。
+
+**Prompt 模板**（新增到 LLM_Prompt_Templates）：
+
+```
+你是一个意图识别引擎。将用户问询分类为以下意图之一:
+- schedule_query: 日程查询
+- promise_tracker: 承诺追踪
+- relationship_status: 关系推进
+- todo_create: 待办创建
+- unclear: 无法识别
+
+用户问询: "{query_text}"
+只返回JSON: {"intent": "xxx", "confidence": 0.xx, "evidence": "匹配理由"}
+```
+
+**融合决策逻辑**：
+
+```python
+from dataclasses import dataclass
+
+
+@dataclass
+class IntentResult:
+    """意图识别结果"""
+    intent: str
+    confidence: float
+    source: str           # "rule" | "llm" | "rule_fallback"
+    evidence: str = ""
+    slots: dict = None    # 槽位填充结果
+
+
+class IntentClassifier:
+    """NLU 意图识别两阶段分类器"""
+
+    RULE_CONFIDENCE_THRESHOLD = 0.85
+    LLM_MODEL = "moka/claude-sonnet-4-6"
+
+    def __init__(self, llm_client=None):
+        self.llm = llm_client
+
+    async def classify(self, query: str) -> IntentResult:
+        """两阶段意图识别主入口"""
+        # Stage 1: 规则快速匹配
+        rule_intent, rule_conf = rule_match(query)
+
+        if rule_conf >= self.RULE_CONFIDENCE_THRESHOLD:
+            # 规则高置信度 → 直接返回，附带槽位填充
+            slots = self._fill_slots(rule_intent, query)
+            return IntentResult(
+                intent=rule_intent,
+                confidence=rule_conf,
+                source="rule",
+                evidence=f"规则模式命中: {query[:20]}",
+                slots=slots,
+            )
+
+        # Stage 2: LLM精确识别
+        if self.llm:
+            llm_result = await self._llm_classify(query)
+
+            # 融合: 取高置信度结果
+            if llm_result.confidence >= (rule_conf or 0.0):
+                slots = self._fill_slots(llm_result.intent, query)
+                return IntentResult(
+                    intent=llm_result.intent,
+                    confidence=llm_result.confidence,
+                    source="llm",
+                    evidence=llm_result.evidence,
+                    slots=slots,
+                )
+            else:
+                # LLM置信度低于规则 → 规则回退
+                slots = self._fill_slots(rule_intent, query)
+                return IntentResult(
+                    intent=rule_intent,
+                    confidence=rule_conf,
+                    source="rule_fallback",
+                    evidence=f"LLM置信度({llm_result.confidence:.2f})低于规则({rule_conf:.2f})",
+                    slots=slots,
+                )
+
+        # 无LLM且规则未命中 → unclear
+        return IntentResult(
+            intent="unclear",
+            confidence=0.3,
+            source="fallback",
+            evidence="无规则匹配且无LLM可用",
+            slots={},
+        )
+
+    async def _llm_classify(self, query: str) -> IntentResult:
+        """调用LLM进行意图分类"""
+        prompt = (
+            f"你是一个意图识别引擎。将用户问询分类为以下意图之一:\n"
+            f"- schedule_query: 日程查询\n"
+            f"- promise_tracker: 承诺追踪\n"
+            f"- relationship_status: 关系推进\n"
+            f"- todo_create: 待办创建\n"
+            f"- unclear: 无法识别\n\n"
+            f'用户问询: "{query}"\n'
+            f'只返回JSON: {{"intent": "xxx", "confidence": 0.xx, "evidence": "匹配理由"}}'
+        )
+        response = await self.llm.generate(prompt, max_tokens=100)
+        import json
+        try:
+            result = json.loads(response.strip())
+            return IntentResult(
+                intent=result.get("intent", "unclear"),
+                confidence=float(result.get("confidence", 0.3)),
+                evidence=result.get("evidence", ""),
+            )
+        except (json.JSONDecodeError, ValueError):
+            return IntentResult(intent="unclear", confidence=0.2, evidence="LLM解析失败")
+```
+
+### 11.4 槽位填充 (Slot Filling)
+
+对于每个意图，提取关键参数：
+
+| 意图 | 必填槽位 | 可选槽位 | 示例 |
+|------|---------|---------|------|
+| schedule_query | date(日期) | time_range(时间段) | "今天"→date=today, "下午"→time_range=afternoon |
+| promise_tracker | target(对象) | category(类别) | "老王"→target=entity:老王 |
+| relationship_status | person(人物) | — | "张总"→person=entity:张总 |
+| todo_create | content(内容) | due_date(截止日) | "明天联系李总"→content=联系李总, due_date=tomorrow |
+
+**日期解析规则**：
+
+```python
+from datetime import date, timedelta
+from typing import Dict, Any
+
+
+DATE_RULES = {
+    r"^今天$": lambda _: date.today(),
+    r"^明天$": lambda _: date.today() + timedelta(days=1),
+    r"^后天$": lambda _: date.today() + timedelta(days=2),
+    r"^明后天$": lambda _: [date.today() + timedelta(days=d) for d in (1, 2)],
+    r"^这周": lambda _: _get_week_range(date.today(), offset=0),
+    r"^下周": lambda _: _get_week_range(date.today(), offset=1),
+    r"^上周": lambda _: _get_week_range(date.today(), offset=-1),
+    r"^本月$": lambda _: _get_month_range(date.today()),
+    r"^下月$": lambda _: _get_month_range(date.today(), offset=1),
+}
+
+TIME_RANGE_RULES = {
+    r"上午|早上": "morning",
+    r"下午": "afternoon",
+    r"晚上": "evening",
+    r"中午": "noon",
+}
+
+
+def parse_date(text: str) -> Any:
+    """解析自然语言日期表达式"""
+    for pattern, resolver in DATE_RULES.items():
+        if re.search(pattern, text.strip()):
+            return resolver(text)
+    return None  # 未解析到具体日期
+
+
+def parse_time_range(text: str) -> str:
+    """解析时间段"""
+    for pattern, value in TIME_RANGE_RULES.items():
+        if re.search(pattern, text):
+            return value
+    return "all_day"
+
+
+def _get_week_range(ref_date: date, offset: int = 0) -> list:
+    """获取周范围"""
+    monday = ref_date - timedelta(days=ref_date.weekday()) + timedelta(weeks=offset)
+    return [monday + timedelta(days=d) for d in range(7)]
+
+
+def _get_month_range(ref_date: date, offset: int = 0) -> list:
+    """获取月范围"""
+    from calendar import monthrange
+    y = ref_date.year + ((ref_date.month - 1 + offset) // 12)
+    m = (ref_date.month - 1 + offset) % 12 + 1
+    _, days_in_month = monthrange(y, m)
+    start = date(y, m, 1)
+    return [start + timedelta(days=d) for d in range(days_in_month)]
+```
+
+**人名解析规则**：
+
+```python
+def parse_person_name(query: str, known_entities: list = None) -> Dict[str, Any]:
+    """
+    解析人名槽位
+    - 匹配entities表中的已知实体名
+    - 未匹配时返回原始文本,由API层做模糊搜索
+    """
+    # 常见称谓前缀模式
+    name_pattern = r"(?:(?:张|李|王|陈|刘|赵|杨|黄|周|吴|徐|孙|马|朱|胡|郭|何|高|林|罗|郑|梁|谢|宋|唐|许|韩|冯|邓|曹|彭|曾|萧|田|董|袁|潘|于|蒋|蔡|余|杜|叶|程|苏|魏|吕|丁|任|沈|姚|卢|姜|崔|钟|谭|陆|汪|范|金|石|廖|贾|夏|韦|傅|方|熊|白|邹|孟|秦|邱|江|尹|薛|闫|段|雷|侯|龙|史|陶|黎|贺|顾|毛|郝|龚|邵|万|钱|严|覃|武|戴|莫|孔|向|汤)\s*总|[^\s，。！？、]{2,4})"
+
+    match = re.search(name_pattern, query)
+    raw_name = match.group(0).strip() if match else None
+    if not raw_name:
+        return {"raw": None, "resolved": None, "match_type": "none"}
+
+    # 尝试在已知实体中匹配
+    if known_entities:
+        for entity in known_entities:
+            if raw_name == entity.name or raw_name in (entity.aliases or []):
+                return {
+                    "raw": raw_name,
+                    "resolved": str(entity.id),
+                    "resolved_name": entity.name,
+                    "match_type": "exact",
+                }
+            # 模糊匹配
+            if len(raw_name) >= 2 and (raw_name in entity.name or entity.name in raw_name):
+                return {
+                    "raw": raw_name,
+                    "resolved": str(entity.id),
+                    "resolved_name": entity.name,
+                    "match_type": "fuzzy",
+                }
+
+    # 未匹配到已知实体，返回原始文本供API层模糊搜索
+    return {"raw": raw_name, "resolved": None, "match_type": "raw_text"}
+```
+
+**完整槽位填充器**：
+
+```python
+class SlotFiller:
+    """槽位填充器——根据意图类型提取结构化参数"""
+
+    def __init__(self, known_entities=None):
+        self.entities = known_entities or []
+
+    def fill(self, intent: str, query: str) -> dict:
+        """根据意图类型执行对应的槽位提取"""
+        fillers = {
+            "schedule_query": self._fill_schedule,
+            "promise_tracker": self._fill_promise,
+            "relationship_status": self._fill_relationship,
+            "todo_create": self._fill_todo_create,
+        }
+        filler = fillers.get(intent, lambda q: {})
+        return filler(query)
+
+    def _fill_schedule(self, query: str) -> dict:
+        """日程查询槽位"""
+        return {
+            "date": parse_date(query),
+            "time_range": parse_time_range(query),
+        }
+
+    def _fill_promise(self, query: str) -> dict:
+        """承诺追踪槽位"""
+        person = parse_person_name(query, self.entities)
+        return {
+            "target": person,
+            "category": self._infer_promise_category(query),
+        }
+
+    def _fill_relationship(self, query: str) -> dict:
+        """关系推进槽位"""
+        person = parse_person_name(query, self.entities)
+        return {"person": person}
+
+    def _fill_todo_create(self, query: str) -> dict:
+        """待办创建槽位"""
+        # 去除提醒动词后剩余内容为待办正文
+        content = re.sub(r"^(提醒|记得|别忘了|帮我记|帮我想?着?)", "", query).strip()
+        return {
+            "content": content or query,
+            "due_date": parse_date(query),
+        }
+
+    @staticmethod
+    def _infer_promise_category(query: str) -> str:
+        """推断承诺类别"""
+        if any(w in query for w in ["方案", "文档", "报告"]):
+            return "deliverable"
+        if any(w in query for w in ["电话", "联系", "见面", "会议"]):
+            return "communication"
+        if any(w in query for w in ["钱", "付款", "账"]):
+            return "financial"
+        return "general"
+```
+
+### 11.5 性能目标
+
+| 指标 | Phase 1.1 目标 | Phase 1.2 目标 | 测量方法 |
+|------|--------------|--------------|---------|
+| 意图识别准确率(P0三类) | ≥ 90% | ≥ 95% | 标注测试集100条 |
+| 规则匹配覆盖率 | ≥ 60% | ≥ 70% | 日志统计 rule hit rate |
+| LLM fallback延迟P50 | < 500ms | < 300ms | Prometheus histogram |
+| 端到端延迟P95(ASR→TTS) | < 5s | < 3s | 全链路 trace |
+| 不确定意图的处理率 | 100%返回建议问题 | 同左 | 自动化测试 |
+
+### 11.6 与现有Pipeline的关系
+
+```
+现有 Event Pipeline:
+  Event → InputScope(Classify) → EntityExtract → TodoGen → Store → Discover → RelationshipBrief
+
+新增 Voice Pipeline (独立,不侵入):
+  VoiceInput → ASR → NLU(Intent+Slots) → QueryOrchestrator → Existing APIs → NLG → TTS → VoiceOutput
+                                              ↑
+                                        复用现有API,不重复造轮子
+```
+
+**关键架构决策（ADR）**：
+
+| 决策项 | 选择 | 理由 |
+|--------|------|------|
+| Voice Pipeline 独立性 | 独立于 Event Pipeline | 故障隔离,独立部署 |
+| 适配层设计 | QueryOrchestrator 作为适配层 | 将 NLU 结果转换为现有 REST API 调用 |
+| API 兼容性 | 不修改任何现有 API 的核心逻辑 | 只增加 summary_level / summary_format 参数 |
+| LLM 选型 | moka/claude-sonnet-4-6 | 中文理解能力强,响应速度满足要求 |
+
+**QueryOrchestrator 适配层伪代码**：
+
+```python
+class QueryOrchestrator:
+    """NLU 结果 → 现有 REST API 的适配层"""
+
+    INTENT_API_MAP = {
+        "schedule_query": ("GET", "/dashboard/day-view"),
+        "promise_tracker": ("GET", "/todos"),
+        "relationship_status": ("GET", "/persons/{person_id}/relationship-brief"),
+        "todo_create": ("POST", "/todos"),
+    }
+
+    async def execute(self, intent_result: IntentResult) -> dict:
+        """将NLU结果路由到对应API并格式化返回"""
+        api_config = self.INTENT_API_MAP.get(intent_result.intent)
+        if not api_config:
+            return await self._handle_unclear()
+
+        method, path_template = api_config
+        path = self._resolve_path(path_template, intent_result.slots)
+        params = self._build_api_params(intent_result.intent, intent_result.slots)
+
+        # 调用现有API（复用，不重写）
+        response = await self.http_client.request(method, path, params=params)
+        return self._format_for_voice(response, intent_result.intent)
+
+    def _build_api_params(self, intent: str, slots: dict) -> dict:
+        """构建API请求参数，统一添加voice相关参数"""
+        base_params = {}
+        if intent == "schedule_query":
+            date_val = slots.get("date")
+            base_params = {
+                "summary_level": "voice",
+                "summary_format": "spoken",
+                "target_date": date_val.isoformat() if hasattr(date_val, 'isoformat') else str(date_val),
+            }
+            if slots.get("time_range") and slots["time_range"] != "all_day":
+                base_params["time_range"] = slots["time_range"]
+        elif intent == "promise_tracker":
+            base_params = {
+                "view": "my-responses",
+                "status": "pending",
+                "summary_level": "voice",
+            }
+        elif intent == "relationship_status":
+            person_id = (slots.get("person") or {}).get("resolved")
+            base_params = {
+                "summary_level": "voice",
+                "summary_format": "spoken",
+            }
+        elif intent == "todo_create":
+            base_params = {
+                "title": slots.get("content", ""),
+                "source": "voice",
+            }
+            due = slots.get("due_date")
+            if due and hasattr(due, 'isoformat'):
+                base_params["due_at"] = due.isoformat()
+        return base_params
+
+    async def _handle_unclear(self) -> dict:
+        """无法识别意图时返回建议问题"""
+        return {
+            "intent": "unclear",
+            "suggested_questions": [
+                "您想查看今天的日程安排吗？",
+                "需要查看您的待办事项吗？",
+                "想了解某位联系人最近的进展吗？",
+            ],
+            "tts_response": "不好意思，我不太确定您的意思。您可以问我今天的日程、待办事项，或者某个联系人的情况。",
+        }
+
+    @staticmethod
+    def _format_for_voice(api_response: dict, intent: str) -> dict:
+        """将API响应格式化为语音输出友好的结构"""
+        return {
+            "raw_data": api_response,
+            "tts_ready": True,
+            "intent": intent,
+            # NLG模块后续基于此结构生成口语化回复
+        }
+```
+
+### 11.7 不确定意图处理策略
+
+当意图被判定为 `unclear` 时，系统采用以下策略保证体验流畅性：
+
+| 场景 | 处理方式 | 示例 |
+|------|---------|------|
+| confidence < 0.4 | 返回建议问题列表 | "您可以问我日程、待办或联系人情况" |
+| 多意图歧义(confidence接近) | 主动澄清 | "您是想问张总的行程还是关系进展？" |
+| 槽位缺失(如缺人名) | 引导补充 | "请问是哪位联系人？" |
+| 连续2次unclear | 降级为开放对话 | 转接人工客服或记录反馈 |
