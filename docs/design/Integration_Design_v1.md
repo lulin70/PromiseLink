@@ -1,42 +1,47 @@
-# EventLink集成设计文档 v1.2
+# EventLink集成设计文档 0.2.0
 
-> **版本**: v1.2
-> **日期**: 2026-06-03  
-> **设计师**: 架构师团队  
-> **参考**: PRD v3.6, 技术设计 v1.7, API设计 v1.0, 数据库设计 v1.0
+> **版本**: 0.2.0（POC阶段）
+> **日期**: 2026-06-04
+> **设计师**: 架构师团队
+> **参考**: PRD v4.3, 技术设计 v2.5, API设计 v1.0, 数据库设计 v2.0, LLM_Prompt_Templates v2.0
+> **状态**: POC阶段 — 共识清单D7-1~D7-11融合修订
 
 ---
 
-## 关键决策（8条铁律）
+## 关键决策（9条铁律）
 
 | # | 决策 | 说明 |
 |---|------|------|
 | 1 | 产品定位 | AI驱动的**个人商务关系经营助手**（非"资源匹配平台"） |
-| 2 | Todo类型 | 6种：cooperation_signal/risk/care/promise/followup/help |
+| 2 | Todo类型 | 6种todo_type：cooperation_signal/risk/care/promise/followup/help；6种action_type：my_promise/their_promise/my_followup/mutual_action/system_reminder/unclear [0.2.0新增action_type] |
 | 3 | 莫兰迪色系 | 雾白#B8C4C0/烟粉#C4A7A0/雾蓝#A0B0C4/雾绿#A0C4A8/雾金#C4C0A0/雾紫#B0A0C4 |
-| 4 | 匹配算法 | 六维：keyword(25%)+industry(20%)+topic(15%)+llm(10%)+history(10%)+callability(20%) |
+| 4 | 匹配算法 | ⏸️ **[F-05暂停] Phase2功能** — 六维算法（keyword25%+industry20%+topic15%+llm10%+history10%+callability20%）PoC阶段不启用 |
 | 5 | 敏感度 | 2级：matchable/no_match |
 | 6 | 部署 | PoC本地Docker+SQLite → Phase1云端Docker Compose+PG+Redis |
 | 7 | 明确排除 | RBAC/多租户/团队协作/他人资源匹配/原生APP |
 | 8 | 字段名 | todo_type（非todo_nature）、callability（非availability） |
+| 9 | LLM Provider | Moka AI（https://api.moka-ai.com/v1），model: moka/claude-sonnet-4-6 [0.2.0新增] |
 
 ---
 
 ## 1. 集成概览
 
-本文档定义7个关键集成模块的设计方案：
+本文档定义10个关键集成模块的设计方案：
 
 | # | 集成模块 | 优先级 | 状态 |
 |---|---------|--------|------|
-| 1 | IAMHERE小程序集成 | P0 | ✅ 设计完成 |
-| 2 | LLM集成设计 | P0 | ✅ 设计完成 |
-| 3 | TTS/ASR集成设计 | P0 | ✅ 设计完成 |
-| 4 | 微信服务号推送 | P1 | ✅ 设计完成 |
-| 5 | CarryMem集成设计 | P1 | ✅ 设计完成 |
-| 6 | 集成测试策略 | P0 | ✅ 设计完成 |
-| 7 | 配置管理 | P1 | ✅ 设计完成 |
+| 1 | IAMHERE小程序集成 | P0 | ✅ 设计完成（[D7-4] 微信OAuth code2session流程不变） |
+| 2 | LLM集成设计 | P0 | ✅ 0.2.0更新（Moka AI + 模板0/3更新 + action_type） |
+| 3 | TTS/ASR集成设计 | P0 | ✅ 0.2.0更新（Phase 1：Whisper/Azure Edge-TTS/Mock） |
+| 4 | 微信服务号推送 | P1 | ✅ 设计完成（[D7-7] 模板消息/订阅消息框架不变） |
+| 5 | CarryMem集成设计 | P1 | ✅ 0.2.0更新（三阶段路径：PoC→Phase1→Phase2） |
+| 6 | 数字名片API对接 | P1 | 🔶 接口预留中（[D7-6] 陈宇欣团队+自建备选） |
+| 7 | 数据导出集成 | P1 | ✅ 0.2.0新增（[D7-9] GET /data/export + PII脱敏） |
+| 8 | Redis缓存服务 | P1 | ✅ 设计完成（[D7-8] CacheService不变） |
+| 9 | 集成测试策略 | P0 | ✅ 设计完成 |
+| 10 | 配置管理 | P1 | ✅ 设计完成 |
 
-**集成架构总览**:
+**集成架构总览（[0.2.0更新]）**:
 
 ```mermaid
 graph TB
@@ -51,13 +56,18 @@ graph TB
         LLM[LLM Client]
         TTS[TTS/ASR Client]
         WX[微信推送服务]
-        CM[CarryMem Provider]
+        CM[CarryMem Provider<br/>PoC: NullMemoryProvider]
+        DC[数字名片Client<br/>PoC: MockDigitalCard]
+        EXPORT[数据导出服务]
+        CACHE[CacheService<br/>Redis优先+内存fallback]
     end
     subgraph 外部服务
-        OPENAI[OpenAI/Claude/通义]
-        ALIYUN[阿里云语音服务]
+        MOKA[Moka AI<br/>moka/claude-sonnet-4-6]
+        ASR_P[ASR: 微信同声传译/Whisper]
+        TTS_P[TTS: Azure Edge-TTS / 预合成MP3]
         WECHAT[微信服务号]
-        CARRYMEM[CarryMem MCP]
+        CARRYMEM[CarryMem MCP<br/>Phase1+启用]
+        CARD_API[陈宇欣团队名片API<br/>接口预留中]
     end
 
     MP -->|ticket模式| H5
@@ -67,15 +77,22 @@ graph TB
     API --> TTS
     API --> WX
     API --> CM
-    LLM --> OPENAI
-    TTS --> ALIYUN
+    API --> DC
+    API --> EXPORT
+    API --> CACHE
+    LLM --> MOKA
+    TTS --> ASR_P
+    TTS --> TTS_P
     WX --> WECHAT
-    CM --> CARRYMEM
+    CM -.->|PoC: 不调用| CARRYMEM
+    CM -->|Phase1+| CARRYMEM
+    DC -.->|PoC: Mock| CARD_API
+    DC -->|Phase1+| CARD_API
 ```
 
 ---
 
-## 2. IAMHERE小程序集成
+## 2. IAMHERE小程序集成（[D7-4] 微信OAuth code2session流程不变）
 
 ### 2.1 WebView嵌入方案
 
@@ -430,70 +447,171 @@ export const authManager = new AuthManager()
 
 ### 3.1 接口封装
 
-统一LLMClient类封装多个LLM Provider，支持优雅降级。
+统一LLMClient类封装LLM调用，[0.2.0更新] 使用 **Moka AI** 作为唯一Provider。
 
 ```python
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Optional
 
-class LLMProvider(str, Enum):
-    OPENAI = "openai"
-    CLAUDE = "claude"
-    QWEN = "qwen"  # 通义千问
+# [0.2.0更新] 统一使用Moka AI
+MOKA_API_BASE = "https://api.moka-ai.com/v1"
+MOKA_MODEL = "moka/claude-sonnet-4-6"
 
 class LLMClient:
-    """统一LLM客户端，支持多Provider和降级"""
-
-    PROVIDER_PRIORITY = [LLMProvider.OPENAI, LLMProvider.CLAUDE, LLMProvider.QWEN]
+    """统一LLM客户端 — [0.2.0] Moka AI单Provider"""
 
     def __init__(self, config: dict):
-        self.providers = {
-            LLMProvider.OPENAI: OpenAIProvider(config["openai"]),
-            LLMProvider.CLAUDE: ClaudeProvider(config["claude"]),
-            LLMProvider.QWEN: QwenProvider(config["qwen"]),
-        }
-        self.max_tokens = config.get("max_tokens", 2000)
+        self.api_key = config.get("api_key")
+        self.base_url = config.get("base_url", MOKA_API_BASE)
+        self.model = config.get("model", MOKA_MODEL)
+        self.max_tokens = config.get("max_tokens", 4000)  # [0.2.0] 提升至4000支持12模块
         self.timeout = config.get("timeout", 30)
+        self._client: Optional[httpx.AsyncClient] = None
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                base_url=self.base_url,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                timeout=self.timeout,
+            )
+        return self._client
 
     async def call(
         self,
         prompt: str,
-        model: str = "gpt-4",
+        model: str = None,
         max_tokens: Optional[int] = None,
         temperature: float = 0.3,
     ) -> str:
-        """调用LLM，失败时自动降级"""
-        for provider_name in self.PROVIDER_PRIORITY:
-            provider = self.providers.get(provider_name)
-            if not provider or not provider.available:
-                continue
-            try:
-                return await provider.call(
-                    prompt=prompt,
-                    model=model,
-                    max_tokens=max_tokens or self.max_tokens,
-                    temperature=temperature,
-                    timeout=self.timeout,
-                )
-            except LLMTimeoutError:
-                continue
-            except LLMQuotaExceeded:
-                continue
-            except LLMError:
-                continue
-
-        # 所有Provider失败，使用规则降级
-        return self._rule_based_fallback(prompt)
+        """调用Moka AI LLM，失败时规则降级"""
+        client = await self._get_client()
+        try:
+            resp = await client.post(
+                "/chat/completions",
+                json={
+                    "model": model or self.model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": max_tokens or self.max_tokens,
+                    "temperature": temperature,
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data["choices"][0]["message"]["content"]
+        except Exception as e:
+            logger.warning(f"Moka AI调用失败: {e}，使用规则降级")
+            return self._rule_based_fallback(prompt)
 
     def _rule_based_fallback(self, prompt: str) -> str:
         """规则降级：LLM不可用时的兜底策略"""
         return '{"error": "llm_unavailable", "fallback": true}'
 ```
 
-### 3.2 Prompt模板库（12个模板）
+> [deprecated] v1.2的多Provider降级策略（OpenAI→Claude→通义千问）已替换为Moka AI单Provider + 规则降级。如需多Provider回退，可在Phase 2引入。
+
+### 3.2 Prompt模板库（14个模板）
 
 > 每个模板包含：完整prompt文本、输入变量、输出格式、示例
+> [0.2.0更新] 新增模板0（Input Scope分类）+ 模板13/14（RelationshipBrief/RelationshipStage），统一使用Moka AI moka/claude-sonnet-4-6模型
+
+---
+
+#### 模板0：Input Scope 分类 [0.2.0新增]
+
+**用途**: 对用户输入进行语义分类，确定输入属于哪种scope，以便路由到正确的处理管线（F-44）
+
+**输入变量**:
+
+| 变量 | 类型 | 说明 |
+|------|------|------|
+| user_input | string | 用户原始输入文本 |
+| context_hint | string | 上下文提示（可选，如来源渠道） |
+
+**8种Scope定义（[0.2.0新增]）**:
+
+| Scope | 说明 | 关键词特征 | 示例 |
+|-------|------|-----------|------|
+| `card_scan` | 名片信息 | 名片、OCR、姓名+公司+职位、电话、邮箱 | "扫了张总的名片" |
+| `meeting` | 会议纪要 | 会议、纪要、讨论、参会人、议程、决议 | "今天开了产品评审会" |
+| `call` | 电话记录 | 电话、通话、沟通、聊了、对方说 | "刚跟李总通了电话" |
+| `manual_input` | 手动补全 | 补充、添加、手动录入、自由文本 | "补充一下王明的信息" |
+| `wechat_chat` | 微信聊天 | 微信、聊天记录、朋友圈、群聊 | "微信上跟王总聊了项目" |
+| `email` | 邮件往来 | 邮件、邮件内容、附件、抄送 | "收到李总发的邮件" |
+| `import` | 批量导入 | 导入、Excel、CSV、批量、通讯录 | "从通讯录导入了50个联系人" |
+| `calendar` | 日历事件 | 日历、日程、会议邀请、提醒 | "日历上有明天下午的会议" |
+
+**关键词触发规则（[0.2.0新增]）**:
+1. 包含"扫"、"OCR"、"名片" → `card_scan`
+2. 包含"会议"、"纪要"、"评审" → `meeting`
+3. 包含"电话"、"通话"、"通了" → `call`
+4. 包含"微信"、"聊天" → `wechat_chat`
+5. 包含"邮件"、"收件箱" → `email`
+6. 包含"导入"、"Excel"、"CSV" → `import`
+7. 包含"日历"、"日程"、"会议邀请" → `calendar`
+8. 包含"补充"、"添加"、"手动" → `manual_input`
+9. **fallback默认值**: 无法匹配以上任一规则时返回 `manual_input`
+
+**Prompt**:
+```
+你是一个EventLink输入分类器。请判断以下用户输入属于哪种scope。
+
+8种scope定义：
+1. card_scan（名片扫描）：名片扫描/OCR识别结果，包含姓名、公司、职位、联系方式等结构化或半结构化信息
+2. meeting（会议）：会议纪要、讨论记录，包含参会人、议题、决议等
+3. call（电话）：通话记录、沟通摘要，包含对话双方及交流要点
+4. manual_input（手动补全）：用户主动补充的信息录入，自由文本形式
+5. wechat_chat（微信聊天）：微信对话记录、朋友圈互动、群聊内容
+6. email（邮件）：邮件往来内容，含附件和抄送信息
+7. import（批量导入）：从外部数据源批量导入联系人或事件
+8. calendar（日历）：日历中的日程安排、会议邀请、提醒事项
+
+分类规则：
+1. 优先匹配最具体的scope（如同时满足card_scan和manual_input，选card_scan）
+2. 如果输入包含多个scope特征，选择置信度最高的主scope
+3. 如果无法明确判断，返回manual_input作为默认值（fallback）
+4. 输出secondary_scopes数组，列出其他可能匹配的scope（置信度>0.3）
+
+用户输入：
+{user_input}
+
+上下文提示：
+{context_hint}
+
+输出JSON格式：
+{{
+  "primary_scope": "scope名称",
+  "scope_confidence": 0.0-1.0,
+  "secondary_scopes": [
+    {{"scope": "scope名称", "confidence": 0.0-1.0}}
+  ],
+  "reasoning": "分类理由",
+  "suggested_pipeline": "推荐处理管线",
+  "is_ai_inference": false,
+  "confidence_level": "confirmed",
+  "requires_confirmation": false
+}}
+```
+
+**输出示例**:
+```json
+{
+  "primary_scope": "card_scan",
+  "scope_confidence": 0.95,
+  "secondary_scopes": [
+    {"scope": "manual_input", "confidence": 0.3}
+  ],
+  "reasoning": "输入包含完整的姓名、公司、职位、联系方式字段，符合名片OCR输出特征",
+  "suggested_pipeline": "card_save",
+  "is_ai_inference": false,
+  "confidence_level": "confirmed",
+  "requires_confirmation": false
+}
+```
 
 ---
 
@@ -638,9 +756,9 @@ OCR文本：
 
 ---
 
-#### 模板3：Todo生成（含todo_type）
+#### 模板3：Todo生成（含todo_type + action_type + Promise双向识别）
 
-**用途**: 根据对话内容和上下文生成待办事项，**必须指定todo_type**
+**用途**: 根据对话内容和上下文生成待办事项，**必须指定todo_type和action_type**，并识别promisor/beneficiary [0.2.0更新]
 
 **输入变量**:
 
@@ -662,9 +780,32 @@ OCR文本：
 | cooperation_signal | 合作信号 | 识别合作信号，发现资源互补和合作可能 | high |
 | risk | 风险 | 识别潜在风险，强调预警和规避措施 | high |
 
+**6种action_type及识别规则（[0.2.0新增]）**:
+
+| action_type | 说明 | 触发关键词示例 |
+|-------------|------|---------------|
+| `my_promise` | 我的承诺 | 我答应、我承诺、我会、保证、一定...给... |
+| `their_promise` | 对方承诺 | 他说、对方答应、他承诺、他说会... |
+| `my_followup` | 我的跟进 | 跟进、确认一下、后续了解、回头问 |
+| `mutual_action` | 共同行动 | 一起、共同、双方、协作、配合 |
+| `system_reminder` | 系统提醒 | 定期、周期性、每周、每月、例行 |
+| `unclear` | 待确认 | 暂时不确定、待确认、需要再确认 |
+
+**Promise双向识别规则（[0.2.0新增]）**:
+1. **promisor识别**：判断"谁做出了承诺动作"——用户自己→`my_promise`；对方→`their_promise`
+2. **beneficiary识别**：判断"谁从该承诺中受益"——用户自己受益或双方受益
+3. **confirmation强制规则**：所有生成的Todo默认`confirmation: "pending"`，必须用户确认后才变为`confirmed`
+
+**降噪规则（[0.2.0新增]）**:
+1. 排除纯寒暄内容（"你好"、"谢谢"、"再见"等）
+2. 排除重复信息（同一事项不重复生成Todo）
+3. 排除过于模糊的表述（"以后再说"、"有空聊聊"等无明确行动项的内容）
+4. 排除已完成的动作（"已经发了"、"已经联系了"等过去完成时）
+5. 单次对话最多生成3条Todo，按优先级排序
+
 **Prompt**:
 ```
-你是一个个人商务关系经营助手。请根据以下信息生成一条待办事项。
+你是一个个人商务关系经营助手。请根据以下信息生成待办事项。
 
 Todo类型：{todo_type}
 - promise（承诺）：提取"我答应过什么"，给出兑现承诺的行动步骤和截止时间
@@ -673,6 +814,26 @@ Todo类型：{todo_type}
 - followup（跟进）：标记需跟进的事项，列出待确认点和下一步行动
 - cooperation_signal（合作信号）：识别合作信号，发现资源互补和合作可能
 - risk（风险）：识别潜在风险，给出预警和规避措施
+
+Action类型（[0.2.0新增]必须从6种中选择最匹配的一种）：
+- my_promise（我的承诺）：我答应、我承诺、我会、保证 → 进入用户Todo列表
+- their_promise（对方承诺）：他说、对方答应、他承诺 → 显示"等待对方回应"
+- my_followup（我的跟进）：跟进、确认、后续了解 → 生成跟进型Todo
+- mutual_action（共同行动）：一起、共同、双方协作 → 双方各生成一条Todo
+- system_reminder（系统提醒）：定期、周期性、每周 → 系统自动生成
+- unclear（待确认）：暂时不确定、需再确认 → 标记待用户手动确认
+
+Promise双向识别规则（[0.2.0新增]）：
+1. 判断谁做出承诺（promisor）：用户自己→my_promise，对方→their_promise
+2. 判断谁受益（beneficiary）：明确受益方
+3. 所有Todo默认confirmation="pending"，需用户确认
+
+降噪规则（[0.2.0新增]）：
+1. 排除纯寒暄（你好/谢谢/再见）
+2. 排除重复信息
+3. 排除模糊表述（以后再说/有空聊聊）
+4. 排除已完成动作（已经发了）
+5. 单次最多3条Todo
 
 对话内容：
 {conversation}
@@ -689,48 +850,82 @@ Todo类型：{todo_type}
 3. priority必须与todo_type匹配
 4. due_date建议：promise/cooperation_signal=3天内，risk=1天内，care/followup=7天内，help=5天内
 5. context字段必须包含生成此Todo的原因
+6. action_type必须从6种中选择最匹配的一种 [0.2.0强制]
+7. 必须识别promisor和beneficiary（如有对应人物）[0.2.0强制]
+8. confirmation默认为"pending"，表示待用户确认 [0.2.0强制]
+9. evidence_quote必须包含原文引用作为证据 [0.2.0强制]
+
+输出语言规则：
+1. 输出语言必须与输入语言一致
+2. 禁止建议索取资源
+3. 禁止自动撮合
+4. 推测必须标记
 
 输出JSON格式：
 {{
   "todo_type": "{todo_type}",
+  "action_type": "my_promise|their_promise|my_followup|mutual_action|system_reminder|unclear",
   "description": "Todo描述",
   "priority": "high|medium|low",
   "due_date_suggestion": "建议截止时间（ISO 8601）",
+  "confirmation": "pending",
+  "promisor": "承诺人姓名或null",
+  "beneficiary": "受益人姓名或null",
+  "evidence_quote": "证据原文引用",
   "context": {{
     "reason": "生成原因",
     "suggested_action": "建议行动",
     "related_entities": ["相关人物名"]
-  }}
+  }},
+  "is_ai_inference": true,
+  "confidence_level": "confirmed|inferred|speculated",
+  "requires_confirmation": true
 }}
 ```
 
-**输出示例（cooperation_signal类型）**:
+**输出示例（cooperation_signal + my_promise类型）[0.2.0更新]**:
 ```json
 {
   "todo_type": "cooperation_signal",
+  "action_type": "my_promise",
   "description": "⚪ 合作信号：李总寻找AI项目，王明有3个推荐项目可对接",
   "priority": "high",
   "due_date_suggestion": "2026-06-06T00:00:00Z",
+  "confirmation": "pending",
+  "promisor": "我（用户）",
+  "beneficiary": "李总",
+  "evidence_quote": "李总说'最近一直在看AI赛道的项目'，王明推荐了3个项目",
   "context": {
     "reason": "李总（盛恒资本投资总监）正在寻找AI赛道项目，与王明推荐的3个项目高度匹配，存在合作可能",
     "suggested_action": "联系王明获取项目详情，安排与李总的路演对接",
     "related_entities": ["李总", "王明"]
-  }
+  },
+  "is_ai_inference": true,
+  "confidence_level": "inferred",
+  "requires_confirmation": true
 }
 ```
 
-**输出示例（help类型）**:
+**输出示例（help + send类型）[0.2.0更新]**:
 ```json
 {
   "todo_type": "help",
+  "action_type": "send",
   "description": "🟢 帮助：张总最近在关注AI大模型落地，你可以分享相关案例",
   "priority": "medium",
   "due_date_suggestion": "2026-06-08T00:00:00Z",
+  "confirmation": "pending",
+  "promisor": null,
+  "beneficiary": "张总",
+  "evidence_quote": "张总提到'正在研究大模型落地场景'",
   "context": {
     "reason": "张总（AI公司CEO）正在研究大模型落地场景，你有相关行业案例可以分享",
     "suggested_action": "整理2-3个大模型落地案例，微信发给张总参考",
     "related_entities": ["张总"]
-  }
+  },
+  "is_ai_inference": false,
+  "confidence_level": "confirmed",
+  "requires_confirmation": false
 }
 ```
 
@@ -1364,7 +1559,7 @@ Todo类型：{todo_type}
 | 最大重试次数 | 3 | 超过3次返回错误 |
 | 退避策略 | 指数退避 | 1s → 2s → 4s |
 | 超时时间 | 30s | 单次请求超时 |
-| 降级策略 | Provider切换 | OpenAI → Claude → 通义千问 → 规则降级 |
+| 降级策略 | Moka AI → 规则降级 | [0.2.0] 单Provider + fallback |
 
 ```python
 import asyncio
@@ -1375,7 +1570,8 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
     wait=wait_exponential(multiplier=1, min=1, max=4),
     retry=retry_if_exception_type((LLMTimeoutError, LLMRateLimitError)),
 )
-async def call_with_retry(prompt: str, model: str = "gpt-4") -> str:
+async def call_with_retry(prompt: str, model: str = "moka/claude-sonnet-4-6") -> str:
+    """[0.2.0] Moka AI重试调用"""
     return await llm_client.call(prompt, model=model)
 ```
 
@@ -1383,27 +1579,30 @@ async def call_with_retry(prompt: str, model: str = "gpt-4") -> str:
 
 | 参数 | 值 | 说明 |
 |------|---|------|
-| 单次请求Token上限 | 2000 | 防止过长prompt |
+| 单次请求Token上限 | 4000 | 防止过长prompt（[0.2.0]提升以支持12模块填充） |
 | 每日Token配额 | 10万 | 控制日成本 |
-| 模型选择策略 | 按场景选模型 | 简单提取用gpt-3.5，复杂推理用gpt-4 |
+| 模型选择策略 | 统一使用Moka AI | moka/claude-sonnet-4-6 |
 | 缓存策略 | 相同prompt缓存24h | 避免重复调用 |
 
-**模型选择策略**:
+**模型选择策略（[0.2.0更新] 统一Moka AI）**:
 
 | 模板 | 推荐模型 | 原因 |
 |------|---------|------|
-| 模板1 名片提取 | gpt-3.5-turbo | 结构化提取，简单任务 |
-| 模板2 语音实体抽取 | gpt-4 | 需要理解上下文 |
-| 模板3 Todo生成 | gpt-4 | 需要理解6种类型策略 |
-| 模板4 商机优化 | gpt-3.5-turbo | 文本优化，中等任务 |
-| 模板5 实体归一 | gpt-4 | 需要推理判断 |
-| 模板6 关系发现 | gpt-4 | 需要综合分析 |
-| 模板7 资源识别 | gpt-4 | 需要深度理解 |
-| 模板8 需求提取 | gpt-4 | 需要深度理解 |
-| 模板9 敏感度判断 | gpt-4 | 需要安全判断 |
-| 模板10 关系维护 | gpt-3.5-turbo | 基于规则+模板生成 |
-| 模板11 承诺提取 | gpt-4 | 需要理解承诺语义 |
-| 模板12 关注点提取 | gpt-4 | 需要理解关注意图 |
+| 模板0 Input Scope分类 | moka/claude-sonnet-4-6 | 分类任务，需要理解scope语义 |
+| 模板1 名片提取 | moka/claude-sonnet-4-6 | 结构化提取，简单任务 |
+| 模板2 语音实体抽取 | moka/claude-sonnet-4-6 | 需要理解上下文 |
+| 模板3 Todo生成 | moka/claude-sonnet-4-6 | 需要理解6种action_type策略+降噪规则 |
+| 模板4 商机优化 | moka/claude-sonnet-4-6 | 文本优化，中等任务 |
+| 模板5 实体归一 | moka/claude-sonnet-4-6 | 需要推理判断 |
+| 模板6 关系发现 | moka/claude-sonnet-4-6 | 需要综合分析 |
+| 模板7 资源识别 | moka/claude-sonnet-4-6 | 需要深度理解 |
+| 模板8 需求提取 | moka/claude-sonnet-4-6 | 需要深度理解 |
+| 模板9 敏感度判断 | moka/claude-sonnet-4-6 | 需要安全判断 |
+| 模板10 关系维护 | moka/claude-sonnet-4-6 | 基于规则+模板生成 |
+| 模板11 承诺提取 | moka/claude-sonnet-4-6 | 需要理解承诺语义 |
+| 模板12 关注点提取 | moka/claude-sonnet-4-6 | 需要理解关注意图 |
+
+> [deprecated] v1.2的按模板选不同模型（gpt-3.5/gpt-4）策略已替换为统一moka/claude-sonnet-4-6。
 
 ### 3.5 错误处理
 
@@ -1514,13 +1713,75 @@ async def safe_llm_call(prompt: str, model: str = "gpt-4") -> dict:
 
 ## 4. TTS/ASR集成设计
 
-### 4.1 服务商选择
+### 4.1 服务商选择（[0.2.0更新] Phase 1方案）
 
-| 服务商 | 用途 | 优先级 | 特点 |
-|--------|------|--------|------|
-| 阿里云智能语音 | ASR+TTS | 首选 | 中文识别率最高，支持实时转写 |
-| 腾讯云语音 | ASR+TTS | 备选 | 微信生态集成好 |
-| Azure Speech | ASR+TTS | 备选 | 多语言支持最好 |
+| 服务商 | 用途 | Phase 1策略 | 特点 |
+|--------|------|------------|------|
+| **微信同声传译插件** | ASR | **PoC首选** — 小程序内置，零额外依赖，实时转写 | 微信原生集成，无需第三方API |
+| **Whisper (local)** | ASR | **备选** — 本地部署OpenAI Whisper模型，离线可用 | 隐私友好，无网络延迟 |
+| 阿里云智能语音 | ASR+TTS | [deprecated] Phase 2再评估 | 中文识别率最高 |
+| **Azure Edge-TTS** | TTS | **Phase 1首选** — 免费开源，预合成MP3缓存 | 多语言支持好，可本地运行 |
+| **预合成MP3** | TTS | **PoC首选** — 常用文案预先合成，直接返回静态文件 | 零延迟，开发成本最低 |
+
+### 4.1.1 Phase 1集成架构 [0.2.0新增]
+
+```mermaid
+graph LR
+    subgraph PoC阶段
+        A[用户录音] --> B[微信同声传译插件 / Whisper local]
+        B --> C[转写文本]
+        C --> D[LLM实体抽取]
+    end
+    subgraph TTS_PoC
+        E[TTS请求] --> F{文案是否已预合成?}
+        F -->|是| G[返回静态MP3]
+        F -->|否| H[Azure Edge-TTS实时合成]
+    end
+    subgraph Mock验证
+        I[MockTTS端点] --> J[返回固定音频URL]
+    end
+```
+
+### 4.1.2 Mock TTS验证端点 [0.2.0新增]
+
+> PoC阶段使用Mock TTS端点验证完整链路，避免TTS服务依赖阻塞开发。
+
+```python
+class MockTTSClient(TTSClient):
+    """PoC阶段 Mock TTS 实现用于验证"""
+
+    VOICE_MAP = {
+        "female_neutral": "mock_female_neutral",
+        "female_warm": "mock_female_warm",
+        "male_neutral": "mock_male_neutral",
+        "male_professional": "mock_male_professional",
+    }
+
+    async def synthesize(
+        self,
+        text: str,
+        voice: str = "female_neutral",
+        language: str = "zh-CN",
+        speed: float = 1.0,
+        format: str = "mp3",
+    ) -> TTSResult:
+        """Mock TTS：返回预录制的固定音频"""
+        logger.info(f"[MockTTS] synthesize: text='{text[:20]}...', voice={voice}")
+        return TTSResult(
+            audio_url=f"/static/mock_tts/{self.VOICE_MAP.get(voice, 'mock_female_neutral')}.mp3",
+            duration=2.0,  # 固定2秒
+            format="mp3",
+            size=32000,   # 约32KB
+        )
+```
+
+**预合成MP3列表（PoC常用文案）**:
+
+| 文案ID | 文案内容 | 语音风格 | 用途 |
+|--------|---------|---------|------|
+| `morning_digest` | "早上好，今日有N条待办需要处理" | female_warm | 今日简报 |
+| `todo_remind` | "您有一条待办即将到期" | male_professional | Todo提醒 |
+| `person_brief` | "以下是XX的简要信息" | female_neutral | 人物速览 |
 
 ### 4.2 ASR（语音识别）详细设计
 
@@ -1769,7 +2030,7 @@ def detect_language(text: str) -> str:
 
 ---
 
-## 5. 微信服务号推送集成
+## 5. 微信服务号推送集成（[D7-7] 模板消息/订阅消息框架不变）
 
 ### 5.1 推送通道设计
 
@@ -2064,6 +2325,42 @@ async def send_push(user_id: str, todo_type: str, data: dict):
 - CarryMem提供recall_memories（记忆检索）和match_rules（规则匹配）能力
 - EventLink通过declare向CarryMem声明新知识，但不期望回读
 - CarryMem不可用时，EventLink通过NullMemoryProvider优雅降级
+- **[0.2.0新增] CarryMem必须通过Protocol接口解耦**，PoC阶段使用NullMemoryProvider
+
+### 6.1.1 三阶段集成路径 [0.2.0更新]
+
+| 阶段 | 名称 | MemoryProvider | 启用能力 | 时间线 |
+|------|------|---------------|---------|--------|
+| **PoC** | 验证阶段 | `NullMemoryProvider` | 所有接口返回空/False，验证Protocol契约正确性 | 当前 |
+| **Phase 1** | 基础集成 | `CarryMemMemoryProvider` | 基础偏好记忆 + 规则匹配（recall_memories + match_rules） | Phase 1 |
+| **Phase 2** | 全量集成 | `CarryMemMemoryProvider` (完整) | 7种记忆类型全量 + 遗忘曲线 + 记忆衰减 | Phase 2+ |
+
+**PoC阶段策略（当前）**:
+- 使用 `NullMemoryProvider` 作为默认实现
+- 所有 `recall_memories()` 调用返回空列表 `[]`
+- 所有 `match_rules()` 调用返回空列表 `[]`
+- 所有 `declare()` 调用返回 `False`（静默丢弃）
+- 系统功能不受影响，仅缺少"记忆增强"效果
+
+**Phase 1启用能力**:
+- `recall_memories`: 检索用户偏好和基础交互历史
+- `match_rules`: 匹配隐私规则和基础行为偏好
+- `declare`: 声明关键新知识（实体创建、关系变更）
+
+**Phase 2全量能力（7种记忆类型）**:
+1. **preference_memory**: 用户偏好（沟通方式、关注领域、时间习惯）
+2. **interaction_history**: 交互历史摘要（时间线、频次、质量）
+3. **entity_knowledge**: 实体知识库（人物画像、组织信息）
+4. **relationship_insight**: 关系洞察（信任度、合作潜力、风险因素）
+5. **commitment_track**: 承诺追踪（待兑现承诺、完成率、逾期记录）
+6. **pattern_learning**: 行为模式学习（最佳联系时间、响应模式）
+7. **context_awareness**: 上下文感知（近期事件关联、环境因素）
+
+**遗忘曲线机制（Phase 2）**:
+```
+memory_weight = base_weight × e^(-λ × days_since_last_access)
+其中 λ = 0.01（默认衰减系数，可配置）
+```
 
 ### 6.2 MemoryProvider Protocol
 
@@ -2313,6 +2610,179 @@ memory_provider = create_memory_provider({
 | EventLink不从CarryMem读取核心数据 | 核心数据（实体/关联/Todo）存储在本地SQLite/PG |
 | EventLink不依赖CarryMem可用性 | NullMemoryProvider保证CarryMem不可用时系统正常运行 |
 | EventLink不向CarryMem同步全量数据 | 仅声明关键新知识，不做双向同步 |
+
+---
+
+## 6.5 数字名片API对接 [0.2.0新增]
+
+### 6.5.1 对接背景
+
+> 陈宇欣团队负责数字名片服务，EventLink需要与其API对接以获取/同步名片数据。
+> 当前为**接口预留**阶段，待对方接口就绪后实施对接。
+
+### 6.5.2 接口预留设计
+
+| 项目 | 说明 |
+|------|------|
+| **对接方** | 陈宇欣团队 — 数字名片服务 |
+| **当前状态** | 接口定义中，等待对方提供OpenAPI/Swagger文档 |
+| **预计时间线** | 对方承诺2-3周内提供接口文档 |
+| **备选方案** | 如对接超3周未完成，启动自建小程序名片扫描模块 |
+| **PoC策略** | 使用Mock数据模拟名片API响应，验证数据处理链路 |
+
+### 6.5.3 Mock名片API（PoC验证用）
+
+```python
+class MockDigitalCardClient:
+    """陈宇欣团队数字名片API的Mock实现"""
+
+    async def get_card(self, card_id: str) -> dict:
+        """获取数字名片详情"""
+        return {
+            "card_id": card_id,
+            "name": "张三",
+            "company": "智源AI科技",
+            "title": "CEO",
+            "phone": "138****5678",  # PII脱敏
+            "email": "z***@zhiyuan-ai.com",  # PII脱敏
+            "wechat": "wxid_***",
+            "avatar_url": "https://mock.example.com/avatar/default.png",
+            "qr_code_url": "https://mock.example.com/qrcode/default.png",
+            "updated_at": "2026-06-04T10:00:00Z",
+        }
+
+    async def search_cards(self, keyword: str, limit: int = 10) -> list[dict]:
+        """搜索数字名片"""
+        return [
+            await self.get_card(f"mock_{i}")
+            for i in range(min(limit, 3))
+        ]
+
+    async def sync_to_eventlink(self, card_data: dict) -> dict:
+        """同步名片到EventLink实体系统"""
+        # 调用EventLink内部实体创建逻辑
+        return {"entity_id": "mock-entity-uuid", "status": "synced"}
+```
+
+### 6.5.4 自建小程序备选方案
+
+> **触发条件**: 陈宇欣团队接口对接超3周未完成时自动激活
+
+| 备选方案 | 实现方式 | 开发周期 | 优缺点 |
+|---------|---------|---------|--------|
+| 微信OCR + LLM提取 | 小程序调用`wx.scanCode`+ OCR API → LLM结构化提取 | 1周 | 无外部依赖，但识别率依赖OCR质量 |
+| 手动录入增强 | 小程序表单录入 + LLM辅助补全 | 3天 | 最快实现，用户体验稍差 |
+
+---
+
+## 6.6 数据导出集成 [0.2.0新增]
+
+### 6.6.1 导出端点设计
+
+**端点**: `GET /api/v1/data/export`
+
+**请求参数**:
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| format | string | 否 | 导出格式：`json`（默认）或 `csv` |
+| include_pii | boolean | 否 | 是否包含PII信息，默认`false` |
+| signature | string | 是 | 请求签名（防篡改） |
+| timestamp | int | 是 | 请求时间戳（Unix秒） |
+
+**签名验证规则**:
+```python
+import hmac
+import hashlib
+
+def verify_export_signature(user_id: str, timestamp: int, signature: str, secret: str) -> bool:
+    """验证导出请求签名"""
+    # 1. 检查时间戳有效性（±5分钟）
+    if abs(time.time() - timestamp) > 300:
+        return False
+
+    # 2. 重建签名
+    expected = hmac.new(
+        secret.encode(),
+        f"{user_id}:{timestamp}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+    # 3. 常量时间比较（防时序攻击）
+    return hmac.compare_digest(expected, signature)
+```
+
+**PII脱敏处理（[0.2.0新增]）**:
+
+```python
+def redact_pii_from_text(text: str) -> str:
+    """对文本中的PII信息进行脱敏处理"""
+    import re
+
+    # 手机号脱敏：13812345678 → 138****5678
+    text = re.sub(r'(\d{3})\d{4}(\d{4})', r'\1****\2', text)
+
+    # 邮箱脱敏：user@example.com → u***@example.com
+    text = re.sub(r'(\w)\w*(@)', r'\1***\2', text)
+
+    # 微信ID脱敏：wxid_xxxxx → wxid_***
+    text = re.sub(r'(wxid_\w{3})\w+', r'\1***', text)
+
+    # 身份证号脱敏
+    text = re.sub(r'(\d{6})\d{8}(\d{4})', r'\1********\2', text)
+
+    return text
+
+
+def sanitize_evidence_quote(quote: str) -> str:
+    """evidence_quote字段存储前sanitize，返回前redact"""
+    # 存储前：保留原始文本用于AI分析
+    # 返回前：redact_pii_from_text() 脱敏后返回给前端
+    return redact_pii_from_text(quote)
+```
+
+**导出JSON格式示例**:
+```json
+{
+  "export_version": "1.0",
+  "exported_at": "2026-06-04T12:00:00Z",
+  "pii_redacted": true,
+  "user": {
+    "username": "test_user"
+  },
+  "events": [...],
+  "entities": [...],
+  "associations": [...],
+  "todos": [
+    {
+      "id": "uuid",
+      "todo_type": "promise",
+      "description": "...",
+      "evidence_quote": "李总说'我的电话是138****5678'"  // 已脱敏
+    }
+  ],
+  "summary": {
+    "total_events": 10,
+    "total_entities": 5,
+    "total_todos": 8
+  }
+}
+```
+
+**CSV导出格式**:
+- UTF-8 BOM编码（Excel兼容）
+- 第一行为列名头
+- PII字段统一脱敏
+- 日期ISO 8601格式
+
+**错误响应**:
+
+| 错误码 | 说明 | HTTP状态码 |
+|--------|------|-----------|
+| E3001 | 签名验证失败 | 401 |
+| E3002 | 请求已过期（时间戳超时） | 401 |
+| E3003 | 用户无权导出 | 403 |
+| E3004 | 导出格式不支持 | 400 |
 
 ---
 
@@ -2604,74 +3074,79 @@ async def test_carrymem_degradation():
 ### 8.1 环境变量
 
 ```bash
-# LLM
-LLM_PROVIDER=openai
-LLM_API_KEY=sk-xxx
-LLM_MODEL=gpt-4
+# LLM（[0.2.0更新] Moka AI）
+LLM_PROVIDER=moka
+LLM_API_KEY=sk-moka-xxx
+LLM_BASE_URL=https://api.moka-ai.com/v1
+LLM_MODEL=moka/claude-sonnet-4-6
 LLM_TIMEOUT=30
 LLM_MAX_RETRIES=3
+LLM_MAX_TOKENS=4000
 LLM_DAILY_QUOTA=100000
 
-# TTS/ASR
-ASR_PROVIDER=aliyun
-ASR_APP_KEY=xxx
-ASR_ACCESS_KEY_ID=xxx
-ASR_ACCESS_KEY_SECRET=xxx
-TTS_PROVIDER=aliyun
-TTS_APP_KEY=xxx
+# TTS/ASR（[0.2.0更新] Phase 1方案）
+ASR_PROVIDER=wechat_plugin  # wechat_plugin | whisper_local
+TTS_PROVIDER=preset_mp3      # preset_mp3 | azure_edge_tts | mock
+TTS_MOCK_ENABLED=true       # PoC阶段启用Mock TTS
 
-# 微信
+# 微信（[D7-4] 不变）
 WECHAT_APPID=xxx
 WECHAT_SECRET=xxx
 WECHAT_PUSH_ENABLED=true
 WECHAT_MAX_DAILY_PUSH=5
 
-# CarryMem
-CARRYMEM_PROVIDER=carrymem  # carrymem|null
+# CarryMem（[0.2.0更新] 三阶段路径）
+CARRYMEM_PROVIDER=null        # null(PoC) | carrymem(Phase1+)
 CARRYMEM_MCP_ENDPOINT=https://carrymem.example.com/mcp
 CARRYMEM_API_KEY=xxx
 CARRYMEM_TIMEOUT=10
+
+# 数字名片（[D7-6] 新增）
+DIGITAL_CARD_PROVIDER=mock     # mock(PoC) | chen_yuxin_api(Phase1+) | self_built(备选)
+DIGITAL_CARD_API_BASE_URL=
+
+# 数据导出（[D7-9] 新增）
+EXPORT_SIGNATURE_SECRET=xxx
+EXPORT_MAX_RECORDS=10000
 
 # Auth
 JWT_SECRET=xxx
 JWT_EXPIRES_IN=900
 TICKET_EXPIRES_IN=60
+
+# Redis缓存（[D7-8] 不变）
+REDIS_URL=redis://localhost:6379/0
+CACHE_FALLBACK=true            # Redis不可用时内存fallback
 ```
 
 ### 8.2 配置文件
 
 ```yaml
 # config/integrations.yml
+# [0.2.0更新] POC阶段配置
+
 llm:
-  provider: openai
+  provider: moka
+  base_url: https://api.moka-ai.com/v1
+  model: moka/claude-sonnet-4-6
   timeout: 30
   max_retries: 3
+  max_tokens: 4000          # [0.2.0] 提升至4000
   daily_quota: 100000
-  models:
-    simple: gpt-3.5-turbo
-    complex: gpt-4
-  providers:
-    openai:
-      api_key: ${LLM_API_KEY}
-      base_url: https://api.openai.com/v1
-    claude:
-      api_key: ${CLAUDE_API_KEY}
-      base_url: https://api.anthropic.com/v1
-    qwen:
-      api_key: ${QWEN_API_KEY}
-      base_url: https://dashscope.aliyuncs.com/api/v1
 
 tts:
-  provider: aliyun
+  provider: preset_mp3      # [0.2.0] PoC首选预合成MP3
+  mock_enabled: true        # [0.2.0] Mock TTS验证端点
+  azure_edge_tts_fallback: true
   language: zh-CN
-  voices:
-    female_neutral: zhiyan
-    female_warm: zhimi
-    male_neutral: zhiqiang
-    male_professional: zhida
+  preset_audios:
+    morning_digest: /static/tts/morning_digest.mp3
+    todo_remind: /static/tts/todo_remind.mp3
+    person_brief: /static/tts/person_brief.mp3
 
 asr:
-  provider: aliyun
+  provider: wechat_plugin   # [0.2.0] PoC首选微信同声传译插件
+  whisper_local_fallback: true
   language: zh-CN
   sample_rate: 16000
   max_file_size: 10485760  # 10MB
@@ -2693,10 +3168,30 @@ wechat:
     help: TPL_HELP
 
 carrymem:
-  provider: carrymem
+  provider: null            # [0.2.0] PoC=NullMemoryProvider
   mcp_endpoint: ${CARRYMEM_MCP_ENDPOINT}
   api_key: ${CARRYMEM_API_KEY}
   timeout: 10
+  # Phase 1+ 启用以下配置
+  # memory_types_enabled: ["preference_memory", "interaction_history"]
+  # forgetting_curve_lambda: 0.01
+
+digital_card:
+  provider: mock            # [D7-6新增]
+  api_base_url: ""
+  sync_on_card_save: true
+  fallback_to_self_built_after_days: 21  # 超3周启动自建备选
+
+data_export:
+  signature_secret: ${EXPORT_SIGNATURE_SECRET}
+  max_records: 10000
+  default_format: json
+  pii_redaction: true         # [D7-9] 默认PII脱敏
+  cache_ttl_seconds: 300      # 签名有效期5分钟
+
+redis:
+  url: redis://localhost:6379/0
+  cache_fallback: true       # [D7-8] 内存fallback不变
 ```
 
 ---
@@ -2768,7 +3263,8 @@ groups:
 | v1.0 | 2026-06-02 | 初始版本，4个集成模块 |
 | v1.1 | 2026-06-03 | 全面重构：Ticket模式替代明文Token；10个完整Prompt模板；ASR实时转写；3通道推送+6种Todo模板；CarryMem集成；集成测试策略 |
 | v1.2 | 2026-06-03 | Todo类型重命名（opportunity→cooperation_signal, context→care, action→promise, pending_confirm→followup, resource_maint→help）；新增模板11承诺提取和模板12关注点提取；新增§3.6 AI输出语言规则（语言约束/禁止判定对方资源/禁止建议索取资源/推测标记）；微信推送模板更新为6种新类型对应文案 |
+| **0.2.0** | **2026-06-04** | **POC阶段融合修订（D7-1~D7-11）：①D7-1模板3全面升级（6种action_type+Promise双向识别+promisor/beneficiary+confirmation强制+降噪5条+evidence_quote）②D7-2新增模板0 Input Scope分类（8种scope+9条关键词触发+fallback=manual_input）③D7-3 CarryMem三阶段路径（PoC NullProvider→Phase1基础记忆→Phase2全量7种记忆+遗忘曲线）④D7-5 TTS/ASR Phase1方案（微信同声传译/Whisper local + Azure Edge-TTS/预合成MP3 + MockTTSClient验证端点）⑤D7-6数字名片API对接预留（陈宇欣团队接口+MockDigitalCardClient+超3周自建备选）⑥D7-9数据导出集成（GET /data/export + HMAC-SHA256签名 + PII脱敏redact_pii_from_text/sanitize_evidence_quote）⑦D7-10关键决策9条铁律（#2补充action_type 6种 #4标注F-05暂停 #9新增Moka AI）⑧LLM Provider统一Moka AI (moka/claude-sonnet-4-6) ⑨集成模块扩展至10个 ⑩参考基线对齐PRD v4.3 + 技术设计v2.5 + 数据库v2.0 + LLM_Prompt_Templates v2.0** |
 
 ---
 
-*v1.2 完成于2026-06-03*
+*0.2.0 完成于2026-06-04 — POC阶段*

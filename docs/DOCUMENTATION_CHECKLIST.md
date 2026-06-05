@@ -1,201 +1,217 @@
-# EventLink 文档完整性清单
+# EventLink 文档一致性检查清单
 
-> **更新时间**: 2026-06-03 (第五轮更新：P0缺口补齐——结构化日志+错误处理+Prompt模板库+小程序边界缺口标记)
-> **审核者**: 7角色共识审核  
-> **目的**: 对照标准软件工程文档体系，识别EventLink项目所有文档缺漏与过时内容
-
----
-
-## 📋 文档体系总览
-
-### ✅ 已完成且最新的文档
-
-#### 1. 需求与规划类
-- ✅ **PRD_v1.md** (spec/) — 内容版本v4.0
-  - 定位：AI驱动的个人商务关系经营助手——先成就关系，再促成合作
-  - 核心闭环：互动→关注→承诺→帮助→反馈
-  - Todo类型：promise/help/care/followup/cooperation_signal/risk
-  
-- ✅ **EventLink_技术设计_v1.md** (architecture/) — 内容版本v2.2
-  - Todo类型DDL更新、AI输出语言规则、匹配算法阶段化
-  - §8.0.6 数据库迁移策略（Alembic）、§8.0.7 结构化日志规范（structlog）、§8.0.8 统一错误处理与降级策略
-  
-- ✅ **会议纪要** (planning/)
-  - 20260601_会议纪要.md
-  - 20260602_许总团队讨论纪要.md
-  - 分类体系方向_会议备忘.md
-  - 会议待确认事项清单.md
-
-#### 2. 详细设计类
-- ✅ **Database_Design_v1.md** (design/) — v1.2 ✅ 已更新（Todo类型重命名、concern/promise/contribution字段）
-- ✅ **API_Design_v1.md** (design/) — v1.3 ✅ 已更新（Todo类型重命名、concern/promise API、AI输出语言规则、§8 API版本管理策略全面补齐）
-- ✅ **Algorithm_Design_v1.md** (design/) — v1.2 ✅ 已更新（Todo类型重命名、匹配算法阶段化、AI输出语言规则算法）
-- ✅ **Integration_Design_v1.md** (design/) — v1.2 ✅ 已更新（Todo类型重命名、12个Prompt模板、AI输出语言规则）
-- ✅ **UI_UX_Design_v1.md** (design/) — v1.2 ✅ 已更新（首次体验4屏、首页重构、Todo类型视觉更新）
-- ✅ **Test_Plan_v1.md** (design/) — v1.2 ✅ 已更新（Todo类型重命名、产品指标、AI输出语言规则测试、E2E场景更新）
-- ✅ **Security_Design_v1.md** (design/) — v1.1 ✅ 已更新（AI输出安全约束、concern/promise数据安全）
-- ✅ **Deployment_Guide.md** (design/) — v1.0 ✅ 新建（684行，8章节完整部署指南）
-- ✅ **LLM_Prompt_Templates.md** (design/) — v1.0 ✅ 新建（12个Prompt模板独立文档，含AI输出语言规则+模型选择策略+重试降级+成本控制）
-
-#### 3. 7角色共识报告
-- ✅ **PRD_v3.2_7角色审核报告.md** (internal/)
-- ✅ **技术设计_v1.2_7角色审核报告.md** (internal/)
-- ✅ **WorkBuddy审阅_7角色共识.md** (internal/)
-- ✅ **李总资源匹配建议_7角色共识.md** (internal/)
-- ✅ **定位校准_7角色共识.md** (internal/)
-
-#### 4. 外部交付物
-- ✅ **for_李总/** — 李总反馈原始文档+图片
-- ✅ **for_许总/** — 技术方案网页版
-- ✅ **for_team/** — 一页纸方案+分工模型+总结报告
-
-#### 5. 项目管理
-- ✅ **PROJECT_STATUS.md** (docs/)
-- ✅ **README_SETUP.md** (deliverables/)
-- ✅ **PROJECT_STRUCTURE.md** (deliverables/)
+> **更新时间**: 2026-06-04
+> **阶段**: POC阶段 (0.2.x) — Sprint 0 编码前最终确认
+> **目的**: 确认所有设计文档从旧版本全面更新至 0.2.0(POC阶段)，验证跨文档引用一致性
 
 ---
 
-## ✅ 已更新的文档（2026-06-03 第二轮）
+## 📋 一、文档版本一致性表
 
-| 文档 | 原版本 | 新版本 | 变更内容 | 行数变化 |
-|------|--------|--------|----------|---------|
-| Database_Design_v1.md | v1.0 | v1.1 | 移除RLS、Todo类型6种、敏感度字段、数据主权 | ~600→~700 |
-| API_Design_v1.md | v1.0 | v1.1 | Todo类型6种、RBAC移除、Resources API新增 | ~930→~1100 |
-| Algorithm_Design_v1.md | v1.0 | v1.1 | 从索引扩展为完整文档、6种Todo、敏感度、callability | ~90→1574 |
-| Integration_Design_v1.md | v1.0 | v1.1 | ticket模式、10个Prompt模板、CarryMem集成 | ~230→2564 |
-| UI_UX_Design_v1.md | v1.0 | v1.1 | 莫兰迪色系、移除分享按钮、6种Todo视觉规范 | ~130→1114 |
-| Test_Plan_v1.md | v1.0 | v1.1 | event_type修正、6种Todo测试、安全测试、E2E场景 | ~466→1575 |
+| # | 文档 | 路径 | 当前版本 | 更新日期 | 状态 |
+|---|------|------|----------|----------|------|
+| 1 | **PRD** | `spec/PRD_v1.md` | **v4.3** | 2026-06-04 | ✅ 生效 |
+| 2 | **技术设计** | `architecture/EventLink_技术设计_v1.md` | **v2.5** | 2026-06-04 | ✅ 生效 |
+| 3 | **数据库设计** | `design/Database_Design_v1.md` | **0.2.0 (POC)** | 2026-06-04 | ✅ 生效 |
+| 4 | **API设计** | `design/API_Design_v1.md` | **0.2.0 (POC)** | 2026-06-04 | ✅ 生效 |
+| 5 | **安全设计** | `design/Security_Design_v1.md` | **0.2.0 (POC)** | 2026-06-04 | ✅ 生效 |
+| 6 | **算法设计** | `design/Algorithm_Design_v1.md` | **0.2.0 (POC)** | 2026-06-04 | ✅ 生效 |
+| 7 | **测试计划** | `design/Test_Plan_v1.md` | **0.2.0 (POC)** | 2026-06-04 | ✅ 生效 |
+| 8 | **LLM Prompt模板** | `design/LLM_Prompt_Templates.md` | **0.2.0 (POC)** | 2026-06-04 | ✅ 生效 |
+| 9 | **集成设计** | `design/Integration_Design_v1.md` | **0.2.0 (POC)** | 2026-06-04 | ✅ 生效 |
+| 10 | **部署指南** | `design/Deployment_Guide.md` | **0.2.0 (POC)** | 2026-06-04 | ✅ 生效 |
+| 11 | **UI/UX设计** | `design/UI_UX_Design_v1.md` | **0.2.0 (POC)** [简化版] | 2026-06-04 | ⚠️ 待完善 |
+| 12 | **规格说明README** | `spec/README.md` | **v4.3** | 2026-06-04 | ✅ 同步 |
+| 13 | **项目状态** | `PROJECT_STATUS.md` | **已同步** | 2026-06-04 | ✅ 最新 |
 
-## ✅ 已创建的缺失文档（2026-06-03）
+### 版本对照总结
 
-| 文档 | 版本 | 行数 | 核心内容 |
-|------|------|------|---------|
-| Security_Design_v1.md | v1.0 | 1393 | JWT认证、临时授权码、PII加密、LLM安全、数据主权 |
-| docker-compose.poc.yml | - | ~60 | PoC部署配置（健康检查、资源限制、日志配置） |
-| .env.poc.example | - | ~40 | PoC环境变量模板 |
-
----
-
-## ⚠️ 仍需更新的文档（低优先级）
-
-| 文档 | 问题 | 优先级 |
-|------|------|--------|
-| spec/README.md | 引用不存在的P2评审报告 | P2 |
-| architecture/README.md | 引用不存在的评审报告 | P2 |
+- **需求层 (P1)**: PRD v4.3 ←→ 技术设计 v2.5（双主文档对齐）
+- **设计层 (P3-P7)**: 全部 8 份设计文档统一至 **0.2.0 (POC)**
+- **特殊标记**: UI_UX_Design 为简化版，完整版待前端团队确定后补充
 
 ---
 
-## ❌ 仍缺失的文档
+## 🔍 二、交叉引用一致性检查项
 
-### 🔴 ~~P0 - 阻塞PoC开发~~ ✅ 已完成
-- ✅ **Security_Design_v1.md** — 安全设计文档（v1.0, 1393行）
-  - 包含：JWT认证、单用户数据隔离（无RBAC）、PII加密、LLM输入消毒、临时授权码
+### 2.1 功能编号一致性
 
-- ✅ **docker-compose.poc.yml** — PoC部署配置（已创建）
-  - 包含：健康检查、资源限制、日志配置、.env.poc.example
+| 检查项 | 涉及文档 | 预期结果 | 状态 |
+|--------|----------|----------|------|
+| PRD功能编号 F-01~F-49 完整性 | PRD §4 | 49项功能全覆盖 | ⬜ 待确认 |
+| 技术设计引用的功能编号与PRD一致 | 技术设计 §3~§7 | F-01~F-49 无遗漏/无多余 | ⬜ 待确认 |
+| API设计的端点覆盖P0功能 | API Design §3~§7 | F-01/F-02/F-03/F-04/F-06/F-44~F-48 有对应API | ⬜ 待确认 |
+| 测试计划的用例覆盖所有P0功能 | Test Plan §3 | 11项P0功能均有测试用例 | ⬜ 待确认 |
 
-### 🟡 P1 - Phase 1前必须补齐
-- ❌ **Deployment_Guide.md** — 部署指南
-  - PoC本地部署 + Phase 1云端部署步骤
-  
-- ~~❌ **LLM_Prompt_Templates.md** — LLM Prompt模板库~~ ✅ 已创建（v1.0）
-  - 事件抽取、实体归一、关联发现、Todo生成、资源识别的Prompt模板
-
-### 🟢 P2 - 持续迭代中补齐
-- ❌ **Monitoring_Runbook.md** — 运维手册
-- ❌ **Contributing.md** — 贡献指南
-
----
-
-## 📁 目录结构（清理后）
-
+**关键编号清单（P0核心）**:
 ```
-EventLink/
-├── docs/
-│   ├── spec/                    # 产品规格
-│   │   ├── PRD_v1.md           # PRD v4.0
-│   │   ├── PRD_v1_review_report.md
-│   │   └── README.md
-│   ├── architecture/            # 架构设计
-│   │   ├── EventLink_技术设计_v1.md  # 技术设计 v1.7
-│   │   └── README.md
-│   ├── design/                  # 详细设计
-│   │   ├── API_Design_v1.md          # v1.1
-│   │   ├── Algorithm_Design_v1.md    # v1.1
-│   │   ├── Database_Design_v1.md     # v1.1
-│   │   ├── Integration_Design_v1.md  # v1.1
-│   │   ├── Security_Design_v1.md     # v1.0 (NEW)
-│   │   ├── Test_Plan_v1.md           # v1.1
-│   │   ├── UI_UX_Design_v1.md        # v1.1
-│   │   └── README.md
-│   ├── internal/                # 内部审核报告
-│   │   ├── PRD_v3.2_7角色审核报告.md
-│   │   ├── 技术设计_v1.2_7角色审核报告.md
-│   │   ├── WorkBuddy审阅_7角色共识.md
-│   │   ├── 李总资源匹配建议_7角色共识.md
-│   │   ├── 定位校准_7角色共识.md
-│   │   ├── EventLink_P1_客户视角评审报告.md
-│   │   ├── EventLink_P2_客户视角架构设计报告.md
-│   │   ├── EventLink_P2_架构设计_7角色评审报告.md
-│   │   ├── EventLink_PRD+技术设计_联合审阅报告_CarryMem.md
-│   │   ├── EventLink_PRD_v1.5_7角色评审报告.md
-│   │   ├── EventLink_PRD_v1.7_目标用户视角评审报告.md
-│   │   ├── EventLink_李总反馈_PM+架构师.md
-│   │   ├── EventLink_李总反馈v2_PM+架构师.md
-│   │   ├── EventLink_李总资源匹配建议_审阅分析.md
-│   │   ├── EventLink_MVP讨论_PM+架构师.md
-│   │   └── EventLink_POC准备度评估报告.md
-│   ├── external/                # 外部交付物
-│   │   ├── for_李总/            # 李总反馈原始文档+图片
-│   │   ├── for_许总/            # 技术方案网页版
-│   │   └── for_team/            # 团队交付物
-│   ├── planning/                # 会议纪要
-│   ├── deliverables/            # 交付物
-│   ├── reports/                 # 评估报告（已清理重复）
-│   │   ├── EventLink_POC准备度评估报告.md
-│   │   ├── EventLink_一页纸方案_给许总.md
-│   │   └── EventLink_DevSquad_真实AI评审报告.md
-│   ├── DOCUMENTATION_CHECKLIST.md
-│   └── PROJECT_STATUS.md
-├── scripts/                     # 7角色共识脚本（保留）
-│   ├── run_v32_review.py
-│   ├── run_v32_review_r2.py
-│   ├── run_workbuddy_consensus.py
-│   ├── run_lizong_consensus.py
-│   └── run_positioning_review.py
-├── src/eventlink/               # 应用源码
-│   ├── api/v1/
-│   ├── models/
-│   ├── config.py
-│   ├── database.py
-│   └── main.py
-├── README.md
-├── pyproject.toml
-├── Dockerfile
-├── docker-compose.yml
-├── docker-compose.poc.yml      # PoC部署配置 (NEW)
-├── .env.poc.example            # PoC环境变量模板 (NEW)
-├── requirements.txt
-└── requirements-dev.txt
+F-01 事件语义路由    F-02 管线化实体抽取   F-03 实体归一(5步)
+F-04 关联发现(8种)   F-05 商机匹配度(暂停) F-06 Todo生成追踪
+F-44 Input Scope分类  F-45 Action Type识别  F-46 RelationshipBrief
+F-47 RelationshipStage  F-48 实体属性增强
 ```
 
+### 2.2 数据模型一致性
+
+| 检查项 | 涉及文档 | 预期结果 | 状态 |
+|--------|----------|----------|------|
+| 数据库表结构与API请求/响应字段名一致 | DB Design ↔ API Design | 字段命名风格统一(snake_case) | ⬜ 待确认 |
+| 核心实体属性定义一致 | DB §2 ↔ API §3 | entity/event/association/todo 字段完全匹配 | ⬜ 待确认 |
+| 枚举值定义一致 | 所有设计文档 | todo_type/scope/action_type/relationship_stage 枚举值相同 | ⬜ 待确认 |
+
+**核心枚举值速查**:
+```python
+# Todo类型 (6种)
+TODO_TYPES = ["promise", "help", "care", "followup", "cooperation_signal", "risk"]
+
+# Input Scope (8种)
+INPUT_SCOPES = ["conversation", "meeting_notes", "business_card", "cooperation_file",
+                "social_interaction", "resource_info", "feedback_record", "system_event"]
+
+# Action Type (6种)
+ACTION_TYPES = ["follow_up", "introduce", "collaborate", "provide_help",
+                "seek_help", "risk_alert"]
+```
+
+### 2.3 安全规则一致性
+
+| 检查项 | 涉及文档 | 预期结果 | 状态 |
+|--------|----------|----------|------|
+| PII字段列表与脱敏规则一致 | Security §3 ↔ API §8 | 手机号/邮箱/姓名脱敏方式相同 | ⬜ 待确认 |
+| LLM输入消毒规则与Prompt模板约束一致 | Security §5 ↔ LLM_Prompt §0 | forbid/avoid规则对齐 | ⬜ 待确认 |
+| 认证机制描述一致 | Security §2 ↔ API §2 | JWT + 临时授权码流程匹配 | ⬜ 待确认 |
+
+### 2.4 算法与Prompt一致性
+
+| 检查项 | 涉及文档 | 预期结果 | 状态 |
+|--------|----------|----------|------|
+| 匹配算法的六维权重与Prompt指令一致 | Algorithm §3 ↔ LLM_Prompt §2 | keyword(25%)+industry(20%)+topic(15%)+llm(10%)+history(10%)+callability(20%) | ⬜ 待确认 |
+| 实体归一5步算法与抽取Prompt一致 | Algorithm §2 ↔ LLM_Prompt §1 | 归一逻辑与Prompt输出格式匹配 | ⬜ 待确认 |
+| AI输出语言规则三铁律在所有AI相关文档中一致 | Algorithm §1 / LLM_Prompt §0 / Integration §3 / Test Plan §4 | 三条规则原文相同 | ⬜ 待确认 |
+
+**AI输出语言规则三铁律**:
+1. 推测必须标记（置信度 < 80% 时标注 `[推测]`）
+2. 禁止自动判定资源（不主动将联系人标记为"可提供资源"）
+3. 禁止建议索取资源（不主动建议用户向联系人索取资源）
+
+### 2.5 部署配置一致性
+
+| 检查项 | 涉及文件 | 预期结果 | 状态 |
+|--------|----------|----------|------|
+| Dockerfile与部署指南步骤一致 | 项目根目录 `Dockerfile` ↔ Deployment Guide §3 | 基础镜像/依赖安装/启动命令匹配 | ⬜ 待确认 |
+| docker-compose.poc.yml服务定义完整 | `docker-compose.poc.yml` ↔ Deployment Guide §3.2 | web/db/redis三个服务配置齐全 | ⬜ 待确认 |
+| 环境变量模板与代码config.py一致 | `.env.poc.example` ↔ `src/eventlink/config.py` | 必需环境变量全覆盖 | ⬜ 待确认 |
+
 ---
 
-## 🔑 关键决策备忘（文档更新时必须遵守）
+## ⚠️ 三、已知遗留问题
 
-1. **产品定位**：AI驱动的**个人商务关系经营助手**——先成就关系，再促成合作（非"资源匹配平台"）
-2. **核心闭环**：互动→关注→承诺→帮助→反馈
-3. **Todo类型**：promise/help/care/followup/cooperation_signal/risk（莫兰迪色系）
-4. **匹配算法**：六维 — keyword(25%)+industry(20%)+topic(15%)+llm(10%)+history(10%)+callability(20%)；PoC阶段先做承诺兑现闭环
-5. **敏感度**：2级 — matchable/no_match
-6. **部署**：PoC本地Docker+SQLite → Phase1云端Docker Compose+PG+Redis
-7. **明确排除**：RBAC/多租户/团队协作/他人资源匹配/原生APP
-8. **字段名**：todo_type（非todo_nature）、callability（非availability）
-9. **AI输出语言规则**：推测必须标记、禁止自动判定资源、禁止建议索取资源
-10. **首次体验**：从"扫名片"改为"记录一次重要交流"（4屏新流程）
-11. **API版本管理**：三层SemVer（主版本URL/次版本响应头/补丁版本内部）+ 12个月废弃过渡期 + Alembic数据库迁移
-12. **P2 Gate**：7角色架构评审加权共识82%（≥70%门槛），许总不参与技术决策
-13. **结构化日志**：structlog + JSON格式 + request_id传递 + 脱敏规则（手机号/邮箱/姓名）
-14. **错误处理**：EventLinkError异常层次（Business/LLM/Infrastructure）+ 降级决策矩阵 + 熔断器
-15. **小程序边界缺口**：Phase1前必须补齐——IAMHERE名片JSON格式、微信用户映射表、card_save metadata schema
+### 3.1 文档完整性缺口
+
+| 问题 | 影响 | 计划解决时间 | 负责人 |
+|------|------|-------------|--------|
+| **UI_UX_Design为简化版**，缺少详细交互流程图和组件规范 | 前端开发可能需要补充设计细节 | Phase 1 前由前端团队确定 | 前端负责人 |
+| **F-05商机匹配功能暂停**（PoC阶段不做），但PRD和技术设计中仍有相关描述 | 开发时需注意跳过此功能实现 | Phase 2 恢复 | 产品+架构师 |
+| **自建小程序为备选方案**（优先使用IAMHERE），集成设计中微信相关章节为占位 | 如需自建小程序需补充详细设计 | 视业务需求确定 | 移动端开发 |
+
+### 3.2 技术债务提醒
+
+| 债务项 | 说明 | 建议 |
+|--------|------|------|
+| PoC使用SQLite，Phase 1 需迁移至PostgreSQL | 数据库设计已包含双平台DDL | 提前准备Alembic迁移脚本 |
+| PoC无Redis缓存，Phase 1 需引入 | 缓存策略已在Deployment Guide中定义 | 缓存层接口先行抽象 |
+| 单用户模式，无RBAC | 安全设计已明确排除多租户 | 保持简单，避免过度设计 |
+
+### 3.3 外部依赖风险
+
+| 依赖项 | 风险等级 | 应对措施 |
+|--------|----------|----------|
+| IAMHERE 数字名片数据接口 | 中 | 已定义JSON schema，但未联调；备选方案为手动录入 |
+| CarryMem AI记忆服务 | 低 | 通过Adapter解耦，可降级为本地规则引擎 |
+| LLM API (OpenAI/Anthropic) | 中 | 已设计重试降级策略和成本控制机制 |
+
+---
+
+## 📊 四、版本策略声明
+
+### 版本号语义
+
+| 版本范围 | 阶段名称 | 说明 | 当前状态 |
+|----------|---------|------|----------|
+| **0.1.x** | 初始化阶段 | 项目启动、初步调研、原型验证 | ✅ 已完成 |
+| **0.2.x** | **POC阶段 (当前)** | 核心功能验证、技术可行性证明 | 🔄 进行中 |
+| **0.3.x** | Phase 1 | MVP开发、IAMHERE集成、云端部署 | ⬜ 待开始 |
+| **0.4.x** | Phase 2 | 商机匹配恢复、高级功能、多用户支持 | ⬜ 待开始 |
+
+### 文档更新触发条件
+
+以下情况必须更新本文档：
+1. 任一设计文档版本号变更
+2. 新增或删除功能编号(F-xx)
+3. 核心枚举值变更(todo_type/scope/action_type等)
+4. 跨文档引用关系调整
+5. 进入新阶段(0.2.x → 0.3.x)
+
+---
+
+## ✅ 五、Sprint 0 冻结前检查清单
+
+在进入编码阶段前，请逐项确认以下内容：
+
+### 必须完成 (Must)
+
+- [ ] **M1**: 所有13份文档版本号已在上表中记录且实际文件头部一致
+- [ ] **M2**: PRD的49项功能编号(F-01~F-49)在技术设计和API设计中均可追溯
+- [ ] **M3**: 数据库设计的核心表(events/entities/associations/todos)与API设计的CRUD端点一一对应
+- [ ] **M4**: 安全设计的PII规则已在API设计的响应脱敏中体现
+- [ ] **M5**: 测试计划包含11项P0功能的测试用例（至少每个P0功能1个正向用例）
+- [ ] **M6**: Deployment_Guide中的Docker命令可在本地成功执行(`docker-compose -f docker-compose.poc.yml up`)
+- [ ] **M7**: LLM_Prompt_Templates中的模板可在LLM客户端中成功调用（mock即可）
+
+### 建议完成 (Should)
+
+- [ ] **S1**: Algorithm_Design中的伪代码可通过单元测试（使用pytest）
+- [ ] **S2**: Integration_Design中的时序图与实际代码调用链路一致
+- [ ] **S3**: UI_UX_Design的关键页面线框图已与产品负责人对齐
+
+### 可以延后 (Could)
+
+- [ ] **C1**: Monitoring_Runbook（运维手册）可在Phase 1前补充
+- [ ] **C2**: Contributing.md（贡献指南）可在有外部协作者时补充
+- [ ] **C3**: UI_UX_Design完整版（含组件库规范）可待前端框架确定后补充
+
+---
+
+## 📝 六、签署确认
+
+| 角色 | 姓名 | 日期 | 确认项 |
+|------|------|------|--------|
+| 架构师 | _____________ | ______ | 设计文档技术一致性 |
+| 产品负责人 | _____________ | ______ | PRD与实现方案对齐 |
+| QA负责人 | _____________ | ______ | 测试计划覆盖完整性 |
+| DevOps | _____________ | ______ | 部署配置可执行性 |
+
+---
+
+## 📎 附录：快速参考链接
+
+| 文档 | 快速跳转 |
+|------|----------|
+| PRD v4.3 | [查看](./spec/PRD_v1.md) |
+| 技术设计 v2.5 | [查看](./architecture/EventLink_技术设计_v1.md) |
+| 数据库设计 0.2.0 | [查看](./design/Database_Design_v1.md) |
+| API设计 0.2.0 | [查看](./design/API_Design_v1.md) |
+| 安全设计 0.2.0 | [查看](./design/Security_Design_v1.md) |
+| 算法设计 0.2.0 | [查看](./design/Algorithm_Design_v1.md) |
+| 测试计划 0.2.0 | [查看](./design/Test_Plan_v1.md) |
+| LLM Prompt模板 0.2.0 | [查看](./design/LLM_Prompt_Templates.md) |
+| 集成设计 0.2.0 | [查看](./design/Integration_Design_v1.md) |
+| 部署指南 0.2.0 | [查看](./design/Deployment_Guide.md) |
+| UI/UX设计 0.2.0 | [查看](./design/UI_UX_Design_v1.md) |
+| 项目状态总览 | [查看](./PROJECT_STATUS.md) |
+
+---
+
+> **维护说明**: 本文档是EventLink进入Sprint 0编码前的最终文档质量门禁。每次文档更新后应重新运行此检查清单。
+>
+> **最后审核**: 2026-06-04 (POC阶段文档全面更新完成)
