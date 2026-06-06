@@ -1,10 +1,11 @@
 # EventLink 技术设计文档
 
-> **版本**: v2.5
-> **日期**: 2026-06-04
-> **对应PRD**: v4.3
+> **版本**: v2.6
+> **日期**: 2026-06-06
+> **对应PRD**: v4.5
 > **架构师**: CarryMem团队
 > **审核**: 文档一致性Bugfix：3项修复（BLK-3枚举值/F-49路径对齐/乐观锁完善）（v2.5迭代）
+> **变更说明**: v2.6: 新增洞察引擎层(动态评分器+隐式反馈)+数据接入层架构+concern/capability提取强化
 
 ---
 
@@ -59,17 +60,17 @@ EventLink → CarryMemAdapter → CarryMem.recall_memories()
 │              (FastAPI + 认证 + 限流 + 日志)                │
 └──────────────────────┬───────────────────────────────────┘
                        │
-          ┌────────────┼────────────┐
-          ▼            ▼            ▼
-┌──────────────┐ ┌──────────┐ ┌──────────────┐
-│ Event Ingest │ │ Query    │ │ Todo         │
-│ Service      │ │ Service  │ │ Service      │
-│              │ │          │ │              │
-│ · 接收事件   │ │ · 搜索   │ │ · 生成       │
-│ · 语义路由   │ │ · 过滤   │ │ · 追踪       │
-│ · 实体抽取   │ │ · 图谱   │ │ · 提醒       │
-│ · 关联发现   │ │ · 画像   │ │ · 反馈闭环   │
-└──────┬───────┘ └──────────┘ └──────────────┘
+          ┌────────────┼────────────┼────────────┐
+          ▼            ▼            ▼            ▼
+┌──────────────┐ ┌──────────┐ ┌──────────────┐ ┌──────────────┐
+│ Event Ingest │ │ Query    │ │ Todo         │ │ Insight      │
+│ Service      │ │ Service  │ │ Service      │ │ Engine       │
+│              │ │          │ │              │ │              │
+│ · 接收事件   │ │ · 搜索   │ │ · 生成       │ │ · 动态评分   │
+│ · 语义路由   │ │ · 过滤   │ │ · 追踪       │ │ · 隐式反馈   │
+│ · 实体抽取   │ │ · 图谱   │ │ · 提醒       │ │ · 优先级排序 │
+│ · 关联发现   │ │ · 画像   │ │ · 反馈闭环   │ │              │
+└──────┬───────┘ └──────────┘ └──────────────┘ └──────────────┘
        │
        ▼
 ┌──────────────────────────────────────────────────────────┐
@@ -96,6 +97,7 @@ EventLink → CarryMemAdapter → CarryMem.recall_memories()
 | **Event Ingest** | 事件接入+处理 | `POST /events`, `GET /events/{id}` | PG, Redis, LLM |
 | **Query** | 查询+搜索+图谱 | `GET /entities`, `GET /associations` | PG, Redis |
 | **Todo** | Todo生成+追踪 | `GET /todos`, `PATCH /todos/{id}` | PG, Redis |
+| **Insight Engine** | 动态优先级+反馈学习 | `GET /todos?sort=smart`, `POST /todos/{id}/complete` | PG, Redis |
 | **Mini** | 小程序专用接口 | `GET /mini/today`, `GET /mini/person/{id}`, `GET /mini/person/{id}/tts` | PG, Redis, TTS |
 | **Notify** | 推送通知 | 微信服务号模板消息, APNs/FCM | Redis, 微信API |
 
@@ -479,11 +481,15 @@ CREATE TABLE todos (
     evidence_quote TEXT,                                  -- v2.3新增：证据原文
     user_id UUID NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    completed_rank INTEGER,                              -- v2.6新增：完成序号（隐式反馈用）
+    dynamic_score FLOAT,                                 -- v2.6新增：动态优先级分
+    score_calculated_at TIMESTAMPTZ                      -- v2.6新增：评分时间
 );
 CREATE INDEX idx_todos_user_status ON todos(user_id, status);
 CREATE INDEX idx_todos_source_event ON todos(source_event);
 CREATE INDEX idx_todos_target_association ON todos(target_association);
+CREATE INDEX idx_todos_dynamic_score ON todos(user_id, dynamic_score DESC) WHERE dynamic_score IS NOT NULL;  -- v2.6新增索引
 
 -- 关系推进卡表（v2.3新增，P0必须）
 CREATE TABLE relationship_briefs (
@@ -1542,6 +1548,200 @@ AI输出中涉及推断性内容时，必须使用以下标记：
 | `[用户确认]` | 已由用户确认的内容 | "对方关注：社区运营 `[用户确认]`" |
 
 **持久化规则**：只有`[用户确认]`标记的内容才能写入Entity.properties或Todo的正式字段。`[待确认]`内容存储在临时确认队列，超时7天自动清除。
+
+### 4.10 洞察引擎设计（v2.6新增）
+
+> **设计背景**：基于与DeepSeek的架构讨论，EventLink的智能从"被动记录"升级为"主动服务"。洞察引擎是这一升级的核心模块，负责动态优先级排序和隐式反馈学习。
+
+#### 4.10.1 动态评分器（PriorityScorer）
+
+PoC阶段实现二维简化模型：
+
+```python
+class PriorityScorer:
+    """
+    动态优先级评分器
+    PoC: Score = 0.4 × urgency + 0.6 × importance
+    Phase 1: Score = w1×urgency + w2×importance + w3×dependency + w4×context
+    """
+
+    WEIGHTS_POC = {"urgency": 0.4, "importance": 0.6}
+
+    async def score(self, todo: Todo, brief: RelationshipBrief | None = None) -> float:
+        urgency = self._calc_urgency(todo)
+        importance = self._calc_importance(todo, brief)
+        return (self.WEIGHTS_POC["urgency"] * urgency
+                + self.WEIGHTS_POC["importance"] * importance)
+
+    def _calc_urgency(self, todo: Todo) -> float:
+        """紧急性：截止时间指数衰减"""
+        if not todo.due_date:
+            # 无截止时间：极缓慢衰减，避免被"雪藏"
+            days_since_created = (now() - todo.created_at).days
+            return max(0.1, 0.5 * math.exp(-0.01 * days_since_created))
+        hours_left = max(0, (todo.due_date - now()).total_seconds() / 3600)
+        if hours_left <= 0:
+            return 1.0  # 已逾期，最高紧急
+        return min(1.0, math.exp(-0.05 * hours_left) + 0.1)
+
+    def _calc_importance(self, todo: Todo, brief: RelationshipBrief | None) -> float:
+        """重要性：基于关系权重"""
+        if brief and brief.brief_data:
+            score = brief.brief_data.get("score", 0)
+            return min(1.0, score / 100.0)
+        return 0.3  # 默认中等偏低
+```
+
+Phase 1扩展维度：
+
+| 维度 | 算法 | 数据来源 |
+|------|------|---------|
+| 紧急性 | 截止时间指数衰减 | Todo.due_date |
+| 重要性 | 关系权重+业务价值标签 | Brief.score + 用户标记 |
+| 依赖性 | 图谱路径分析（阻塞检测） | Association图谱 |
+| 场景匹配 | 日历事件关联度 | Calendar API |
+
+#### 4.10.2 隐式反馈收集器（ImplicitFeedbackCollector）
+
+PoC阶段实现：零额外交互，通过观察完成顺序学习。
+
+```python
+class ImplicitFeedbackCollector:
+    """
+    隐式反馈收集器
+    原理：用户完成Todo的顺序 = 真实优先级信号
+    """
+
+    async def on_todo_completed(self, todo: Todo, completed_rank: int):
+        """Todo完成时调用，记录完成序号"""
+        todo.completed_rank = completed_rank
+        await self._update_person_weight(todo)
+
+    async def _update_person_weight(self, todo: Todo):
+        """根据完成顺序调整关系权重"""
+        # 获取该Todo关联的Person
+        person = await self._get_target_person(todo)
+        if not person:
+            return
+
+        # 完成序号越靠前，权重提升越大
+        if todo.completed_rank and todo.completed_rank <= 3:
+            boost = 0.05  # 前3名完成，显著提权
+        elif todo.completed_rank and todo.completed_rank <= 10:
+            boost = 0.02  # 前10名完成，轻微提权
+        else:
+            boost = 0.0   # 后续完成，不调整
+
+        if boost > 0:
+            await self._adjust_brief_score(person, boost)
+
+    async def daily_rebalance(self):
+        """每日重平衡：根据全天的完成顺序重新计算权重"""
+        # 获取今日所有完成的Todo，按completed_rank排序
+        # 如果某人的Todo总是被提前完成，提升该人的关系权重
+        # 如果某人的Todo总是被延后完成，降低该人的关系权重
+        pass
+```
+
+Phase 1扩展：长按Todo → "以后少提醒"按钮（负反馈信号）
+
+#### 4.10.3 Todo模型扩展
+
+```python
+# Todo模型新增字段
+class Todo:
+    # ... existing fields ...
+    completed_rank: int | None = None  # 完成序号（v2.6新增，隐式反馈用）
+    dynamic_score: float | None = None  # 动态优先级分（v2.6新增，排序用）
+    score_calculated_at: datetime | None = None  # 评分时间（v2.6新增）
+```
+
+API变更：
+- `GET /api/v1/todos?sort=smart` — 按动态评分排序（默认）
+- `GET /api/v1/todos?sort=due_date` — 按截止时间排序
+- `POST /api/v1/todos/{id}/complete` — 完成时自动记录completed_rank
+
+### 4.11 数据接入层设计（v2.6新增）
+
+> **设计背景**：Pipeline是source-agnostic的，数据接入层负责将不同数据源转换为统一的Event格式。所有adapter的输出都是`Event(event_type, raw_text, source)`，Pipeline零改动。
+
+#### 4.11.1 DataSourceAdapter接口
+
+```python
+from abc import ABC, abstractmethod
+
+class DataSourceAdapter(ABC):
+    """数据源适配器接口"""
+
+    @abstractmethod
+    async def fetch_new_events(self, user_id: str, since: datetime) -> list[EventCreate]:
+        """拉取新事件"""
+        ...
+
+    @abstractmethod
+    async def authenticate(self, user_id: str, credentials: dict) -> bool:
+        """认证数据源"""
+        ...
+
+class ManualInputAdapter(DataSourceAdapter):
+    """手动输入（已有）"""
+    async def fetch_new_events(self, user_id, since):
+        return []  # 手动输入通过API直接创建
+
+class VoiceAdapter(DataSourceAdapter):
+    """语音输入（已有，F-50 NLU）"""
+    async def fetch_new_events(self, user_id, since):
+        return []  # 语音输入通过Voice API直接创建
+
+class EmailAdapter(DataSourceAdapter):
+    """邮件解析（Phase 1）
+
+    设计原则：原子事件+溯源边
+    - 邮件原文作为完整Event存储（raw_text归档）
+    - 承诺/待办拆解为原子化Todo（source_event_id链回原始邮件）
+    - 一封邮件一个Event，Todo的action_type区分方向
+    """
+    async def fetch_new_events(self, user_id, since):
+        # Phase 1: IMAP/Exchange API → Event
+        # 需要OAuth授权
+        ...
+
+class CalendarAdapter(DataSourceAdapter):
+    """日历同步（Phase 2）"""
+    async def fetch_new_events(self, user_id, since):
+        # Phase 2: CalDAV/Exchange → Event
+        ...
+```
+
+#### 4.11.2 邮件场景数据流
+
+```
+原始邮件（3个承诺埋在长文中）
+    │
+    ▼
+EmailAdapter → Event(raw_text=邮件全文, source="email:imap:msg_123")
+    │
+    ▼ Pipeline处理（零改动）
+    │
+    ├── Todo #1: "给张总发产品报价" (source_event_id → Event, action_type=my_promise)
+    ├── Todo #2: "确认下周三会议时间" (source_event_id → Event, action_type=my_promise)
+    └── Todo #3: "回复李总的技术方案" (source_event_id → Event, action_type=their_promise)
+    │
+    ▼ 关联发现（零改动）
+    │
+    └── Association: 张总 ↔ 李总 [topic_overlap: 产品报价]
+```
+
+#### 4.11.3 微信生态约束
+
+| 方案 | 可行性 | 阶段 |
+|------|--------|------|
+| 小程序内交互 | ✅ 已实现 | PoC |
+| 企业微信API | ✅ 需企业微信环境 | Phase 1 |
+| 用户转发到小程序 | ✅ 长按转发 | Phase 1 |
+| 个人微信消息API | ❌ 不开放 | 不规划 |
+
+PoC阶段聚焦降低输入摩擦，语音输入（F-50）是最低摩擦方式。
 
 ### 5.1 协议接口
 
@@ -3274,6 +3474,7 @@ class SemanticSearchEngine:
 
 | 版本 | 日期 | 变更内容 | 作者 |
 |------|------|----------|------|
+| v2.6 | 2026-06-06 | 新增洞察引擎层+数据接入层架构：①§2.1架构图新增Insight Engine服务②§2.2服务拆分表新增Insight Engine行③§3.1 todos表DDL新增completed_rank/dynamic_score/score_calculated_at字段+索引④§4.10新增洞察引擎设计（动态评分器PriorityScorer+隐式反馈收集器ImplicitFeedbackCollector+Todo模型扩展+API变更）⑤§4.11新增数据接入层设计（DataSourceAdapter接口+邮件场景数据流+微信生态约束） | CarryMem团队 |
 | v1.0 | 2026-06-02 | 初始版本：4表数据模型+5步引擎+CarryMem解耦+YAML配置化+API设计 | CarryMem团队 |
 | v1.1 | 2026-06-02 | 小程序整合：§2.1架构图+§2.2 Mini/Notify服务+§2.3前端架构+H5通信协议+TTS服务 | CarryMem团队 |
 | v1.2 | 2026-06-02 | 7角色审核P0修复：①临时授权码模式替代明文token②语音录入/TTS走小程序原生③TTS播报模板+隐私分级④微信推送分级⑤PG列索引+CarryMem协议补充+JWT认证+资源预估 | CarryMem团队 |
