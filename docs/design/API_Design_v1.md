@@ -1,10 +1,11 @@
 # EventLink API设计文档
 
-> **版本**: 0.2.0 (POC阶段)
-> **日期**: 2026-06-04
+> **版本**: 0.2.6 (POC阶段)
+> **日期**: 2026-06-06
 > **阶段**: POC (0.2.x series)
 > **设计师**: 架构师 + 开发团队
-> **参考**: PRD v4.3, 技术设计 v2.5 §7
+> **参考**: PRD v4.3, 技术设计 v2.6 §7
+> **v2.6变更**: Insight Engine API新增priority-breakdown/upcoming-context端点(§3.13)、Todo schema新增dependency_raw/context_raw字段
 
 ---
 
@@ -579,6 +580,10 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 - `type`: cooperation_signal\|risk\|care\|promise\|followup\|help
 - `priority`: high\|medium\|low
 - `due_before`: 截止时间筛选（ISO 8601）
+- **[v2.5新增] `sort`**: 排序方式（可选）。枚举值：
+  - `smart` — （默认）按动态评分(dynamic_score)降序排列，分数高的优先展示
+  - `due_date` — 按截止时间升序排列，最紧急的优先
+- **[v2.5新增] `view`**: 视图类型（可选，见§3.9.4）
 - **[0.2.1更新] `summary_level`**: 摘要级别（可选）。枚举值：
   - `brief` — （默认）标准Todo列表格式，适合Dashboard展示
   - `detail` — 完整信息，包含完整context和关联数据
@@ -618,6 +623,8 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
         "reason": "您有AI算法经验，匹配张三的需求"
       },
       "due_date": "2026-06-10T00:00:00Z",
+      "completed_rank": null,
+      "dynamic_score": 72.5,
       "created_at": "2026-06-03T10:00:00Z"
     },
     {
@@ -636,6 +643,8 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
         "reason": "李四所在公司近期公开报道融资受阻"
       },
       "due_date": "2026-06-05T00:00:00Z",
+      "completed_rank": null,
+      "dynamic_score": 85.2,
       "created_at": "2026-06-03T10:00:00Z"
     },
     {
@@ -654,6 +663,8 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
         "reason": "王五在AI峰会发表演讲，可能对您的项目有参考价值"
       },
       "due_date": null,
+      "completed_rank": null,
+      "dynamic_score": 45.8,
       "created_at": "2026-06-03T10:00:00Z"
     },
     {
@@ -672,6 +683,8 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
         "reason": "赵六有AI算法团队管理经验，张三正在寻找联合创始人"
       },
       "due_date": "2026-06-08T00:00:00Z",
+      "completed_rank": null,
+      "dynamic_score": 68.3,
       "created_at": "2026-06-03T10:00:00Z"
     },
     {
@@ -691,6 +704,8 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
         "suggested_action": "确认或否认此关联"
       },
       "due_date": "2026-06-07T00:00:00Z",
+      "completed_rank": null,
+      "dynamic_score": 52.1,
       "created_at": "2026-06-03T10:00:00Z"
     },
     {
@@ -710,6 +725,8 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
         "reason": "长期未联系可能导致关系弱化，建议发送问候或分享行业资讯"
       },
       "due_date": "2026-06-06T00:00:00Z",
+      "completed_rank": null,
+      "dynamic_score": 30.4,
       "created_at": "2026-06-03T10:00:00Z"
     }
   ]
@@ -1947,6 +1964,468 @@ Cache-Control: private, max-age=300
 
 ---
 
+### 3.13 Insight Engine API（v2.5 新增）
+
+> **定位**: Insight Engine 将 Todo 从"被动记录"升级为"主动服务"，基于动态优先级评分和隐式反馈驱动用户注意力。
+
+#### 3.13.1 按动态评分排序的 Todo 列表
+
+**端点**: `GET /api/v1/todos?sort=smart`
+
+**说明**: 按动态评分(dynamic_score)降序排列返回 Todo 列表，分数高的优先展示。这是默认排序方式。
+
+**认证**: Bearer Token
+
+**限流**: 100次/分钟（统一限流）
+
+**查询参数**: 同 §3.4.1，额外支持 `sort=smart`（默认）
+
+**响应**: 同 §3.4.1 Todo 列表格式，items 按 dynamic_score DESC 排序
+
+**示例**: `GET /api/v1/todos?sort=smart&status=pending`
+
+#### 3.13.2 按截止时间排序的 Todo 列表
+
+**端点**: `GET /api/v1/todos?sort=due_date`
+
+**说明**: 按截止时间升序排列，最紧急的优先。无截止日期的 Todo 排在最后。
+
+**认证**: Bearer Token
+
+**限流**: 100次/分钟
+
+**查询参数**: 同 §3.4.1，`sort=due_date`
+
+**响应**: 同 §3.4.1 Todo 列表格式，items 按 due_date ASC 排序（NULL 排最后）
+
+**示例**: `GET /api/v1/todos?sort=due_date&status=pending`
+
+#### 3.13.3 触发优先级重新计算
+
+**端点**: `POST /api/v1/insights/calculate`
+
+**说明**: 手动触发所有 Todo 的动态优先级分数重新计算。适用于用户修改了关系推进卡信息后希望立即看到分数变化。
+
+**认证**: Bearer Token
+
+**限流**: 10次/分钟（计算密集型，独立限流）
+
+**请求**:
+```json
+{
+  "scope": "all",
+  "reason": "manual_recalc"
+}
+```
+
+**字段说明**:
+- `scope`: 计算范围（可选，默认 `all`）。枚举值：
+  - `all` — 重新计算所有 Todo
+  - `entity` — 仅重新计算指定人物的 Todo（需提供 `entity_id`）
+  - `overdue` — 仅重新计算已过期的 Todo
+- `entity_id`: 人物实体ID（可选，当 scope=entity 时必填）
+- `reason`: 触发原因（可选，默认 `manual_recalc`）
+
+**响应**: `200 OK`
+```json
+{
+  "calculated_count": 28,
+  "updated_count": 12,
+  "scope": "all",
+  "triggered_by": "manual_recalc",
+  "calculation_time_ms": 450,
+  "score_changes": [
+    {
+      "todo_id": "todo-uuid",
+      "old_score": 65.3,
+      "new_score": 72.5,
+      "factors": {
+        "urgency": 0.85,
+        "importance": 0.72
+      }
+    }
+  ]
+}
+```
+
+**错误码**:
+
+| HTTP状态码 | 错误码 | 场景 |
+|-----------|--------|------|
+| 401 | E2000 | 未认证 |
+| 422 | E1003 | scope=entity 但未提供 entity_id |
+| 429 | E3000 | 超过限流（10次/分钟） |
+
+#### 3.13.4 获取隐式反馈统计
+
+**端点**: `GET /api/v1/insights/feedback-stats`
+
+**说明**: 获取隐式反馈的统计数据，包括完成顺序分布、权重调整历史、每日再平衡结果等。
+
+**认证**: Bearer Token
+
+**限流**: 100次/分钟
+
+**查询参数**:
+- `period`: 统计周期（可选，默认 `7d`）。枚举值：`1d` / `7d` / `30d`
+- `entity_id`: 筛选指定人物（可选）
+
+**示例**: `GET /api/v1/insights/feedback-stats?period=7d`
+
+**响应**: `200 OK`
+```json
+{
+  "period": "7d",
+  "total_completions": 45,
+  "rank_distribution": {
+    "top3": 12,
+    "top10": 28,
+    "beyond10": 5
+  },
+  "entity_weight_changes": [
+    {
+      "entity_id": "entity-uuid",
+      "entity_name": "张三",
+      "old_weight": 0.50,
+      "current_weight": 0.62,
+      "weight_delta": +0.12,
+      "completion_count": 8
+    }
+  ],
+  "daily_rebalance_results": [
+    {
+      "date": "2026-06-05",
+      "entities_updated": 5,
+      "avg_weight_change": 0.03
+    }
+  ],
+  "negative_feedback_count": 2,
+  "cold_attention_entities": []
+}
+```
+
+**错误码**:
+
+| HTTP状态码 | 错误码 | 场景 |
+|-----------|--------|------|
+| 401 | E2000 | 未认证 |
+| 404 | E1001 | entity_id 不存在 |
+
+#### 3.13.5 获取Todo优先级评分详情（v2.6 新增, F-55/F-56）
+
+**端点**: `GET /api/v1/todos/{todo_id}/priority-breakdown`
+
+**说明**: 返回指定Todo的四维评分详情（urgency/importance/dependency/context），包含每个维度的原始得分和计算因子。用于前端展示"为什么这个Todo排在前面"的可解释性面板。
+
+**认证**: Bearer Token
+
+**限流**: 100次/分钟
+
+**路径参数**:
+- `todo_id`: Todo ID（UUID）
+
+**响应**: `200 OK`
+```json
+{
+  "todo_id": "todo-uuid",
+  "dynamic_score": 72.5,
+  "score_calculated_at": "2026-06-06T10:00:00Z",
+  "phase": "phase1",
+  "weights": {
+    "urgency": 0.30,
+    "importance": 0.35,
+    "dependency": 0.20,
+    "context_match": 0.15
+  },
+  "breakdown": {
+    "urgency": {
+      "score": 0.85,
+      "raw": {
+        "days_until_due": 1,
+        "lambda": 0.1,
+        "formula": "exp(-λ × days_until_due)"
+      }
+    },
+    "importance": {
+      "score": 0.72,
+      "raw": {
+        "brief_score": 72,
+        "formula": "brief_score / 100"
+      }
+    },
+    "dependency": {
+      "score": 0.45,
+      "raw": {
+        "depth_weight_sum": 1.5,
+        "blocked_count": 2,
+        "block_weight": 0.3,
+        "max_depth": 3,
+        "formula": "Σ(1/depth) × min(1.0, blocked_count × 0.3)"
+      }
+    },
+    "context": {
+      "score": 0.917,
+      "raw": {
+        "entity_id": "entity-uuid",
+        "hours_until": 2.0,
+        "window_hours": 24,
+        "matched_event": {
+          "event_title": "供应链优化方案讨论",
+          "nearest_meeting_at": "2026-06-06T14:00:00Z"
+        },
+        "formula": "max(0, 1 - hours_until / 24)"
+      }
+    }
+  }
+}
+```
+
+> **PoC阶段说明**: PoC阶段 dependency 和 context 维度未启用，对应 score 固定为 0.0，raw 返回 `{"reason": "not_enabled_in_poc"}`。
+
+**错误码**:
+
+| HTTP状态码 | 错误码 | 场景 |
+|-----------|--------|------|
+| 401 | E2000 | 未认证 |
+| 404 | E1001 | todo_id 不存在 |
+
+#### 3.13.6 获取即将见面的Entity及关联Todo（v2.6 新增, F-56）
+
+**端点**: `GET /api/v1/users/{user_id}/upcoming-context`
+
+**说明**: 返回未来24h即将见面的Entity列表及每个Entity关联的待办Todo。用于"会前准备"场景——用户在会议前快速查看与该人物相关的所有待办事项。
+
+**认证**: Bearer Token
+
+**限流**: 100次/分钟
+
+**路径参数**:
+- `user_id`: 用户ID（UUID）
+
+**查询参数**:
+- `hours`: 时间窗口（可选，默认24，范围1-72）
+
+**示例**: `GET /api/v1/users/{user_id}/upcoming-context?hours=24`
+
+**响应**: `200 OK`
+```json
+{
+  "user_id": "user-uuid",
+  "window_hours": 24,
+  "upcoming_meetings": [
+    {
+      "event_id": "event-uuid-1",
+      "event_title": "供应链优化方案讨论",
+      "event_type": "meeting",
+      "meeting_at": "2026-06-06T14:00:00Z",
+      "hours_until": 2.5,
+      "entities": [
+        {
+          "entity_id": "entity-uuid",
+          "entity_name": "张三",
+          "company": "AI公司",
+          "title": "CEO",
+          "relationship_stage": "understanding_needs",
+          "related_todos": [
+            {
+              "todo_id": "todo-uuid-1",
+              "todo_type": "promise",
+              "description": "承诺下周介绍赵六给张三认识",
+              "status": "pending",
+              "priority": "medium",
+              "due_date": "2026-06-08T00:00:00Z",
+              "dynamic_score": 72.5,
+              "morandi_color": "#A0C4A8"
+            },
+            {
+              "todo_id": "todo-uuid-2",
+              "todo_type": "followup",
+              "description": "跟进：张三的融资进展",
+              "status": "pending",
+              "priority": "low",
+              "due_date": null,
+              "dynamic_score": 45.2,
+              "morandi_color": "#C4C0A0"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "total_meetings": 3,
+  "total_todos": 7,
+  "generated_at": "2026-06-06T11:30:00Z"
+}
+```
+
+**错误码**:
+
+| HTTP状态码 | 错误码 | 场景 |
+|-----------|--------|------|
+| 401 | E2000 | 未认证 |
+| 404 | E1001 | user_id 不存在 |
+
+---
+
+### 3.14 DataSourceAdapter API（v2.5 新增）
+
+> **定位**: 多数据源适配器管理接口，支持用户配置和同步不同来源的数据（微信转发、邮件、日历等）。
+
+#### 3.14.1 列出已配置的数据源
+
+**端点**: `GET /api/v1/adapters`
+
+**说明**: 列出当前用户已配置的所有数据源适配器。
+
+**认证**: Bearer Token
+
+**限流**: 100次/分钟
+
+**响应**: `200 OK`
+```json
+{
+  "total": 3,
+  "items": [
+    {
+      "id": "adapter-uuid-1",
+      "adapter_name": "manual",
+      "is_active": true,
+      "last_sync_at": "2026-06-06T08:00:00Z",
+      "created_at": "2026-06-01T10:00:00Z"
+    },
+    {
+      "id": "adapter-uuid-2",
+      "adapter_name": "voice",
+      "is_active": true,
+      "last_sync_at": "2026-06-06T09:30:00Z",
+      "created_at": "2026-06-01T10:00:00Z"
+    },
+    {
+      "id": "adapter-uuid-3",
+      "adapter_name": "wechat_forward",
+      "is_active": false,
+      "last_sync_at": null,
+      "created_at": "2026-06-05T14:00:00Z"
+    }
+  ]
+}
+```
+
+> **安全约束**: 响应中不返回 `config_encrypted` 字段内容，防止密钥泄露。
+
+#### 3.14.2 添加新数据源配置
+
+**端点**: `POST /api/v1/adapters`
+
+**说明**: 为当前用户添加新的数据源适配器配置。
+
+**认证**: Bearer Token
+
+**限流**: 10次/分钟（写操作独立限流）
+
+**请求**:
+```json
+{
+  "adapter_name": "wechat_forward",
+  "config": {
+    "webhook_url": "https://...",
+    "api_key": "sk-xxx"
+  }
+}
+```
+
+**字段说明**:
+- `adapter_name`: 适配器名称（必填）。枚举值：`manual` / `voice` / `wechat_forward` / `email` / `calendar`
+- `config`: 适配器配置（可选）。JSON对象，内容因适配器类型而异。**服务端加密后存储，API响应中不返回**
+
+**响应**: `201 Created`
+```json
+{
+  "id": "adapter-uuid-new",
+  "adapter_name": "wechat_forward",
+  "is_active": true,
+  "last_sync_at": null,
+  "created_at": "2026-06-06T10:00:00Z"
+}
+```
+
+**错误码**:
+
+| HTTP状态码 | 错误码 | 场景 |
+|-----------|--------|------|
+| 400 | E1000 | 缺少 adapter_name |
+| 401 | E2000 | 未认证 |
+| 409 | E1002 | 该用户已配置同名适配器（UNIQUE约束冲突） |
+| 422 | E1003 | adapter_name 不在合法枚举值内 |
+
+#### 3.14.3 手动触发同步
+
+**端点**: `POST /api/v1/adapters/{name}/sync`
+
+**说明**: 手动触发指定数据源的同步操作。同步为异步执行，立即返回任务ID。
+
+**认证**: Bearer Token
+
+**限流**: 5次/分钟/适配器（同步操作资源密集）
+
+**路径参数**:
+- `name`: 适配器名称（枚举值：`manual` / `voice` / `wechat_forward` / `email` / `calendar`）
+
+**请求**:
+```json
+{
+  "full_sync": false
+}
+```
+
+**字段说明**:
+- `full_sync`: 是否全量同步（可选，默认 `false`）。`false` 为增量同步，`true` 为全量同步
+
+**响应**: `202 Accepted`
+```json
+{
+  "task_id": "sync-task-uuid",
+  "adapter_name": "wechat_forward",
+  "status": "queued",
+  "estimated_duration_ms": 5000,
+  "created_at": "2026-06-06T10:00:00Z"
+}
+```
+
+**错误码**:
+
+| HTTP状态码 | 错误码 | 场景 |
+|-----------|--------|------|
+| 401 | E2000 | 未认证 |
+| 404 | E1001 | 适配器未配置 |
+| 409 | E1002 | 已有同步任务在执行中 |
+| 429 | E3000 | 超过限流（5次/分钟/适配器） |
+
+#### 3.14.4 删除数据源配置
+
+**端点**: `DELETE /api/v1/adapters/{name}`
+
+**说明**: 删除指定数据源的配置。`manual` 和 `voice` 为系统内置适配器，不可删除，仅可禁用。
+
+**认证**: Bearer Token
+
+**限流**: 10次/分钟
+
+**路径参数**:
+- `name`: 适配器名称
+
+**响应**: `204 No Content`
+
+**错误码**:
+
+| HTTP状态码 | 错误码 | 场景 |
+|-----------|--------|------|
+| 401 | E2000 | 未认证 |
+| 404 | E1001 | 适配器未配置 |
+| 422 | E1003 | 尝试删除内置适配器（manual/voice），请使用 PATCH 设置 is_active=false |
+
+---
+
 ## 4. 安全策略（v2.0新增）
 
 ### 4.1 PII脱敏API行为
@@ -2802,6 +3281,71 @@ components:
           type: string
           format: date-time
           nullable: true
+        completed_rank:
+          type: integer
+          nullable: true
+          description: 完成序号(隐式反馈用, v2.5新增)
+        dynamic_score:
+          type: number
+          nullable: true
+          minimum: 0
+          maximum: 100
+          description: 动态优先级分(v2.5新增)
+        breakdown:
+          type: object
+          nullable: true
+          description: 四维评分详情(v2.6新增)
+          properties:
+            urgency:
+              type: number
+              description: 紧急度得分(0-1)
+            importance:
+              type: number
+              description: 重要度得分(0-1)
+            dependency:
+              type: number
+              description: 依赖阻塞度得分(0-1, F-55)
+            context:
+              type: number
+              description: 场景匹配度得分(0-1, F-56)
+            dependency_raw:
+              type: object
+              nullable: true
+              description: 依赖分析原始计算因子(F-55, v2.6新增)
+              properties:
+                depth_weight_sum:
+                  type: number
+                blocked_count:
+                  type: integer
+                block_weight:
+                  type: number
+                max_depth:
+                  type: integer
+                formula:
+                  type: string
+            context_raw:
+              type: object
+              nullable: true
+              description: 场景匹配原始计算因子(F-56, v2.6新增)
+              properties:
+                entity_id:
+                  type: string
+                  format: uuid
+                hours_until:
+                  type: number
+                window_hours:
+                  type: integer
+                matched_event:
+                  type: object
+                  nullable: true
+                  properties:
+                    event_title:
+                      type: string
+                    nearest_meeting_at:
+                      type: string
+                      format: date-time
+                formula:
+                  type: string
         created_at:
           type: string
           format: date-time
@@ -3448,7 +3992,9 @@ X-Cache-Hit: true
 | v1.3 | 2026-06-03 | §8 API版本管理策略全面补齐：三层版本号（SemVer）+ 版本协商机制 + 兼容性规则 + 废弃流程（12个月过渡期）+ 多版本共存（FastAPI路由层）+ Alembic数据库迁移策略 + 客户端SDK版本策略 + 版本变更日志规范 |
 | **v2.0** | **2026-06-04** | **v2.0大版本升级（参考 PRD v4.3 + 技术设计 v2.5 §7）：**<br/>**① D2-1** 版本头更新<br/>**② D2-2 新增6个P0 API端点**: GET relationship-brief / PATCH stage(乐观锁) / GET dashboard/today / GET todos?view=my-responses / POST contributions / POST feedbacks<br/>**③ D2-3 日视图API (F-49)**: GET /api/v1/dashboard/day-view<br/>**④ D2-4 现有端点变更**: POST /events增加input_scope字段 / PATCH /todos增加action_type+promisor_id+beneficiary_id / GET /entities返回值增加relationship_stage<br/>**⑤ D2-5 JWT认证加固**: Payload结构(sub/iat/exp/role) + 4项安全约束(Secret≥256/黑名单/Refresh旋转/CORS白名单)<br/>**⑥ D2-6 PII脱敏行为**: 标注7类端点执行redact_pii_from_text() + 5种PII掩码规则<br/>**⑦ D2-7 SC-01安全约束**: input_scope服务端强制校验，永远不以客户端值为准<br/>**⑧ D2-8 错误码扩展**: E1004 INVALID_INPUT_SCOPE(400) + E1005 OPTIMISTIC_LOCK_CONFLICT(409)<br/>**⑨ D2-9 数据导出API**: GET /api/v1/data/export?format=json\|csv（GDPR数据携带权，Phase 1提前）<br/>**⑩ D2-10 F-05暂停声明**: 商机匹配相关API标记Phase 2 |
 | **v0.2.1** | **2026-06-05** | **[F-50新增] 语音助手API (Voice Assistant, Phase 1.1)：**<br/>**① F50-1 新增§3.12 Voice Assistant API章节**:<br/>　- POST /api/v1/voice/session — 创建语音问答会话(NLU意图识别→业务API调用→自然语言回答→TTS预生成)<br/>　- GET /api/v1/voice/tts/{session_id} — 获取预生成TTS音频(MP3流, Cache-Control private max-age=300)<br/>　- POST /api/v1/voice/feedback — 语音回答质量反馈(NLU模型优化用)<br/>**② F50-2 NLU意图枚举 VoiceIntent**: schedule_query/promise_tracker/relationship_status(P0) + schedule_range/action_suggestion(P1) + conversation_review/knowledge_retrieval(P2) + unclear<br/>**③ F50-3 VoiceSessionCreate/VoiceSessionResponse 数据模型定义**<br/>**④ F50-4 现有端点变更** — summary_level参数(三档: brief/detail/voice):<br/>　- GET /api/v1/dashboard/day-view(F-49) + natural_date参数("今天"|"明天"|"后天"|"本周"|"下游") → answer_paragraph字段<br/>　- GET /api/v1/persons/{id}/relationship-brief(F-47) → voice_summary字段<br/>　- GET /api/v1/todos → voice_summary字段<br/>**⑤ F50-5 PII脱敏清单扩展**: POST /voice/session(answer_text) + GET /voice/tts(音频内容)<br/>**关键约束**: 不存储原始音频; TTS输出PII脱敏; 所有端点JWT认证; TTL=5分钟音频缓存 |
+| **v2.5** | **2026-06-06** | **Insight Engine + DataSourceAdapter API (v2.5)：**<br/>**① 新增§3.13 Insight Engine API**:<br/>　- GET /api/v1/todos?sort=smart — 按动态评分排序(默认)<br/>　- GET /api/v1/todos?sort=due_date — 按截止时间排序<br/>　- POST /api/v1/insights/calculate — 触发优先级重新计算(scope: all/entity/overdue, 限流10次/分)<br/>　- GET /api/v1/insights/feedback-stats — 获取隐式反馈统计(period: 1d/7d/30d)<br/>**② 新增§3.14 DataSourceAdapter API**:<br/>　- GET /api/v1/adapters — 列出已配置数据源(不返回config_encrypted)<br/>　- POST /api/v1/adapters — 添加新数据源配置(adapter_name枚举5值, config加密存储)<br/>　- POST /api/v1/adapters/{name}/sync — 手动触发同步(异步, 限流5次/分/适配器)<br/>　- DELETE /api/v1/adapters/{name} — 删除数据源配置(manual/voice不可删)<br/>**③ Todo响应schema新增字段**: completed_rank(完成序号) + dynamic_score(动态优先级分, 0-100)<br/>**④ OpenAPI YAML Todo schema更新**: 新增completed_rank(integer, nullable) + dynamic_score(number, 0-100, nullable) |
+| **v2.6** | **2026-06-06** | **F-55/F-56 Insight Engine API扩展 (v2.6)：**<br/>**① §3.13 Insight Engine API新增2个端点**:<br/>　- GET /api/v1/todos/{todo_id}/priority-breakdown — 返回四维评分详情(urgency/importance/dependency/context)，含每个维度的原始得分和计算因子，支持可解释性面板<br/>　- GET /api/v1/users/{user_id}/upcoming-context — 返回未来24h即将见面的Entity及关联Todo，支持会前准备场景<br/>**② Todo schema breakdown字段扩展**: 新增dependency_raw(依赖分析原始因子, F-55) + context_raw(场景匹配原始因子, F-56)<br/>**③ OpenAPI YAML Todo schema更新**: 新增breakdown对象(含urgency/importance/dependency/context四维得分 + dependency_raw/context_raw原始因子) |
 
 ---
 
-*最后更新: 2026-06-05*
+*最后更新: 2026-06-06*

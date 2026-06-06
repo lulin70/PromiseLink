@@ -1,10 +1,10 @@
-# EventLink集成设计文档 0.2.1
+# EventLink集成设计文档 v2.6
 
-> **版本**: 0.2.1（POC阶段 — Voice Service 详细集成规格）
-> **日期**: 2026-06-05
+> **版本**: v2.6（POC阶段 — Insight Engine + DataSourceAdapter + 依赖性/场景匹配 集成规格）
+> **日期**: 2026-06-06
 > **设计师**: 架构师团队
 > **参考**: PRD v4.3, 技术设计 v2.5, API设计 v1.0, 数据库设计 v2.0, LLM_Prompt_Templates v2.0
-> **状态**: POC阶段 — 共识清单D7-1~D7-11融合修订
+> **状态**: POC阶段 — 共识清单D7-1~D7-11融合修订 + DevSquad Review更新
 
 ---
 
@@ -26,7 +26,7 @@
 
 ## 1. 集成概览
 
-本文档定义10个关键集成模块的设计方案：
+本文档定义12个关键集成模块的设计方案：
 
 | # | 集成模块 | 优先级 | 状态 |
 |---|---------|--------|------|
@@ -40,6 +40,8 @@
 | 8 | Redis缓存服务 | P1 | ✅ 设计完成（[D7-8] CacheService不变） |
 | 9 | 集成测试策略 | P0 | ✅ 设计完成 |
 | 10 | 配置管理 | P1 | ✅ 设计完成 |
+| 11 | DependencyAnalyzer集成 | P2 | ✅ v2.6新增（F-55 依赖性全图谱路径分析） |
+| 12 | ContextMatcher集成 | P2 | ✅ v2.6新增（F-56 场景匹配Event表驱动） |
 
 **集成架构总览（[0.2.0更新]）**:
 
@@ -4769,7 +4771,370 @@ groups:
 
 ---
 
-## 10. 版本历史
+## 10. DataSourceAdapter 集成 [v2.5新增]
+
+> EventLink从"被动记录"升级为"主动服务"，需要多源数据接入能力。DataSourceAdapter定义统一的数据源适配接口，使系统能从邮件、日历、微信等多种渠道获取Event数据。
+
+### 10.1 Adapter接口定义 [v2.5新增]
+
+DataSourceAdapter抽象基类，所有数据源适配器必须实现以下接口：
+
+```python
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from enum import Enum
+
+
+class EventType(str, Enum):
+    MEETING = "meeting"
+    CALL = "call"
+    EMAIL = "email"
+    WECHAT_FORWARD = "wechat_forward"
+    CALENDAR = "calendar"
+    MANUAL_INPUT = "manual_input"
+
+
+@dataclass
+class Event:
+    """统一事件模型——所有Adapter输出此格式"""
+    event_type: EventType
+    raw_text: str
+    source: str  # adapter名称，如 "email", "wechat_forward"
+
+
+class DataSourceAdapter(ABC):
+    """数据源适配器抽象基类"""
+
+    @abstractmethod
+    async def fetch_new_events(self) -> list[Event]:
+        """拉取新事件，返回统一Event列表"""
+        ...
+
+    @abstractmethod
+    async def authenticate(self) -> bool:
+        """认证/授权，成功返回True"""
+        ...
+```
+
+**具体适配器清单**：
+
+| 适配器 | 类名 | 数据源 | 说明 |
+|--------|------|--------|------|
+| ManualInputAdapter | `ManualInputAdapter` | 手动输入 | 默认适配器，用户通过录入页输入 |
+| VoiceAdapter | `VoiceAdapter` | 语音录入 | ASR转写后生成Event |
+| EmailAdapter | `EmailAdapter` | 邮件 | IMAP/Exchange协议拉取 |
+| CalendarAdapter | `CalendarAdapter` | 日历 | CalDAV/Exchange日历同步 |
+| WeChatForwardAdapter | `WeChatForwardAdapter` | 微信转发 | 用户手动转发到小程序 |
+
+**统一输出约束**：
+- 所有Adapter输出统一 `Event(event_type, raw_text, source)` 格式
+- `raw_text` 包含完整原始文本（邮件全文、语音转写全文等）
+- 后续Pipeline步骤（Step 1-14）统一处理，无需关心数据来源
+
+### 10.2 Email集成（Phase 1） [v2.5新增]
+
+| 配置项 | 值 | 说明 |
+|--------|-----|------|
+| 协议 | IMAP / Exchange | IMAP为通用方案，Exchange为企业环境首选 |
+| 认证 | OAuth2 | 遵循RFC 6749，支持Google/Microsoft OAuth2 |
+| 同步频率 | 每15分钟 | 可配置，见Deployment Guide §Adapter Sync Jobs |
+
+**数据流**：
+
+```
+Email → EmailAdapter.fetch_new_events()
+      → Event(event_type=EMAIL, raw_text=完整邮件正文, source="email")
+      → Pipeline Step 1-14
+      → Todos(source_event_id → Event)
+```
+
+**关键设计决策**：
+- **一封邮件 = 一个Event**：保持Event粒度一致，Pipeline负责拆解
+- **Todo.action_type区分方向**：邮件中"我答应的"→`my_promise`，"对方答应的"→`their_promise`
+- **邮件元数据保留**：`Event.metadata`存储发件人/收件人/时间戳，供后续关联Person实体
+
+### 10.3 微信集成约束 [v2.5新增]
+
+| 场景 | 可行性 | 说明 |
+|------|--------|------|
+| 个人微信 | ❌ 无API | 微信不开放个人消息API，无法自动抓取 |
+| 企业微信 | ✅ API可用 | 需企业微信管理员授权，回调URL接收消息 |
+| 手动转发 | ✅ PoC可行 | 用户手动转发聊天记录到小程序 |
+
+**PoC策略**：
+- **聚焦降低输入摩擦**：语音输入是最低摩擦方案（按住即说，无需打字）
+- **微信转发方案**：用户长按聊天记录 → 转发到EventLink小程序 → 小程序接收文本 → 生成Event
+- **企业微信方案留Phase 2**：需要企业环境支持，PoC不实现
+
+**WeChatForwardAdapter实现（PoC）**：
+
+```python
+class WeChatForwardAdapter(DataSourceAdapter):
+    """微信转发适配器——用户手动转发聊天记录到小程序"""
+
+    async def fetch_new_events(self) -> list[Event]:
+        # 小程序onShareAppMessage接收转发内容
+        # 此处从消息队列获取待处理的转发消息
+        messages = await self._poll_forwarded_messages()
+        return [
+            Event(
+                event_type=EventType.WECHAT_FORWARD,
+                raw_text=msg["content"],
+                source="wechat_forward"
+            )
+            for msg in messages
+        ]
+
+    async def authenticate(self) -> bool:
+        # 微信小程序登录态由wx.login()维护
+        return True
+```
+
+### 10.4 供应链安全 [v2.5新增]
+
+多源数据接入引入外部依赖，需严格管控供应链安全：
+
+**依赖锁定与哈希校验**：
+
+```bash
+# 生成带哈希的锁文件
+pip-compile --generate-hashes requirements.in > requirements.txt
+
+# 安装时校验哈希
+pip install --require-hashes -r requirements.txt
+```
+
+**CI/CD漏洞扫描**：
+
+```yaml
+# GitHub Actions集成
+- name: Security Scan
+  run: |
+    pip install pip-audit bandit
+    pip-audit -r requirements.txt
+    bandit -r src/eventlink/adapters/ -ll
+```
+
+**Adapter审查流程**：
+
+| 阶段 | 内容 | 负责人 |
+|------|------|--------|
+| 1. 代码审查 | Adapter代码逻辑、异常处理、日志规范 | 开发者 |
+| 2. 依赖扫描 | pip-audit + bandit扫描新增依赖 | CI自动 |
+| 3. 沙箱测试 | 隔离环境运行Adapter，验证无越权访问 | 测试工程师 |
+| 4. 签署发布 | 审查通过后签署，标记版本号 | 架构师 |
+| 5. 部署上线 | 灰度发布，监控异常指标 | 运维 |
+
+---
+
+## 11. DependencyAnalyzer 集成设计 [v2.6新增]
+
+> F-55 依赖性全图谱路径分析。DependencyAnalyzer在Pipeline Step 8 Promise分析完成后构建Todo→Entity依赖图，计算每个Todo的依赖性分数（dependency_score），为PriorityScorerV2提供四维评分中的依赖性维度输入。
+
+### 11.1 与Pipeline Step 8.5的集成点 [v2.6新增]
+
+DependencyAnalyzer作为Pipeline Step 8.5执行，位于Step 8（Promise分析）之后、Step 9（Todo持久化）之前：
+
+```
+Pipeline Step 7: Entity关联  →  Step 8: Promise分析  →  Step 8.5: DependencyAnalyzer  →  Step 9: Todo持久化
+                                                              │
+                                                              ├── 构建依赖图
+                                                              ├── 计算dependency_score
+                                                              └── 写入Todo.metadata
+```
+
+**触发时机**：Pipeline Step 8 Promise分析完成后自动触发，无需额外调度。
+
+**输入**：
+- 当前Event提取的Todo列表
+- 关联Entity列表（含历史Todo）
+- AssociationDiscoveryEngine提供的Entity关联关系
+
+**输出**：
+- 每个Todo的`dependency_score`（0.0~1.0）
+- 依赖链信息（上游/下游Todo），写入`Todo.metadata["dependency_chain"]`
+
+### 11.2 与AssociationDiscoveryEngine的数据依赖关系 [v2.6新增]
+
+DependencyAnalyzer依赖AssociationDiscoveryEngine提供的Entity关联数据构建跨Todo依赖图：
+
+```python
+# 依赖关系示意
+class DependencyAnalyzer:
+    def __init__(self, association_engine: AssociationDiscoveryEngine):
+        self.association_engine = association_engine
+
+    async def build_dependency_graph(self, todos: list[Todo], entities: list[Entity]) -> DependencyGraph:
+        # 1. 从AssociationDiscoveryEngine获取Entity间关联
+        associations = await self.association_engine.get_associations(entities)
+
+        # 2. 构建Todo→Entity→Todo依赖链
+        graph = DependencyGraph()
+        for todo in todos:
+            related_entities = [e for e in entities if todo.related_entity_id == e.id]
+            for entity in related_entities:
+                # 查找该Entity关联的其他Entity的活跃Todo
+                linked_entities = associations.get_linked_entities(entity.id)
+                for linked_entity in linked_entities:
+                    linked_todos = await self._get_active_todos(linked_entity.id)
+                    graph.add_edge(todo, linked_todos, weight=association.strength)
+
+        return graph
+```
+
+**数据流向**：
+```
+AssociationDiscoveryEngine → Entity关联关系 → DependencyAnalyzer → 依赖图 → dependency_score
+```
+
+### 11.3 依赖图构建算法 [v2.6新增]
+
+**算法**：基于BFS的依赖链遍历，从当前Todo出发，沿Entity关联关系扩展依赖链。
+
+**复杂度**：O(N×E)，其中N=活跃Todo数，E=Entity关联数。
+
+| 参数 | PoC典型值 | 说明 |
+|------|----------|------|
+| N（活跃Todo数） | 50~200 | 单用户活跃Todo |
+| E（Entity关联数） | 20~100 | 人脉关联数 |
+| 计算耗时 | < 500ms | 单次构建 |
+
+**dependency_score计算公式**：
+
+```python
+dependency_score = normalize(
+    upstream_count * 0.6 +    # 被多少人等待（上游依赖数）
+    downstream_count * 0.3 +   # 阻塞多少人（下游影响数）
+    chain_depth * 0.1          # 依赖链深度
+)
+```
+
+**性能考量**：
+- PoC阶段：全量计算，N×E < 20000，耗时可控
+- Phase1：增量更新，仅重新计算受影响Todo的依赖分数
+- Phase2：图数据库（Neo4j）存储依赖图，支持复杂路径查询
+
+---
+
+## 12. ContextMatcher 集成设计 [v2.6新增]
+
+> F-56 场景匹配Event表驱动。ContextMatcher基于Event表中的日程数据，计算Todo的场景匹配分数（context_score），实现"即将见某人时，相关Todo自动提升优先级"。
+
+### 12.1 与Pipeline Step 8.5的集成点 [v2.6新增]
+
+ContextMatcher与DependencyAnalyzer并行执行于Pipeline Step 8.5：
+
+```
+Pipeline Step 8: Promise分析  →  Step 8.5:
+                                       ├── DependencyAnalyzer（依赖性分数）
+                                       └── ContextMatcher（场景匹配分数）
+                                                │
+                                                ├── 查询Event表（近期日程）
+                                                ├── 匹配Todo关联Entity与日程参会人
+                                                └── 计算context_score
+```
+
+**触发时机**：与DependencyAnalyzer相同，Pipeline Step 8完成后自动触发。
+
+**输入**：
+- 当前活跃Todo列表（含related_entity_id）
+- Event表中的近期日程（meeting类型Event）
+- 当前时间
+
+**输出**：
+- 每个Todo的`context_score`（0.0~1.0）
+- 场景匹配信息（关联日程、时间距离），写入`Todo.metadata["context_match"]`
+
+### 12.2 Event表查询优化 [v2.6新增]
+
+ContextMatcher高频查询Event表以获取近期日程，需要索引优化保障查询性能。
+
+**核心查询模式**：
+
+```sql
+-- 查询某用户近期的会议日程
+SELECT id, event_type, event_data, created_at
+FROM events
+WHERE user_id = :user_id
+  AND event_type = 'meeting'
+  AND created_at >= NOW() - INTERVAL '7 days'
+ORDER BY created_at DESC
+LIMIT 50;
+```
+
+**索引设计**：
+
+```sql
+-- 复合索引：覆盖ContextMatcher的核心查询路径
+CREATE INDEX idx_events_context ON events(user_id, event_type, created_at);
+```
+
+| 索引字段 | 排序 | 说明 |
+|---------|------|------|
+| `user_id` | ASC | 用户隔离，第一过滤条件 |
+| `event_type` | ASC | 仅查询meeting类型 |
+| `created_at` | DESC | 时间排序，支持范围查询 |
+
+**查询性能预估**：
+
+| 数据规模 | 无索引 | 有索引 | 说明 |
+|---------|--------|--------|------|
+| 1000条Event | ~50ms | <5ms | PoC典型规模 |
+| 10000条Event | ~500ms | <10ms | Phase1规模 |
+| 100000条Event | ~5s | <20ms | Phase2规模 |
+
+### 12.3 与PriorityScorerV2的调用链 [v2.6新增]
+
+ContextMatcher计算的context_score作为PriorityScorerV2四维评分的输入之一：
+
+```
+DependencyAnalyzer ──→ dependency_score ──┐
+ContextMatcher    ──→ context_score    ──┤
+                                         ├── PriorityScorerV2 ──→ dynamic_score
+UrgencyCalculator──→ urgency_score    ──┤
+ImportanceCalculator→ importance_score──┘
+```
+
+**PriorityScorerV2公式**：
+
+```python
+dynamic_score = (
+    0.25 * urgency_score +       # 紧急性
+    0.35 * importance_score +    # 重要性
+    0.20 * dependency_score +    # 依赖性（F-55）
+    0.20 * context_score         # 场景匹配（F-56）
+)
+```
+
+**调用时序**：
+
+```python
+class PriorityScorerV2:
+    def __init__(self, dependency_analyzer, context_matcher):
+        self.dependency_analyzer = dependency_analyzer
+        self.context_matcher = context_matcher
+
+    async def calculate(self, todo: Todo) -> float:
+        # 1. 计算四维分数（可并行）
+        urgency = self._calc_urgency(todo)
+        importance = self._calc_importance(todo)
+        dependency = await self.dependency_analyzer.get_score(todo)
+        context = await self.context_matcher.get_score(todo)
+
+        # 2. 加权求和
+        return (
+            0.25 * urgency +
+            0.35 * importance +
+            0.20 * dependency +
+            0.20 * context
+        )
+```
+
+**降级策略**：当DependencyAnalyzer或ContextMatcher不可用时，回退到PoC公式（0.4×urgency + 0.6×importance），确保评分不中断。
+
+---
+
+## 13. 版本历史
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
@@ -4778,7 +5143,9 @@ groups:
 | v1.2 | 2026-06-03 | Todo类型重命名（opportunity→cooperation_signal, context→care, action→promise, pending_confirm→followup, resource_maint→help）；新增模板11承诺提取和模板12关注点提取；新增§3.6 AI输出语言规则（语言约束/禁止判定对方资源/禁止建议索取资源/推测标记）；微信推送模板更新为6种新类型对应文案 |
 | **0.2.0** | **2026-06-04** | **POC阶段融合修订（D7-1~D7-11）：①D7-1模板3全面升级（6种action_type+Promise双向识别+promisor/beneficiary+confirmation强制+降噪5条+evidence_quote）②D7-2新增模板0 Input Scope分类（8种scope+9条关键词触发+fallback=manual_input）③D7-3 CarryMem三阶段路径（PoC NullProvider→Phase1基础记忆→Phase2全量7种记忆+遗忘曲线）④D7-5 TTS/ASR Phase1方案（微信同声传译/Whisper local + Azure Edge-TTS/预合成MP3 + MockTTSClient验证端点）⑤D7-6数字名片API对接预留（陈宇欣团队接口+MockDigitalCardClient+超3周自建备选）⑥D7-9数据导出集成（GET /data/export + HMAC-SHA256签名 + PII脱敏redact_pii_from_text/sanitize_evidence_quote）⑦D7-10关键决策9条铁律（#2补充action_type 6种 #4标注F-05暂停 #9新增Moka AI）⑧LLM Provider统一Moka AI (moka/claude-sonnet-4-6) ⑨集成模块扩展至10个 ⑩参考基线对齐PRD v4.3 + 技术设计v2.5 + 数据库v2.0 + LLM_Prompt_Templates v2.0** |
 | **0.2.1** | **2026-06-05** | **Voice Service 集成规格详细化：①§4.2 ASR详细化[0.2.1] — 新增4.2.4微信同声传译插件(Phase1.1首选,含小程序端集成代码+局限/Fallback策略) + 4.2.5 Whisper Local备选(Phase1.2, faster-whisper+模型对比表base/small/medium) + 4.2.6 ASR Client抽象层(Protocol接口+WechatASRProvider+WhisperASRProviderWrapper+MockASRProvider+工厂方法) ②§4.3 TTS详细化[0.2.1] — 新增4.3.3 Azure Edge-TTS(免费Neural音质+4种中文声音推荐+SSML支持+EdgeTTSProvider实现) + 4.3.4预合成MP3缓存策略(MD5 Key+24h TTL+CachedTTSProvider装饰器+高频文案列表) + 4.3.5 TTS Client抽象层(Protocol接口+EdgeTTSWrapper+MockTTSProvider+CachedTTSWrapper+工厂方法) + 4.3.6 TTS输出安全PII脱敏(TTSSecurityMiddleware+6种PII正则复用§6.6+审计日志) ③§4.6 Voice Orchestrator[0.2.1新增] — 5步Pipeline架构(ASR→NLU→API→NLG→TTS) + VoiceOrchestrator核心类(VoiceIntent枚举+VoiceResponse数据模型+完整process()方法+降级策略) + API端点POST /api/v1/voice/query + 4级降级行为表 ④§4.7 NLG[0.2.1新增] — Prompt-based NLG策略(非训练模型) + 5个意图Prompt模板(schedule/todo/person/digest/create_todo含输出示例) + NLGGenerator实现(复用Moka AI+模板注册表+输出验证) + 与现有LLM模板关系对比表** |
+| **v2.5** | **2026-06-06** | **DevSquad Review更新 — Insight Engine + DataSourceAdapter集成：①§10 DataSourceAdapter集成[v2.5新增] — 10.1 Adapter接口定义(DataSourceAdapter抽象基类+fetch_new_events/authenticate方法+5个具体适配器ManualInputAdapter/VoiceAdapter/EmailAdapter/CalendarAdapter/WeChatForwardAdapter+统一Event输出) ②§10.2 Email集成Phase1(IMAP/Exchange+OAuth2+一封邮件=一个Event+action_type区分方向) ③§10.3 微信集成约束(个人微信无API/企业微信API可用/手动转发PoC方案+语音最低摩擦策略) ④§10.4 供应链安全(依赖锁定哈希校验+CI/CD漏洞扫描+Adapter五阶段审查流程)** |
+| **v2.6** | **2026-06-06** | **F-55/F-56 依赖性与场景匹配集成：①§11 DependencyAnalyzer集成设计[v2.6新增] — 11.1 与Pipeline Step 8.5集成点(Step8 Promise分析后触发→Step9 Todo持久化前) 11.2 与AssociationDiscoveryEngine数据依赖(Entity关联关系→Todo→Entity→Todo依赖链构建) 11.3 依赖图构建算法(BFS遍历+O(N×E)复杂度+N=Todo数/E=Entity关联数+dependency_score公式+性能考量PoC全量/Phase1增量/Phase2 Neo4j) ②§12 ContextMatcher集成设计[v2.6新增] — 12.1 与Pipeline Step 8.5集成点(与DependencyAnalyzer并行执行) 12.2 Event表查询优化(idx_events_context复合索引user_id+event_type+created_at+查询性能预估) 12.3 与PriorityScorerV2调用链(四维评分公式0.25×urgency+0.35×importance+0.20×dependency+0.20×context+降级策略)** |
 
 ---
 
-*0.2.1 完成于2026-06-05 — Voice Service 详细集成规格*
+*v2.6 完成于2026-06-06 — Insight Engine + DataSourceAdapter + 依赖性/场景匹配 集成规格*

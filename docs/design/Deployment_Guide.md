@@ -1,7 +1,7 @@
 # EventLink 部署指南
 
-> **版本**: 0.2.0（POC阶段）
-> **日期**: 2026-06-04
+> **版本**: 0.3.1（POC阶段 — Insight Engine + 依赖性/场景匹配 部署）
+> **日期**: 2026-06-06
 > **定位**: AI驱动的个人商务关系经营助手 — 先成就关系，再促成合作
 > **参考**: 技术设计 v2.5 §9（部署架构与数据主权）、§8.0.5（监控指标）、§8.0.6（数据库迁移策略）
 > **技术栈**: Python 3.11 / FastAPI / httpx async / Pydantic v2
@@ -1342,6 +1342,390 @@ docker compose logs eventlink > eventlink.log 2>&1
 
 ---
 
+## 12. Insight Engine 部署 [0.3.0新增]
+
+> EventLink从"被动记录"升级为"主动服务"，Insight Engine引入动态优先级评分和隐式反馈收集。本节定义Insight Engine相关的部署配置。
+
+### 12.1 优先级评分定时任务 [0.3.0新增]
+
+PriorityScorer每小时重新计算所有活跃Todo的动态分数。
+
+**PoC阶段**：简单Cron脚本
+
+```bash
+# crontab -e 添加以下条目
+# 每小时整点重新计算动态分数
+0 * * * * cd /path/to/EventLink && python -m eventlink.jobs.recalculate_scores >> /var/log/eventlink/scores.log 2>&1
+```
+
+**recalculate_scores脚本**：
+
+```python
+# eventlink/jobs/recalculate_scores.py
+"""
+定时任务：重新计算所有活跃Todo的dynamic_score
+公式（PoC）：Score = 0.4 × urgency + 0.6 × importance
+"""
+import asyncio
+from datetime import datetime, timezone
+from eventlink.core.database import get_session
+from eventlink.models import Todo
+from eventlink.insight.priority_scorer import PriorityScorer
+from sqlalchemy import select
+
+
+async def recalculate_all_scores():
+    scorer = PriorityScorer()
+    async with get_session() as session:
+        # 查询所有未完成Todo
+        result = await session.execute(
+            select(Todo).where(Todo.status.in_(["pending", "in_progress"]))
+        )
+        todos = result.scalars().all()
+
+        for todo in todos:
+            todo.dynamic_score = await scorer.calculate(todo)
+            todo.score_calculated_at = datetime.now(timezone.utc)
+
+        await session.commit()
+        print(f"[{datetime.now()}] Recalculated scores for {len(todos)} todos")
+
+
+if __name__ == "__main__":
+    asyncio.run(recalculate_all_scores())
+```
+
+**Phase 1**：升级为Celery Beat / APScheduler
+
+| 方案 | 优点 | 缺点 |
+|------|------|------|
+| Celery Beat | 成熟稳定、支持分布式、与Redis集成 | 需额外部署Celery Worker |
+| APScheduler | 轻量、集成在FastAPI进程内 | 不支持分布式、单点故障 |
+
+**推荐**：Phase 1使用APScheduler（单用户场景足够），Phase 2迁移到Celery Beat。
+
+### 12.2 pgcrypto扩展（Phase 1） [0.3.0新增]
+
+concern和capability字段包含敏感商业信息，Phase 1需启用字段级加密。
+
+**安装pgcrypto扩展**：
+
+```sql
+-- 在PostgreSQL中执行
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+```
+
+**验证安装**：
+
+```sql
+-- 验证扩展已安装
+SELECT extname, extversion FROM pg_extension WHERE extname = 'pgcrypto';
+
+-- 测试加密函数
+SELECT encrypt('test_data'::bytea, 'secret_key'::bytea, 'aes');
+SELECT decrypt(encrypt('test_data'::bytea, 'secret_key'::bytea, 'aes'), 'secret_key'::bytea, 'aes');
+```
+
+**Alembic迁移脚本**：
+
+```python
+# alembic/versions/006_concern_capability_encryption.py
+"""Encrypt concern and capability fields
+
+Revision ID: 006
+Revises: 005
+Create Date: 2026-06-06
+"""
+from alembic import op
+import sqlalchemy as sa
+
+
+def upgrade() -> None:
+    # 1. 启用pgcrypto扩展
+    op.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
+
+    # 2. 添加加密列（临时）
+    op.add_column("entities", sa.Column("concerns_encrypted", sa.LargeBinary, nullable=True))
+    op.add_column("entities", sa.Column("capabilities_encrypted", sa.LargeBinary, nullable=True))
+
+    # 3. 迁移数据（使用应用层加密，避免SQL中暴露密钥）
+    # 注意：实际迁移应通过应用脚本完成，此处仅示意
+
+    # 4. 验证数据完整性后，删除明文列（下个主版本）
+
+
+def downgrade() -> None:
+    op.drop_column("entities", "capabilities_encrypted")
+    op.drop_column("entities", "concerns_encrypted")
+    # pgcrypto扩展保留（其他功能可能依赖）
+```
+
+**加密策略**：
+
+| 字段 | 加密方式 | 密钥来源 |
+|------|---------|---------|
+| concerns | AES-256-GCM | 环境变量 `ENCRYPTION_KEY` |
+| capabilities | AES-256-GCM | 环境变量 `ENCRYPTION_KEY` |
+
+> **安全注意**：`ENCRYPTION_KEY` 不得硬编码或提交到代码仓库，通过环境变量或KMS注入。
+
+### 12.3 Adapter同步任务（Phase 1） [0.3.0新增]
+
+DataSourceAdapter需要定时同步外部数据源，以下为Phase 1的同步任务配置。
+
+| 数据源 | 同步频率 | 实现方式 | 速率限制 |
+|--------|---------|---------|---------|
+| Email | 每15分钟 | IMAP IDLE / 轮询 | 10封/次 |
+| Calendar | 每30分钟 | CalDAV / Exchange API | 50事件/次 |
+
+**后台Worker配置**：
+
+```python
+# eventlink/jobs/adapter_sync.py
+"""Adapter同步后台任务"""
+import asyncio
+from datetime import datetime, timezone
+from eventlink.adapters import EmailAdapter, CalendarAdapter
+from eventlink.core.pipeline import process_event
+
+
+async def sync_email():
+    adapter = EmailAdapter()
+    if not await adapter.authenticate():
+        print(f"[{datetime.now()}] Email auth failed, skipping sync")
+        return
+
+    events = await adapter.fetch_new_events()
+    for event in events:
+        await process_event(event)
+    print(f"[{datetime.now()}] Email sync: {len(events)} new events")
+
+
+async def sync_calendar():
+    adapter = CalendarAdapter()
+    if not await adapter.authenticate():
+        print(f"[datetime.now()}] Calendar auth failed, skipping sync")
+        return
+
+    events = await adapter.fetch_new_events()
+    for event in events:
+        await process_event(event)
+    print(f"[{datetime.now()}] Calendar sync: {len(events)} new events")
+```
+
+**APScheduler集成（Phase 1推荐）**：
+
+```python
+# eventlink/jobs/scheduler.py
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+scheduler = AsyncIOScheduler()
+
+# 每15分钟同步邮件
+scheduler.add_job(sync_email, "interval", minutes=15, id="email_sync")
+
+# 每30分钟同步日历
+scheduler.add_job(sync_calendar, "interval", minutes=30, id="calendar_sync")
+```
+
+**速率限制**：每个Adapter同步任务内置速率限制，防止短时间内大量数据涌入导致Pipeline过载。
+
+### 12.4 监控指标 [0.3.0新增]
+
+Insight Engine和DataSourceAdapter新增以下Prometheus监控指标：
+
+| 指标名 | 类型 | Labels | 说明 | 告警阈值 |
+|--------|------|--------|------|---------|
+| `eventlink_priority_score_calculations_total` | counter | status (success/error) | 优先级分数计算次数 | error率 > 5% |
+| `eventlink_implicit_feedback_adjustments_total` | counter | feedback_type (completed_order/less_remind/mark_important) | 隐式反馈调整次数 | 无阈值，观察趋势 |
+| `eventlink_adapter_sync_duration_seconds` | histogram | adapter (email/calendar/wechat) | Adapter同步耗时 | P95 > 30s |
+| `eventlink_adapter_sync_errors_total` | counter | adapter, error_type (auth/network/parse/rate_limit) | Adapter同步错误计数 | 任意 > 5/min |
+
+**Prometheus查询示例**：
+
+```promql
+# 优先级分数计算成功率
+sum(rate(eventlink_priority_score_calculations_total{status="success"}[5m]))
+/
+sum(rate(eventlink_priority_score_calculations_total[5m]))
+
+# Adapter同步P95延迟
+histogram_quantile(0.95, sum(rate(eventlink_adapter_sync_duration_seconds_bucket[5m])) by (le, adapter))
+
+# Adapter错误速率（按类型分组）
+sum(rate(eventlink_adapter_sync_errors_total[5m])) by (adapter, error_type)
+
+# 隐式反馈调整趋势
+sum(rate(eventlink_implicit_feedback_adjustments_total[1h])) by (feedback_type)
+```
+
+**Grafana面板建议**：
+
+| 面板 | 图表类型 | 查询 | 说明 |
+|------|----------|------|------|
+| 优先级计算成功率 | Gauge | success/total比率 | 目标>95% |
+| Adapter同步延迟 | Time Series | P95 by adapter | 各数据源同步性能 |
+| Adapter错误趋势 | Stacked Area | errors by adapter+type | 错误分类趋势 |
+| 隐式反馈分布 | Pie Chart | adjustments by type | 反馈类型占比 |
+
+### 12.5 DependencyAnalyzer 部署 [0.3.1新增]
+
+F-55 依赖性全图谱路径分析。DependencyAnalyzer为纯Python算法模块，无额外部署依赖。
+
+**部署依赖**：
+
+| 依赖项 | 说明 |
+|--------|------|
+| Python标准库 | `collections.deque`（BFS遍历）、`dataclasses` |
+| SQL查询 | 查询`todos`和`associations`表，复用现有数据库连接 |
+| 外部服务 | 无（不依赖Redis/外部API/LLM调用） |
+
+**关键特性**：
+- **纯Python算法**：依赖图构建和dependency_score计算均在应用进程内完成
+- **SQL查询**：通过现有SQLAlchemy会话查询Todo和Entity关联数据
+- **无额外容器**：不需要新增Docker服务或Sidecar
+- **无额外cron**：在Pipeline Step 8.5内同步执行，不需要独立定时任务
+
+**性能预估**（PoC单用户场景）：
+
+| 指标 | 预估值 | 说明 |
+|------|--------|------|
+| 依赖图构建耗时 | < 500ms | N=200 Todo, E=100 Entity关联 |
+| 内存增量 | < 10MB | 依赖图内存占用 |
+| 数据库查询 | 2~3次 | 查询活跃Todo + Entity关联 |
+
+### 12.6 ContextMatcher 部署 [0.3.1新增]
+
+F-56 场景匹配Event表驱动。ContextMatcher需要Event表索引优化以保障查询性能。
+
+**部署依赖**：
+
+| 依赖项 | 说明 |
+|--------|------|
+| Python标准库 | `datetime`（时间计算）、`dataclasses` |
+| SQL查询 | 查询`events`表（meeting类型日程），复用现有数据库连接 |
+| Event表索引 | **需要新增复合索引**（见下方） |
+| 外部服务 | 无（不依赖Redis/外部API/LLM调用） |
+
+**Event表索引优化**：
+
+ContextMatcher高频查询Event表获取近期日程，需要创建复合索引：
+
+```sql
+-- PoC阶段（SQLite）
+CREATE INDEX IF NOT EXISTS idx_events_context
+ON events(user_id, event_type, created_at);
+
+-- Phase1阶段（PostgreSQL）
+CREATE INDEX IF NOT EXISTS idx_events_context
+ON events(user_id, event_type, created_at);
+```
+
+**Alembic迁移脚本**：
+
+```python
+# alembic/versions/007_events_context_index.py
+"""Add context matching index on events table
+
+Revision ID: 007
+Revises: 006
+Create Date: 2026-06-06
+"""
+from alembic import op
+
+
+def upgrade() -> None:
+    op.create_index(
+        "idx_events_context",
+        "events",
+        ["user_id", "event_type", "created_at"],
+    )
+
+
+def downgrade() -> None:
+    op.drop_index("idx_events_context", table_name="events")
+```
+
+**索引效果预估**：
+
+| 数据规模 | 无索引 | 有索引 | 说明 |
+|---------|--------|--------|------|
+| 1000条Event | ~50ms | <5ms | PoC典型规模 |
+| 10000条Event | ~500ms | <10ms | Phase1规模 |
+
+**关键特性**：
+- **纯Python算法**：场景匹配计算在应用进程内完成
+- **无额外容器**：不需要新增Docker服务
+- **无额外cron**：在Pipeline Step 8.5内与DependencyAnalyzer并行执行
+
+### 12.7 PriorityScorerV2 定时评分任务 [0.3.1新增]
+
+PriorityScorerV2整合四维评分（紧急性/重要性/依赖性/场景匹配），定时任务配置与PoC现有方案相同。
+
+**定时任务配置**：
+
+| 配置项 | 值 | 说明 |
+|--------|-----|------|
+| 执行频率 | 每小时整点 | 与PoC PriorityScorer相同 |
+| 执行方式 | cron脚本 | 复用现有 `recalculate_scores.py`，升级为PriorityScorerV2 |
+| 无额外cron | ✅ | 不需要新增独立定时任务 |
+
+**recalculate_scores脚本升级**：
+
+```python
+# eventlink/jobs/recalculate_scores.py
+"""
+定时任务：重新计算所有活跃Todo的dynamic_score
+公式（PriorityScorerV2）：
+  Score = 0.25×urgency + 0.35×importance + 0.20×dependency + 0.20×context
+降级：当DependencyAnalyzer/ContextMatcher不可用时，回退到PoC公式
+  Score = 0.4×urgency + 0.6×importance
+"""
+import asyncio
+from datetime import datetime, timezone
+from eventlink.core.database import get_session
+from eventlink.models import Todo
+from eventlink.insight.priority_scorer_v2 import PriorityScorerV2
+from eventlink.insight.dependency_analyzer import DependencyAnalyzer
+from eventlink.insight.context_matcher import ContextMatcher
+from eventlink.core.association_engine import AssociationDiscoveryEngine
+from sqlalchemy import select
+
+
+async def recalculate_all_scores():
+    # 初始化依赖组件
+    association_engine = AssociationDiscoveryEngine()
+    dependency_analyzer = DependencyAnalyzer(association_engine)
+    context_matcher = ContextMatcher()
+
+    scorer = PriorityScorerV2(
+        dependency_analyzer=dependency_analyzer,
+        context_matcher=context_matcher,
+    )
+
+    async with get_session() as session:
+        # 查询所有未完成Todo
+        result = await session.execute(
+            select(Todo).where(Todo.status.in_(["pending", "in_progress"]))
+        )
+        todos = result.scalars().all()
+
+        for todo in todos:
+            todo.dynamic_score = await scorer.calculate(todo)
+            todo.score_calculated_at = datetime.now(timezone.utc)
+
+        await session.commit()
+        print(f"[{datetime.now()}] Recalculated scores for {len(todos)} todos (V2)")
+
+
+if __name__ == "__main__":
+    asyncio.run(recalculate_all_scores())
+```
+
+**降级行为**：当DependencyAnalyzer或ContextMatcher初始化失败时，PriorityScorerV2自动回退到PoC公式（0.4×urgency + 0.6×importance），确保评分不中断。
+
+---
+
 ## 版本历史
 
 | 版本 | 日期 | 变更内容 | 作者 |
@@ -1349,10 +1733,12 @@ docker compose logs eventlink > eventlink.log 2>&1
 | v1.0 | 2026-06-03 | 初始版本，包含8章节完整部署指南 | 架构师 |
 | **0.2.0** | **2026-06-04** | **POC阶段重大更新：①D8-1 Dockerfile多阶段构建详细说明(builder→runtime非root) ②D8-2 新增GitHub Actions CI/CD完整章节(trigger/strategy/services/steps/lint/typecheck/test/coverage) ③D8-3 确认docker-compose.poc.yml与实际文件一致(含PG/Redis预定义) ④D8-4 新增6项P0 Prometheus监控指标(input_scope延迟/Todo分布/查询延迟/阶段变更频率/脱敏覆盖率/400率) ⑤D8-5 新增Alembic数据库迁移章节(初始化+autogenerate+铁律+SQLite→PG升级路径) ⑥D8-6 新增自建小程序Taro备选方案(触发条件+构建流程+CI上传+API对接) ⑦D8-7 版本号改为0.2.0+参考更新为技术设计v2.5 §9** | **DevSquad** |
 | **0.2.0+F-50** | **2026-06-05** | **F-50语音助手部署内容：①§2.1 新增edge-tts Python依赖+ffmpeg/sox系统依赖 ②§2.3 Dockerfile Runtime阶段追加edge-tts安装+TTS缓存目录创建 ③§2.4 docker-compose新增TTS缓存volume mount+3项Voice环境变量(TTS_VOICE_NAME/TTS_RATE/VOICE_ENABLED) ④§5.1.1 新增4项Voice专用Prometheus指标(延迟/置信度/ASR错误/TTS缓存命中率)+查询示例+Grafana面板建议 ⑤§8.5 新增Voice Service运维手册(排查/调优参数/安全检查清单) ⑥§9.1 环境变量表追加6项Voice变量** | **DevSquad** |
+| **0.3.0** | **2026-06-06** | **DevSquad Review更新 — Insight Engine部署：①§12.1 优先级评分定时任务(PoC: cron每小时执行recalculate_scores脚本 + Phase1: Celery Beat/APScheduler方案对比+推荐APScheduler) ②§12.2 pgcrypto扩展Phase1(CREATE EXTENSION安装+验证+Alembic迁移脚本006+AES-256-GCM加密策略+ENCRYPTION_KEY安全注入) ③§12.3 Adapter同步任务Phase1(Email每15分钟/Calendar每30分钟+后台Worker配置+APScheduler集成+速率限制) ④§12.4 监控指标4项(eventlink_priority_score_calculations_total/eventlink_implicit_feedback_adjustments_total/eventlink_adapter_sync_duration_seconds/eventlink_adapter_sync_errors_total+Prometheus查询示例+Grafana面板建议)** |
+| **0.3.1** | **2026-06-06** | **F-55/F-56 依赖性与场景匹配部署：①§12.5 DependencyAnalyzer部署[0.3.1新增](纯Python算法+SQL查询+无额外容器/无额外cron/无外部依赖+性能预估<500ms) ②§12.6 ContextMatcher部署[0.3.1新增](Event表索引优化CREATE INDEX idx_events_context ON events(user_id,event_type,created_at)+Alembic迁移脚本007+索引效果预估+纯Python算法无额外容器) ③§12.7 PriorityScorerV2定时评分任务[0.3.1新增](复用现有cron每小时整点+recalculate_scores脚本升级为V2四维评分+降级策略回退PoC公式)** | **DevSquad** |
 
 ---
 
-> **文档状态**: ✅ 0.2.0 POC阶段版本完成
+> **文档状态**: ✅ 0.3.1 POC阶段版本完成（Insight Engine + 依赖性/场景匹配 部署）
 > **下次审查**: Phase1开发启动前 / CI/CD CD部分上线前
 > **维护负责人**: DevSquad架构师
 > **适用阶段**: PoC（当前）→ Phase1（下一里程碑）
