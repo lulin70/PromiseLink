@@ -255,6 +255,62 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
             entities_persisted=len(entities),
         )
 
+        # ── Step 5.5: Entity embedding for semantic search (F-57) ──
+        _t55 = time.monotonic()
+        try:
+            from eventlink.services.embedding_provider import EmbeddingProvider
+            from eventlink.services.semantic_search import SemanticSearchEngine
+
+            embedder = EmbeddingProvider()
+            search_engine = SemanticSearchEngine(provider=embedder, db_path="test.db")
+
+            for entity in entities:
+                try:
+                    # Combine concern + capability + basic info for embedding
+                    props = entity.properties or {}
+                    basic = props.get("basic", {})
+                    concern = props.get("concern", [])
+                    capability = props.get("capability", [])
+
+                    text_parts = []
+                    if entity.name:
+                        text_parts.append(f"姓名: {entity.name}")
+                    if basic.get("company"):
+                        text_parts.append(f"公司: {basic['company']}")
+                    if basic.get("industry"):
+                        text_parts.append(f"行业: {basic['industry']}")
+                    if basic.get("title"):
+                        text_parts.append(f"职位: {basic['title']}")
+                    for c in concern:
+                        if isinstance(c, dict) and c.get("category"):
+                            text_parts.append(f"关注: {c['category']} - {c.get('detail', '')}")
+                    for c in capability:
+                        if isinstance(c, dict) and c.get("category"):
+                            text_parts.append(f"能力: {c['category']} - {c.get('detail', '')}")
+
+                    if text_parts:
+                        combined_text = " | ".join(text_parts)
+                        await search_engine.index_entity(
+                            entity_id=str(entity.id),
+                            text=combined_text,
+                            user_id=str(entity.user_id),
+                        )
+                except Exception as embed_err:
+                    logger.warning("pipeline_step5_5_entity_embed_failed",
+                        entity_id=str(entity.id), error=str(embed_err))
+
+            # Also index the event
+            if event.raw_text:
+                await search_engine.index_event(
+                    event_id=str(event.id),
+                    text=event.raw_text[:500],  # Truncate for embedding
+                    user_id=str(event.user_id),
+                )
+        except Exception as embed_init_err:
+            logger.warning("pipeline_step5_5_init_failed", error=str(embed_init_err))
+
+        result.step_timings["step5_5_embedding"] = time.monotonic() - _t55
+
         # Step 7: Todo generation (LLM call + persist + commit)
         todos: list[Todo] = []
         async with AsyncSessionLocal() as session:

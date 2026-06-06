@@ -1,10 +1,10 @@
 # EventLink 技术设计文档
 
-> **版本**: v2.7
+> **版本**: v2.8
 > **日期**: 2026-06-06
-> **对应PRD**: v4.6
+> **对应PRD**: v4.7
 > **架构师**: CarryMem团队
-> **变更说明**: v2.7: Phase 1动态优先级四维演进（依赖性全图谱路径分析+场景匹配Event表驱动）
+> **变更说明**: v2.8: 向量化语义能力设计（EmbeddingProvider+SemanticSearchEngine+sqlite-vec+关联发现增强）
 
 ---
 
@@ -1977,6 +1977,179 @@ EmailAdapter → Event(raw_text=邮件全文, source="email:imap:msg_123")
 
 PoC阶段聚焦降低输入摩擦，语音输入（F-50）是最低摩擦方式。
 
+### 4.12 向量化语义引擎设计（v2.8新增）
+
+> **设计背景**：对应PRD v4.7 §1.7.7向量化语义能力，实现F-57语义搜索和F-58关联发现增强。结构化匹配无法发现语义相似但字面不同的关联，向量化能力让系统理解"意思相近"而非仅"字面相同"。
+
+#### 4.12.1 EmbeddingProvider
+
+通过Moka AI API调用text-embedding-3-small模型，完全兼容OpenAI SDK，只需替换base_url和api_key。
+
+- 批量embedding接口（最多2048条/批）
+- 缓存策略：相同文本不重复调用API
+
+```python
+from openai import AsyncOpenAI
+
+class EmbeddingProvider:
+    def __init__(self):
+        self.client = AsyncOpenAI(
+            base_url="https://api.moka-ai.com/v1",
+            api_key=settings.moka_api_key,
+        )
+        self.model = "text-embedding-3-small"
+        self._cache = {}  # text -> embedding
+
+    async def embed(self, text: str) -> list[float]:
+        if text in self._cache:
+            return self._cache[text]
+        response = await self.client.embeddings.create(
+            model=self.model, input=text
+        )
+        embedding = response.data[0].embedding
+        self._cache[text] = embedding
+        return embedding
+
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        # Check cache first
+        uncached = [(i, t) for i, t in enumerate(texts) if t not in self._cache]
+        if uncached:
+            response = await self.client.embeddings.create(
+                model=self.model, input=[t for _, t in uncached]
+            )
+            for (orig_idx, text), data in zip(uncached, response.data):
+                self._cache[text] = data.embedding
+        return [self._cache[t] for t in texts]
+```
+
+#### 4.12.2 SemanticSearchEngine
+
+语义搜索引擎，支持自然语言查询Entity和Event。
+
+- 语义搜索接口：`search(query, user_id, top_k)` → `list[SearchResult]`
+- 搜索范围：Entity + Event
+- 相似度计算：余弦相似度（sqlite-vec内置）
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class SearchResult:
+    target_type: str   # "entity" | "event"
+    target_id: str
+    score: float       # cosine similarity
+    metadata: dict     # 实体/事件的摘要信息
+
+class SemanticSearchEngine:
+    def __init__(self, provider: EmbeddingProvider, db_path: str):
+        self.provider = provider
+        self.db_path = db_path
+
+    async def search(self, query: str, user_id: str, top_k: int = 10) -> list[SearchResult]:
+        query_embedding = await self.provider.embed(query)
+        # sqlite-vec vector search
+        results = await self._vector_search(query_embedding, user_id, top_k)
+        return results
+
+    async def index_entity(self, entity_id: str, text: str, user_id: str):
+        embedding = await self.provider.embed(text)
+        await self._store_embedding("entity", entity_id, embedding, user_id)
+
+    async def index_event(self, event_id: str, text: str, user_id: str):
+        embedding = await self.provider.embed(text)
+        await self._store_embedding("event", event_id, embedding, user_id)
+```
+
+#### 4.12.3 sqlite-vec存储设计
+
+与PoC部署模型一致，零额外依赖。Phase 2迁移至PostgreSQL时切换为pgvector。
+
+**向量表（常规表）**：
+
+```sql
+CREATE TABLE vector_embeddings (
+    id TEXT PRIMARY KEY,
+    target_type TEXT NOT NULL,  -- "entity" | "event"
+    target_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    embedding BLOB NOT NULL,    -- 768维float32序列化
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX idx_vector_user_type ON vector_embeddings(user_id, target_type);
+```
+
+**sqlite-vec虚拟表（向量检索）**：
+
+```sql
+CREATE VIRTUAL TABLE vec_entities USING vec0(
+    embedding float[768],
+    entity_id TEXT
+);
+```
+
+**迁移路径**：Phase 2 → pgvector时，BLOB → `vector(768)` 列类型，SQL查询语法从sqlite-vec函数替换为pgvector的 `<=>` 操作符。
+
+#### 4.12.4 关联发现增强（F-58）
+
+在`AssociationDiscoveryEngine._discover_supply_demand`中增加语义相似度，补充结构化匹配的不足。
+
+- 当结构化匹配得分为0时，用embedding余弦相似度补充
+- 语义匹配阈值：`cosine_similarity > 0.7` 才计入
+- 混合得分公式：`final_score = 0.7 × structured_score + 0.3 × semantic_score`
+
+```python
+# 在 AssociationDiscoveryEngine 中增强
+async def _discover_supply_demand(self, entity_a, entity_b, user_id):
+    # 1. 结构化匹配（已有逻辑）
+    structured_score = self._calc_structured_match(entity_a, entity_b)
+
+    # 2. 语义相似度补充
+    semantic_score = 0.0
+    if structured_score < 0.3:  # 结构化匹配不足时启用语义补充
+        text_a = self._build_entity_text(entity_a)
+        text_b = self._build_entity_text(entity_b)
+        emb_a = await self.embedding_provider.embed(text_a)
+        emb_b = await self.embedding_provider.embed(text_b)
+        cosine_sim = self._cosine_similarity(emb_a, emb_b)
+        if cosine_sim > 0.7:  # 语义匹配阈值
+            semantic_score = cosine_sim
+
+    # 3. 混合得分
+    final_score = 0.7 * structured_score + 0.3 * semantic_score
+    return final_score
+```
+
+#### 4.12.5 Pipeline集成点
+
+在现有Pipeline中嵌入向量化处理：
+
+**Step 5.5（新增）：Entity extraction后自动生成embedding并存储**
+
+```
+Step 5: Entity extraction
+    ↓
+Step 5.5 (新增): Embedding generation
+    - 对每个提取的Entity，组合concern+capability+basic信息
+    - 调用EmbeddingProvider.embed()生成向量
+    - 存储到vector_embeddings表和vec_entities虚拟表
+    ↓
+Step 6: Association discovery
+```
+
+**Step 11.5（新增）：Association discovery中使用语义相似度增强**
+
+```
+Step 11: Association discovery
+    ↓
+Step 11.5 (新增): Semantic similarity enhancement
+    - 在_discover_supply_demand中调用语义相似度
+    - 结构化匹配不足时启用embedding余弦相似度补充
+    - 混合得分：0.7 × structured + 0.3 × semantic
+    ↓
+Step 12: Todo generation
+```
+
 ### 5.1 协议接口
 
 ```python
@@ -3709,6 +3882,8 @@ class SemanticSearchEngine:
 | 版本 | 日期 | 变更内容 | 作者 |
 |------|------|----------|------|
 | v2.6 | 2026-06-06 | 新增洞察引擎层+数据接入层架构：①§2.1架构图新增Insight Engine服务②§2.2服务拆分表新增Insight Engine行③§3.1 todos表DDL新增completed_rank/dynamic_score/score_calculated_at字段+索引④§4.10新增洞察引擎设计（动态评分器PriorityScorer+隐式反馈收集器ImplicitFeedbackCollector+Todo模型扩展+API变更）⑤§4.11新增数据接入层设计（DataSourceAdapter接口+邮件场景数据流+微信生态约束） | CarryMem团队 |
+| v2.7 | 2026-06-06 | Phase 1动态优先级四维演进：①§4.10.1a新增Phase 1四维评分器详细设计（依赖性全图谱路径分析+场景匹配Event表驱动）②依赖性算法：有向依赖图+阻塞链检测+3跳间接依赖+dependency_score=Σ(1/depth)×blocked_weight③场景匹配算法：未来24h meeting/call扫描+Entity匹配+context_score=max(0,1-hours/24)④权重配置Phase1(0.3/0.35/0.2/0.15) | CarryMem团队 |
+| v2.8 | 2026-06-06 | 向量化语义能力设计（对应PRD v4.7）：①§4.12新增向量化语义引擎设计（5子节）②§4.12.1 EmbeddingProvider（Moka AI API+text-embedding-3-small+768维+缓存策略+批量接口）③§4.12.2 SemanticSearchEngine（语义搜索接口+SearchResult+余弦相似度）④§4.12.3 sqlite-vec存储设计（vector_embeddings表+vec_entities虚拟表+Phase2迁移pgvector路径）⑤§4.12.4 关联发现增强F-58（混合得分0.7×structured+0.3×semantic+阈值0.7）⑥§4.12.5 Pipeline集成点（Step5.5 Entity embedding+Step11.5语义相似度增强） | CarryMem团队 |
 | v1.0 | 2026-06-02 | 初始版本：4表数据模型+5步引擎+CarryMem解耦+YAML配置化+API设计 | CarryMem团队 |
 | v1.1 | 2026-06-02 | 小程序整合：§2.1架构图+§2.2 Mini/Notify服务+§2.3前端架构+H5通信协议+TTS服务 | CarryMem团队 |
 | v1.2 | 2026-06-02 | 7角色审核P0修复：①临时授权码模式替代明文token②语音录入/TTS走小程序原生③TTS播报模板+隐私分级④微信推送分级⑤PG列索引+CarryMem协议补充+JWT认证+资源预估 | CarryMem团队 |
