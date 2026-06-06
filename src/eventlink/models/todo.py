@@ -91,14 +91,10 @@ class Todo(Base):
         UUID(as_uuid=True) if not IS_SQLITE else String(36),
         nullable=True,
     )
-    
-    # F-52: Implicit feedback learning (v4.5)
-    completed_rank: Mapped[int | None] = mapped_column(nullable=True)
-    dynamic_score: Mapped[float | None] = mapped_column(nullable=True)
 
     # Feedback
     feedback: Mapped[str | None] = mapped_column(String(50))  # useful, not_useful, or custom
-    
+
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(nullable=False, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
