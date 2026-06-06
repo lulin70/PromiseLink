@@ -1,11 +1,10 @@
 # EventLink 技术设计文档
 
-> **版本**: v2.6
+> **版本**: v2.7
 > **日期**: 2026-06-06
-> **对应PRD**: v4.5
+> **对应PRD**: v4.6
 > **架构师**: CarryMem团队
-> **审核**: 文档一致性Bugfix：3项修复（BLK-3枚举值/F-49路径对齐/乐观锁完善）（v2.5迭代）
-> **变更说明**: v2.6: 新增洞察引擎层(动态评分器+隐式反馈)+数据接入层架构+concern/capability提取强化
+> **变更说明**: v2.7: Phase 1动态优先级四维演进（依赖性全图谱路径分析+场景匹配Event表驱动）
 
 ---
 
@@ -1594,12 +1593,247 @@ class PriorityScorer:
 
 Phase 1扩展维度：
 
-| 维度 | 算法 | 数据来源 |
-|------|------|---------|
-| 紧急性 | 截止时间指数衰减 | Todo.due_date |
-| 重要性 | 关系权重+业务价值标签 | Brief.score + 用户标记 |
-| 依赖性 | 图谱路径分析（阻塞检测） | Association图谱 |
-| 场景匹配 | 日历事件关联度 | Calendar API |
+| 维度 | 算法 | 数据来源 | Phase |
+|------|------|---------|-------|
+| 紧急性 | 截止时间指数衰减 | Todo.due_date | PoC |
+| 重要性 | 关系权重+业务价值标签 | Brief.score + 用户标记 | PoC |
+| 依赖性 | 全图谱路径分析（阻塞检测+间接依赖） | Association图谱+Todo promise链 | Phase 1 |
+| 场景匹配 | Event表驱动（未来24h会议关联） | Event(meeting/call)+Entity | Phase 1 |
+
+#### 4.10.1a Phase 1 四维评分器详细设计（v2.7新增）
+
+权重配置演进：
+```python
+# PoC (v4.5)
+WEIGHTS_POC = {"urgency": 0.4, "importance": 0.6, "dependency": 0.0, "context": 0.0}
+
+# Phase 1 (v4.6)
+WEIGHTS_PHASE1 = {"urgency": 0.3, "importance": 0.35, "dependency": 0.2, "context": 0.15}
+```
+
+**维度3：依赖性（dependency）— 全图谱路径分析**
+
+```python
+class DependencyAnalyzer:
+    """
+    依赖性分析器 — Phase 1新增
+    从Association图谱中提取承诺依赖链，检测阻塞关系
+    """
+
+    MAX_DEPTH = 3  # 最大依赖链深度
+
+    async def compute_dependency_score(self, todo: Todo, session) -> float:
+        """计算Todo的依赖性得分 (0.0~1.0)"""
+        if todo.todo_type not in ("promise", "help"):
+            return 0.0  # 只有承诺和帮助类Todo有依赖性
+
+        # Step 1: 构建承诺依赖图
+        dep_graph = await self._build_promise_dependency_graph(todo.user_id, session)
+
+        # Step 2: 检测该Todo的阻塞链
+        blocking_chains = self._find_blocking_chains(todo, dep_graph)
+
+        if not blocking_chains:
+            return 0.0
+
+        # Step 3: 计算依赖性得分
+        score = 0.0
+        for chain in blocking_chains:
+            depth = len(chain)
+            blocked_count = self._count_blocked_todos(chain[-1], dep_graph)
+            score += (1.0 / depth) * min(1.0, blocked_count * 0.3)
+
+        return min(1.0, score)
+
+    async def _build_promise_dependency_graph(self, user_id: str, session) -> dict:
+        """构建承诺依赖图：有向图，边表示"X的完成是Y的前置条件"
+
+        节点: Todo ID
+        边: Todo A → Todo B 表示 "A完成后B才能推进"
+        """
+        # 查询所有pending的promise/help类型Todo
+        result = await session.execute(
+            select(Todo).where(
+                Todo.user_id == user_id,
+                Todo.status == "pending",
+                Todo.todo_type.in_(["promise", "help"]),
+            )
+        )
+        todos = result.scalars().all()
+
+        # 构建依赖边：如果两个Todo关联同一个Entity，
+        # 且一个是my_promise，另一个是their_promise，
+        # 则my_promise是their_promise的前置条件
+        graph = {}  # {todo_id: [dependent_todo_ids]}
+        entity_todos = {}  # {entity_id: [todos]}
+
+        for t in todos:
+            if t.related_entity_id:
+                entity_todos.setdefault(str(t.related_entity_id), []).append(t)
+
+        for entity_id, entity_todo_list in entity_todos.items():
+            my_promises = [t for t in entity_todo_list
+                          if t.action_type == "my_promise"]
+            their_promises = [t for t in entity_todo_list
+                             if t.action_type == "their_promise"]
+
+            # 我的承诺是对方承诺的前置条件
+            for mp in my_promises:
+                for tp in their_promises:
+                    graph.setdefault(str(mp.id), []).append(str(tp.id))
+
+        return graph
+
+    def _find_blocking_chains(self, todo: Todo, graph: dict) -> list[list[str]]:
+        """BFS查找从该Todo出发的阻塞链"""
+        chains = []
+        todo_id = str(todo.id)
+
+        # 如果该Todo被其他Todo依赖，说明有人在等
+        visited = set()
+        queue = [[todo_id]]
+
+        while queue:
+            chain = queue.pop(0)
+            current = chain[-1]
+
+            if len(chain) > self.MAX_DEPTH:
+                continue
+
+            dependents = graph.get(current, [])
+            for dep_id in dependents:
+                if dep_id not in visited:
+                    visited.add(dep_id)
+                    new_chain = chain + [dep_id]
+                    chains.append(new_chain)
+                    queue.append(new_chain)
+
+        return chains
+
+    def _count_blocked_todos(self, todo_id: str, graph: dict) -> int:
+        """计算被该Todo阻塞的Todo数量"""
+        count = 0
+        visited = set()
+        queue = [todo_id]
+
+        while queue:
+            current = queue.pop(0)
+            for dep_id in graph.get(current, []):
+                if dep_id not in visited:
+                    visited.add(dep_id)
+                    count += 1
+                    queue.append(dep_id)
+
+        return count
+```
+
+**维度4：场景匹配（context_match）— Event表驱动**
+
+```python
+class ContextMatcher:
+    """
+    场景匹配器 — Phase 1新增
+    基于Event表中的即将到来的会议/通话，临时提升相关Todo优先级
+    """
+
+    CONTEXT_WINDOW_HOURS = 24  # 场景匹配窗口：未来24小时
+
+    async def compute_context_score(self, todo: Todo, session) -> float:
+        """计算Todo的场景匹配得分 (0.0~1.0)"""
+        if not todo.related_entity_id:
+            return 0.0  # 无关联Entity的Todo不参与场景匹配
+
+        # Step 1: 查找未来24h内的meeting/call事件
+        now = datetime.now(timezone.utc)
+        window_end = now + timedelta(hours=self.CONTEXT_WINDOW_HOURS)
+
+        result = await session.execute(
+            select(Event).where(
+                Event.user_id == todo.user_id,
+                Event.event_type.in_(["meeting", "call"]),
+                Event.status == "completed",
+                Event.created_at >= now,  # 近期创建的事件
+            )
+        )
+        upcoming_events = result.scalars().all()
+
+        if not upcoming_events:
+            return 0.0
+
+        # Step 2: 查找这些事件关联的Entity
+        event_ids = [str(e.id) for e in upcoming_events]
+        result = await session.execute(
+            select(Entity).where(
+                Entity.source_event_id.in_(event_ids),
+            )
+        )
+        upcoming_entities = result.scalars().all()
+        upcoming_entity_ids = {str(e.id) for e in upcoming_entities}
+
+        # Step 3: 检查Todo关联的Entity是否在即将见面列表中
+        if str(todo.related_entity_id) not in upcoming_entity_ids:
+            return 0.0
+
+        # Step 4: 计算场景匹配得分
+        # 找到最近的匹配事件时间
+        min_hours = self.CONTEXT_WINDOW_HOURS
+        for event in upcoming_events:
+            # 用事件关联的Entity匹配
+            entity_ids_for_event = [
+                str(e.id) for e in upcoming_entities
+                if str(e.source_event_id) == str(event.id)
+            ]
+            if str(todo.related_entity_id) in entity_ids_for_event:
+                hours_until = max(0, (event.created_at - now).total_seconds() / 3600)
+                min_hours = min(min_hours, hours_until)
+
+        # 线性衰减：越近得分越高
+        context_score = max(0.0, 1.0 - min_hours / self.CONTEXT_WINDOW_HOURS)
+        return round(context_score, 4)
+```
+
+**四维评分器整合**
+
+```python
+class PriorityScorerV2(PriorityScorer):
+    """Phase 1四维评分器 — 继承PoC二维评分器，扩展依赖性和场景匹配"""
+
+    WEIGHTS = {"urgency": 0.3, "importance": 0.35, "dependency": 0.2, "context": 0.15}
+
+    def __init__(self):
+        super().__init__()
+        self.dependency_analyzer = DependencyAnalyzer()
+        self.context_matcher = ContextMatcher()
+
+    async def score_with_context(
+        self, todo: Todo, session, brief=None
+    ) -> PriorityScore:
+        """四维评分（需要session用于图谱查询）"""
+        urgency = self._calc_urgency(todo.due_date, datetime.now(timezone.utc))
+        importance = self._calc_importance(todo.todo_type)
+        dependency = await self.dependency_analyzer.compute_dependency_score(todo, session)
+        context = await self.context_matcher.compute_context_score(todo, session)
+
+        score = (
+            self.WEIGHTS["urgency"] * urgency
+            + self.WEIGHTS["importance"] * importance
+            + self.WEIGHTS["dependency"] * dependency
+            + self.WEIGHTS["context"] * context
+        )
+
+        return PriorityScore(
+            score=round(min(1.0, max(0.0, score)), 4),
+            urgency=round(urgency, 4),
+            importance=round(importance, 4),
+            breakdown={
+                "urgency_raw": urgency,
+                "importance_raw": importance,
+                "dependency_raw": dependency,
+                "context_raw": context,
+                "weights": self.WEIGHTS,
+            },
+        )
+```
 
 #### 4.10.2 隐式反馈收集器（ImplicitFeedbackCollector）
 
