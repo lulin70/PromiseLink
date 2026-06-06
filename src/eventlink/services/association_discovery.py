@@ -933,6 +933,10 @@ class AssociationDiscoveryEngine:
             matches.append(("supplies", b.name, a.name, list(b_supplies_a)))
 
         if not matches:
+            # F-58: Semantic similarity fallback when structured matching finds nothing
+            semantic_score = self._semantic_similarity_fallback(a, b)
+            if semantic_score > 0:
+                return semantic_score * 0.3, {"semantic_match": True, "similarity": round(semantic_score, 4)}
             return 0.0, {}
 
         # Confidence based on match quality: more specific matches = higher confidence
@@ -946,7 +950,86 @@ class AssociationDiscoveryEngine:
             ],
             "total_match_count": total_matches,
         }
+
+        # F-58: Blend with semantic similarity if available
+        semantic_score = self._semantic_similarity_fallback(a, b)
+        if semantic_score > 0:
+            # Hybrid: 70% structured + 30% semantic
+            confidence = 0.7 * confidence + 0.3 * semantic_score
+            evidence["semantic_boost"] = round(semantic_score, 4)
+
         return confidence, evidence
+
+    def _semantic_similarity_fallback(self, a: Entity, b: Entity) -> float:
+        """F-58: Compute semantic similarity between two entities using embeddings.
+
+        Uses pre-computed embeddings stored in vector_embeddings table.
+        Returns 0.0 if embeddings are not available.
+
+        Threshold: cosine_similarity > 0.7 to be considered a match.
+
+        Args:
+            a: First entity
+            b: Second entity
+
+        Returns:
+            Semantic similarity score (0.0 ~ 1.0), or 0.0 if not available
+        """
+        try:
+            from eventlink.services.semantic_search import SemanticSearchEngine
+
+            # Use the same DB path as the session
+            db_path = "test.db"
+            if self.session and hasattr(self.session, "bind"):
+                engine = self.session.bind
+                if hasattr(engine, "url"):
+                    db_path = str(engine.url.database) or "test.db"
+
+            # Get embeddings from vector_embeddings table
+            import sqlite3
+            conn = sqlite3.connect(db_path)
+            try:
+                rows = conn.execute(
+                    "SELECT embedding FROM vector_embeddings WHERE target_id = ? AND target_type = 'entity'",
+                    (str(a.id),)
+                ).fetchone()
+                if not rows:
+                    return 0.0
+
+                import struct
+                blob_a = rows[0]
+                count = len(blob_a) // 4
+                emb_a = list(struct.unpack(f"{count}f", blob_a))
+
+                rows = conn.execute(
+                    "SELECT embedding FROM vector_embeddings WHERE target_id = ? AND target_type = 'entity'",
+                    (str(b.id),)
+                ).fetchone()
+                if not rows:
+                    return 0.0
+
+                blob_b = rows[0]
+                count = len(blob_b) // 4
+                emb_b = list(struct.unpack(f"{count}f", blob_b))
+
+                # Cosine similarity
+                dot = sum(x * y for x, y in zip(emb_a, emb_b))
+                norm_a = sum(x * x for x in emb_a) ** 0.5
+                norm_b = sum(x * x for x in emb_b) ** 0.5
+                if norm_a == 0 or norm_b == 0:
+                    return 0.0
+
+                similarity = dot / (norm_a * norm_b)
+
+                # Only return if above threshold
+                if similarity > 0.7:
+                    return round(similarity, 4)
+                return 0.0
+            finally:
+                conn.close()
+        except Exception:
+            # Embeddings not available, return 0.0 gracefully
+            return 0.0
 
     def _discover_industry_chain(self, a: Entity, b: Entity) -> tuple[float, dict]:
         """Industry chain: upstream/downstream industry relationship.
