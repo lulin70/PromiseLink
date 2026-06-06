@@ -101,8 +101,14 @@ async def create_voice_session(
     classifier = NLUIntentClassifier(llm_client=llm_client)
     nlu_result = await classifier.classify(body.query_text)
 
-    # Generate placeholder response text (NLG will be enhanced in future phases)
-    response_text = _generate_response_text(nlu_result.intent, nlu_result.slots)
+    # Generate response text using NLG service (queries real DB data)
+    from eventlink.services.nlg_service import generate_nlu_response
+    response_text = await generate_nlu_response(
+        session=session,
+        intent=nlu_result.intent,
+        slots=nlu_result.slots,
+        user_id=user_id,
+    )
 
     # Create voice session record
     voice_session = VoiceSession(

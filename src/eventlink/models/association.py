@@ -14,9 +14,9 @@ from eventlink.database import Base, IS_SQLITE, _uuid_default
 class Association(Base):
     """
     Association model representing relationships between entities.
-    
+
     Schema aligned with Technical Design v1.7 §3.1
-    Supports 8 association types as per §4.3
+    Supports 12 association types: 9 structural + 3 semantic
     """
 
     __tablename__ = "associations"
@@ -47,8 +47,10 @@ class Association(Base):
         nullable=False,
     )
     
-    # Association type: alumni, ex_colleague, same_city, competitor, tech_overlap, 
-    #                   deal_link, risk_link, supply_chain
+    # Association type: 9 structural + 3 semantic
+    #   Structural: alumni, ex_colleague, same_city, competitor, tech_overlap,
+    #               deal_link, risk_link, supply_chain, co_occurrence
+    #   Semantic:   topic_overlap, supply_demand, industry_chain
     association_type: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
     
     # Strength score with time decay
@@ -82,7 +84,8 @@ class Association(Base):
             """association_type IN (
                 'alumni', 'ex_colleague', 'same_city', 'competitor',
                 'tech_overlap', 'deal_link', 'risk_link', 'supply_chain',
-                'co_occurrence'
+                'co_occurrence',
+                'topic_overlap', 'supply_demand', 'industry_chain'
             )""",
             name="association_type_check",
         ),

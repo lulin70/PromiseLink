@@ -640,8 +640,8 @@ class TestGenerateNextActionsMultipleRules:
         action_texts = [a["action"] for a in actions]
         assert any("深入了解" in t for t in action_texts)
 
-    def test_max_three_actions(self):
-        """Should never return more than 3 actions."""
+    def test_max_five_actions(self):
+        """Should never return more than 5 actions (3 standard + 2 association-based)."""
         past_due = datetime.now(timezone.utc) - timedelta(days=2)
         stale_date = datetime.now(timezone.utc) - timedelta(days=14)
         data = {
@@ -661,7 +661,7 @@ class TestGenerateNextActionsMultipleRules:
 
         actions = RelationshipBriefService._generate_next_actions(data)
 
-        assert len(actions) <= 3
+        assert len(actions) <= 5
 
 
 class TestSyncOpenPromisesExcludesDone:

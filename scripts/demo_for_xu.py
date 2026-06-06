@@ -24,13 +24,42 @@ Prerequisites:
 import asyncio
 import json
 import logging
+import os
+import re
 import sys
 import time
 from pathlib import Path
 from datetime import date, datetime, timezone, timedelta
 
+# ── Strip ANSI color codes when output is piped to file ──
+if not sys.stdout.isatty():
+    _original_write = sys.stdout.write
+    _ansi_re = re.compile(r'\033\[[0-9;]*m')
+    def _strip_ansi_write(text):
+        return _original_write(_ansi_re.sub('', text))
+    sys.stdout.write = _strip_ansi_write
+
 # ── 抑制技术日志（许总不需要看info/debug/warning）──
 logging.basicConfig(level=logging.CRITICAL)  # 演示输出禁止所有日志
+# Suppress all eventlink + sqlalchemy loggers
+for _logger_name in ("eventlink", "eventlink.nlu", "eventlink.pipeline",
+                      "eventlink.entity_extractor", "eventlink.association_discovery",
+                      "eventlink.llm_client", "eventlink.todo_generator",
+                      "eventlink.promise_bidirectional", "eventlink.relationship_brief",
+                      "eventlink.dashboard", "eventlink.input_scope",
+                      "sqlalchemy", "sqlalchemy.pool", "httpx", "httpcore"):
+    logging.getLogger(_logger_name).setLevel(logging.CRITICAL)
+# Redirect structlog to stderr so it doesn't pollute stdout (demo output)
+import structlog as _structlog
+_structlog.configure(
+    processors=[
+        _structlog.stdlib.add_log_level,
+        _structlog.dev.ConsoleRenderer(),
+    ],
+    wrapper_class=_structlog.stdlib.BoundLogger,
+    logger_factory=_structlog.PrintLoggerFactory(file=sys.stderr),
+    cache_logger_on_first_use=False,
+)
 
 # ── 东8时区 ──
 TZ_CN = timezone(timedelta(hours=8))
@@ -111,7 +140,7 @@ _BRIEF_STAGE_LABELS = {
 # ════════════════════════════════════════════════════════════════
 
 # 场景1: Pipeline测试事件 — 一段真实的投资对接会议记录
-PIPELINE_EVENT_TEXT = """今天下午和盛恒资本的李总、王明一起开了投资对接会。
+PIPELINE_EVENT_TEXT = """今天上午和盛恒资本的李总、王明一起开了投资对接会。
 
 李总说他们最近一直在看AI赛道的早期项目，特别是大模型应用方向。
 他提到手上有3个LP在找AI项目，希望我推荐靠谱的团队。
@@ -124,7 +153,7 @@ PIPELINE_EVENT_TEXT = """今天下午和盛恒资本的李总、王明一起开�
 会议在国贸三期，大概聊了一个半小时。整体感觉合作机会很大。"""
 
 # 第二事件: 与第一事件有主题/资源交集，但涉及不同的人(不直接提及对方)
-PIPELINE_EVENT_2_TEXT = """上周在望京SOHO和智谱AI的张总吃了个午饭。
+PIPELINE_EVENT_2_TEXT = """下午在望京SOHO和智谱AI的张总一起下午茶
 
 张总说他们刚发布了一个大模型API产品，正在找早期客户和投资方。
 他提到团队有15个工程师，专门做大模型应用开发，产能很充裕。
@@ -156,9 +185,14 @@ async def demo_pipeline() -> dict:
     自动提取人物、识别承诺、生成待办、更新关系推进卡。
     """
     from uuid import uuid4
+    # Suppress config warnings during import
+    import io as _io
+    _saved = sys.stdout
+    sys.stdout = _io.StringIO()
     from eventlink.database import AsyncSessionLocal, init_db
     from eventlink.models.event import Event
     from eventlink.services.event_pipeline import process_event_with_short_transactions
+    sys.stdout = _saved
 
     header("场景1: 记录一次重要交流 — 完整11步Pipeline")
 
@@ -173,9 +207,21 @@ async def demo_pipeline() -> dict:
         print(f"  {DIM}|{RESET} {line}")
     print(f"  {DIM}{'─' * 60}{RESET}\n")
 
-    # 1. 初始化数据库
+    # 1. 初始化数据库（清理旧数据，包括WAL/SHM文件）
     sub_header("准备: 系统初始化")
+    # Clean up all DB files including WAL/SHM to prevent data residue
+    # Note: actual DB path is data/eventlink.db (from config.py default)
+    db_path = project_root / "data" / "eventlink.db"
+    for suffix in ("", "-wal", "-shm"):
+        p = db_path.parent / f"{db_path.name}{suffix}"
+        if p.exists():
+            p.unlink()
+    # Suppress config warnings (e.g. "default secret_key") during init
+    import io as _io
+    _saved_stdout = sys.stdout
+    sys.stdout = _io.StringIO()
     await init_db()
+    sys.stdout = _saved_stdout
     ok("数据库就绪 (SQLite + Alembic migrations)")
 
     # 2. 创建测试事件
@@ -185,14 +231,17 @@ async def demo_pipeline() -> dict:
 
     async with AsyncSessionLocal() as session:
         async with session.begin():
+            # 事件1: 上午10:30
+            event_ts_1 = datetime.now(TZ_CN).replace(hour=10, minute=30, second=0, microsecond=0)
             event = Event(
                 id=event_id,
                 user_id=user_id,
                 event_type="meeting",
                 source="manual",
-                title="投资对接会 - 盛恒资本李总/王明",
+                title="未命名",  # Pipeline Step 0.5 will auto-generate from raw_text
                 raw_text=PIPELINE_EVENT_TEXT,
                 status="pending",
+                timestamp=event_ts_1,
             )
             session.add(event)
     print(f"  事件ID: {event_id[:8]}... | 文本长度: {len(PIPELINE_EVENT_TEXT)}字符")
@@ -347,14 +396,17 @@ async def demo_pipeline() -> dict:
     event2_id = str(uuid4())
     async with AsyncSessionLocal() as session:
         async with session.begin():
+            # 事件2: 下午15:00
+            event_ts_2 = datetime.now(TZ_CN).replace(hour=15, minute=0, second=0, microsecond=0)
             event2 = Event(
                 id=event2_id,
                 user_id=user_id,
                 event_type="meeting",
                 source="manual",
-                title="午餐交流 - 智谱AI张总",
+                title="未命名",  # Pipeline Step 0.5 will auto-generate from raw_text
                 raw_text=PIPELINE_EVENT_2_TEXT,
                 status="pending",
+                timestamp=event_ts_2,
             )
             session.add(event2)
 
@@ -388,30 +440,151 @@ async def demo_pipeline() -> dict:
         marker = " ← 同一人(两次出现)" if events_count > 1 else ""
         print(f"    · {name}{marker}")
 
-    # 检查Association发现
+    # 检查Association发现（包括cold类型）
     try:
         from eventlink.models.association import Association
         from eventlink.models.entity import Entity
+        from eventlink.services.association_discovery import AssociationDiscoveryEngine
         async with AsyncSessionLocal() as session:
             assoc_result = await session.execute(
                 select(Association).where(Association.user_id == user_id)
             )
             associations = assoc_result.scalars().all()
-            if associations:
-                # Build entity name lookup
-                all_ent_result = await session.execute(select(Entity))
-                entity_map = {str(e.id): e.name for e in all_ent_result.scalars().all()}
 
-                print(f"\n  系统发现 {len(associations)} 组人物关联:")
-                for a in associations[:5]:
-                    src_name = entity_map.get(str(a.source_entity_id), str(a.source_entity_id)[:8])
-                    tgt_name = entity_map.get(str(a.target_entity_id), str(a.target_entity_id)[:8])
-                    atype = a.association_type or "unknown"
-                    conf = f"{a.confidence:.0%}" if a.confidence else "?"
-                    print(f"    · {src_name} --[{atype}, 置信度{conf}]--> {tgt_name}")
-            else:
-                print(f"\n  关联发现: (暂无 — 可能需要更多事件积累)")
+            # Also run cold-type discovery for cross-entity pairs (李总↔张总 etc.)
+            engine = AssociationDiscoveryEngine(session)
+            all_ent_result = await session.execute(
+                select(Entity).where(Entity.user_id == user_id)
+            )
+            all_db_entities = list(all_ent_result.scalars().all())
+            entity_map = {str(e.id): e.name for e in all_db_entities}
+
+            # Find pairs that might have additional cold-type associations
+            # (a pair can have multiple association types, e.g., topic_overlap + industry_chain)
+            cold_findings = []
+            for i, ea in enumerate(all_db_entities):
+                for eb in all_db_entities[i + 1:]:
+                    pair_key = tuple(sorted([str(ea.id), str(eb.id)]))
+                    existing_types = {
+                        a.association_type for a in associations
+                        if tuple(sorted([str(a.source_entity_id), str(a.target_entity_id)])) == pair_key
+                    }
+
+                    # Run cold type discovery (always, to find additional types)
+                    cold_results = await engine.discover_cold_types(ea, eb)
+                    # Filter out types already discovered as hot
+                    new_cold = [cr for cr in cold_results if cr["association_type"] not in existing_types]
+                    if new_cold:
+                        cold_findings.append((ea, eb, new_cold))
+
+            # Merge associations by pair (avoid duplicate lines for same pair)
+            pair_assocs: dict[tuple, list] = {}
+            for a in associations:
+                pair_key = tuple(sorted([str(a.source_entity_id), str(a.target_entity_id)]))
+                if pair_key not in pair_assocs:
+                    pair_assocs[pair_key] = []
+                src_name = entity_map.get(str(a.source_entity_id), str(a.source_entity_id)[:8])
+                tgt_name = entity_map.get(str(a.target_entity_id), str(a.target_entity_id)[:8])
+                pair_assocs[pair_key].append({
+                    "src": src_name, "tgt": tgt_name,
+                    "type": a.association_type or "unknown",
+                    "conf": a.confidence or 0,
+                    "detail": "",
+                })
+
+            for ea, eb, cold_results in cold_findings:
+                pair_key = tuple(sorted([str(ea.id), str(eb.id)]))
+                if pair_key not in pair_assocs:
+                    pair_assocs[pair_key] = []
+                for cr in cold_results:
+                    atype = cr["association_type"]
+                    evidence = cr.get("evidence", {})
+                    detail = ""
+                    if atype == "industry_chain":
+                        rel = evidence.get("relation", "")
+                        if rel == "potential_investor_startup":
+                            detail = f" ({evidence.get('investor','')} → {evidence.get('startup','')}, 投资-创业链)"
+                    elif atype == "supply_demand":
+                        matches = evidence.get("matches", [])
+                        if matches:
+                            m = matches[0]
+                            detail = f" ({m['supplier']} 可满足 {m['requester']} 的需求: {', '.join(m.get('matched_items', [])[:2])})"
+                    elif atype == "topic_overlap":
+                        ratio = evidence.get("keyword_overlap_ratio", 0)
+                        detail = f" (关键词重合度{ratio:.0%})"
+                    pair_assocs[pair_key].append({
+                        "src": ea.name, "tgt": eb.name,
+                        "type": atype,
+                        "conf": cr.get("confidence", 0),
+                        "detail": detail,
+                    })
+
+            # Display results
+            print(f"\n  系统发现 {len(pair_assocs)} 组人物关联:")
+
+            for pair_key, assoc_list in pair_assocs.items():
+                assoc_list.sort(key=lambda x: x["conf"], reverse=True)
+                name_a = assoc_list[0]["src"]
+                name_b = assoc_list[0]["tgt"]
+                types_str = " + ".join(a["type"] for a in assoc_list)
+                max_conf = max(a["conf"] for a in assoc_list)
+                conf_str = f"{max_conf:.0%}" if max_conf else "?"
+                # Show detail from highest-confidence association
+                best_detail = assoc_list[0].get("detail", "")
+                print(f"    · {name_a} ↔ {name_b} [{types_str}, 置信度{conf_str}]{best_detail}")
+
+            if not associations and not cold_findings:
+                print(f"    (暂无 — 可能需要更多事件积累)")
+
+            # ── 基于关联的行动建议 ──
+            action_suggestions = []
+            for ea, eb, cold_results in cold_findings:
+                for cr in cold_results:
+                    atype = cr["association_type"]
+                    evidence = cr.get("evidence", {})
+                    if atype == "industry_chain":
+                        rel = evidence.get("relation", "")
+                        if rel == "potential_investor_startup":
+                            investor = evidence.get("investor", "")
+                            startup = evidence.get("startup", "")
+                            action_suggestions.append(
+                                f"💡 {investor} 对 {startup} 感兴趣 → 建议引荐双方"
+                            )
+                    elif atype == "supply_demand":
+                        matches = evidence.get("matches", [])
+                        for m in matches[:2]:
+                            action_suggestions.append(
+                                f"💡 {m['supplier']} 可以帮助 {m['requester']} ({', '.join(m['matched_items'][:2])})"
+                            )
+                    elif atype == "topic_overlap":
+                        action_suggestions.append(
+                            f"💡 {ea.name} 和 {eb.name} 关注相似领域 → 建议安排交流"
+                        )
+
+            if action_suggestions:
+                print(f"\n  基于关联的行动建议:")
+                for s in action_suggestions[:3]:
+                    print(f"    {s}")
+
+            # ── 关联生成的Todo（Step 7.5的产出）──
+            from eventlink.models.todo import Todo
+            assoc_todos = (await session.execute(
+                select(Todo).where(
+                    Todo.user_id == user_id,
+                    Todo.source_event_id.in_([event_id, event2_id]),
+                    Todo.todo_type.in_(["cooperation_signal", "help", "followup", "care"]),
+                ).order_by(Todo.created_at.asc())
+            )).scalars().all()
+            # Filter: only show association-generated todos (those with 引荐/对接/安排/约 in title)
+            assoc_todos = [t for t in assoc_todos if any(kw in t.title for kw in ("引荐", "对接", "安排", "约"))]
+            if assoc_todos:
+                print(f"\n  关联发现自动生成的待办:")
+                for t in assoc_todos:
+                    type_cn = {"cooperation_signal": "合作信号", "help": "帮助", "followup": "跟进", "care": "关注"}.get(t.todo_type, t.todo_type)
+                    print(f"    · [{type_cn}] {t.title}")
+
     except Exception as ex:
+        import traceback
         print(f"\n  关联发现检查: 异常({ex})")
 
     # Brief跨事件聚合检查
@@ -431,7 +604,14 @@ async def demo_pipeline() -> dict:
                     interactions = data.get("interaction_history", [])
                     interaction_count = len(interactions) if isinstance(interactions, list) else 0
                     concerns = data.get("their_concerns", [])[:2]
-                    concerns_str = ", ".join(concerns) if concerns else "-"
+                    # Clean concern text: remove [type] prefix and person name prefix
+                    clean_concerns = []
+                    for c in concerns:
+                        clean = re.sub(r'^\[[^\]]+\]\s*', '', str(c))
+                        clean = re.sub(r'^[^—]+—\s*', '', clean).strip()
+                        if clean:
+                            clean_concerns.append(clean)
+                    concerns_str = ", ".join(clean_concerns) if clean_concerns else "-"
                     print(f"    · {name}: 阶段={stage_cn} | 互动次数≥{interaction_count} | 关心={concerns_str}")
     except Exception as ex:
         print(f"\n  Brief聚合检查: 异常({ex})")
@@ -452,9 +632,14 @@ async def demo_nlu() -> dict:
     许总的核心需求: "语音特别重要，开车的时候就可以干很多活了"
     这里展示NLU的两阶段分类: 规则引擎(<5ms) → LLM fallback(~300ms)
     """
+    # Suppress config warnings during import
+    import io as _io
+    _saved = sys.stdout
+    sys.stdout = _io.StringIO()
     from eventlink.config import Settings
     from eventlink.services.llm_client import LLMClient
     from eventlink.services.nlu_intent_classifier import NLUIntentClassifier, VoiceIntent
+    sys.stdout = _saved
 
     header("场景2: 语音问询理解 — F-50 NLU意图识别")
 
@@ -462,8 +647,12 @@ async def demo_nlu() -> dict:
     print(f"  {BOLD}许总的话{RESET}: \"{DIM}语音特别重要，这样我开车的时候就可以干很多活了{RESET}\"")
     print(f"  {BOLD}EventLink的答案{RESET}: 两阶段NLU — 规则引擎极速匹配 + LLM智能兜底\n")
 
-    # 初始化
+    # 初始化（抑制config WARNING）
+    import io as _io2
+    _saved2 = sys.stdout
+    sys.stdout = _io2.StringIO()
     config = Settings()
+    sys.stdout = _saved2
     llm = LLMClient(config=config)
     classifier = NLUIntentClassifier(llm_client=llm)
 
@@ -491,148 +680,32 @@ async def demo_nlu() -> dict:
     today = date.today()
 
     async def _build_response(intent_value: str, slots: dict | None) -> str:
-        """根据NLU识别结果 + 真实DB数据，构造系统回答."""
+        """根据NLU识别结果 + 真实DB数据，构造系统回答（调用系统NLG服务）."""
         from eventlink.database import AsyncSessionLocal
-        from eventlink.models.event import Event
-        from eventlink.models.todo import Todo
+        from eventlink.services.nlg_service import generate_nlu_response
+        from eventlink.services.nlu_intent_classifier import VoiceIntent
+
+        # Map intent string to VoiceIntent enum
+        intent_map = {
+            "schedule_query": VoiceIntent.SCHEDULE_QUERY,
+            "schedule_range": VoiceIntent.SCHEDULE_RANGE,
+            "promise_tracker": VoiceIntent.PROMISE_TRACKER,
+            "relationship_status": VoiceIntent.RELATIONSHIP_STATUS,
+            "action_suggestion": VoiceIntent.ACTION_SUGGESTION,
+            "todo_create": VoiceIntent.TODO_CREATE,
+            "unclear": VoiceIntent.UNCLEAR,
+            "chitchat": VoiceIntent.CHITCHAT,
+            "exit": VoiceIntent.EXIT,
+        }
+        intent_enum = intent_map.get(intent_value, VoiceIntent.UNCLEAR)
+
         async with AsyncSessionLocal() as session:
-            # ── 日程查询 ──
-            if intent_value == "schedule_query":
-                day_start = datetime(today.year, today.month, today.day, 0, 0, 0, tzinfo=timezone.utc)
-                day_end = day_start.replace(hour=23, minute=59, second=59)
-                from sqlalchemy import select as sa_select
-                evt_result = await session.execute(
-                    sa_select(Event).where(Event.user_id == user_id)
-                    .where(Event.timestamp >= day_start)
-                    .where(Event.timestamp < day_end)
-                )
-                events = evt_result.scalars().all()
-                if events:
-                    lines = [f"今天您有{len(events)}条记录："]
-                    for e in events:
-                        t = e.timestamp.strftime("%H:%M") if e.timestamp else ""
-                        lines.append(f"  {t} {e.title}")
-                    return "\n".join(lines)
-                return "今天暂无已记录的安排。"
-
-            # ── 范围日程 ──
-            if intent_value == "schedule_range":
-                return "明后两天暂无已记录的安排。需要我帮您创建一个提醒吗？"
-
-            # ── 承诺追踪 ──
-            if intent_value == "promise_tracker":
-                from sqlalchemy import select as sa_select
-                todo_result = await session.execute(
-                    sa_select(Todo).where(Todo.user_id == user_id)
-                    .where(Todo.action_type == "my_promise")
-                    .where(Todo.status == "pending")
-                )
-                promises = todo_result.scalars().all()
-                if promises:
-                    lines = [f"您目前有{len(promises)}条未完成的承诺："]
-                    for p in promises[:5]:
-                        # 日期合理性检查：只显示未来或近期的截止日期
-                        due_str = ""
-                        if p.due_date:
-                            try:
-                                d = p.due_date.date() if hasattr(p.due_date, 'date') else p.due_date
-                                if d >= today:
-                                    due_str = f"（截止:{d}）"
-                                # 过去或不合理的日期不显示
-                            except (ValueError, AttributeError):
-                                pass
-                        lines.append(f"  · {clean_title(p.title)}{due_str}")
-                    lines.append("\n需要我帮您设置提醒吗？")
-                    return "\n".join(lines)
-                return "太棒了！您当前没有未完成的承诺。"
-
-            # ── 关系状态 ──
-            if intent_value == "relationship_status":
-                person_name = (slots or {}).get("person", "")
-                from eventlink.models.relationship_brief import RelationshipBrief
-                from sqlalchemy import select as sa_select
-                briefs_q = sa_select(RelationshipBrief).where(
-                    RelationshipBrief.user_id == user_id
-                ).order_by(RelationshipBrief.last_updated_at.desc())
-                briefs_result = await session.execute(briefs_q)
-                all_briefs = briefs_result.scalars().all()
-
-                if not all_briefs:
-                    return "暂时还没有关系记录。先记录一次交流试试？"
-
-                # 按人名过滤：如果问询指定了人名，只返回匹配的
-                matched_brief = None
-                if person_name:
-                    for b in all_briefs:
-                        bname = (b.brief_data or {}).get("basic_info", {}).get("name", "")
-                        if person_name in bname or bname in person_name:
-                            matched_brief = b
-                            break
-                    if not matched_brief:
-                        return f"还没有{person_name}的关系记录。先和他/她交流一次试试？"
-                else:
-                    # 没指定人名，取最新的
-                    matched_brief = all_briefs[0]
-
-                b = matched_brief
-                data = b.brief_data or {}
-                name = data.get("basic_info", {}).get("name", person_name or "对方")
-                stage = b.relationship_stage or "new_connection"
-                stage_cn = _BRIEF_STAGE_LABELS.get(stage, stage)
-                last_int = data.get("last_interaction", {})
-                summary = last_int.get("summary", "")[:40] if last_int else ""
-                concerns = data.get("their_concerns", [])
-                concerns_str = f"，他关心{concerns[0]}" if concerns else ""
-                parts = [
-                    f"{name}目前处于「{stage_cn}」阶段。",
-                ]
-                if summary:
-                    parts.append(f"你们最近一次互动是：{summary}")
-                if concerns_str:
-                    parts.append(concerns_str)
-                parts.append("建议近期跟进。")
-                return " ".join(parts)
-
-            # ── 行动建议 ──
-            if intent_value == "action_suggestion":
-                from sqlalchemy import select as sa_select
-                # 查找即将到期的promise
-                todo_result = await session.execute(
-                    sa_select(Todo).where(Todo.user_id == user_id)
-                    .where(Todo.status == "pending")
-                    .where(Todo.action_type.in_(["my_promise", "my_followup"]))
-                    .order_by(Todo.due_date.asc().nullslast())
-                )
-                actions = todo_result.scalars().all()[:3]
-                if actions:
-                    lines = ["根据您的数据，建议优先处理："]
-                    for a in actions:
-                        atype = "承诺" if a.action_type == "my_promise" else "跟进"
-                        due_str = ""
-                        if a.due_date:
-                            try:
-                                d = a.due_date.date() if hasattr(a.due_date, 'date') else a.due_date
-                                if d >= today:
-                                    due_str = f"（截止:{d}）"
-                            except (ValueError, AttributeError):
-                                pass
-                        lines.append(f"  · [{atype}] {clean_title(a.title, 45)}{due_str}")
-                    return "\n".join(lines)
-                return "当前没有紧急待办，保持联系频率就好。"
-
-            # ── 创建提醒 ──
-            if intent_value == "todo_create":
-                content = (slots or {}).get("content", "")
-                person = (slots or {}).get("person", "")
-                return f"好的，已为您创建提醒：{content or '（内容）'}。我会到时间提醒您。"
-
-            # ── 其他 ──
-            fallback = {
-                "unclear": "抱歉，我不太确定您的意思。您可以试试问\"我今天的会议是什么\"或\"我答应谁什么事了\"？",
-                "chitchat": "哈哈，谢谢！我是EventLink，专门帮您经营商务关系的助手。有什么关系方面的问题随时问我。",
-                "exit": "好的，有事随时叫我！开车注意安全~",
-            }
-            return fallback.get(intent_value, "好的，我明白了。")
+            return await generate_nlu_response(
+                session=session,
+                intent=intent_enum,
+                slots=slots,
+                user_id=user_id,
+            )
 
     for i, (category, query, expected_intent) in enumerate(VOICE_QUERIES, 1):
         sub_header(f"问询 {i}/{total}: [{category}]")
@@ -661,9 +734,21 @@ async def demo_nlu() -> dict:
             slots_str = json.dumps(nlu_result.slots, ensure_ascii=False)[:100]
             print(f"       槽位: {slots_str}")
 
-        # 显示证据
+        # 显示证据（翻译为中文）
         if nlu_result.evidence:
-            evidence_short = nlu_result.evidence[:80]
+            ev = nlu_result.evidence
+            # Translate common English evidence patterns to Chinese
+            ev = ev.replace("Keyword ", "关键词 ")
+            ev = ev.replace(" matched as schedule_query", " 匹配为日程查询")
+            ev = ev.replace(" matched as promise_tracker", " 匹配为承诺追踪")
+            ev = ev.replace(" matched as relationship_status", " 匹配为关系状态")
+            ev = ev.replace(" matched as action_suggestion", " 匹配为行动建议")
+            ev = ev.replace(" matched as todo_create", " 匹配为创建提醒")
+            ev = ev.replace(" matched as person_query", " 匹配为人物查询")
+            ev = ev.replace(" matched as resource_match", " 匹配为资源匹配")
+            ev = ev.replace("Regex ", "正则 ")
+            ev = ev.replace(" matched", " 匹配")
+            evidence_short = ev[:80]
             print(f"       依据: {DIM}{evidence_short}{RESET}")
 
         # 基于真实DB数据构造系统回答
@@ -802,7 +887,14 @@ async def demo_brief() -> dict:
             # 对方关心的话题
             concerns = data.get("their_concerns", [])
             if concerns:
-                print(f"    对方关心: {', '.join(concerns[:3])}")
+                # Clean concern text: remove [type] prefix and person name prefix
+                clean_concerns = []
+                for c in concerns[:3]:
+                    clean = re.sub(r'^\[[^\]]+\]\s*', '', str(c))
+                    clean = re.sub(r'^[^—]+—\s*', '', clean).strip()
+                    if clean:
+                        clean_concerns.append(clean)
+                print(f"    对方关心: {', '.join(clean_concerns)}")
 
             # 我的贡献
             contribs = data.get("my_contributions", [])
@@ -812,7 +904,12 @@ async def demo_brief() -> dict:
             # 合作信号
             signals = data.get("cooperation_signals", [])
             if signals:
-                print(f"    合作信号: {', '.join(signals[:3])}")
+                clean_signals = []
+                for s in signals[:3]:
+                    clean = re.sub(r'^\[[^\]]+\]\s*', '', str(s))
+                    if clean:
+                        clean_signals.append(clean)
+                print(f"    合作信号: {', '.join(clean_signals)}")
 
             # 风险标志
             risks = data.get("risk_flags", [])
@@ -823,9 +920,15 @@ async def demo_brief() -> dict:
             actions = data.get("next_actions", [])
             if actions:
                 print(f"    下一步建议:")
-                for a in actions[:3]:
-                    priority_color = RED if a.get("priority") == "high" else YELLOW if a.get("priority") == "medium" else DIM
-                    print(f"      [{priority_color}{a.get('priority', '?')}{RESET}] {a.get('action', '')}")
+                priority_cn = {"high": "高", "medium": "中", "low": "低", "1": "高", "2": "中", "3": "低", "4": "低", "5": "低"}
+                for a in actions:
+                    p = str(a.get("priority", "?"))
+                    p_cn = priority_cn.get(p, p)
+                    priority_color = RED if p in ("high", "1") else YELLOW if p in ("medium", "2", "3") else DIM
+                    action_text = str(a.get('action', ''))
+                    # Clean action text: remove all [type] prefixes like [关注]
+                    action_text = re.sub(r'\[[^\]]+\]\s*', '', action_text)
+                    print(f"      [{priority_color}{p_cn}{RESET}] {action_text}")
 
             print()
 
@@ -958,8 +1061,12 @@ async def demo_dashboard() -> dict:
                 print(f"  涉及人物: {', '.join(e.name for e in entities)}")
                 print()
 
-            # 关联待办
-            todo_for_evt = [td for td in todos if td.source_event_id == str(evt.id)]
+            # 关联待办（该事件生成的所有todo，不限due_date）
+            evt_todo_result = await session.execute(
+                select(Todo).where(Todo.source_event_id == str(evt.id))
+                .order_by(Todo.created_at.asc())
+            )
+            todo_for_evt = evt_todo_result.scalars().all()
             if todo_for_evt:
                 print(f"  生成待办 ({len(todo_for_evt)}条):")
                 for td in todo_for_evt:
