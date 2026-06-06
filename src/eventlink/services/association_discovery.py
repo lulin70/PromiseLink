@@ -1,23 +1,26 @@
 """Association Discovery Engine — discovers relationships between entities.
 
-Implements 8 association types as defined in Algorithm Design v1.2 §6:
-  alumni, ex_colleague, same_city, competitor,
-  tech_overlap, deal_link, risk_link, supply_chain
+Implements 11 association types:
 
-Plus a co_occurrence type for entities that appear in the same event.
+Structural types (exact field match):
+  co_occurrence, same_city, ex_colleague, competitor,
+  alumni, tech_overlap, deal_link, risk_link, supply_chain
+
+Semantic types (LLM-assisted inference):
+  topic_overlap, supply_demand, industry_chain
 
 Architecture (Phase 1):
   - **Incremental discovery**: Only process new/merged entities, not full rescan
   - **SQL pushdown**: same_city/same_company via SQL JOIN, not Python memory
-  - **Lazy discovery**: Low-frequency types (alumni, tech_overlap, deal_link,
-    risk_link, supply_chain) computed on-demand with Redis cache
+  - **Lazy discovery**: Low-frequency types computed on-demand with Redis cache
   - **Conflict resolution**: existing_pairs dedup + merge-triggered partial rescan
 
 Hot types (computed on write):
-  co_occurrence, same_city, ex_colleague, competitor
+  co_occurrence, same_city, ex_colleague, competitor, topic_overlap
 
 Cold types (computed on read):
-  alumni, tech_overlap, deal_link, risk_link, supply_chain
+  alumni, tech_overlap, deal_link, risk_link, supply_chain,
+  supply_demand, industry_chain
 """
 
 from __future__ import annotations
@@ -43,10 +46,13 @@ PROVISIONAL_THRESHOLD = 0.30
 DECAY_HALF_LIFE_DAYS = 180
 
 # Hot types: computed on every write (incremental)
-HOT_ASSOCIATION_TYPES = {"co_occurrence", "same_city", "ex_colleague", "competitor"}
+HOT_ASSOCIATION_TYPES = {"co_occurrence", "same_city", "ex_colleague", "competitor", "topic_overlap"}
 
 # Cold types: computed on read (lazy, cached)
-COLD_ASSOCIATION_TYPES = {"alumni", "tech_overlap", "deal_link", "risk_link", "supply_chain"}
+COLD_ASSOCIATION_TYPES = {
+    "alumni", "tech_overlap", "deal_link", "risk_link", "supply_chain",
+    "supply_demand", "industry_chain",
+}
 
 VALID_ASSOCIATION_TYPES = HOT_ASSOCIATION_TYPES | COLD_ASSOCIATION_TYPES
 
@@ -76,6 +82,8 @@ class AssociationDiscoveryEngine:
             "deal_link": self._discover_deal_link,
             "risk_link": self._discover_risk_link,
             "supply_chain": self._discover_supply_chain,
+            "supply_demand": self._discover_supply_demand,
+            "industry_chain": self._discover_industry_chain,
         }
 
     # ── Public API ──
@@ -135,19 +143,18 @@ class AssociationDiscoveryEngine:
         if co_occ:
             await self.session.flush()
 
-        # Step 2: For each new entity, find hot associations with existing entities
+        # Step 2: For each new entity, find hot + cold associations with existing entities
         for new_entity in new_entities:
             # Find candidates: entities that share city/company with new entity
             candidates = await self._find_incremental_candidates(new_entity, user_id)
             for candidate in candidates:
                 pair_key = tuple(sorted([str(new_entity.id), str(candidate.id)]))
-                if pair_key in existing_pairs:
-                    continue
+
+                # Hot types (same_city, ex_colleague, competitor, co_occurrence, topic_overlap)
                 results = self._discover_hot_types(new_entity, candidate)
                 for r in results:
                     type_key = (pair_key[0], pair_key[1], r["association_type"])
-                    reverse_key = (pair_key[1], pair_key[0], r["association_type"])
-                    if type_key in existing_pairs or reverse_key in existing_pairs:
+                    if type_key in existing_pairs:
                         continue
                     assoc = self._create_association(
                         source_entity=new_entity,
@@ -158,10 +165,61 @@ class AssociationDiscoveryEngine:
                     self.session.add(assoc)
                     new_associations.append(assoc)
                     existing_pairs.add(type_key)
-                    existing_pairs.add(pair_key)
+
+                # Cold types (industry_chain, supply_demand, etc.) — also persist for Step 7.5 todos
+                cold_results = await self.discover_cold_types(new_entity, candidate)
+                for r in cold_results:
+                    type_key = (pair_key[0], pair_key[1], r["association_type"])
+                    if type_key in existing_pairs:
+                        continue
+                    assoc = self._create_association(
+                        source_entity=new_entity,
+                        target_entity=candidate,
+                        assoc_data=r,
+                        event_id=event_id,
+                    )
+                    self.session.add(assoc)
+                    new_associations.append(assoc)
+                    existing_pairs.add(type_key)
 
         if new_associations:
             await self.session.flush()
+
+        # Step 2.5: Cold discovery for new entities against ALL existing entities
+        # This catches associations like industry_chain that aren't found by
+        # city/company-based candidate matching (e.g., 投资↔人工智能)
+        if new_entities:
+            all_persons = await self._fetch_all_person_entities(user_id)
+            for new_entity in new_entities:
+                for existing in all_persons:
+                    if str(existing.id) == str(new_entity.id):
+                        continue
+                    pair_key = tuple(sorted([str(new_entity.id), str(existing.id)]))
+                    # Only run cold discovery if no cold-type associations exist yet
+                    has_cold = any(
+                        pk for pk in existing_pairs
+                        if pk[0] == pair_key[0] and pk[1] == pair_key[1]
+                        and pk[2] in ("industry_chain", "supply_demand", "alumni",
+                                       "tech_overlap", "deal_link", "risk_link")
+                    )
+                    if has_cold:
+                        continue
+                    cold_results = await self.discover_cold_types(new_entity, existing)
+                    for r in cold_results:
+                        type_key = (pair_key[0], pair_key[1], r["association_type"])
+                        if type_key in existing_pairs:
+                            continue
+                        assoc = self._create_association(
+                            source_entity=new_entity,
+                            target_entity=existing,
+                            assoc_data=r,
+                            event_id=event_id,
+                        )
+                        self.session.add(assoc)
+                        new_associations.append(assoc)
+                        existing_pairs.add(type_key)
+            if new_associations:
+                await self.session.flush()
 
         # Step 3: For merged entities, rescan their associations
         if merged_entity_ids:
@@ -178,8 +236,7 @@ class AssociationDiscoveryEngine:
                     results = self._discover_hot_types(merged_entity, candidate)
                     for r in results:
                         type_key = (pair_key[0], pair_key[1], r["association_type"])
-                        reverse_key = (pair_key[1], pair_key[0], r["association_type"])
-                        if type_key in existing_pairs or reverse_key in existing_pairs:
+                        if type_key in existing_pairs:
                             # Update existing association if confidence changed
                             await self._maybe_update_association(
                                 pair_key, r, user_id
@@ -194,7 +251,6 @@ class AssociationDiscoveryEngine:
                         self.session.add(assoc)
                         new_associations.append(assoc)
                         existing_pairs.add(type_key)
-                        existing_pairs.add(pair_key)
 
             if new_associations:
                 await self.session.flush()
@@ -397,6 +453,16 @@ class AssociationDiscoveryEngine:
                 "status": "confirmed" if confidence >= self.confirm_threshold else "provisional",
             })
 
+        # Topic overlap (semantic: events discuss similar topics/domains)
+        confidence, evidence = self._discover_topic_overlap(entity_a, entity_b)
+        if confidence > PROVISIONAL_THRESHOLD:
+            results.append({
+                "association_type": "topic_overlap",
+                "confidence": round(confidence, 4),
+                "evidence": evidence,
+                "status": "confirmed" if confidence >= self.confirm_threshold else "provisional",
+            })
+
         return results
 
     # ── Incremental Candidate Finding ──
@@ -443,13 +509,20 @@ class AssociationDiscoveryEngine:
         result = await self.session.execute(stmt)
         all_entities = list(result.scalars().all())
 
-        # Filter: keep entities that share city, company, or event_ids
+        # Filter: keep entities that share city, company, event_ids,
+        #         OR have overlapping keywords/topics (for semantic associations)
         candidates = []
         new_event_ids = set()
         if new_entity.source_event_id:
             new_event_ids.add(str(new_entity.source_event_id))
         for ev_id in props.get("event_ids", []):
             new_event_ids.add(str(ev_id))
+
+        # Build keyword sets for topic-overlap candidate matching
+        new_keywords = set(
+            k.lower() for k in props.get("event_keywords", [])
+        ) | set(t.lower() for t in props.get("tech_stack", []))
+        new_topics = set(props.get("event_topics", []))
 
         for e in all_entities:
             e_props = e.properties or {}
@@ -474,6 +547,21 @@ class AssociationDiscoveryEngine:
             if new_event_ids & e_event_ids:
                 candidates.append(e)
                 continue
+
+            # Overlapping keywords or topics? (for topic_overlap/supply_demand)
+            if new_keywords:
+                e_keywords = set(
+                    k.lower() for k in e_props.get("event_keywords", [])
+                ) | set(t.lower() for t in e_props.get("tech_stack", []))
+                if new_keywords & e_keywords:
+                    candidates.append(e)
+                    continue
+
+            if new_topics:
+                e_topics = set(e_props.get("event_topics", []))
+                if new_topics & e_topics:
+                    candidates.append(e)
+                    continue
 
         return candidates
 
@@ -696,6 +784,229 @@ class AssociationDiscoveryEngine:
             return 0.85, {"upstream": company_b, "downstream": company_a}
         return 0.0, {}
 
+    # ── Semantic Association Types (LLM-assisted) ──
+
+    def _discover_topic_overlap(self, a: Entity, b: Entity) -> tuple[float, dict]:
+        """Topic overlap: entities whose events discuss similar topics/domains.
+
+        Compares event_topics (from LLM extraction) and event_keywords
+        between two entities using keyword overlap + topic similarity.
+        Uses character-level tokenization for Chinese text to handle
+        cases like "大模型应用" ∩ "大模型" → partial match.
+
+        This captures semantic relationships like:
+          - Entity A discussed "AI赛道投资" ↔ Entity B discussed "大模型API"
+          - Both events share keywords like AI, 投资, 大模型
+
+        Returns:
+            (confidence, evidence_dict)
+        """
+        props_a = a.properties or {}
+        props_b = b.properties or {}
+
+        topics_a = set(props_a.get("event_topics", []))
+        topics_b = set(props_b.get("event_topics", []))
+        keywords_a_raw = props_a.get("event_keywords", [])
+        keywords_b_raw = props_b.get("event_keywords", [])
+
+        # Also consider entity-level tech_stack as topic signal
+        tech_a = set(t.lower() for t in props_a.get("tech_stack", []))
+        tech_b = set(t.lower() for t in props_b.get("tech_stack", []))
+
+        # Build keyword sets with Chinese-aware normalization
+        # For Chinese: use individual chars as tokens for fuzzy matching
+        def _tokenize_chinese(texts: list[str]) -> set[str]:
+            tokens = set()
+            for t in texts:
+                t_lower = t.lower()
+                # Add the full string
+                tokens.add(t_lower)
+                # For Chinese strings, also add individual chars and bigrams
+                # This handles "大模型应用" partially matching "大模型"
+                if any("\u4e00" <= c <= "\u9fff" for c in t):
+                    for i in range(len(t)):
+                        tokens.add(t_lower[i])
+                        if i < len(t) - 1:
+                            tokens.add(t_lower[i:i + 2])
+            return tokens
+
+        all_keywords_a = _tokenize_chinese(keywords_a_raw) | tech_a
+        all_keywords_b = _tokenize_chinese(keywords_b_raw) | tech_b
+
+        if not all_keywords_a or not all_keywords_b:
+            return 0.0, {}
+
+        # Keyword overlap (Jaccard similarity on tokenized sets)
+        kw_overlap = all_keywords_a & all_keywords_b
+        kw_jaccard = len(kw_overlap) / min(len(all_keywords_a), len(all_keywords_b))
+
+        # Topic string similarity (substring/semantic match)
+        topic_score = 0.0
+        matched_topics = []
+        if topics_a and topics_b:
+            for ta in topics_a:
+                for tb in topics_b:
+                    ta_words = set(ta)
+                    tb_words = set(tb)
+                    if ta_words & tb_words:
+                        overlap_ratio = len(ta_words & tb_words) / min(len(ta_words), len(tb_words))
+                        if overlap_ratio > 0.3:
+                            topic_score = max(topic_score, overlap_ratio)
+                            matched_topics.append((ta, tb))
+
+        # Combine scores: keyword overlap (60%) + topic similarity (40%)
+        confidence = 0.4 + kw_jaccard * 0.35 + topic_score * 0.25
+
+        if confidence <= PROVISIONAL_THRESHOLD:
+            return 0.0, {}
+
+        evidence: dict[str, Any] = {}
+        # Show original keyword matches (not tokenized), for readability
+        orig_overlap = set(k.lower() for k in keywords_a_raw) & set(k.lower() for k in keywords_b_raw)
+        if orig_overlap:
+            evidence["common_keywords"] = list(orig_overlap)
+        if kw_overlap:
+            evidence["partial_keyword_matches"] = len(kw_overlap)
+            evidence["keyword_overlap_ratio"] = round(kw_jaccard, 2)
+        if matched_topics:
+            evidence["matched_topic_pairs"] = matched_topics
+
+        return confidence, evidence
+
+    def _discover_supply_demand(self, a: Entity, b: Entity) -> tuple[float, dict]:
+        """Supply-demand match: A's resources can satisfy B's demands.
+
+        This is EventLink's core value proposition — discovering that
+        one person in your network has what another person needs.
+
+        Matches entity A's resource.capabilities against entity B's concern (demand),
+        and vice versa (bidirectional).
+
+        Examples:
+          - 张总(需求: 找投资方) ↔ 李总(资源: 盛恒资本投资人)
+          - A(需求: 需要AI技术方案) ↔ B(资源: 大模型应用开发)
+
+        Returns:
+            (confidence, evidence_dict)
+        """
+        props_a = a.properties or {}
+        props_b = b.properties or {}
+
+        res_a = set(
+            c.lower() for c in (props_a.get("resource", {}) or {}).get("capabilities", [])
+        )
+        res_b = set(
+            c.lower() for c in (props_b.get("resource", {}) or {}).get("capabilities", [])
+        )
+        demand_a = set(d.lower() for d in (props_a.get("concern") or []))
+        demand_b = set(d.lower() for d in (props_b.get("concern") or []))
+
+        # Bidirectional: A's resource → B's demand, AND B's resource → A's demand
+        matches = []
+
+        # A can supply what B needs
+        a_supplies_b = res_a & demand_b
+        if a_supplies_b:
+            matches.append(("supplies", a.name, b.name, list(a_supplies_b)))
+
+        # B can supply what A needs
+        b_supplies_a = res_b & demand_a
+        if b_supplies_a:
+            matches.append(("supplies", b.name, a.name, list(b_supplies_a)))
+
+        if not matches:
+            return 0.0, {}
+
+        # Confidence based on match quality: more specific matches = higher confidence
+        total_matches = sum(len(m[3]) for m in matches)
+        confidence = 0.5 + min(total_matches * 0.1, 0.45)
+
+        evidence = {
+            "matches": [
+                {"direction": m[0], "supplier": m[1], "requester": m[2], "matched_items": m[3]}
+                for m in matches
+            ],
+            "total_match_count": total_matches,
+        }
+        return confidence, evidence
+
+    def _discover_industry_chain(self, a: Entity, b: Entity) -> tuple[float, dict]:
+        """Industry chain: upstream/downstream industry relationship.
+
+        Uses configurable industry chain mapping to detect relationships like:
+          - Investment firm → Startup (investor-investee)
+          - Platform provider → Application developer
+          - Enterprise client → Solution vendor
+
+        Config format (in self.config["industry_chain_map"]):
+          {
+            "投资": ["创业公司", "AI应用", "SaaS"],
+            "互联网平台": ["应用开发者", "内容创作者"],
+            ...
+          }
+
+        Also does basic inference from industry fields when no config exists:
+          - "投资" industry ↔ technology/AI company = potential investor-startup link
+
+        Returns:
+            (confidence, evidence_dict)
+        """
+        basic_a = (a.properties or {}).get("basic", {})
+        basic_b = (b.properties or {}).get("basic", {})
+        industry_a = (basic_a.get("industry") or "").lower()
+        industry_b = (basic_b.get("industry") or "").lower()
+        company_a = (basic_a.get("company") or "")
+        company_b = (basic_b.get("company") or "")
+
+        if not industry_a or not industry_b:
+            return 0.0, {}
+
+        # Use configured chain map first
+        chain_map = self.config.get("industry_chain_map", {})
+
+        # Check both directions
+        if industry_b in chain_map.get(industry_a, []):
+            return 0.80, {
+                "relation": "upstream_downstream",
+                "upstream": f"{company_a}({industry_a})",
+                "downstream": f"{company_b}({industry_b})",
+            }
+        if industry_a in chain_map.get(industry_b, []):
+            return 0.80, {
+                "relation": "upstream_downstream",
+                "upstream": f"{company_b}({industry_b})",
+                "downstream": f"{company_a}({industry_a})",
+            }
+
+        # Fallback: built-in inference rules for common industry pairs
+        investment_keywords = {"投资", "创投", "风投", "vc", "pe", "基金", "资本"}
+        tech_startup_keywords = {
+            "人工智能", "ai", "大模型", "saas", "互联网", "科技",
+            "软件开发", "信息技术", "创业",
+        }
+
+        a_is_investment = any(kw in industry_a for kw in investment_keywords)
+        b_is_tech = any(kw in industry_b for kw in tech_startup_keywords)
+        b_is_investment = any(kw in industry_b for kw in investment_keywords)
+        a_is_tech = any(kw in industry_a for kw in tech_startup_keywords)
+
+        if a_is_investment and b_is_tech:
+            return 0.65, {
+                "relation": "potential_investor_startup",
+                "investor": f"{company_a}({industry_a})",
+                "startup": f"{company_b}({industry_b})",
+                "inference": "built_in_rule",
+            }
+        if b_is_investment and a_is_tech:
+            return 0.65, {
+                "relation": "potential_investor_startup",
+                "investor": f"{company_b}({industry_b})",
+                "startup": f"{company_a}({industry_a})",
+                "inference": "built_in_rule",
+            }
+
+        return 0.0, {}
+
     # ── Helper Methods ──
 
     async def _fetch_entities_by_ids(self, entity_ids: list[str]) -> list[Entity]:
@@ -706,18 +1017,33 @@ class AssociationDiscoveryEngine:
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def _fetch_all_person_entities(self, user_id: str) -> list[Entity]:
+        """Fetch all person entities for a user (for cold discovery sweep)."""
+        stmt = select(Entity).where(
+            Entity.user_id == user_id,
+            Entity.entity_type == "person",
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
     async def _get_existing_pair_set(self, user_id: str) -> set[tuple]:
         """Get set of existing association pairs for dedup.
 
-        Returns set of (source_id, target_id, association_type) tuples.
+        Returns set of (min_id, max_id, association_type) tuples
+        with normalized direction (smaller ID first) to prevent
+        bidirectional duplicates.
         """
         stmt = select(Association).where(Association.user_id == user_id)
         result = await self.session.execute(stmt)
         associations = result.scalars().all()
-        return {
-            (a.source_entity_id, a.target_entity_id, a.association_type)
-            for a in associations
-        }
+        normalized = set()
+        for a in associations:
+            src, tgt = str(a.source_entity_id), str(a.target_entity_id)
+            # Normalize direction: smaller ID first
+            if src > tgt:
+                src, tgt = tgt, src
+            normalized.add((src, tgt, a.association_type))
+        return normalized
 
     async def _maybe_update_association(
         self,
@@ -750,11 +1076,20 @@ class AssociationDiscoveryEngine:
         assoc_data: dict[str, Any],
         event_id: str | None = None,
     ) -> Association:
-        """Create an Association ORM object."""
+        """Create an Association ORM object.
+
+        Normalizes direction so source_entity_id < target_entity_id
+        to prevent bidirectional duplicates (A→B and B→A for same type).
+        """
+        src_id = str(source_entity.id)
+        tgt_id = str(target_entity.id)
+        # Normalize direction: smaller ID first
+        if src_id > tgt_id:
+            src_id, tgt_id = tgt_id, src_id
         return Association(
             user_id=source_entity.user_id,
-            source_entity_id=str(source_entity.id),
-            target_entity_id=str(target_entity.id),
+            source_entity_id=src_id,
+            target_entity_id=tgt_id,
             association_type=assoc_data["association_type"],
             strength=assoc_data["confidence"],
             confidence=assoc_data["confidence"],
@@ -798,12 +1133,14 @@ class AssociationDiscoveryEngine:
             for i in range(len(eids)):
                 for j in range(i + 1, len(eids)):
                     a_id, b_id = eids[i], eids[j]
+                    # Normalize direction: smaller ID first (consistent with _create_association)
+                    if a_id > b_id:
+                        a_id, b_id = b_id, a_id
                     key = (a_id, b_id, "co_occurrence")
-                    reverse_key = (b_id, a_id, "co_occurrence")
-                    if key in existing_pairs or reverse_key in existing_pairs:
+                    if key in existing_pairs:
                         continue
-                    a = entity_map.get(a_id)
-                    b = entity_map.get(b_id)
+                    a = entity_map.get(eids[i])
+                    b = entity_map.get(eids[j])
                     if not a or not b:
                         continue
                     assoc = self._create_association(

@@ -39,7 +39,7 @@ class Event(Base):
         index=True,
     )
     source: Mapped[str] = mapped_column(String(50), nullable=False)
-    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False, default="未命名")
     timestamp: Mapped[datetime] = mapped_column(nullable=False, index=True, default=func.now())
     
     # Raw content (max 500KB as per Technical Design §3.1)

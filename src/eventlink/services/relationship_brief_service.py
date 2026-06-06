@@ -15,6 +15,7 @@ Implements 12-module relationship brief generation and management:
   12. notes               - Manual notes
 """
 
+import copy
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -229,7 +230,7 @@ class RelationshipBriefService:
         brief, is_new = await self.get_or_create_brief(user_id, person_entity_id)
 
         modules_updated: list[str] = []
-        data = dict(brief.brief_data) if brief.brief_data else {}
+        data = copy.deepcopy(brief.brief_data) if brief.brief_data else {}
 
         # 1. Update last_interaction
         data["last_interaction"] = self._build_last_interaction(event)
@@ -243,6 +244,20 @@ class RelationshipBriefService:
             if person_entity:
                 data["basic_info"] = self._build_basic_info(person_entity)
                 modules_updated.append("basic_info")
+
+        # Fallback: query entity from DB if basic_info is still empty
+        if not data.get("basic_info", {}).get("name"):
+            try:
+                db_entity_result = await self.session.execute(
+                    select(Entity).where(Entity.id == person_entity_id)
+                )
+                db_entity = db_entity_result.scalar_one_or_none()
+                if db_entity:
+                    data["basic_info"] = self._build_basic_info(db_entity)
+                    if "basic_info" not in modules_updated:
+                        modules_updated.append("basic_info")
+            except Exception:
+                pass
 
         # 3. Update interaction_freq
         data["interaction_freq"] = await self._build_interaction_freq(
@@ -284,8 +299,9 @@ class RelationshipBriefService:
                 data["risk_flags"] = sorted(existing)
                 modules_updated.append("risk_flags")
 
-        # 5. Regenerate next_actions
-        data["next_actions"] = self._generate_next_actions(data)
+        # 5. Regenerate next_actions (include association-based suggestions)
+        associations = await self._get_associations_for_entity(str(brief.person_entity_id))
+        data["next_actions"] = self._generate_next_actions(data, associations)
         modules_updated.append("next_actions")
 
         # 6. Recalculate strength_score
@@ -298,6 +314,9 @@ class RelationshipBriefService:
         # Apply changes with optimistic lock increment
         brief.brief_data = data
         brief.version += 1
+        # Force SQLAlchemy to detect JSON/JSONB mutation (critical for SQLite)
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(brief, "brief_data")
 
         await self.session.flush()
 
@@ -349,7 +368,7 @@ class RelationshipBriefService:
                 f"current version {brief.version}"
             )
 
-        data = dict(brief.brief_data) if brief.brief_data else {}
+        data = copy.deepcopy(brief.brief_data) if brief.brief_data else {}
 
         if notes is not None:
             data["notes"] = notes
@@ -358,11 +377,16 @@ class RelationshipBriefService:
             data.update(brief_data_partial)
 
         # Recalculate derived fields after manual update
-        data["next_actions"] = self._generate_next_actions(data)
+        entity_id = str(brief.person_entity_id)
+        associations = await self._get_associations_for_entity(entity_id)
+        data["next_actions"] = self._generate_next_actions(data, associations)
         data["strength_score"] = self._calculate_strength_score(data)
 
         brief.brief_data = data
         brief.version += 1
+        # Force SQLAlchemy to detect JSON/JSONB mutation (critical for SQLite)
+        from sqlalchemy.orm.attributes import flag_modified as _flag_modified
+        _flag_modified(brief, "brief_data")
 
         await self.session.flush()
 
@@ -571,17 +595,95 @@ class RelationshipBriefService:
 
         return min(score, 100)
 
+    async def _get_associations_for_entity(self, entity_id: str) -> list[dict]:
+        """Fetch associations involving this entity for action generation.
+
+        Returns list of dicts with: association_type, other_entity_name, evidence.
+        """
+        from eventlink.models.association import Association
+        from eventlink.models.entity import Entity
+
+        result = await self.session.execute(
+            select(Association).where(
+                (Association.source_entity_id == entity_id)
+                | (Association.target_entity_id == entity_id)
+            )
+        )
+        assocs = result.scalars().all()
+
+        # Also run cold-type discovery for richer suggestions
+        ent_result = await self.session.execute(
+            select(Entity).where(Entity.id == entity_id)
+        )
+        entity = ent_result.scalar_one_or_none()
+        if not entity:
+            return []
+
+        # Get all other entities for cold discovery
+        all_ent_result = await self.session.execute(
+            select(Entity).where(Entity.id != entity_id)
+        )
+        other_entities = all_ent_result.scalars().all()
+
+        # Build entity name map
+        name_map = {str(entity.id): entity.name}
+        for e in other_entities:
+            name_map[str(e.id)] = e.name
+
+        entries = []
+        seen_types = set()
+
+        # Hot associations from DB
+        for a in assocs:
+            other_id = str(a.target_entity_id if str(a.source_entity_id) == entity_id else a.source_entity_id)
+            other_name = name_map.get(other_id, "")
+            key = (a.association_type, other_name)
+            if key not in seen_types:
+                seen_types.add(key)
+                entries.append({
+                    "association_type": a.association_type,
+                    "other_entity_name": other_name,
+                    "evidence": (a.properties or {}).get("evidence", {}),
+                    "confidence": a.confidence or 0,
+                })
+
+        # Cold associations (semantic discoveries)
+        try:
+            from eventlink.services.association_discovery import AssociationDiscoveryEngine
+            engine = AssociationDiscoveryEngine(self.session)
+            for other in other_entities:
+                cold_results = await engine.discover_cold_types(entity, other)
+                for cr in cold_results:
+                    atype = cr["association_type"]
+                    key = (atype, other.name)
+                    if key not in seen_types:
+                        seen_types.add(key)
+                        entries.append({
+                            "association_type": atype,
+                            "other_entity_name": other.name,
+                            "evidence": cr.get("evidence", {}),
+                            "confidence": cr.get("confidence", 0),
+                        })
+        except Exception:
+            pass  # Cold discovery is best-effort
+
+        return entries
+
     @staticmethod
-    def _generate_next_actions(brief_data: dict) -> list[dict]:
-        """Generate recommended next actions based on current state.
+    def _generate_next_actions(brief_data: dict, associations: list[dict] | None = None) -> list[dict]:
+        """Generate recommended next actions based on current state and associations.
 
         Rules (no LLM needed for PoC):
         1. If has open my_promise overdue → "兑现承诺: {promise_title}"
         2. If last_interaction > 7 days ago → "主动联系{person_name}"
         3. If stage=understanding_needs → "深入了解{person_name}当前需求"
         4. If has their_concerns → "关注对方关心的话题: {concern}"
-        5. Default → "保持定期联系"
-        Max 3 actions.
+        5. Association-based actions (the soul of EventLink):
+           - industry_chain: "引荐{A}和{B}（投资-创业链）"
+           - supply_demand: "{A}可以帮助{B}"
+           - topic_overlap: "安排{A}和{B}交流（同领域）"
+        6. Default → "保持定期联系"
+        Max 5 actions.
         """
         actions: list[dict] = []
         now = datetime.now(timezone.utc)
@@ -633,14 +735,63 @@ class RelationshipBriefService:
 
         # Rule 4: Their concerns follow-up
         concerns = brief_data.get("their_concerns", [])
-        if concerns and len(actions) < 3:
+        if concerns and len(actions) < 5:
             actions.append({
                 "action": f"关注对方关心的话题: {concerns[0]}",
                 "priority": "low",
                 "suggested_date": (now + timedelta(days=5)).strftime("%Y-%m-%d"),
             })
 
-        # Rule 5: Default fallback
+        # Rule 5: Association-based actions (the soul of EventLink)
+        # These are the actions that emerge from discovering hidden links
+        if associations and len(actions) < 5:
+            basic = brief_data.get("basic_info", {})
+            person_name = basic.get("name", "对方")
+            for assoc in associations:
+                atype = assoc.get("association_type", "")
+                other_name = assoc.get("other_entity_name", "")
+                evidence = assoc.get("evidence", {})
+                if not other_name:
+                    continue
+
+                if atype == "industry_chain":
+                    rel = evidence.get("relation", "")
+                    if rel == "potential_investor_startup":
+                        actions.append({
+                            "action": f"引荐{person_name}和{other_name}（投资-创业链）",
+                            "priority": "high",
+                            "source": "association:industry_chain",
+                        })
+                    else:
+                        actions.append({
+                            "action": f"对接{person_name}和{other_name}（产业链上下游）",
+                            "priority": "medium",
+                            "source": "association:industry_chain",
+                        })
+                elif atype == "supply_demand":
+                    matches = evidence.get("matches", [])
+                    if matches:
+                        m = matches[0]
+                        items = ", ".join(m.get("matched_items", [])[:2])
+                        actions.append({
+                            "action": f"{m.get('supplier', person_name)} 可帮助 {m.get('requester', other_name)} ({items})",
+                            "priority": "high",
+                            "source": "association:supply_demand",
+                        })
+                elif atype == "topic_overlap":
+                    actions.append({
+                        "action": f"安排{person_name}和{other_name}交流（同领域）",
+                        "priority": "medium",
+                        "source": "association:topic_overlap",
+                    })
+                elif atype == "same_city":
+                    actions.append({
+                        "action": f"约{person_name}和{other_name}同城见面",
+                        "priority": "low",
+                        "source": "association:same_city",
+                    })
+
+        # Rule 6: Default fallback
         if not actions:
             actions.append({
                 "action": "保持定期联系",
@@ -648,4 +799,4 @@ class RelationshipBriefService:
                 "suggested_date": (now + timedelta(days=7)).strftime("%Y-%m-%d"),
             })
 
-        return actions[:3]
+        return actions[:5]

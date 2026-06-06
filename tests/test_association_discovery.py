@@ -411,11 +411,14 @@ class TestConstants:
     """Test module-level constants."""
 
     def test_valid_association_types_count(self):
-        """VALID_ASSOCIATION_TYPES should contain 9 types."""
-        assert len(VALID_ASSOCIATION_TYPES) == 9
+        """VALID_ASSOCIATION_TYPES should contain 12 types (9 structural + 3 semantic)."""
+        assert len(VALID_ASSOCIATION_TYPES) == 12
         expected = {
+            # Structural types (exact field match)
             "alumni", "ex_colleague", "same_city", "competitor",
             "tech_overlap", "deal_link", "risk_link", "supply_chain",
             "co_occurrence",
+            # Semantic types (LLM-assisted inference)
+            "topic_overlap", "supply_demand", "industry_chain",
         }
         assert VALID_ASSOCIATION_TYPES == expected

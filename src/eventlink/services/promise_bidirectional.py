@@ -193,9 +193,14 @@ class PromiseBidirectionalHandler:
     def _rule_analyze(self, todo: Todo, event: Event | None = None) -> PromiseAnalysis | None:
         """Rule-based promise direction analysis.
 
-        Checks todo title, description, AND original event text against
-        predefined patterns. Event raw_text is included because LLM-generated
-        todo titles often lose key directionality words like "我答应".
+        Priority order:
+        1. Title/description keyword match (highest confidence)
+        2. todo_type mapping (semantic type of the todo)
+        3. Event raw_text fallback (lowest priority — only for vague titles)
+
+        Key principle: A `care` or `help` todo should NOT become `my_promise`
+        just because the event text mentions "我答应" somewhere else.
+        The todo_type carries semantic meaning that overrides loose text matches.
 
         Args:
             todo: The todo item to analyze.
@@ -204,20 +209,15 @@ class PromiseBidirectionalHandler:
         Returns:
             PromiseAnalysis if a high-confidence rule matches, else None.
         """
-        # Combine title + description for matching
-        text = f"{todo.title} {(todo.description or '')}"
-
-        # Also include event raw_text — LLM-generated titles often drop
-        # directionality keywords ("我答应", "对方说") that exist in source
-        if event and event.raw_text:
-            text = f"{text} {event.raw_text}"
+        # Primary: match against todo's own title + description
+        title_text = f"{todo.title} {(todo.description or '')}"
 
         best_match: PromiseAnalysis | None = None
         best_confidence = 0.0
 
-        # Check keyword patterns
+        # Step 1: Check keyword patterns against title (highest priority)
         for pattern, action_type, confidence in RULE_PATTERNS:
-            if pattern.search(text):
+            if pattern.search(title_text):
                 if confidence > best_confidence:
                     best_confidence = confidence
                     best_match = PromiseAnalysis(
@@ -225,7 +225,12 @@ class PromiseBidirectionalHandler:
                         confidence=confidence,
                     )
 
-        # Check todo_type mapping (lower priority than keywords)
+        # If title matched a high-confidence pattern, use it directly
+        if best_match and best_confidence >= 0.85:
+            return best_match
+
+        # Step 2: Check todo_type mapping (semantic type overrides loose text match)
+        # This ensures care/help todos keep their semantic meaning
         if todo.todo_type in TODO_TYPE_MAPPING:
             action_type, type_confidence = TODO_TYPE_MAPPING[todo.todo_type]
             if type_confidence > best_confidence:
@@ -234,6 +239,23 @@ class PromiseBidirectionalHandler:
                     action_type=action_type,
                     confidence=type_confidence,
                 )
+
+        # Step 3: Event raw_text fallback (lowest priority)
+        # Only used when title is vague AND todo_type mapping didn't provide
+        # a strong enough signal. This prevents "我答应" in event text from
+        # overriding care/help type semantics.
+        # Key: if todo_type already gave us a result, don't let raw_text override it
+        # unless the raw_text match is in the todo's OWN title (already checked in Step 1)
+        if event and event.raw_text and best_confidence == 0.0:
+            full_text = f"{title_text} {event.raw_text}"
+            for pattern, action_type, confidence in RULE_PATTERNS:
+                if pattern.search(full_text):
+                    if confidence > best_confidence:
+                        best_confidence = confidence
+                        best_match = PromiseAnalysis(
+                            action_type=action_type,
+                            confidence=confidence,
+                        )
 
         return best_match
 

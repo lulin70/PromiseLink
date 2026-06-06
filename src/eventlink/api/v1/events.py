@@ -28,7 +28,7 @@ class EventCreateRequest(BaseModel):
     
     event_type: str = Field(..., description="Event type: card_save, meeting, call, manual")
     source: str = Field(..., description="Data source identifier")
-    title: str = Field(..., max_length=200, description="Event title")
+    title: str = Field(default="未命名", max_length=200, description="Event title (auto-generated from raw_text if omitted)")
     timestamp: datetime | None = Field(default=None, description="Event timestamp")
     raw_text: str | None = Field(default=None, description="Raw text content (max 500KB)")
     metadata: dict[str, Any] | None = Field(default=None, description="Additional metadata")
