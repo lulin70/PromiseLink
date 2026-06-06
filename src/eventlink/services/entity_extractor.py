@@ -42,9 +42,14 @@ class ExtractedPerson:
     phone: str | None = None
     email: str | None = None
     city: str | None = None
+    industry: str | None = None
+    schools: list[str] = field(default_factory=list)
+    tech_stack: list[str] = field(default_factory=list)
+    work_history: list[str] = field(default_factory=list)
     resource: list[str] = field(default_factory=list)
     demand: list[str] = field(default_factory=list)
-    industry: str | None = None
+    concern: list[dict] = field(default_factory=list)   # [{"category": "...", "detail": "..."}]
+    capability: list[dict] = field(default_factory=list)  # [{"category": "...", "detail": "..."}]
     confidence: float = 1.0
     is_ai_inference: bool = False
     confidence_level: str = "confirmed"
@@ -147,6 +152,10 @@ class EntityExtractor:
 
         # Step 4-5: Resolve and persist each person
         persisted_entities: list[Entity] = []
+        # Event-level context (topics/keywords) shared across all persons in this extraction
+        event_topics = [e.get("topic") for e in result.events if e.get("topic")]
+        event_keywords = result.keywords or []
+
         for person in result.persons:
             try:
                 # Use savepoint to isolate each person's persistence
@@ -156,6 +165,8 @@ class EntityExtractor:
                         person=person,
                         user_id=str(event.user_id),
                         event_id=str(event.id),
+                        event_topics=event_topics,
+                        event_keywords=event_keywords,
                     )
                     persisted_entities.append(entity)
             except Exception:
@@ -208,6 +219,8 @@ class EntityExtractor:
             city=person_data.get("city"),
             resource=person_data.get("resource", []),
             demand=person_data.get("demand", []),
+            concern=person_data.get("concern", []),
+            capability=person_data.get("capability", []),
             industry=person_data.get("industry"),
             confidence=1.0,
             is_ai_inference=False,
@@ -261,6 +274,8 @@ class EntityExtractor:
             city=data.get("city"),
             resource=data.get("resource", []),
             demand=data.get("demand", []),
+            concern=data.get("concern", []),
+            capability=data.get("capability", []),
             industry=data.get("industry"),
             confidence=float(data.get("confidence", 1.0)),
             is_ai_inference=bool(data.get("is_ai_inference", False)),
@@ -310,8 +325,15 @@ class EntityExtractor:
                 name=p.get("name", ""),
                 company=p.get("company"),
                 title=p.get("title"),
+                city=p.get("city"),
+                industry=p.get("industry"),
+                schools=p.get("schools", []),
+                tech_stack=p.get("tech_stack", []),
+                work_history=p.get("work_history", []),
                 resource=p.get("resource", []),
                 demand=p.get("demand", []),
+                concern=p.get("concern", []),
+                capability=p.get("capability", []),
             )
             persons.append(person)
 
@@ -326,7 +348,12 @@ class EntityExtractor:
         )
 
     async def _resolve_and_persist(
-        self, person: ExtractedPerson, user_id: str, event_id: str
+        self,
+        person: ExtractedPerson,
+        user_id: str,
+        event_id: str,
+        event_topics: list[str] | None = None,
+        event_keywords: list[str] | None = None,
     ) -> Entity:
         """Run entity resolution and persist to database.
 
@@ -371,6 +398,8 @@ class EntityExtractor:
                     user_id=user_id,
                     event_id=event_id,
                     status="provisional",
+                    event_topics=event_topics,
+                    event_keywords=event_keywords,
                 )
                 self.session.add(entity)
                 await self.session.flush()
@@ -391,6 +420,8 @@ class EntityExtractor:
             user_id=user_id,
             event_id=event_id,
             status=status,
+            event_topics=event_topics,
+            event_keywords=event_keywords,
         )
         self.session.add(entity)
         await self.session.flush()
@@ -436,17 +467,26 @@ class EntityExtractor:
                     "city": person.city,
                     "industry": person.industry,
                 },
+                "schools": person.schools,
+                "tech_stack": person.tech_stack,
+                "work_history": person.work_history,
                 "resource": {
                     "capabilities": person.resource,
                     "sensitivity": "matchable",
                 },
-                "concern": person.demand,
+                "concern": person.concern,
+                "demand": person.demand,
             },
         }
 
     @staticmethod
     def _create_entity(
-        person: ExtractedPerson, user_id: str, event_id: str, status: str
+        person: ExtractedPerson,
+        user_id: str,
+        event_id: str,
+        status: str,
+        event_topics: list[str] | None = None,
+        event_keywords: list[str] | None = None,
     ) -> Entity:
         """Create an Entity ORM instance from extracted person data.
 
@@ -455,6 +495,8 @@ class EntityExtractor:
             user_id: Owner user ID.
             event_id: Source event ID.
             status: Entity status (confirmed or provisional).
+            event_topics: Event-level topics from extraction (shared across persons).
+            event_keywords: Event-level keywords from extraction.
 
         Returns:
             New Entity instance (not yet added to session).
@@ -474,12 +516,19 @@ class EntityExtractor:
                     "city": person.city,
                     "industry": person.industry,
                 },
+                "schools": person.schools,
+                "tech_stack": person.tech_stack,
+                "work_history": person.work_history,
                 "resource": {
                     "capabilities": person.resource,
                     "sensitivity": "matchable",
                 },
-                "concern": person.demand,
+                "concern": person.concern,
+                "demand": person.demand,
+                "capability": person.capability,
                 "event_ids": [event_id] if event_id else [],
+                "event_topics": event_topics or [],
+                "event_keywords": event_keywords or [],
             },
             source_event_id=event_id,
             confidence=person.confidence,

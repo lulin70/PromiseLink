@@ -92,6 +92,10 @@ class Todo(Base):
         nullable=True,
     )
     
+    # F-52: Implicit feedback learning (v4.5)
+    completed_rank: Mapped[int | None] = mapped_column(nullable=True)
+    dynamic_score: Mapped[float | None] = mapped_column(nullable=True)
+
     # Feedback
     feedback: Mapped[str | None] = mapped_column(String(50))  # useful, not_useful, or custom
     
@@ -103,6 +107,13 @@ class Todo(Base):
         onupdate=func.now(),
     )
     completed_at: Mapped[datetime | None] = mapped_column()
+
+    # F-51: Dynamic priority scoring (v4.5)
+    dynamic_score: Mapped[float | None] = mapped_column(nullable=True)
+    score_calculated_at: Mapped[datetime | None] = mapped_column()
+
+    # F-52: Implicit feedback tracking (v4.5)
+    completed_rank: Mapped[int | None] = mapped_column(nullable=True)
 
     # Constraints
     __table_args__ = (
@@ -127,6 +138,15 @@ class Todo(Base):
         Index("idx_todos_user_type_status", "user_id", "todo_type", "status"),
         Index("idx_todos_user_due", "user_id", "due_date"),
         Index("idx_todos_user_priority", "user_id", "priority", "status"),
+        Index("idx_todos_dynamic_score", "user_id", "dynamic_score"),
+        CheckConstraint(
+            "dynamic_score IS NULL OR (dynamic_score >= 0.0 AND dynamic_score <= 1.0)",
+            name="dynamic_score_range_check",
+        ),
+        CheckConstraint(
+            "completed_rank IS NULL OR completed_rank >= 0",
+            name="completed_rank_check",
+        ),
     )
 
     def __repr__(self) -> str:
