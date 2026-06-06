@@ -1,6 +1,6 @@
 # EventLink 测试计划文档
 
-> **版本**: v2.6 (POC阶段)
+> **版本**: v2.7 (POC阶段)
 > **日期**: 2026-06-06
 > **阶段**: POC (0.2.x series)
 > **测试周期**: Week 1-3 (POC阶段)
@@ -4010,6 +4010,214 @@ def test_sv05_user_isolation_voice_history():
 
 ---
 
+### 11.7 [v2.7新增] EmbeddingProvider测试用例（F-57）
+
+#### TC-EM-001: embed返回768维向量
+
+**目标**: 验证EmbeddingProvider.embed()返回768维float向量
+
+**前置条件**: EmbeddingProvider服务正常运行，Moka AI API可用
+
+**测试步骤**:
+1. 初始化EmbeddingProvider(api_key=test_key)
+2. 调用embed("张三 AI创业公司 CEO")
+3. 检查返回值
+
+**期望结果**:
+- 返回list[float]类型
+- len(result) == 768
+- 所有值在[-1.0, 1.0]范围内
+
+**验收标准**: 768维 + 值范围[-1, 1] ✅
+
+---
+
+#### TC-EM-002: 缓存命中验证
+
+**目标**: 验证SHA256缓存机制正确工作
+
+**前置条件**: EmbeddingProvider服务正常运行
+
+**测试步骤**:
+1. 调用embed("测试文本A")，记录结果result_1
+2. 再次调用embed("测试文本A")，记录结果result_2
+3. 检查_cache字典大小
+4. 验证两次结果完全一致
+
+**期望结果**:
+- result_1 == result_2（浮点数精确相等）
+- _cache包含1个条目
+- 第二次调用未发起API请求（通过mock验证）
+
+**验收标准**: 缓存命中 + 结果一致 + 无重复API调用 ✅
+
+---
+
+#### TC-EM-003: 批量嵌入
+
+**目标**: 验证embed_batch()正确处理多条文本
+
+**前置条件**: EmbeddingProvider服务正常运行
+
+**测试步骤**:
+1. 准备5条文本: ["文本1", "文本2", "文本3", "文本4", "文本5"]
+2. 调用embed_batch(texts)
+3. 检查返回结果
+
+**期望结果**:
+- 返回5个embedding
+- 每个embedding为768维
+- 顺序与输入一致
+
+**验收标准**: 数量正确 + 维度正确 + 顺序一致 ✅
+
+---
+
+### 11.8 [v2.7新增] SemanticSearchEngine测试用例（F-57）
+
+#### TC-SS-001: Entity索引存储
+
+**目标**: 验证Entity的embedding正确存入vector_embeddings表
+
+**前置条件**: SemanticSearchEngine + EmbeddingProvider正常运行
+
+**测试步骤**:
+1. 创建Entity: name="张三", company="AI公司", industry="科技"
+2. 调用build_index(user_id)
+3. 查询vector_embeddings表
+
+**期望结果**:
+- vector_embeddings表新增1条记录
+- target_type = "entity"
+- target_id = entity.id
+- embedding BLOB长度 = 768 * 4 = 3072字节
+
+**验收标准**: 记录存在 + 类型正确 + BLOB长度正确 ✅
+
+---
+
+#### TC-SS-002: Event索引存储
+
+**目标**: 验证Event的embedding正确存入vector_embeddings表
+
+**前置条件**: SemanticSearchEngine + EmbeddingProvider正常运行
+
+**测试步骤**:
+1. 创建Event: title="与张三讨论AI合作", event_type="meeting"
+2. 调用build_index(user_id)
+3. 查询vector_embeddings表
+
+**期望结果**:
+- vector_embeddings表新增1条记录
+- target_type = "event"
+- target_id = event.id
+
+**验收标准**: 记录存在 + 类型正确 ✅
+
+---
+
+#### TC-SS-003: 语义搜索排序
+
+**目标**: 验证语义搜索按相似度降序返回结果
+
+**前置条件**: 已构建索引，包含3个Entity: 张三(AI)、李四(金融)、王五(教育)
+
+**测试步骤**:
+1. 调用search("AI创业合伙人", user_id, top_k=3)
+2. 检查返回结果顺序
+
+**期望结果**:
+- 结果按similarity降序排列
+- 张三(AI)的similarity最高
+- 所有similarity ≥ 0.5（MIN_SIMILARITY阈值）
+
+**验收标准**: 排序正确 + 阈值过滤正确 ✅
+
+---
+
+#### TC-SS-004: 用户数据隔离
+
+**目标**: 验证语义搜索不返回其他用户的数据
+
+**前置条件**: 两个用户各有独立数据
+
+**测试步骤**:
+1. 用户A创建Entity: "张三 AI公司"
+2. 用户B创建Entity: "李四 金融公司"
+3. 用户A调用search("AI", user_id_A)
+4. 检查搜索结果
+
+**期望结果**:
+- 搜索结果仅包含用户A的数据
+- 不包含用户B的"李四 金融公司"
+
+**验收标准**: 跨用户数据不可见 ✅
+
+---
+
+### 11.9 [v2.7新增] 关联发现语义增强测试用例（F-58）
+
+#### TC-AE-001: 结构化匹配为0时语义降级
+
+**目标**: 验证当structured_score=0时，语义增强仍可发现关联
+
+**前置条件**: SemanticAssociationEnhancer + EmbeddingProvider正常运行
+
+**测试步骤**:
+1. 创建两个Entity: 张三(AI创业)和李四(科技投资)，无结构化匹配维度
+2. structured_score = 0.0
+3. 调用enhance_score(0.0, text_a, text_b)
+4. 检查结果
+
+**期望结果**:
+- semantic_score > 0（语义相似度非零）
+- 若semantic_score ≥ 0.7: final_score = 0.7*0 + 0.3*semantic_score
+- 若semantic_score < 0.7: final_score = 0.0（不应用语义增强）
+
+**验收标准**: 语义降级逻辑正确 ✅
+
+---
+
+#### TC-AE-002: 混合评分公式验证
+
+**目标**: 验证final_score = 0.7 × structured_score + 0.3 × semantic_score
+
+**前置条件**: SemanticAssociationEnhancer正常运行
+
+**测试步骤**:
+1. 设置structured_score = 0.6
+2. 设置semantic_score = 0.85（> 0.7阈值）
+3. 调用enhance_score(0.6, text_a, text_b)
+4. 检查final_score
+
+**期望结果**:
+- final_score = 0.7 * 0.6 + 0.3 * 0.85 = 0.42 + 0.255 = 0.675
+- semantic_applied = True
+
+**验收标准**: 公式计算精确 ✅
+
+---
+
+#### TC-AE-003: Embedding不可用时优雅降级
+
+**目标**: 验证EmbeddingProvider不可用时，关联发现退化为纯结构化匹配
+
+**前置条件**: EmbeddingProvider API不可用（mock返回None）
+
+**测试步骤**:
+1. 初始化AssociationDiscoveryEngine(semantic_enhancer=None)
+2. 执行关联发现
+3. 检查结果
+
+**期望结果**:
+- final_score = structured_score（无语义增强）
+- 结果中无semantic字段
+- 不抛出异常
+
+**验收标准**: 优雅降级 + 无异常 + 结果正确 ✅
+
+---
+
 ## 12. 测试数据准备
 
 ### 12.1 名片测试数据（10张）
@@ -4417,3 +4625,6 @@ PM初审 → 通过？ → 提交Arch复审
 *② 新增§11.4 DependencyAnalyzer测试用例6个（TC-DA-001~006: 非promise/help得分=0 + 直接依赖链 + 间接依赖链 + MAX_DEPTH截断 + 多链累加 + 得分范围）*
 *③ 新增§11.5 ContextMatcher测试用例5个（TC-CM-001~005: 无关联实体得分=0 + 即将meeting提升 + 远期事件低分 + 非meeting/call忽略 + 得分范围）*
 *④ 新增§11.6 PriorityScorerV2集成测试用例2个（TC-PS-001~002: 四维评分公式 + Pipeline Step 8.5集成）*
+*⑤ 新增§11.7 EmbeddingProvider测试用例3个（TC-EM-001~003: 768维向量 + 缓存命中 + 批量嵌入）*
+*⑥ 新增§11.8 SemanticSearchEngine测试用例4个（TC-SS-001~004: Entity索引存储 + Event索引存储 + 语义搜索排序 + 用户数据隔离）*
+*⑦ 新增§11.9 关联发现语义增强测试用例3个（TC-AE-001~003: 结构化匹配为0时语义降级 + 混合评分公式 + Embedding不可用时优雅降级）*

@@ -1,12 +1,13 @@
 # EventLink 数据库设计文档
 
-> **版本**: 0.2.6 (POC阶段)
+> **版本**: 0.2.7 (POC阶段)
 > **日期**: 2026-06-06
 > **阶段**: POC (0.2.x series)
 > **设计师**: 架构师团队
-> **参考**: PRD v4.3, 技术设计 v2.6 §3.1
+> **参考**: PRD v4.3, 技术设计 v2.7 §3.1
 > **状态**: 李总v1.2+许总POC反馈融合修订
 > **v2.6变更**: score_audit_logs表calculation_factors扩展dependency_score/context_score审计字段
+> **v2.7变更**: 新增vector_embeddings表(F-57)、vec_entities虚拟表(F-57)、语义搜索数据存储
 
 ---
 
@@ -1805,6 +1806,101 @@ ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC
 LIMIT 5;
 ```
 
+### 9.X vector_embeddings 表（v2.7 新增, F-57）
+
+> **用途**: 存储Entity/Event的向量嵌入，供SemanticSearchEngine进行语义搜索
+
+```sql
+CREATE TABLE vector_embeddings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    target_type TEXT NOT NULL,          -- 'entity' | 'event'
+    target_id TEXT NOT NULL,            -- 对应entity.id或event.id
+    user_id TEXT NOT NULL,              -- 数据归属用户
+    embedding BLOB NOT NULL,            -- 768维float32向量，struct.pack存储
+    source_text TEXT,                   -- 生成embedding的原始文本（用于缓存校验）
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(target_type, target_id)      -- 每个目标仅一条embedding
+);
+
+-- 按用户+类型查询索引（语义搜索核心查询路径）
+CREATE INDEX idx_vec_user_type ON vector_embeddings(user_id, target_type);
+
+-- 按更新时间索引（增量重建用）
+CREATE INDEX idx_vec_updated ON vector_embeddings(updated_at);
+```
+
+**字段说明**:
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| id | INTEGER | PK AUTOINCREMENT | 自增主键 |
+| target_type | TEXT | NOT NULL | 目标类型：'entity'或'event' |
+| target_id | TEXT | NOT NULL | 目标ID，关联entities.id或events.id |
+| user_id | TEXT | NOT NULL | 数据归属用户ID（数据隔离） |
+| embedding | BLOB | NOT NULL | 768维float32向量，使用struct.pack存储 |
+| source_text | TEXT | 可选 | 生成embedding的原始文本，用于SHA256缓存校验 |
+| created_at | TEXT | NOT NULL DEFAULT | 创建时间 |
+| updated_at | TEXT | NOT NULL DEFAULT | 更新时间（增量重建用） |
+
+**BLOB存储格式**:
+```python
+import struct
+# 写入: 768个float32 → 3072字节BLOB
+blob = struct.pack(f"{768}f", *embedding)
+# 读取: BLOB → 768个float32
+embedding = struct.unpack(f"{768}f", blob)
+```
+
+### 9.Y vec_entities 虚拟表（v2.7 新增, F-57, 可选）
+
+> **用途**: sqlite-vec虚拟表，加速向量相似度搜索。当sqlite-vec扩展不可用时，系统自动降级为Python余弦相似度计算。
+
+```sql
+-- 仅当sqlite-vec扩展可用时创建
+CREATE VIRTUAL TABLE IF NOT EXISTS vec_entities
+USING vec0(
+    embedding float[768]    -- 768维float32向量
+);
+```
+
+**虚拟表与物理表的关系**:
+- `vec_entities` 是内存级虚拟表，不持久化到磁盘
+- 应用启动时从 `vector_embeddings` 表加载BLOB数据填充
+- 查询使用 `WHERE embedding MATCH ? AND k = ?` 语法
+- sqlite-vec不可用时自动降级，不影响功能
+
+**Phase 2 迁移说明**:
+
+| 特性 | PoC (SQLite) | Phase 2 (PostgreSQL) |
+|------|-------------|---------------------|
+| 向量列类型 | BLOB (3072字节) | vector(768) (pgvector) |
+| 索引 | sqlite-vec虚拟表 | IVFFlat / HNSW索引 |
+| 查询 | Python余弦 / sqlite-vec | `<=>` 余弦距离操作符 |
+| 存储 | 单文件SQLite | PG独立表空间 |
+
+**Phase 2 迁移DDL**:
+```sql
+-- PostgreSQL + pgvector
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE vector_embeddings (
+    id SERIAL PRIMARY KEY,
+    target_type VARCHAR(20) NOT NULL,
+    target_id UUID NOT NULL,
+    user_id UUID NOT NULL,
+    embedding vector(768) NOT NULL,
+    source_text TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(target_type, target_id)
+);
+
+CREATE INDEX idx_vec_user_type ON vector_embeddings(user_id, target_type);
+CREATE INDEX idx_vec_cosine ON vector_embeddings
+    USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+```
+
 ---
 
 ## 10. 版本演进
@@ -1818,6 +1914,7 @@ LIMIT 5;
 | **[0.2.1新增]** | **2026-06-05** | **F-50语音助手数据表（3张）：①voice_sessions语音会话表（18字段+3索引，ASR→NLU→API→NLG→TTS全链路记录，不存原始音频，query_text max500/answer_text max2000，含intent/answer_source枚举说明+slots JSONB结构示例）②voice_turns多轮对话轮次表（9字段+唯一约束+CASCADE外键，Phase 1.2启用标注，含role/turn_type枚举说明）③voice_analytics分析聚合表（12字段+唯一约束，定时任务聚合写入，含UPSERT聚合SQL示例）④ER图新增VOICE_SESSIONS/VOICE_TURNS/VOICE_ANALYTICS三节点及users→sessions/sessions→turns/sessions→entities关系线⑤§5.4新增Alembic迁移代码（upgrade/downgrade完整实现+SQLite兼容映射表+6项验证清单）⑥版本保持0.2.0不变（增量更新）** |
 | **v2.5** | **2026-06-06** | **Insight Engine + DataSourceAdapter 数据库变更：①todos表新增3字段：completed_rank(完成序号/隐式反馈)、dynamic_score(动态优先级分)、score_calculated_at(评分时间)，含2个CHECK约束(check_dynamic_score_range/check_score_timestamp_valid)和2个索引(idx_todos_dynamic_score/idx_todos_completed_rank)②新增score_audit_logs评分审计日志表（7字段+2索引，triggered_by枚举3值，calculation_factors JSONB结构）③新增adapter_configs数据源适配器配置表（6字段+CHECK约束+唯一约束，adapter_name枚举5值，config_encrypted BYTEA加密存储）④entities.properties JSONB新增concerns/capabilities结构化字段（{tag,detail,source_event_id}格式，无需DDL变更）** |
 | **v2.6** | **2026-06-06** | **F-55/F-56 评分审计扩展：①score_audit_logs.calculation_factors JSONB结构扩展，新增dependency_score/context_score/dependency_raw/context_raw字段，用于审计依赖性全图谱路径分析(F-55)和场景匹配Event表驱动(F-56)的计算因子②todos表确认已有dynamic_score/score_calculated_at/completed_rank字段（F-51/F-52已加），无需新增DDL变更③Phase1启用四维模型后审计日志将完整记录四维得分及原始计算因子** |
+| **v2.7** | **2026-06-06** | **F-57/F-58 语义搜索与关联发现增强：①新增vector_embeddings表（8字段+2索引+唯一约束，target_type枚举entity/event，embedding BLOB存储768维float32向量，source_text用于缓存校验，user_id数据隔离）②新增vec_entities虚拟表（sqlite-vec vec0扩展，embedding float[768]，可选创建，不可用时Python余弦降级）③Phase2迁移DDL（PostgreSQL+pgvector，vector(768)列类型+IVFFlat索引）** |
 | v2.1 | TBD | 添加用户反馈表 |
 
 ---

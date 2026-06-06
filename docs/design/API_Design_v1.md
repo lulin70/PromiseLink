@@ -1,11 +1,12 @@
 # EventLink API设计文档
 
-> **版本**: 0.2.6 (POC阶段)
+> **版本**: 0.2.7 (POC阶段)
 > **日期**: 2026-06-06
 > **阶段**: POC (0.2.x series)
 > **设计师**: 架构师 + 开发团队
-> **参考**: PRD v4.3, 技术设计 v2.6 §7
+> **参考**: PRD v4.3, 技术设计 v2.7 §7
 > **v2.6变更**: Insight Engine API新增priority-breakdown/upcoming-context端点(§3.13)、Todo schema新增dependency_raw/context_raw字段
+> **v2.7变更**: 新增§3.15 Semantic Search API（3个端点+SearchResult schema, F-57/F-58）
 
 ---
 
@@ -2424,6 +2425,186 @@ Cache-Control: private, max-age=300
 | 404 | E1001 | 适配器未配置 |
 | 422 | E1003 | 尝试删除内置适配器（manual/voice），请使用 PATCH 设置 is_active=false |
 
+### 3.15 Semantic Search API（v2.7 新增, F-57/F-58）
+
+> **定位**: 提供基于向量嵌入的语义搜索能力，支持Entity/Event的自然语言查询，同时为关联发现提供语义增强（F-58）。
+
+#### 3.15.1 语义搜索
+
+**端点**: `POST /api/v1/search/semantic`
+
+**说明**: 根据自然语言查询，返回语义最相似的Entity和Event列表。搜索范围限定为当前用户数据。
+
+**认证**: Bearer Token
+
+**限流**: 20次/分钟
+
+**请求体**:
+
+```json
+{
+  "query": "做AI创业的张总",
+  "user_id": "auto",           // 从JWT提取，忽略客户端传入
+  "top_k": 10,                 // 可选，默认10，范围1-50
+  "target_types": ["entity", "event"],  // 可选，默认全部
+  "min_similarity": 0.5        // 可选，默认0.5，范围0.0-1.0
+}
+```
+
+**响应**: `200 OK`
+
+```json
+{
+  "query": "做AI创业的张总",
+  "results": [
+    {
+      "target_type": "entity",
+      "target_id": "entity-uuid-001",
+      "name": "张三",
+      "company": "AI创业公司",
+      "similarity": 0.8923,
+      "matched_text": "姓名: 张三 | 公司: AI创业公司 | 行业: 科技 | 关注: AI应用落地 - 寻找合作伙伴",
+      "highlights": ["AI创业", "张总"]
+    },
+    {
+      "target_type": "event",
+      "target_id": "event-uuid-002",
+      "name": "与张三讨论AI合作方案",
+      "similarity": 0.7541,
+      "matched_text": "与张三讨论AI合作方案 | 参与者: 张三, 李四 | 类型: meeting | 关键内容: AI应用场景",
+      "highlights": ["AI", "张三"]
+    }
+  ],
+  "total": 2,
+  "search_method": "sqlite_vec",  // "sqlite_vec" | "python_cosine"
+  "latency_ms": 45
+}
+```
+
+**错误码**:
+
+| HTTP状态码 | 错误码 | 场景 |
+|-----------|--------|------|
+| 400 | E1000 | 参数校验失败（top_k>50, min_similarity<0等） |
+| 401 | E2000 | 未认证 |
+| 503 | E4000 | 语义搜索服务不可用（embedding API故障） |
+
+#### 3.15.2 向量索引统计
+
+**端点**: `GET /api/v1/search/stats`
+
+**说明**: 返回当前用户的向量索引统计信息，用于监控和调试。
+
+**认证**: Bearer Token
+
+**限流**: 10次/分钟
+
+**响应**: `200 OK`
+
+```json
+{
+  "user_id": "user-uuid",
+  "total_embeddings": 156,
+  "by_type": {
+    "entity": 98,
+    "event": 58
+  },
+  "index_method": "sqlite_vec",   // "sqlite_vec" | "python_cosine"
+  "last_indexed_at": "2026-06-06T10:30:00Z",
+  "cache_size": 234,
+  "embedding_model": "text-embedding-3-small",
+  "embedding_dimensions": 768
+}
+```
+
+#### 3.15.3 重建索引
+
+**端点**: `POST /api/v1/search/reindex`
+
+**说明**: 触发向量索引重建。异步执行，立即返回任务ID。
+
+**认证**: Bearer Token
+
+**限流**: 2次/小时
+
+**请求体**:
+
+```json
+{
+  "scope": "full",     // "full" 全量重建 | "incremental" 增量更新
+  "target_types": ["entity", "event"]  // 可选，默认全部
+}
+```
+
+**响应**: `202 Accepted`
+
+```json
+{
+  "task_id": "reindex-task-uuid",
+  "status": "started",
+  "scope": "full",
+  "estimated_items": 156,
+  "started_at": "2026-06-06T10:30:00Z"
+}
+```
+
+**错误码**:
+
+| HTTP状态码 | 错误码 | 场景 |
+|-----------|--------|------|
+| 401 | E2000 | 未认证 |
+| 409 | E1002 | 已有重建任务在执行中 |
+| 429 | E3000 | 超过限流（2次/小时） |
+
+#### 3.15.4 SearchResult Schema
+
+```python
+from pydantic import BaseModel
+from typing import Optional
+
+class SearchResultItem(BaseModel):
+    """语义搜索结果项"""
+    target_type: str           # "entity" | "event"
+    target_id: str             # 目标ID
+    name: str                  # Entity名称或Event标题
+    company: Optional[str]     # 仅Entity有值
+    similarity: float          # 余弦相似度 [0, 1]
+    matched_text: str          # 生成embedding的原始文本
+    highlights: list[str]      # 高亮关键词
+
+class SemanticSearchResponse(BaseModel):
+    """语义搜索响应"""
+    query: str
+    results: list[SearchResultItem]
+    total: int
+    search_method: str         # "sqlite_vec" | "python_cosine"
+    latency_ms: int
+
+class SearchStatsResponse(BaseModel):
+    """搜索统计响应"""
+    user_id: str
+    total_embeddings: int
+    by_type: dict[str, int]
+    index_method: str
+    last_indexed_at: Optional[str]
+    cache_size: int
+    embedding_model: str
+    embedding_dimensions: int
+
+class ReindexRequest(BaseModel):
+    """重建索引请求"""
+    scope: str = "full"        # "full" | "incremental"
+    target_types: list[str] = ["entity", "event"]
+
+class ReindexResponse(BaseModel):
+    """重建索引响应"""
+    task_id: str
+    status: str                # "started"
+    scope: str
+    estimated_items: int
+    started_at: str
+```
+
 ---
 
 ## 4. 安全策略（v2.0新增）
@@ -3994,6 +4175,7 @@ X-Cache-Hit: true
 | **v0.2.1** | **2026-06-05** | **[F-50新增] 语音助手API (Voice Assistant, Phase 1.1)：**<br/>**① F50-1 新增§3.12 Voice Assistant API章节**:<br/>　- POST /api/v1/voice/session — 创建语音问答会话(NLU意图识别→业务API调用→自然语言回答→TTS预生成)<br/>　- GET /api/v1/voice/tts/{session_id} — 获取预生成TTS音频(MP3流, Cache-Control private max-age=300)<br/>　- POST /api/v1/voice/feedback — 语音回答质量反馈(NLU模型优化用)<br/>**② F50-2 NLU意图枚举 VoiceIntent**: schedule_query/promise_tracker/relationship_status(P0) + schedule_range/action_suggestion(P1) + conversation_review/knowledge_retrieval(P2) + unclear<br/>**③ F50-3 VoiceSessionCreate/VoiceSessionResponse 数据模型定义**<br/>**④ F50-4 现有端点变更** — summary_level参数(三档: brief/detail/voice):<br/>　- GET /api/v1/dashboard/day-view(F-49) + natural_date参数("今天"|"明天"|"后天"|"本周"|"下游") → answer_paragraph字段<br/>　- GET /api/v1/persons/{id}/relationship-brief(F-47) → voice_summary字段<br/>　- GET /api/v1/todos → voice_summary字段<br/>**⑤ F50-5 PII脱敏清单扩展**: POST /voice/session(answer_text) + GET /voice/tts(音频内容)<br/>**关键约束**: 不存储原始音频; TTS输出PII脱敏; 所有端点JWT认证; TTL=5分钟音频缓存 |
 | **v2.5** | **2026-06-06** | **Insight Engine + DataSourceAdapter API (v2.5)：**<br/>**① 新增§3.13 Insight Engine API**:<br/>　- GET /api/v1/todos?sort=smart — 按动态评分排序(默认)<br/>　- GET /api/v1/todos?sort=due_date — 按截止时间排序<br/>　- POST /api/v1/insights/calculate — 触发优先级重新计算(scope: all/entity/overdue, 限流10次/分)<br/>　- GET /api/v1/insights/feedback-stats — 获取隐式反馈统计(period: 1d/7d/30d)<br/>**② 新增§3.14 DataSourceAdapter API**:<br/>　- GET /api/v1/adapters — 列出已配置数据源(不返回config_encrypted)<br/>　- POST /api/v1/adapters — 添加新数据源配置(adapter_name枚举5值, config加密存储)<br/>　- POST /api/v1/adapters/{name}/sync — 手动触发同步(异步, 限流5次/分/适配器)<br/>　- DELETE /api/v1/adapters/{name} — 删除数据源配置(manual/voice不可删)<br/>**③ Todo响应schema新增字段**: completed_rank(完成序号) + dynamic_score(动态优先级分, 0-100)<br/>**④ OpenAPI YAML Todo schema更新**: 新增completed_rank(integer, nullable) + dynamic_score(number, 0-100, nullable) |
 | **v2.6** | **2026-06-06** | **F-55/F-56 Insight Engine API扩展 (v2.6)：**<br/>**① §3.13 Insight Engine API新增2个端点**:<br/>　- GET /api/v1/todos/{todo_id}/priority-breakdown — 返回四维评分详情(urgency/importance/dependency/context)，含每个维度的原始得分和计算因子，支持可解释性面板<br/>　- GET /api/v1/users/{user_id}/upcoming-context — 返回未来24h即将见面的Entity及关联Todo，支持会前准备场景<br/>**② Todo schema breakdown字段扩展**: 新增dependency_raw(依赖分析原始因子, F-55) + context_raw(场景匹配原始因子, F-56)<br/>**③ OpenAPI YAML Todo schema更新**: 新增breakdown对象(含urgency/importance/dependency/context四维得分 + dependency_raw/context_raw原始因子) |
+| **v2.7** | **2026-06-06** | **F-57/F-58 语义搜索与关联发现增强 API (v2.7)：**<br/>**① 新增§3.15 Semantic Search API**:<br/>　- POST /api/v1/search/semantic — 语义搜索(query+top_k+target_types+min_similarity，返回SearchResultItem列表含similarity/highlights)<br/>　- GET /api/v1/search/stats — 向量索引统计(total_embeddings/by_type/index_method/cache_size)<br/>　- POST /api/v1/search/reindex — 重建索引(full/incremental，异步202返回task_id，限流2次/小时)<br/>**② 新增SearchResult Schema**: SearchResultItem + SemanticSearchResponse + SearchStatsResponse + ReindexRequest + ReindexResponse<br/>**③ 数据隔离**: user_id从JWT提取，搜索结果按user_id过滤，忽略客户端传入的user_id** |
 
 ---
 

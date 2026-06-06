@@ -1,6 +1,6 @@
-# EventLink集成设计文档 v2.6
+# EventLink集成设计文档 v2.7
 
-> **版本**: v2.6（POC阶段 — Insight Engine + DataSourceAdapter + 依赖性/场景匹配 集成规格）
+> **版本**: v2.7（POC阶段 — Insight Engine + DataSourceAdapter + 依赖性/场景匹配 + 语义搜索 集成规格）
 > **日期**: 2026-06-06
 > **设计师**: 架构师团队
 > **参考**: PRD v4.3, 技术设计 v2.5, API设计 v1.0, 数据库设计 v2.0, LLM_Prompt_Templates v2.0
@@ -5134,7 +5134,146 @@ class PriorityScorerV2:
 
 ---
 
-## 13. 版本历史
+## 13. EmbeddingProvider集成设计 [v2.7新增]
+
+### 13.1 与Pipeline Step 5.5的集成点 [v2.7新增]
+
+> **定位**: 在Pipeline Step 5（Entity提取/归一）之后，新增Step 5.5执行EmbeddingProvider嵌入生成，为语义搜索和关联发现增强提供向量数据。
+
+**集成位置**:
+
+```
+Pipeline Step 5: Entity提取/归一
+    ↓
+Pipeline Step 5.5: EmbeddingProvider嵌入生成 [v2.7新增]
+    ↓
+Pipeline Step 6: Todo生成
+    ↓
+Pipeline Step 8.5: DependencyAnalyzer + ContextMatcher
+    ↓
+Pipeline Step 11: AssociationDiscoveryEngine（含语义增强）
+```
+
+**触发条件**:
+- Entity新建或属性变更时触发embed
+- Event创建时触发embed
+- 批量场景（build_index）由POST /api/v1/search/reindex触发
+
+### 13.2 Moka AI API调用链 [v2.7新增]
+
+```
+EmbeddingProvider.embed(text)
+    ↓
+httpx.AsyncClient.post("https://api.moka-ai.com/v1/embeddings")
+    Headers: Authorization: Bearer {LLM_API_KEY}
+    Body: {model: "text-embedding-3-small", input: [text]}
+    ↓
+Response: {data: [{embedding: [0.001, -0.002, ...], index: 0}]}
+    ↓
+SHA256(text) → cache[text_hash] = embedding
+    ↓
+struct.pack(768f, *embedding) → vector_embeddings.embedding BLOB
+```
+
+**性能预估**:
+
+| 操作 | 延迟 | 说明 |
+|------|------|------|
+| 单条embed | ~100ms | 含API调用+缓存写入 |
+| 批量embed(100条) | ~2s | 单次API调用 |
+| 缓存命中 | <1ms | 内存dict查询 |
+| build_index(200条) | ~5s | 2次批量API调用+DB写入 |
+
+### 13.3 与AssociationDiscoveryEngine的数据依赖 [v2.7新增]
+
+```
+EmbeddingProvider.embed(entity_text)
+    ↓
+vector_embeddings表（BLOB存储）
+    ↓
+SemanticAssociationEnhancer.enhance_score()
+    ├── structured_score: 原有六维匹配
+    └── semantic_score: cosine_similarity(entity_a_embedding, entity_b_embedding)
+    ↓
+final_score = 0.7 × structured_score + 0.3 × semantic_score
+```
+
+**数据流**: Entity属性 → compose_entity_text() → EmbeddingProvider.embed() → vector_embeddings → SemanticAssociationEnhancer
+
+---
+
+## 14. SemanticSearchEngine集成设计 [v2.7新增]
+
+### 14.1 与Pipeline Step 5.5和Step 11的集成点 [v2.7新增]
+
+**双集成点**:
+
+1. **Step 5.5**: Pipeline执行时自动触发EmbeddingProvider，将Entity/Event的embedding写入vector_embeddings表
+2. **Step 11**: AssociationDiscoveryEngine执行关联发现时，调用SemanticAssociationEnhancer进行语义增强
+
+**调用时序**:
+
+```python
+# Step 5.5: Pipeline自动触发
+async def pipeline_step_5_5(entity, embedding_provider):
+    """Pipeline Step 5.5: 生成Entity embedding"""
+    text = compose_entity_text(entity)
+    embedding = await embedding_provider.embed(text)
+    if embedding:
+        await store_embedding(entity.user_id, "entity", entity.id, text, embedding)
+
+# Step 11: 关联发现语义增强
+async def pipeline_step_11(entity_a, entity_b, semantic_enhancer):
+    """Pipeline Step 11: 关联发现（含语义增强）"""
+    structured_result = structured_match(entity_a, entity_b)
+    if semantic_enhancer:
+        text_a = compose_entity_text(entity_a)
+        text_b = compose_entity_text(entity_b)
+        enhanced = await semantic_enhancer.enhance_score(
+            structured_result["score"], text_a, text_b
+        )
+        structured_result["score"] = enhanced["final_score"]
+        structured_result["semantic"] = enhanced
+    return structured_result
+```
+
+### 14.2 sqlite-vec vs Python余弦降级 [v2.7新增]
+
+| 特性 | sqlite-vec | Python余弦降级 |
+|------|-----------|---------------|
+| 安装 | `pip install sqlite-vec` | 无需额外安装 |
+| 性能 | ~5ms/1000条 | ~50ms/1000条 |
+| 精度 | float32 | float64（更高精度） |
+| 索引 | vec0虚拟表 | 全表扫描 |
+| 可用性 | 需编译环境 | 始终可用 |
+
+**降级决策流程**:
+
+```python
+def create_search_engine(embedding_provider, db_path):
+    """工厂方法：自动选择搜索引擎"""
+    try:
+        import sqlite_vec
+        return SemanticSearchEngine(embedding_provider, db_path, vec_available=True)
+    except ImportError:
+        logger.warning("sqlite-vec不可用，降级为Python余弦相似度")
+        return SemanticSearchEngine(embedding_provider, db_path, vec_available=False)
+```
+
+### 14.3 Phase 2 pgvector迁移路径 [v2.7新增]
+
+| 迁移步骤 | 说明 | 风险 |
+|----------|------|------|
+| 1. 安装pgvector | `CREATE EXTENSION vector` | 低 |
+| 2. 创建新表 | vector(768)列替代BLOB | 中（需数据迁移） |
+| 3. 数据迁移 | BLOB→vector转换脚本 | 中（停机窗口） |
+| 4. 索引构建 | IVFFlat/HNSW索引 | 低 |
+| 5. 切换查询 | Python余弦→`<=>`操作符 | 低 |
+| 6. 删除旧表 | DROP vector_embeddings BLOB列 | 低（确认后） |
+
+---
+
+## 15. 版本历史
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
@@ -5145,7 +5284,8 @@ class PriorityScorerV2:
 | **0.2.1** | **2026-06-05** | **Voice Service 集成规格详细化：①§4.2 ASR详细化[0.2.1] — 新增4.2.4微信同声传译插件(Phase1.1首选,含小程序端集成代码+局限/Fallback策略) + 4.2.5 Whisper Local备选(Phase1.2, faster-whisper+模型对比表base/small/medium) + 4.2.6 ASR Client抽象层(Protocol接口+WechatASRProvider+WhisperASRProviderWrapper+MockASRProvider+工厂方法) ②§4.3 TTS详细化[0.2.1] — 新增4.3.3 Azure Edge-TTS(免费Neural音质+4种中文声音推荐+SSML支持+EdgeTTSProvider实现) + 4.3.4预合成MP3缓存策略(MD5 Key+24h TTL+CachedTTSProvider装饰器+高频文案列表) + 4.3.5 TTS Client抽象层(Protocol接口+EdgeTTSWrapper+MockTTSProvider+CachedTTSWrapper+工厂方法) + 4.3.6 TTS输出安全PII脱敏(TTSSecurityMiddleware+6种PII正则复用§6.6+审计日志) ③§4.6 Voice Orchestrator[0.2.1新增] — 5步Pipeline架构(ASR→NLU→API→NLG→TTS) + VoiceOrchestrator核心类(VoiceIntent枚举+VoiceResponse数据模型+完整process()方法+降级策略) + API端点POST /api/v1/voice/query + 4级降级行为表 ④§4.7 NLG[0.2.1新增] — Prompt-based NLG策略(非训练模型) + 5个意图Prompt模板(schedule/todo/person/digest/create_todo含输出示例) + NLGGenerator实现(复用Moka AI+模板注册表+输出验证) + 与现有LLM模板关系对比表** |
 | **v2.5** | **2026-06-06** | **DevSquad Review更新 — Insight Engine + DataSourceAdapter集成：①§10 DataSourceAdapter集成[v2.5新增] — 10.1 Adapter接口定义(DataSourceAdapter抽象基类+fetch_new_events/authenticate方法+5个具体适配器ManualInputAdapter/VoiceAdapter/EmailAdapter/CalendarAdapter/WeChatForwardAdapter+统一Event输出) ②§10.2 Email集成Phase1(IMAP/Exchange+OAuth2+一封邮件=一个Event+action_type区分方向) ③§10.3 微信集成约束(个人微信无API/企业微信API可用/手动转发PoC方案+语音最低摩擦策略) ④§10.4 供应链安全(依赖锁定哈希校验+CI/CD漏洞扫描+Adapter五阶段审查流程)** |
 | **v2.6** | **2026-06-06** | **F-55/F-56 依赖性与场景匹配集成：①§11 DependencyAnalyzer集成设计[v2.6新增] — 11.1 与Pipeline Step 8.5集成点(Step8 Promise分析后触发→Step9 Todo持久化前) 11.2 与AssociationDiscoveryEngine数据依赖(Entity关联关系→Todo→Entity→Todo依赖链构建) 11.3 依赖图构建算法(BFS遍历+O(N×E)复杂度+N=Todo数/E=Entity关联数+dependency_score公式+性能考量PoC全量/Phase1增量/Phase2 Neo4j) ②§12 ContextMatcher集成设计[v2.6新增] — 12.1 与Pipeline Step 8.5集成点(与DependencyAnalyzer并行执行) 12.2 Event表查询优化(idx_events_context复合索引user_id+event_type+created_at+查询性能预估) 12.3 与PriorityScorerV2调用链(四维评分公式0.25×urgency+0.35×importance+0.20×dependency+0.20×context+降级策略)** |
+| **v2.7** | **2026-06-06** | **F-57/F-58 语义搜索与关联发现增强集成：①§13 EmbeddingProvider集成设计[v2.7新增] — 13.1 与Pipeline Step 5.5集成点(Entity提取后触发嵌入生成) 13.2 Moka AI API调用链(text-embedding-3-small+SHA256缓存+性能预估单条~100ms/批量~2s) 13.3 与AssociationDiscoveryEngine数据依赖(Entity→embed→vector_embeddings→SemanticAssociationEnhancer) ②§14 SemanticSearchEngine集成设计[v2.7新增] — 14.1 双集成点(Step5.5嵌入生成+Step11语义增强) 14.2 sqlite-vec vs Python余弦降级(5ms vs 50ms/1000条) 14.3 Phase2 pgvector迁移路径(6步骤+风险评估)** |
 
 ---
 
-*v2.6 完成于2026-06-06 — Insight Engine + DataSourceAdapter + 依赖性/场景匹配 集成规格*
+*v2.7 完成于2026-06-06 — Insight Engine + DataSourceAdapter + 依赖性/场景匹配 + 语义搜索 集成规格*

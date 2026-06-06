@@ -1,12 +1,12 @@
 # EventLink 算法设计文档
 
-> **版本**: 0.2.6 (POC阶段)
+> **版本**: 0.2.7 (POC阶段)
 > **日期**: 2026-06-06
 > **阶段**: POC (0.2.x series)
 > **定位**: AI驱动的**个人商务关系经营助手**（非"资源匹配平台"）
-> **参考**: 技术设计 v2.6 §4
+> **参考**: 技术设计 v2.7 §4
 > **状态**: ✅ 独立完整版，含详细算法与Python实现
-> **v2.6变更**: 新增DependencyAnalyzer算法(§2.13, F-55)、ContextMatcher算法(§2.14, F-56)
+> **v2.7变更**: 新增EmbeddingProvider算法(§2.15, F-57)、SemanticSearchEngine算法(§2.16, F-57)、关联发现语义增强算法(§2.17, F-58)
 
 ---
 
@@ -1654,6 +1654,456 @@ Score = 0.30 × urgency + 0.35 × importance + 0.20 × dependency + 0.15 × cont
 | 窗口 | 不计算 | 24小时 |
 | Entity匹配 | 不匹配 | Todo.related_entity_id ∈ upcoming_event.entities |
 | 得分审计 | 不记录 | context_raw写入score_audit_logs |
+
+### 2.15 EmbeddingProvider 算法（v2.7 新增, F-57）
+
+#### 2.15.1 核心思路
+
+EmbeddingProvider负责将Entity/Event的文本描述转换为768维向量（embedding），供SemanticSearchEngine进行语义搜索。使用Moka AI的text-embedding-3-small模型，通过SHA256缓存避免重复调用，支持批量嵌入。
+
+**核心类**: `EmbeddingProvider`
+
+**关键参数**:
+- 模型: `text-embedding-3-small`（Moka AI API）
+- 向量维度: 768
+- 批量上限: 2048 items/batch
+- 缓存策略: SHA256(text)→embedding，内存存储，重启清空
+
+#### 2.15.2 文本组合规则
+
+Entity和Event的文本组合遵循Template 24（见LLM_Prompt_Templates.md），确保嵌入输入的一致性：
+
+```
+Entity文本: "姓名: {name} | 公司: {company} | 行业: {industry} | 关注: {concern_tag} - {concern_detail} | 能力: {capability_tag} - {capability_detail}"
+Event文本:  "{title} | 参与者: {participants} | 类型: {event_type} | 关键内容: {summary}"
+```
+
+**空字段处理**: 空字段跳过，不输出"关注: - "这种空标签。例如无concern时: "姓名: 张三 | 公司: AI公司 | 行业: 科技"
+
+#### 2.15.3 嵌入生成算法
+
+```python
+import hashlib
+import httpx
+
+class EmbeddingProvider:
+    """向量嵌入提供者"""
+
+    MODEL = "text-embedding-3-small"
+    DIMENSIONS = 768
+    MAX_BATCH = 2048
+
+    def __init__(self, api_key: str, base_url: str = "https://api.moka-ai.com/v1"):
+        self.api_key = api_key
+        self.base_url = base_url
+        self._cache: dict[str, list[float]] = {}  # SHA256(text) → embedding
+
+    def _cache_key(self, text: str) -> str:
+        """生成缓存键"""
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+    async def embed(self, text: str) -> list[float]:
+        """单条文本嵌入（带缓存）"""
+        key = self._cache_key(text)
+        if key in self._cache:
+            return self._cache[key]
+
+        result = await self._call_api([text])
+        self._cache[key] = result[0]
+        return result[0]
+
+    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+        """批量嵌入（自动分批）"""
+        results = []
+        for i in range(0, len(texts), self.MAX_BATCH):
+            batch = texts[i:i + self.MAX_BATCH]
+            # 检查缓存
+            uncached = []
+            uncached_indices = []
+            for j, text in enumerate(batch):
+                key = self._cache_key(text)
+                if key in self._cache:
+                    results.append(self._cache[key])
+                else:
+                    uncached.append(text)
+                    uncached_indices.append(len(results))
+
+            if uncached:
+                embeddings = await self._call_api(uncached)
+                for text, embedding in zip(uncached, embeddings):
+                    key = self._cache_key(text)
+                    self._cache[key] = embedding
+                # 按原始顺序插入
+                for idx, embedding in zip(uncached_indices, embeddings):
+                    results[idx] = embedding
+
+        return results
+
+    async def _call_api(self, texts: list[str]) -> list[list[float]]:
+        """调用Moka AI Embedding API"""
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{self.base_url}/embeddings",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                json={
+                    "model": self.MODEL,
+                    "input": texts,
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+            # 按index排序确保顺序一致
+            sorted_data = sorted(data["data"], key=lambda x: x["index"])
+            return [item["embedding"] for item in sorted_data]
+
+    def clear_cache(self):
+        """清空缓存（重启时调用）"""
+        self._cache.clear()
+```
+
+#### 2.15.4 降级策略
+
+| 场景 | 处理方式 | 影响 |
+|------|---------|------|
+| API不可用 | 返回None，调用方跳过语义搜索 | 关联发现退化为纯结构化匹配 |
+| 单条超时(30s) | 重试1次后返回None | 该条目无embedding |
+| 批量部分失败 | 成功的写入缓存，失败的返回None | 部分条目无embedding |
+| 缓存未命中 | 正常调用API | 无特殊处理 |
+
+#### 2.15.5 PoC vs Phase1 差异
+
+| 特性 | PoC | Phase1 |
+|------|-----|--------|
+| 缓存 | 内存dict，重启清空 | Redis持久化，TTL 7天 |
+| 存储 | SQLite BLOB | PostgreSQL vector(768) + pgvector |
+| 批量 | 同步分批 | 异步并发分批 |
+| 监控 | 无 | Prometheus嵌入延迟/缓存命中率 |
+
+### 2.16 SemanticSearchEngine 算法（v2.7 新增, F-57）
+
+#### 2.16.1 核心思路
+
+SemanticSearchEngine基于EmbeddingProvider生成的向量，实现Entity/Event的语义搜索。PoC阶段使用Python余弦相似度计算，优先尝试sqlite-vec虚拟表加速；Phase2迁移至pgvector。
+
+**核心类**: `SemanticSearchEngine`
+
+**关键参数**:
+- 相似度算法: 余弦相似度 (cosine_similarity)
+- 默认top_k: 10
+- 最小相似度阈值: 0.5（低于此值不返回）
+
+#### 2.16.2 索引构建算法
+
+```python
+import struct
+import sqlite3
+
+class SemanticSearchEngine:
+    """语义搜索引擎"""
+
+    MIN_SIMILARITY = 0.5
+    DEFAULT_TOP_K = 10
+
+    def __init__(self, embedding_provider: EmbeddingProvider, db_path: str):
+        self.provider = embedding_provider
+        self.db_path = db_path
+        self._vec_available = self._check_sqlite_vec()
+
+    def _check_sqlite_vec(self) -> bool:
+        """检查sqlite-vec是否可用"""
+        try:
+            import sqlite_vec
+            return True
+        except ImportError:
+            return False
+
+    async def build_index(self, user_id: str) -> int:
+        """为用户构建向量索引，返回索引条目数"""
+        import asyncio
+        from eventlink.core.database import get_session
+
+        async with get_session() as session:
+            # 1. 获取所有Entity文本
+            entities = await session.execute(
+                "SELECT id, name, company, industry, properties "
+                "FROM entities WHERE user_id = ?",
+                (user_id,)
+            )
+            texts = []
+            targets = []
+            for row in entities:
+                text = self._compose_entity_text(row)
+                texts.append(text)
+                targets.append(("entity", row.id))
+
+            # 2. 获取所有Event文本
+            events = await session.execute(
+                "SELECT id, title, event_type, summary, participants "
+                "FROM events WHERE user_id = ?",
+                (user_id,)
+            )
+            for row in events:
+                text = self._compose_event_text(row)
+                texts.append(text)
+                targets.append(("event", row.id))
+
+            # 3. 批量嵌入
+            embeddings = await self.provider.embed_batch(texts)
+
+            # 4. 存入vector_embeddings表
+            count = 0
+            for (target_type, target_id), embedding in zip(targets, embeddings):
+                if embedding is not None:
+                    await self._store_embedding(
+                        user_id, target_type, target_id,
+                        texts[count], embedding
+                    )
+                    count += 1
+
+            # 5. 如果sqlite-vec可用，构建虚拟表
+            if self._vec_available:
+                await self._build_vec_table(user_id)
+
+            return count
+
+    async def _store_embedding(self, user_id, target_type, target_id,
+                                source_text, embedding):
+        """存储embedding到vector_embeddings表"""
+        blob = struct.pack(f"{len(embedding)}f", *embedding)
+        async with get_session() as session:
+            await session.execute(
+                """INSERT OR REPLACE INTO vector_embeddings
+                   (target_type, target_id, user_id, embedding, source_text)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (target_type, target_id, user_id, blob, source_text)
+            )
+```
+
+#### 2.16.3 语义搜索算法
+
+```python
+    async def search(self, query: str, user_id: str,
+                     top_k: int = 10) -> list[dict]:
+        """语义搜索：返回与query最相似的Entity/Event"""
+        # 1. 生成查询向量
+        query_embedding = await self.provider.embed(query)
+        if query_embedding is None:
+            return []
+
+        # 2. 优先使用sqlite-vec
+        if self._vec_available:
+            results = await self._search_sqlite_vec(
+                query_embedding, user_id, top_k
+            )
+            if results:
+                return results
+
+        # 3. 降级：Python余弦相似度
+        return await self._search_python_cosine(
+            query_embedding, user_id, top_k
+        )
+
+    async def _search_sqlite_vec(self, query_embedding, user_id, top_k):
+        """使用sqlite-vec虚拟表搜索"""
+        import sqlite_vec
+
+        conn = sqlite3.connect(self.db_path)
+        try:
+            db = sqlite_vec.connect(conn)
+            db.execute(
+                "CREATE VIRTUAL TABLE IF NOT EXISTS vec_entities "
+                "USING vec0(embedding float[768])"
+            )
+            # 查询
+            query_blob = struct.pack(f"{len(query_embedding)}f", *query_embedding)
+            rows = db.execute(
+                "SELECT rowid, distance FROM vec_entities "
+                "WHERE embedding MATCH ? AND k = ?",
+                (query_blob, top_k)
+            ).fetchall()
+
+            results = []
+            for rowid, distance in rows:
+                # 根据rowid查找对应target
+                target = await self._get_target_by_rowid(rowid, user_id)
+                if target:
+                    similarity = 1 - distance  # vec0 distance = 1 - cosine
+                    if similarity >= self.MIN_SIMILARITY:
+                        target["similarity"] = round(similarity, 4)
+                        results.append(target)
+            return results
+        finally:
+            conn.close()
+
+    async def _search_python_cosine(self, query_embedding, user_id, top_k):
+        """Python余弦相似度降级搜索"""
+        import numpy as np
+
+        async with get_session() as session:
+            rows = await session.execute(
+                "SELECT target_type, target_id, embedding "
+                "FROM vector_embeddings WHERE user_id = ?",
+                (user_id,)
+            )
+
+        candidates = []
+        query_vec = np.array(query_embedding)
+
+        for target_type, target_id, blob in rows:
+            emb_vec = np.array(struct.unpack(f"{len(blob)//4}f", blob))
+            similarity = float(np.dot(query_vec, emb_vec) /
+                              (np.linalg.norm(query_vec) * np.linalg.norm(emb_vec)))
+            if similarity >= self.MIN_SIMILARITY:
+                candidates.append({
+                    "target_type": target_type,
+                    "target_id": target_id,
+                    "similarity": round(similarity, 4),
+                })
+
+        candidates.sort(key=lambda x: x["similarity"], reverse=True)
+        return candidates[:top_k]
+```
+
+#### 2.16.4 PoC vs Phase1 差异
+
+| 特性 | PoC | Phase1 |
+|------|-----|--------|
+| 向量存储 | SQLite BLOB | PostgreSQL vector(768) + pgvector |
+| 搜索引擎 | Python余弦 / sqlite-vec | pgvector索引查询 |
+| 索引构建 | Pipeline触发 | 定时任务+增量更新 |
+| top_k | 10 | 可配置 |
+
+### 2.17 关联发现语义增强算法（v2.7 新增, F-58）
+
+#### 2.17.1 核心思路
+
+在现有AssociationDiscoveryEngine的结构化匹配基础上，引入语义相似度作为补充维度。混合评分公式：
+
+```
+final_score = 0.7 × structured_score + 0.3 × semantic_score
+```
+
+其中：
+- `structured_score`: 原有六维匹配算法得分（见§2.1-2.12）
+- `semantic_score`: 基于EmbeddingProvider的余弦相似度
+
+**设计原则**:
+- 结构化匹配为主（70%），语义为辅（30%）
+- 语义相似度阈值: cosine_similarity > 0.7 才计入semantic_score
+- 优雅降级: embedding不可用时退化为纯结构化匹配
+
+#### 2.17.2 混合评分算法
+
+```python
+class SemanticAssociationEnhancer:
+    """关联发现语义增强器"""
+
+    STRUCTURED_WEIGHT = 0.7
+    SEMANTIC_WEIGHT = 0.3
+    SEMANTIC_THRESHOLD = 0.7  # 语义相似度阈值
+
+    def __init__(self, embedding_provider: EmbeddingProvider):
+        self.provider = embedding_provider
+
+    async def enhance_score(self, structured_score: float,
+                            entity_a_text: str, entity_b_text: str) -> dict:
+        """计算混合评分"""
+        # 1. 计算语义相似度
+        semantic_score = await self._compute_semantic_score(
+            entity_a_text, entity_b_text
+        )
+
+        # 2. 语义得分低于阈值时不计入
+        if semantic_score < self.SEMANTIC_THRESHOLD:
+            return {
+                "final_score": structured_score,
+                "structured_score": structured_score,
+                "semantic_score": semantic_score,
+                "semantic_applied": False,
+                "reason": f"semantic_score {semantic_score:.4f} < threshold {self.SEMANTIC_THRESHOLD}",
+            }
+
+        # 3. 混合评分
+        final_score = (
+            self.STRUCTURED_WEIGHT * structured_score +
+            self.SEMANTIC_WEIGHT * semantic_score
+        )
+
+        return {
+            "final_score": round(final_score, 4),
+            "structured_score": structured_score,
+            "semantic_score": round(semantic_score, 4),
+            "semantic_applied": True,
+        }
+
+    async def _compute_semantic_score(self, text_a: str, text_b: str) -> float:
+        """计算两个文本的语义相似度"""
+        import numpy as np
+
+        emb_a = await self.provider.embed(text_a)
+        emb_b = await self.provider.embed(text_b)
+
+        if emb_a is None or emb_b is None:
+            return 0.0  # embedding不可用时退化为0
+
+        vec_a = np.array(emb_a)
+        vec_b = np.array(emb_b)
+        similarity = float(np.dot(vec_a, vec_b) /
+                          (np.linalg.norm(vec_a) * np.linalg.norm(vec_b)))
+        return max(0.0, min(1.0, similarity))  # clamp to [0, 1]
+```
+
+#### 2.17.3 与AssociationDiscoveryEngine的集成
+
+```python
+class AssociationDiscoveryEngine:
+    """关联发现引擎（集成语义增强）"""
+
+    def __init__(self, ..., semantic_enhancer: SemanticAssociationEnhancer = None):
+        self.semantic_enhancer = semantic_enhancer
+
+    async def discover(self, entity_a, entity_b) -> dict:
+        """发现两个实体之间的关联关系"""
+        # 1. 结构化匹配（原有逻辑不变）
+        structured_result = self._structured_match(entity_a, entity_b)
+        structured_score = structured_result["score"]
+
+        # 2. 语义增强（如果可用）
+        if self.semantic_enhancer:
+            entity_a_text = self._compose_entity_text(entity_a)
+            entity_b_text = self._compose_entity_text(entity_b)
+            enhanced = await self.semantic_enhancer.enhance_score(
+                structured_score, entity_a_text, entity_b_text
+            )
+            structured_result["score"] = enhanced["final_score"]
+            structured_result["semantic"] = {
+                "score": enhanced["semantic_score"],
+                "applied": enhanced["semantic_applied"],
+            }
+            if not enhanced["semantic_applied"]:
+                structured_result["semantic"]["reason"] = enhanced.get("reason", "")
+
+        return structured_result
+```
+
+#### 2.17.4 降级策略
+
+| 场景 | 处理方式 | 影响 |
+|------|---------|------|
+| EmbeddingProvider不可用 | semantic_enhancer=None | 退化为纯结构化匹配，final_score=structured_score |
+| 单条embedding失败 | semantic_score=0.0 | 该对关联不应用语义增强 |
+| 语义相似度<0.7 | semantic_applied=False | 不计入混合评分，保留structured_score |
+| sqlite-vec不可用 | Python余弦相似度降级 | 性能略降，结果一致 |
+
+#### 2.17.5 PoC vs Phase1 差异
+
+| 特性 | PoC | Phase1 |
+|------|-----|--------|
+| 语义增强 | 可选启用，默认关闭 | 默认启用 |
+| 权重 | 0.7/0.3 | 可配置（A/B测试） |
+| 语义阈值 | 0.7 | 可配置 |
+| 存储 | BLOB + Python计算 | pgvector + 索引加速 |
+| 监控 | 无 | 语义增强命中率/延迟 |
 
 ---
 

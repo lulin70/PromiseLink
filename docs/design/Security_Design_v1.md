@@ -1,6 +1,6 @@
 # EventLink 安全设计文档
 
-> **版本**: v2.6 (POC阶段)
+> **版本**: v2.7 (POC阶段)
 > **日期**: 2026-06-06
 > **阶段**: POC (0.2.x series)
 > **设计师**: 架构师 + 安全工程师
@@ -2113,6 +2113,122 @@ class ContextMatcherSecurity:
         return filtered
 ```
 
+### 6.12 EmbeddingProvider安全专项 [v2.7新增]
+
+#### 6.12.1 API Key安全
+
+| 防护措施 | 说明 | 实施阶段 |
+|----------|------|----------|
+| **复用LLM API Key** | EmbeddingProvider复用Moka AI的LLM_API_KEY，不新增独立密钥 | PoC+ |
+| **.env存储** | API Key存储在.env文件中，不硬编码、不提交Git | PoC+ |
+| **传输加密** | 所有API调用使用HTTPS（https://api.moka-ai.com/v1） | PoC+ |
+| **Key轮换** | Phase1支持API Key热轮换，无需重启服务 | Phase1 |
+
+```python
+class EmbeddingProviderSecurity:
+    """EmbeddingProvider安全守卫"""
+
+    @staticmethod
+    def validate_api_key(api_key: str) -> bool:
+        """验证API Key格式"""
+        if not api_key or len(api_key) < 20:
+            return False
+        # 不记录Key到日志
+        return True
+
+    @staticmethod
+    def sanitize_log(text: str) -> str:
+        """日志脱敏：移除API Key相关信息"""
+        import re
+        # 移除Bearer token
+        text = re.sub(r'Bearer\s+\S+', 'Bearer ***', text)
+        return text
+```
+
+#### 6.12.2 缓存安全
+
+| 防护措施 | 说明 | 实施阶段 |
+|----------|------|----------|
+| **内存存储** | SHA256(text)→embedding缓存仅存储在内存dict中，不持久化到磁盘 | PoC+ |
+| **重启清空** | 服务重启时缓存自动清空，无残留数据 | PoC+ |
+| **无敏感信息** | 缓存键为SHA256哈希，缓存值为float数组，不含原始文本 | PoC+ |
+| **Phase1 Redis** | 迁移至Redis时设置TTL=7天，启用ACL访问控制 | Phase1 |
+
+#### 6.12.3 数据隔离
+
+| 防护措施 | 说明 | 实施阶段 |
+|----------|------|----------|
+| **user_id隔离** | vector_embeddings表按user_id存储和查询，embedding归属明确 | PoC+ |
+| **API层强制** | 搜索API的user_id从JWT提取，忽略客户端传入值 | PoC+ |
+| **查询范围限制** | embed/search操作仅返回当前user_id的数据 | PoC+ |
+
+### 6.13 SemanticSearch安全专项 [v2.7新增]
+
+#### 6.13.1 搜索数据隔离
+
+| 防护措施 | 说明 | 实施阶段 |
+|----------|------|----------|
+| **user_id强制过滤** | 所有搜索查询WHERE条件必须包含user_id，SQL层强制 | PoC+ |
+| **JWT提取user_id** | POST /api/v1/search/semantic的user_id从JWT Token提取，忽略请求体中的user_id字段 | PoC+ |
+| **结果二次校验** | 搜索结果返回前，校验每条结果的user_id与当前用户一致 | PoC+ |
+
+```python
+class SemanticSearchSecurity:
+    """语义搜索安全守卫"""
+
+    async def filter_search_results(
+        self, user_id: str, results: list[dict]
+    ) -> list[dict]:
+        """搜索结果二次校验：确保仅返回当前用户数据"""
+        return [
+            r for r in results
+            if r.get("user_id") == user_id
+        ]
+```
+
+#### 6.13.2 sqlite-vec文件安全
+
+| 防护措施 | 说明 | 实施阶段 |
+|----------|------|----------|
+| **文件权限0o600** | SQLite数据库文件权限设置为0o600，仅owner可读写 | PoC+ |
+| **虚拟表不持久化** | vec_entities虚拟表为内存级，不写入磁盘文件 | PoC+ |
+| **Phase2 pgvector** | 迁移至PostgreSQL后，使用PG行级安全策略(RLS) | Phase2 |
+
+#### 6.13.3 向量注入防护
+
+| 防护措施 | 说明 | 实施阶段 |
+|----------|------|----------|
+| **系统生成** | embedding由EmbeddingProvider系统生成，不接受用户直接写入 | PoC+ |
+| **不可写API** | 无直接写入vector_embeddings的API端点，仅通过Pipeline自动触发 | PoC+ |
+| **source_text审计** | vector_embeddings.source_text记录生成embedding的原始文本，可审计 | PoC+ |
+| **输入清洗** | compose_entity_text()输出经过sanitize处理，移除特殊字符 | PoC+ |
+
+```python
+class VectorInjectionGuard:
+    """向量注入防护守卫"""
+
+    ALLOWED_TARGET_TYPES = {"entity", "event"}
+
+    def validate_embedding_request(
+        self, target_type: str, target_id: str, user_id: str
+    ) -> bool:
+        """验证embedding写入请求合法性"""
+        # 1. target_type白名单
+        if target_type not in self.ALLOWED_TARGET_TYPES:
+            return False
+        # 2. target_id格式校验（UUID）
+        import re
+        if not re.match(
+            r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+            target_id
+        ):
+            return False
+        # 3. user_id非空
+        if not user_id:
+            return False
+        return True
+```
+
 ---
 
 ## 7. 数据主权
@@ -2546,11 +2662,12 @@ trivy image --severity HIGH,CRITICAL eventlink:latest  # 仅报告高危
 | v2.0 | 2026-06-04 | **v2.0大版本更新（10项D3变更）**：①版本头更新参考PRD v4.3+技术设计v2.5 §8 ②§3.6新增PII检测正则规则表(6种PII+3条注意事项+redact_pii_from_text实现) ③§2.1b新增JWT HS256认证规范(Payload结构+4项安全约束) ④§1.2 STRIDE威胁模型替换为简化版(含实施状态追踪+分阶段重点) ⑤§5.6新增input_scope SC-01输入分类越权防护 ⑥§4.7新增evidence_quote LLM输出证据字段安全处理(4层安全措施) ⑦§1.1 Non-goals从3项扩展至8项 ⑧§6.5新增TTS语音播报安全评估(隐私分级+推送安全+缓存安全) ⑨§7.2a新增数据导出安全(PII脱敏+频率限制+审计日志) ⑩§10.4新增依赖安全评估(核心依赖风险表+管理策略+Dependabot配置) | 架构师 + 安全工程师 |
 | v2.0[0.2.1] | 2026-06-05 | **F-50 语音助手安全专项（增量更新）**：§6.6新增Voice Assistant安全专项(5个子节) ①§6.6.1 Voice API端点安全(POST /voice/session + GET /voice/tts安全约束表 + sanitize_voice_input清洗函数) ②§6.6.2 NLU Prompt Injection防护(威胁模型+攻击示例+4层纵深防护+安全Prompt模板) ③§6.6.3 ASR数据隐私策略(5类数据存储策略表+保留期限+用户权利) ④§6.6.4 voice_sessions数据访问控制(RBAC归属校验代码+敏感字段脱敏) ⑤§6.6.5车载场景特殊安全考虑(4种驾驶场景风险缓解表)。复用已有组件：JWT中间件/redact_pii_from_text/RBAC/user_scope | 架构师 + 安全工程师 |
 | v2.5 | 2026-06-06 | **Insight Engine + DataSourceAdapter + Concern/Capability安全专项**：①§6.7新增Insight Engine安全专项(评分操纵防护+隐式反馈完整性+动态评分API安全+score_audit_logs表DDL) ②§6.8新增DataSourceAdapter安全专项(Adapter配置安全+出站流量控制+供应链安全) ③§6.9新增Concern/Capability数据保护(敏感性分析+分阶段保护策略+行级安全策略) | 架构师 + 安全工程师 |
-| v2.6 | 2026-06-06 | **F-55/F-56安全专项**：①§6.10新增DependencyAnalyzer安全专项(依赖图注入防护+阻塞链深度限制MAX_DEPTH=3+依赖性得分操纵防护) ②§6.11新增ContextMatcher安全专项(场景匹配数据隔离+24h时间窗口限制+即将见面信息隐私) | 架构师 + 安全工程师 |
+| v2.6 | 2026-06-06 | **F-55/F-56安全专项**：①§6.10新增DependencyAnalyzer安全专项(依赖图注入防护+阻塞链深度限制MAX_DEPTH=3+依赖性得分操纵防护) ②§6.11新增ContextMatcher安全专项(场景匹配数据隔离+24h时间窗口限制+即将见面信息隐私) |
+| v2.7 | 2026-06-06 | **F-57/F-58安全专项**：①§6.12新增EmbeddingProvider安全专项(API Key复用LLM密钥+.env存储+缓存内存存储重启清空+user_id数据隔离) ②§6.13新增SemanticSearch安全专项(搜索数据隔离user_id强制过滤+JWT提取+sqlite-vec文件权限0o600+向量注入防护系统生成only) | 架构师 + 安全工程师 |
 
 ---
 
-> **文档状态**: ✅ v2.6 更新完成（F-55 DependencyAnalyzer + F-56 ContextMatcher 安全专项已落地）
+> **文档状态**: ✅ v2.7 更新完成（F-57 EmbeddingProvider + F-58 SemanticSearch 安全专项已落地）
 > **下次审查**: Phase1开发启动前
 > **安全负责人**: 架构师
 > **对齐文档**: 技术设计 v2.5 §3.1a + §8.0.3
