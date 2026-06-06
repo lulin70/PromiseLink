@@ -1659,13 +1659,13 @@ Score = 0.30 × urgency + 0.35 × importance + 0.20 × dependency + 0.15 × cont
 
 #### 2.15.1 核心思路
 
-EmbeddingProvider负责将Entity/Event的文本描述转换为768维向量（embedding），供SemanticSearchEngine进行语义搜索。使用Moka AI的text-embedding-3-small模型，通过SHA256缓存避免重复调用，支持批量嵌入。
+EmbeddingProvider负责将Entity/Event的文本描述转换为向量（embedding），供SemanticSearchEngine进行语义搜索。API模式使用Moka AI的text-embedding-3-small模型（768维），本地降级模式使用all-MiniLM-L6-v2模型（384维）。通过SHA256缓存避免重复调用，支持批量嵌入。
 
 **核心类**: `EmbeddingProvider`
 
 **关键参数**:
-- 模型: `text-embedding-3-small`（Moka AI API）
-- 向量维度: 768
+- 模型: `text-embedding-3-small`（Moka AI API，768维）/ `all-MiniLM-L6-v2`（本地降级，384维）
+- 向量维度: API模式768维，本地降级384维（SemanticSearchEngine._actual_dims动态检测）
 - 批量上限: 2048 items/batch
 - 缓存策略: SHA256(text)→embedding，内存存储，重启清空
 
@@ -1690,7 +1690,8 @@ class EmbeddingProvider:
     """向量嵌入提供者"""
 
     MODEL = "text-embedding-3-small"
-    DIMENSIONS = 768
+    EMBEDDING_DIMENSIONS = 768       # API模式维度
+    LOCAL_EMBEDDING_DIMENSIONS = 384 # 本地降级模式维度(all-MiniLM-L6-v2)
     MAX_BATCH = 2048
 
     def __init__(self, api_key: str, base_url: str = "https://api.moka-ai.com/v1"):
@@ -1775,7 +1776,7 @@ class EmbeddingProvider:
 | 特性 | PoC | Phase1 |
 |------|-----|--------|
 | 缓存 | 内存dict，重启清空 | Redis持久化，TTL 7天 |
-| 存储 | SQLite BLOB | PostgreSQL vector(768) + pgvector |
+| 存储 | SQLite BLOB（API模式3072字节/本地模式1536字节） | PostgreSQL vector(768) + pgvector |
 | 批量 | 同步分批 | 异步并发分批 |
 | 监控 | 无 | Prometheus嵌入延迟/缓存命中率 |
 
@@ -1912,7 +1913,7 @@ class SemanticSearchEngine:
             db = sqlite_vec.connect(conn)
             db.execute(
                 "CREATE VIRTUAL TABLE IF NOT EXISTS vec_entities "
-                "USING vec0(embedding float[768])"
+                "USING vec0(embedding float[384])"  # PoC使用本地模型384维
             )
             # 查询
             query_blob = struct.pack(f"{len(query_embedding)}f", *query_embedding)
@@ -1968,7 +1969,7 @@ class SemanticSearchEngine:
 
 | 特性 | PoC | Phase1 |
 |------|-----|--------|
-| 向量存储 | SQLite BLOB | PostgreSQL vector(768) + pgvector |
+| 向量存储 | SQLite BLOB（API模式3072字节/本地模式1536字节） | PostgreSQL vector(768) + pgvector |
 | 搜索引擎 | Python余弦 / sqlite-vec | pgvector索引查询 |
 | 索引构建 | Pipeline触发 | 定时任务+增量更新 |
 | top_k | 10 | 可配置 |

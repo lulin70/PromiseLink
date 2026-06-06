@@ -2512,8 +2512,8 @@ Cache-Control: private, max-age=300
   "index_method": "sqlite_vec",   // "sqlite_vec" | "python_cosine"
   "last_indexed_at": "2026-06-06T10:30:00Z",
   "cache_size": 234,
-  "embedding_model": "text-embedding-3-small",
-  "embedding_dimensions": 768
+  "embedding_model": "text-embedding-3-small",  // API模式; 本地降级为all-MiniLM-L6-v2
+  "embedding_dimensions": 768  // API模式768维; 本地降级384维
 }
 ```
 

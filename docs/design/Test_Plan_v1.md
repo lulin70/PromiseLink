@@ -4012,11 +4012,11 @@ def test_sv05_user_isolation_voice_history():
 
 ### 11.7 [v2.7新增] EmbeddingProvider测试用例（F-57）
 
-#### TC-EM-001: embed返回768维向量
+#### TC-EM-001: embed返回正确维度向量
 
-**目标**: 验证EmbeddingProvider.embed()返回768维float向量
+**目标**: 验证EmbeddingProvider.embed()返回正确维度的float向量（API模式768维，本地降级384维）
 
-**前置条件**: EmbeddingProvider服务正常运行，Moka AI API可用
+**前置条件**: EmbeddingProvider服务正常运行（API模式或本地模式）
 
 **测试步骤**:
 1. 初始化EmbeddingProvider(api_key=test_key)
@@ -4025,10 +4025,10 @@ def test_sv05_user_isolation_voice_history():
 
 **期望结果**:
 - 返回list[float]类型
-- len(result) == 768
+- API模式: len(result) == 768；本地降级模式: len(result) == 384
 - 所有值在[-1.0, 1.0]范围内
 
-**验收标准**: 768维 + 值范围[-1, 1] ✅
+**验收标准**: 维度匹配当前模式 + 值范围[-1, 1] ✅
 
 ---
 
@@ -4066,7 +4066,7 @@ def test_sv05_user_isolation_voice_history():
 
 **期望结果**:
 - 返回5个embedding
-- 每个embedding为768维
+- 每个embedding维度匹配当前模式（API模式768维，本地降级384维）
 - 顺序与输入一致
 
 **验收标准**: 数量正确 + 维度正确 + 顺序一致 ✅
@@ -4090,7 +4090,7 @@ def test_sv05_user_isolation_voice_history():
 - vector_embeddings表新增1条记录
 - target_type = "entity"
 - target_id = entity.id
-- embedding BLOB长度 = 768 * 4 = 3072字节
+- embedding BLOB长度 = 维度 * 4（API模式3072字节，本地模式1536字节）
 
 **验收标准**: 记录存在 + 类型正确 + BLOB长度正确 ✅
 
@@ -4625,6 +4625,6 @@ PM初审 → 通过？ → 提交Arch复审
 *② 新增§11.4 DependencyAnalyzer测试用例6个（TC-DA-001~006: 非promise/help得分=0 + 直接依赖链 + 间接依赖链 + MAX_DEPTH截断 + 多链累加 + 得分范围）*
 *③ 新增§11.5 ContextMatcher测试用例5个（TC-CM-001~005: 无关联实体得分=0 + 即将meeting提升 + 远期事件低分 + 非meeting/call忽略 + 得分范围）*
 *④ 新增§11.6 PriorityScorerV2集成测试用例2个（TC-PS-001~002: 四维评分公式 + Pipeline Step 8.5集成）*
-*⑤ 新增§11.7 EmbeddingProvider测试用例3个（TC-EM-001~003: 768维向量 + 缓存命中 + 批量嵌入）*
+*⑤ 新增§11.7 EmbeddingProvider测试用例3个（TC-EM-001~003: 正确维度向量(API 768/本地384) + 缓存命中 + 批量嵌入）*
 *⑥ 新增§11.8 SemanticSearchEngine测试用例4个（TC-SS-001~004: Entity索引存储 + Event索引存储 + 语义搜索排序 + 用户数据隔离）*
 *⑦ 新增§11.9 关联发现语义增强测试用例3个（TC-AE-001~003: 结构化匹配为0时语义降级 + 混合评分公式 + Embedding不可用时优雅降级）*

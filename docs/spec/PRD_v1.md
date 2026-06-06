@@ -628,7 +628,7 @@ Phase 2扩展：滑动手势语义分化（需原生APP）
 
 | 组件 | 选型 | 说明 |
 |------|------|------|
-| Embedding模型 | text-embedding-3-small | 通过Moka AI API，768维，兼容OpenAI SDK |
+| Embedding模型 | text-embedding-3-small | 通过Moka AI API，API模式768维/本地降级384维，兼容OpenAI SDK |
 | 向量存储 | sqlite-vec扩展 | 与PoC部署模型一致，零额外依赖 |
 | Phase 2迁移路径 | sqlite-vec → pgvector | PostgreSQL迁移时 |
 
@@ -2714,7 +2714,7 @@ PoC阶段聚焦**降低输入摩擦**而非自动抓取，语音输入（F-50已
 | v4.4 | 2026-06-05 | 新增F-50智能语音助手（DevSquad PM评审结论）：**A组（F-50核心功能定义）**：①新增F-50智能语音助手(Phase 1核心/P0优先级)，含3个子功能(F-50.1语音问答引擎/F-50.2多轮对话管理/F-50.3主动语音提醒)②用户故事基于许总(种子用户,有视力障碍)场景。**B组（现有功能补充）**：③F-10语音录入补充查询指令语音输入支持④F-41 TTS播报新增NLG结构化数据→自然语言转换层⑤F-44 input_scope分类器扩展枚举新增voice_query类型(8种→9种)⑥F-49日视图补充自然语言日期解析支持。**C组（设计规范新增）**：⑦新增§6.5语音交互范式设计（6子节：交互流程/唤醒方式/中间态反馈/错误处理/隐私保护/MVP能力边界）⑧Non-goals追加通用AI助手排除说明+多租户排除补充语音单用户限制⑨验收标准总表新增7.5语音助手验收标准(AC-49~AC-56共8项)⑩功能总数从49更新为50 | CarryMem团队 |
 | v4.5 | 2026-06-06 | 明确智能定义与边界+动态优先级排序+隐式反馈机制+数据接入层架构（基于DeepSeek架构讨论+团队共识）：**A组（智能定义与边界）**：①新增§1.7智能定义与边界（6子节：智能定义三层能力/四层架构/PoC验证边界/Person concern/capability强化/动态优先级排序模型/隐式反馈学习机制）②智能定义为"以个人知识图谱为基础，对商务关系的理解、记忆与预见能力"③四层架构：事件感知与结构化层→索引与知识图谱层→关联匹配引擎层→行动建议与交互层④PoC验证边界明确：二维优先级→Phase1四维→Phase2上下文感知⑤Person实体concern/capability字段强化（受控词表+自由文本混合模式），不扩展实体类型⑥动态优先级排序：PoC二维(0.4×紧急性+0.6×重要性)→Phase1四维(+依赖性+场景匹配)⑦隐式反馈：通过观察用户完成Todo顺序学习真实优先级，新增completed_rank字段。**B组（画像维度更新）**：⑧§5.13.1 Person画像维度表新增"关注与能力"维度(concerns+capabilities)⑨"资源能力"行Phase从✅调整为Phase 1(结构化资源表)。**C组（数据接入层架构）**：⑩新增§5.17数据接入层架构（3子节：DataSourceAdapter接口/邮件场景设计/微信消息接入约束）⑪Pipeline保持source-agnostic，所有adapter输出统一Event格式⑫邮件场景：原子事件+溯源边设计⑬微信约束：PoC聚焦降低输入摩擦而非自动抓取 | CarryMem团队 |
 | v4.6 | 2026-06-06 | Phase 1动态优先级四维演进详细设计：①§1.7.5扩展Phase 1四维模型完整设计②新增维度3依赖性：全图谱路径分析算法（有向依赖图+阻塞链检测+3跳间接依赖+dependency_score=Σ(1/depth)×blocked_weight）③新增维度4场景匹配：Event表驱动算法（未来24h meeting/call扫描+Entity匹配+context_score=max(0,1-hours/24)）④权重配置从PoC(0.4/0.6/0/0)演进为Phase1(0.3/0.35/0.2/0.15)⑤新增F-55依赖性全图谱路径分析⑥新增F-56场景匹配Event表驱动 |
-| v4.7 | 2026-06-06 | Phase 1向量化功能设计：①新增§1.7.7向量化语义能力②新增F-57语义搜索（embedding向量化Entity/Event，支持自然语言查询）③新增F-58关联发现增强（embedding余弦相似度补充结构化匹配，混合得分0.7×structured+0.3×semantic）④技术选型：text-embedding-3-small（Moka AI API，768维，兼容OpenAI SDK）+sqlite-vec扩展（零额外依赖）⑤向量化对象：Entity(concern+capability+basic)+Event(raw_text摘要)⑥性能目标：embedding<500ms/条，语义搜索<200ms(100条以内)⑦Phase 2迁移路径：sqlite-vec→pgvector | CarryMem团队 |
+| v4.7 | 2026-06-06 | Phase 1向量化功能设计：①新增§1.7.7向量化语义能力②新增F-57语义搜索（embedding向量化Entity/Event，支持自然语言查询）③新增F-58关联发现增强（embedding余弦相似度补充结构化匹配，混合得分0.7×structured+0.3×semantic）④技术选型：text-embedding-3-small（Moka AI API，API模式768维/本地降级384维，兼容OpenAI SDK）+sqlite-vec扩展（零额外依赖）⑤向量化对象：Entity(concern+capability+basic)+Event(raw_text摘要)⑥性能目标：embedding<500ms/条，语义搜索<200ms(100条以内)⑦Phase 2迁移路径：sqlite-vec→pgvector | CarryMem团队 |
 | v4.3 | 2026-06-04 | 7角色Review融合+许总PoC反馈修订版：**A组（P0阻塞修复）**：①F-45新增evidence_quote PII脱敏策略（BLK-1：sanitize_llm_input清洗/API返回脱敏/不参与搜索索引/crypto.py加密引用）②F-44新增input_scope服务端校验规则（BLK-2：仅接受auto/InputClassifier强制覆盖/hint参考/400错误码）③F-45 action_type枚举从5种统一为6种（BLK-3：my_promise/their_promise/my_followup/mutual_action/system_reminder/unclear）+Todo模型新增evidence_event_id外键字段（Arch意见C2）。**B组（许总PoC反馈）**：④新增F-49日视图（今日议程）作为首页子模块⑤F-04关联发现引擎增加"主题互通"用户视角语言+D3.js Phase 1 Plus计划⑥产品愿景增加"终身关系经营智能体"长期愿景（CarryMem 7种记忆类型支撑）+数据导出提前到Phase 1⑦F-10/F-41语音交互增加许总确认为刚需注释+Mock TTS端点。**C组（7角色Review意见采纳）**：⑧PM意见C1：PoC退出条件增加测试方法学表（100条脱敏数据/PM+Arch双签/Sprint 2窗口）⑨Tester意见C3：F-47增加回归测试策略标注（2正向+1异常用例/E2E场景/Sprint阻塞）⑩DevOps意见C4：新增§4.5运维监控指标（6项P0指标含延迟/分布/覆盖率）⑪UI意见C5：F-47推进卡12模块展示优先级（P0首屏/P1展开/P2详情页） | CarryMem团队 |
 
 ### 7角色评审共识整合清单
