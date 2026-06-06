@@ -1,10 +1,10 @@
 # EventLink 产品需求文档 (PRD)
 
-> **版本**: v4.5
+> **版本**: v4.6
 > **日期**: 2026-06-06
 > **状态**: 李总v1.2+许总POC反馈+7角色Review融合修订版
 > **负责人**: CarryMem 团队
-> **变更说明**: v4.5: 明确智能定义与边界+动态优先级排序+隐式反馈机制+数据接入层架构
+> **变更说明**: v4.6: Phase 1动态优先级四维演进详细设计（依赖性全图谱路径分析+场景匹配Event表驱动）
 
 ***
 
@@ -525,8 +525,58 @@ Phase 1扩展（四维完整版）：
 Score = w1×紧急性 + w2×重要性 + w3×依赖性 + w4×场景匹配
 ```
 
-- **依赖性**：图谱分析阻塞关系，承诺闭环追踪
-- **场景匹配**：日历联动，会前临时提升相关Todo优先级
+权重配置：
+```
+PoC:      w1=0.4, w2=0.6, w3=0.0, w4=0.0
+Phase 1:  w1=0.3, w2=0.35, w3=0.2, w4=0.15
+```
+
+**维度3：依赖性（dependency）— 全图谱路径分析**
+
+核心问题：Todo A被Todo B阻塞，B没完成A就无法推进。EventLink的核心价值是承诺闭环，依赖性维度让系统理解"谁在等谁"。
+
+算法：全图谱路径分析
+1. 从Association图谱中提取所有"承诺"类型的边（promise类型Todo关联的Entity对）
+2. 构建有向依赖图：如果"我答应A"是"A答应我"的前置条件，则存在依赖边
+3. 检测阻塞链：如果Todo X的完成是Todo Y的前置条件，且X未完成，则Y的依赖性得分提升
+4. 间接依赖：支持多跳路径分析（A→B→C），但限制最大深度为3跳避免过度膨胀
+
+依赖性得分计算：
+```
+dependency_score = Σ(1/depth) × blocked_weight
+```
+- depth: 依赖链深度（1=直接依赖, 2=间接依赖, 3=三跳依赖）
+- blocked_weight: 被阻塞的Todo数量权重
+
+示例：
+- 我答应李总发AI项目资料（promise, pending）
+- 李总答应对接LP资源（promise, pending）
+- 依赖分析：我的promise是李总promise的前置条件
+- 结果：我的"发资料"Todo依赖性得分提升（有人在等我）
+
+**维度4：场景匹配（context_match）— Event表驱动**
+
+核心问题：即将见某人时，与该人相关的Todo应该临时提升优先级。
+
+算法：Event表驱动场景匹配
+1. 扫描Event表中未来24h的meeting/call类型事件
+2. 提取这些事件关联的Entity（通过source_event_id关联）
+3. 匹配当前pending Todo中related_entity_id与即将见面Entity相同的Todo
+4. 根据距离见面时间计算场景匹配得分
+
+场景匹配得分计算：
+```
+context_score = max(0, 1 - hours_until_meeting / 24)
+```
+- hours_until_meeting < 1h: score ≈ 1.0（即将见面，最高提升）
+- hours_until_meeting = 6h: score ≈ 0.75
+- hours_until_meeting = 24h: score ≈ 0.0（不提升）
+
+示例：
+- 下午3点要见李总（Event: meeting, 14:00）
+- 上午10点查看Todo列表
+- "发AI项目资料给李总"（promise, related_entity=李总）
+- context_score = 1 - 4/24 ≈ 0.83 → 优先级显著提升
 
 Phase 2扩展：上下文感知推送，从"工具"向"助理"进化
 
@@ -2619,6 +2669,7 @@ PoC阶段聚焦**降低输入摩擦**而非自动抓取，语音输入（F-50已
 | v4.2 | 2026-06-04 | 李总v1.2建议融合修订版（DevSquad PM+Architect联合评审共识）：①§1.1 Slogan更新为主Slogan"让每一次连接，都有回应"+路演场景保留旧slogan+Slogan使用场景说明②§1.1 Non-goals补充4项排除（商机匹配引擎首期暂停/关系图谱非主展示/竞对风险主动推送Phase2+/批量名片商机发现）③§3.0.1 F-05商机匹配度从PoC移至Phase2（含重新启用条件：≥30次回应记录/≥20条稳定能力/≥10个明确需求）④§3.1 MVP-Core新增F-44~F-48五项P0功能（input_scope输入分类器/Promise双向动作模型/Todo降噪规则/RelationshipBrief关系推进卡/RelationshipStage关系阶段）⑤PoC退出条件更新：资源线索确认率→承诺兑现闭环验证率≥50%+新增4周持续使用率≥60%/输入分类准确率≥95%/承诺责任人识别准确率≥90%⑥§5.8首页设计从信息展示转向回应驱动（双核心区域：今天需要回应/最近值得推进）+移除人脉推荐区域⑦首次体验流程固定为"记录一次重要交流"4屏流+名片扫描降级为补充入口⑧新增§1.5.4自建小程序前端备选方案（Taro+Vue3+NutUI+3项决策触发条件） | CarryMem团队 |
 | v4.4 | 2026-06-05 | 新增F-50智能语音助手（DevSquad PM评审结论）：**A组（F-50核心功能定义）**：①新增F-50智能语音助手(Phase 1核心/P0优先级)，含3个子功能(F-50.1语音问答引擎/F-50.2多轮对话管理/F-50.3主动语音提醒)②用户故事基于许总(种子用户,有视力障碍)场景。**B组（现有功能补充）**：③F-10语音录入补充查询指令语音输入支持④F-41 TTS播报新增NLG结构化数据→自然语言转换层⑤F-44 input_scope分类器扩展枚举新增voice_query类型(8种→9种)⑥F-49日视图补充自然语言日期解析支持。**C组（设计规范新增）**：⑦新增§6.5语音交互范式设计（6子节：交互流程/唤醒方式/中间态反馈/错误处理/隐私保护/MVP能力边界）⑧Non-goals追加通用AI助手排除说明+多租户排除补充语音单用户限制⑨验收标准总表新增7.5语音助手验收标准(AC-49~AC-56共8项)⑩功能总数从49更新为50 | CarryMem团队 |
 | v4.5 | 2026-06-06 | 明确智能定义与边界+动态优先级排序+隐式反馈机制+数据接入层架构（基于DeepSeek架构讨论+团队共识）：**A组（智能定义与边界）**：①新增§1.7智能定义与边界（6子节：智能定义三层能力/四层架构/PoC验证边界/Person concern/capability强化/动态优先级排序模型/隐式反馈学习机制）②智能定义为"以个人知识图谱为基础，对商务关系的理解、记忆与预见能力"③四层架构：事件感知与结构化层→索引与知识图谱层→关联匹配引擎层→行动建议与交互层④PoC验证边界明确：二维优先级→Phase1四维→Phase2上下文感知⑤Person实体concern/capability字段强化（受控词表+自由文本混合模式），不扩展实体类型⑥动态优先级排序：PoC二维(0.4×紧急性+0.6×重要性)→Phase1四维(+依赖性+场景匹配)⑦隐式反馈：通过观察用户完成Todo顺序学习真实优先级，新增completed_rank字段。**B组（画像维度更新）**：⑧§5.13.1 Person画像维度表新增"关注与能力"维度(concerns+capabilities)⑨"资源能力"行Phase从✅调整为Phase 1(结构化资源表)。**C组（数据接入层架构）**：⑩新增§5.17数据接入层架构（3子节：DataSourceAdapter接口/邮件场景设计/微信消息接入约束）⑪Pipeline保持source-agnostic，所有adapter输出统一Event格式⑫邮件场景：原子事件+溯源边设计⑬微信约束：PoC聚焦降低输入摩擦而非自动抓取 | CarryMem团队 |
+| v4.6 | 2026-06-06 | Phase 1动态优先级四维演进详细设计：①§1.7.5扩展Phase 1四维模型完整设计②新增维度3依赖性：全图谱路径分析算法（有向依赖图+阻塞链检测+3跳间接依赖+dependency_score=Σ(1/depth)×blocked_weight）③新增维度4场景匹配：Event表驱动算法（未来24h meeting/call扫描+Entity匹配+context_score=max(0,1-hours/24)）④权重配置从PoC(0.4/0.6/0/0)演进为Phase1(0.3/0.35/0.2/0.15)⑤新增F-55依赖性全图谱路径分析⑥新增F-56场景匹配Event表驱动 | CarryMem团队 |
 | v4.3 | 2026-06-04 | 7角色Review融合+许总PoC反馈修订版：**A组（P0阻塞修复）**：①F-45新增evidence_quote PII脱敏策略（BLK-1：sanitize_llm_input清洗/API返回脱敏/不参与搜索索引/crypto.py加密引用）②F-44新增input_scope服务端校验规则（BLK-2：仅接受auto/InputClassifier强制覆盖/hint参考/400错误码）③F-45 action_type枚举从5种统一为6种（BLK-3：my_promise/their_promise/my_followup/mutual_action/system_reminder/unclear）+Todo模型新增evidence_event_id外键字段（Arch意见C2）。**B组（许总PoC反馈）**：④新增F-49日视图（今日议程）作为首页子模块⑤F-04关联发现引擎增加"主题互通"用户视角语言+D3.js Phase 1 Plus计划⑥产品愿景增加"终身关系经营智能体"长期愿景（CarryMem 7种记忆类型支撑）+数据导出提前到Phase 1⑦F-10/F-41语音交互增加许总确认为刚需注释+Mock TTS端点。**C组（7角色Review意见采纳）**：⑧PM意见C1：PoC退出条件增加测试方法学表（100条脱敏数据/PM+Arch双签/Sprint 2窗口）⑨Tester意见C3：F-47增加回归测试策略标注（2正向+1异常用例/E2E场景/Sprint阻塞）⑩DevOps意见C4：新增§4.5运维监控指标（6项P0指标含延迟/分布/覆盖率）⑪UI意见C5：F-47推进卡12模块展示优先级（P0首屏/P1展开/P2详情页） | CarryMem团队 |
 
 ### 7角色评审共识整合清单
