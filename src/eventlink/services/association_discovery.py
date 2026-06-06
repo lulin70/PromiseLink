@@ -978,12 +978,8 @@ class AssociationDiscoveryEngine:
         try:
             from eventlink.services.semantic_search import SemanticSearchEngine
 
-            # Use the same DB path as the session
-            db_path = "test.db"
-            if self.session and hasattr(self.session, "bind"):
-                engine = self.session.bind
-                if hasattr(engine, "url"):
-                    db_path = str(engine.url.database) or "test.db"
+            # Derive db_path from Settings (same as SemanticSearchEngine._default_db_path)
+            db_path = SemanticSearchEngine._default_db_path()
 
             # Get embeddings from vector_embeddings table
             import sqlite3
@@ -1013,13 +1009,7 @@ class AssociationDiscoveryEngine:
                 emb_b = list(struct.unpack(f"{count}f", blob_b))
 
                 # Cosine similarity
-                dot = sum(x * y for x, y in zip(emb_a, emb_b))
-                norm_a = sum(x * x for x in emb_a) ** 0.5
-                norm_b = sum(x * x for x in emb_b) ** 0.5
-                if norm_a == 0 or norm_b == 0:
-                    return 0.0
-
-                similarity = dot / (norm_a * norm_b)
+                similarity = SemanticSearchEngine._cosine_similarity(emb_a, emb_b)
 
                 # Only return if above threshold
                 if similarity > 0.7:

@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from eventlink.core.logging import get_logger
-from eventlink.services.embedding_provider import EMBEDDING_DIMENSIONS, EmbeddingProvider
+from eventlink.services.embedding_provider import EMBEDDING_DIMENSIONS, LOCAL_EMBEDDING_DIMENSIONS, EmbeddingProvider
 
 logger = get_logger("eventlink.semantic_search")
 
@@ -37,10 +37,26 @@ class SemanticSearchEngine:
     - User-scoped data isolation
     """
 
-    def __init__(self, provider: EmbeddingProvider, db_path: str = "test.db"):
+    def __init__(self, provider: EmbeddingProvider, db_path: str | None = None):
         self.provider = provider
-        self.db_path = db_path
+        self.db_path = db_path or self._default_db_path()
+        self._actual_dims = None  # Detected on first embed
         self._init_db()
+
+    @staticmethod
+    def _default_db_path() -> str:
+        """Derive SQLite file path from Settings.database_url."""
+        from eventlink.config import get_settings
+        settings = get_settings()
+        url = settings.database_url
+        # sqlite:///./data/eventlink.db → ./data/eventlink.db
+        # sqlite:///data/eventlink.db → data/eventlink.db
+        if url.startswith("sqlite:///"):
+            return url[len("sqlite:///"):]
+        if url.startswith("sqlite://"):
+            return url[len("sqlite://"):]
+        # Fallback for non-sqlite (shouldn't happen in PoC)
+        return "data/eventlink.db"
 
     def _init_db(self) -> None:
         """Initialize the vector storage tables."""
@@ -78,10 +94,12 @@ class SemanticSearchEngine:
 
             # Create sqlite-vec virtual table if available
             if self._vec_available:
+                # Use LOCAL_EMBEDDING_DIMENSIONS (384) since local model is preferred
+                dims = LOCAL_EMBEDDING_DIMENSIONS
                 conn.execute(f"""
-                    CREATE VIRTUAL TABLE IF NOT EXISTS vec_entities
+                    CREATE VIRTUAL TABLE IF NOT EXISTS vec_entities 
                     USING vec0(
-                        embedding float[{EMBEDDING_DIMENSIONS}],
+                        embedding float[{dims}],
                         target_id TEXT,
                         user_id TEXT
                     )
@@ -109,6 +127,8 @@ class SemanticSearchEngine:
             user_id: User ID for data isolation
         """
         embedding = await self.provider.embed(text)
+        if self._actual_dims is None:
+            self._actual_dims = len(embedding)
         self._store_embedding("entity", entity_id, embedding, user_id, text)
 
     async def index_event(self, event_id: str, text: str, user_id: str) -> None:
@@ -120,6 +140,8 @@ class SemanticSearchEngine:
             user_id: User ID for data isolation
         """
         embedding = await self.provider.embed(text)
+        if self._actual_dims is None:
+            self._actual_dims = len(embedding)
         self._store_embedding("event", event_id, embedding, user_id, text)
 
     def _store_embedding(
@@ -271,7 +293,7 @@ class SemanticSearchEngine:
             return {
                 "total_embeddings": count,
                 "vec_available": self._vec_available,
-                "dimensions": EMBEDDING_DIMENSIONS,
+                "dimensions": self._actual_dims or LOCAL_EMBEDDING_DIMENSIONS,
             }
         finally:
             conn.close()

@@ -262,7 +262,7 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
             from eventlink.services.semantic_search import SemanticSearchEngine
 
             embedder = EmbeddingProvider()
-            search_engine = SemanticSearchEngine(provider=embedder, db_path="test.db")
+            search_engine = SemanticSearchEngine(provider=embedder)
 
             for entity in entities:
                 try:
@@ -420,7 +420,12 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
             from eventlink.services.priority_scorer import PriorityScorerV2
             scorer_v2 = PriorityScorerV2()
             async with AsyncSessionLocal() as score_session:
-                for todo in fresh_todos:
+                # Re-query todos in this session to avoid detached instance issues
+                score_result_q = await score_session.execute(
+                    select(Todo).where(Todo.source_event_id == str(event_id))
+                )
+                score_todos = list(score_result_q.scalars().all())
+                for todo in score_todos:
                     try:
                         score_result = await scorer_v2.score_with_context(todo, score_session)
                         todo.dynamic_score = score_result.score
