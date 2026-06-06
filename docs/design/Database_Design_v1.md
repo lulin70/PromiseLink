@@ -1,11 +1,12 @@
 # EventLink 数据库设计文档
 
-> **版本**: 0.2.0 (POC阶段)
-> **日期**: 2026-06-04
+> **版本**: 0.2.6 (POC阶段)
+> **日期**: 2026-06-06
 > **阶段**: POC (0.2.x series)
 > **设计师**: 架构师团队
-> **参考**: PRD v4.3, 技术设计 v2.5 §3.1
+> **参考**: PRD v4.3, 技术设计 v2.6 §3.1
 > **状态**: 李总v1.2+许总POC反馈融合修订
+> **v2.6变更**: score_audit_logs表calculation_factors扩展dependency_score/context_score审计字段
 
 ---
 
@@ -321,6 +322,36 @@ CREATE UNIQUE INDEX idx_entities_user_name_company
 }
 ```
 
+> **v2.5新增 concerns/capabilities 结构**（存储在现有 properties JSONB 中，无需DDL变更）:
+
+**concerns 字段**（v2.5新增，替代原有 concern 数组，提供结构化标签）:
+```json
+{
+  "concerns": [
+    {
+      "tag": "人才招聘",
+      "detail": "正在寻找有5年经验的AI算法工程师，prefer CV方向",
+      "source_event_id": "uuid-of-event"
+    }
+  ]
+}
+```
+
+**capabilities 字段**（v2.5新增）:
+```json
+{
+  "capabilities": [
+    {
+      "tag": "技术选型",
+      "detail": "在微服务架构选型上有丰富经验，主导过3次技术栈迁移",
+      "source_event_id": "uuid-of-event"
+    }
+  ]
+}
+```
+
+> **迁移说明**: concerns/capabilities 存储在现有 properties JSONB 列中，无需 Schema 变更。原有 concern 数组保持兼容，新增 concerns/capabilities 字段为结构化版本。
+
 > **注意**: `resource` 和 `demand` 字段为 **Phase2** 使用，当前阶段保留结构但暂不主动填充。
 
 **resource_sensitivity枚举说明**:
@@ -520,11 +551,22 @@ CREATE UNIQUE INDEX idx_briefs_user_person ON relationship_briefs(user_id, perso
 | user_id | UUID | NOT NULL, FK(users.id) | - | 用户ID |
 | created_at | TIMESTAMPTZ | NOT NULL | NOW() | 创建时间 |
 | updated_at | TIMESTAMPTZ | NOT NULL | NOW() | 更新时间 |
+| completed_rank | INTEGER | - | NULL | 完成序号(隐式反馈用, v2.5新增) |
+| dynamic_score | FLOAT | - | NULL | 动态优先级分(v2.5新增) |
+| score_calculated_at | TIMESTAMPTZ | - | NULL | 评分时间(v2.5新增) |
 
 **CHECK约束（v2.0新增）**:
 ```sql
 ALTER TABLE todos ADD CONSTRAINT todo_action_type_check
     CHECK (action_type IN ('my_promise','their_promise','my_followup','mutual_action','system_reminder','unclear'));
+```
+
+**CHECK约束（v2.5新增）**:
+```sql
+ALTER TABLE todos ADD CONSTRAINT check_dynamic_score_range
+    CHECK (dynamic_score IS NULL OR (dynamic_score >= 0 AND dynamic_score <= 100));
+ALTER TABLE todos ADD CONSTRAINT check_score_timestamp_valid
+    CHECK (score_calculated_at IS NULL OR score_calculated_at <= CURRENT_TIMESTAMP);
 ```
 
 **action_type枚举说明（F-45，v2.0新增）**:
@@ -545,6 +587,8 @@ CREATE INDEX idx_todos_type ON todos(todo_type);
 CREATE INDEX idx_todos_priority ON todos(priority);
 CREATE INDEX idx_todos_due_date ON todos(due_date) WHERE due_date IS NOT NULL;
 CREATE INDEX idx_todos_entity ON todos(related_entity_id);
+CREATE INDEX idx_todos_dynamic_score ON todos(user_id, dynamic_score DESC) WHERE dynamic_score IS NOT NULL;  -- v2.5新增
+CREATE UNIQUE INDEX idx_todos_completed_rank ON todos(user_id, completed_rank) WHERE completed_rank IS NOT NULL;  -- v2.5新增
 ```
 
 **todo_type枚举与莫兰迪色映射**:
@@ -660,6 +704,105 @@ CREATE INDEX idx_todos_entity ON todos(related_entity_id);
 CREATE UNIQUE INDEX idx_users_username ON users(username);
 CREATE UNIQUE INDEX idx_users_email ON users(email) WHERE email IS NOT NULL;
 ```
+
+---
+
+### 3.5b ScoreAuditLogs表（评分审计日志表）[v2.5新增]
+
+**用途**: 记录 Todo 动态优先级分数的变更历史，支撑 Insight Engine 的可解释性和调试。
+
+| 字段名 | 类型 | 约束 | 默认值 | 说明 |
+|--------|------|------|--------|------|
+| id | BIGSERIAL | PRIMARY KEY | - | 主键 |
+| todo_id | UUID | NOT NULL, FK(todos.id) | - | 关联Todo ID |
+| user_id | UUID | NOT NULL | - | 用户ID |
+| old_score | FLOAT | - | NULL | 变更前分数 |
+| new_score | FLOAT | NOT NULL | - | 变更后分数 |
+| calculation_factors | JSONB | NOT NULL | - | 计算因子快照 |
+| triggered_by | VARCHAR(50) | NOT NULL | - | 触发来源 |
+| created_at | TIMESTAMPTZ | NOT NULL | NOW() | 创建时间 |
+
+**triggered_by枚举说明**:
+
+| 值 | 说明 |
+|----|------|
+| `implicit_feedback` | 隐式反馈触发（完成顺序变化） |
+| `manual_recalc` | 手动触发重新计算 |
+| `scheduled_job` | 定时任务触发（daily_rebalance） |
+
+**索引**:
+```sql
+CREATE INDEX idx_score_audit_user_time ON score_audit_logs(user_id, created_at DESC);
+CREATE INDEX idx_score_audit_todo ON score_audit_logs(todo_id, created_at DESC);
+```
+
+**calculation_factors JSONB结构示例**:
+```json
+{
+  "urgency": 0.85,
+  "importance": 0.72,
+  "dependency_score": 0.45,
+  "context_score": 0.917,
+  "completed_rank": 3,
+  "weight_adjustment": 0.05,
+  "entity_id": "uuid-of-person",
+  "dependency_raw": {
+    "depth_weight_sum": 1.5,
+    "blocked_count": 2,
+    "block_weight": 0.3,
+    "max_depth": 3
+  },
+  "context_raw": {
+    "entity_id": "uuid-of-person",
+    "hours_until": 2.0,
+    "window_hours": 24,
+    "formula": "max(0, 1 - hours_until / 24)"
+  }
+}
+```
+
+> **v2.6扩展说明**: calculation_factors 新增 `dependency_score`、`context_score`、`dependency_raw`、`context_raw` 字段，用于审计 F-55 依赖性全图谱路径分析和 F-56 场景匹配Event表驱动的计算因子。Phase1 启用四维模型后，审计日志将完整记录四个维度的得分和原始计算因子。
+
+---
+
+### 3.5c AdapterConfigs表（数据源适配器配置表）[v2.5新增]
+
+**用途**: 存储多数据源适配器配置，支撑 DataSourceAdapter 接口的多源数据接入能力。
+
+| 字段名 | 类型 | 约束 | 默认值 | 说明 |
+|--------|------|------|--------|------|
+| id | UUID | PRIMARY KEY | gen_random_uuid() | 主键 |
+| user_id | UUID | NOT NULL | - | 用户ID |
+| adapter_name | VARCHAR(50) | NOT NULL | - | 适配器名称 |
+| config_encrypted | BYTEA | - | NULL | 加密存储API密钥等配置 |
+| is_active | BOOLEAN | NOT NULL | true | 是否启用 |
+| last_sync_at | TIMESTAMPTZ | - | NULL | 最近同步时间 |
+| created_at | TIMESTAMPTZ | NOT NULL | NOW() | 创建时间 |
+
+**adapter_name枚举约束**:
+```sql
+CONSTRAINT valid_adapter_name CHECK (adapter_name IN ('manual', 'voice', 'wechat_forward', 'email', 'calendar'))
+```
+
+**唯一约束**:
+```sql
+UNIQUE(user_id, adapter_name)
+```
+
+**adapter_name枚举说明**:
+
+| 值 | 说明 | 数据格式 |
+|----|------|---------|
+| `manual` | 手动输入 | 用户直接输入文本 |
+| `voice` | 语音输入 | ASR识别后的文本 |
+| `wechat_forward` | 微信转发 | 聊天记录转发文本 |
+| `email` | 邮件解析 | 邮件正文+元数据 |
+| `calendar` | 日历同步 | 会议信息+参与者 |
+
+**安全要求**:
+- `config_encrypted` 使用 AES-256-GCM 加密存储 API 密钥等敏感配置
+- 解密密钥通过环境变量注入，不存储在数据库中
+- 读取配置时应用层解密，API响应中不返回配置内容
 
 ---
 
@@ -1673,8 +1816,10 @@ LIMIT 5;
 | v1.2 | 2026-06-03 | Todo类型重命名（opportunity→cooperation_signal, context→care, action→promise, pending_confirm→followup, resource_maint→help）；莫兰迪色映射更新；Entities properties新增concern/promise/contribution字段；resource/demand标注Phase2；Todos context按类型分类定义 |
 | **v2.0** | **2026-06-04** | **李总v1.2+许总POC反馈融合修订（共识清单D1-1~D1-7）：①新增relationship_briefs关系推进卡表（F-47 P0，20字段+3索引+唯一约束+7阶段枚举）②events表追加input_scope/input_scope_confidence字段及索引（F-44）③todos表追加6字段（action_type/promisor_id/beneficiary_id/confirmation_status/evidence_quote/evidence_event_id）+CHECK约束+枚举说明（F-45）④entities.properties JSONB扩展relationship_stage+完整relationship对象结构（F-48）⑤ER图新增RELATIONSHIP_BRIEFS节点及与EVENTS/ENTITIES关系线⑥新增§5.3 Alembic增量迁移策略（含upgrade/downgrade完整代码+验证清单）⑦参考基线对齐PRD v4.3 + 技术设计v2.5 §3.1** |
 | **[0.2.1新增]** | **2026-06-05** | **F-50语音助手数据表（3张）：①voice_sessions语音会话表（18字段+3索引，ASR→NLU→API→NLG→TTS全链路记录，不存原始音频，query_text max500/answer_text max2000，含intent/answer_source枚举说明+slots JSONB结构示例）②voice_turns多轮对话轮次表（9字段+唯一约束+CASCADE外键，Phase 1.2启用标注，含role/turn_type枚举说明）③voice_analytics分析聚合表（12字段+唯一约束，定时任务聚合写入，含UPSERT聚合SQL示例）④ER图新增VOICE_SESSIONS/VOICE_TURNS/VOICE_ANALYTICS三节点及users→sessions/sessions→turns/sessions→entities关系线⑤§5.4新增Alembic迁移代码（upgrade/downgrade完整实现+SQLite兼容映射表+6项验证清单）⑥版本保持0.2.0不变（增量更新）** |
+| **v2.5** | **2026-06-06** | **Insight Engine + DataSourceAdapter 数据库变更：①todos表新增3字段：completed_rank(完成序号/隐式反馈)、dynamic_score(动态优先级分)、score_calculated_at(评分时间)，含2个CHECK约束(check_dynamic_score_range/check_score_timestamp_valid)和2个索引(idx_todos_dynamic_score/idx_todos_completed_rank)②新增score_audit_logs评分审计日志表（7字段+2索引，triggered_by枚举3值，calculation_factors JSONB结构）③新增adapter_configs数据源适配器配置表（6字段+CHECK约束+唯一约束，adapter_name枚举5值，config_encrypted BYTEA加密存储）④entities.properties JSONB新增concerns/capabilities结构化字段（{tag,detail,source_event_id}格式，无需DDL变更）** |
+| **v2.6** | **2026-06-06** | **F-55/F-56 评分审计扩展：①score_audit_logs.calculation_factors JSONB结构扩展，新增dependency_score/context_score/dependency_raw/context_raw字段，用于审计依赖性全图谱路径分析(F-55)和场景匹配Event表驱动(F-56)的计算因子②todos表确认已有dynamic_score/score_calculated_at/completed_rank字段（F-51/F-52已加），无需新增DDL变更③Phase1启用四维模型后审计日志将完整记录四维得分及原始计算因子** |
 | v2.1 | TBD | 添加用户反馈表 |
 
 ---
 
-*最后更新: 2026-06-05*
+*最后更新: 2026-06-06*

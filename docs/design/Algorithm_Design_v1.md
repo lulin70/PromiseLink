@@ -1,11 +1,12 @@
 # EventLink 算法设计文档
 
-> **版本**: 0.2.0 (POC阶段)
-> **日期**: 2026-06-04
+> **版本**: 0.2.6 (POC阶段)
+> **日期**: 2026-06-06
 > **阶段**: POC (0.2.x series)
 > **定位**: AI驱动的**个人商务关系经营助手**（非"资源匹配平台"）
-> **参考**: 技术设计 v2.5 §4
+> **参考**: 技术设计 v2.6 §4
 > **状态**: ✅ 独立完整版，含详细算法与Python实现
+> **v2.6变更**: 新增DependencyAnalyzer算法(§2.13, F-55)、ContextMatcher算法(§2.14, F-56)
 
 ---
 
@@ -778,6 +779,881 @@ class OpportunityMatcher:
 - 精准率: 用户标记"useful"的匹配 / 总匹配数
 - 召回率: 用户实际采纳的商机 / 系统推荐的商机
 - 覆盖率: 至少产生1个匹配的person比例
+
+### 2.10 PriorityScorer 算法（v2.5 新增）
+
+> **定位**: Insight Engine 的核心组件，将 Todo 从"被动记录"升级为"主动服务"，基于动态优先级评分驱动用户注意力。
+
+#### 2.10.1 PoC 二维模型
+
+**公式**: `Score = 0.4 × urgency + 0.6 × importance`
+
+| 维度 | 权重 | 含义 | 取值范围 |
+|------|------|------|---------|
+| urgency | 0.4 | 紧急程度，基于截止时间衰减 | 0.0 ~ 1.0 |
+| importance | 0.6 | 重要程度，基于 Brief.score 归一化 | 0.0 ~ 1.0 |
+
+**最终分数范围**: 0 ~ 100（线性映射：`dynamic_score = Score × 100`）
+
+#### 2.10.2 Urgency 计算
+
+**有截止日期的 Todo**: 基于 due_date 的指数衰减
+
+```
+urgency = exp(-λ × days_until_due)
+
+其中:
+  λ = 0.1 (衰减系数，约7天半衰期)
+  days_until_due = (due_date - now).days
+
+特殊值:
+  days_until_due < 0  → urgency = 1.0 (已过期，最高紧急度)
+  days_until_due = 0  → urgency = 1.0 (今天到期)
+```
+
+**无截止日期的 Todo**: 慢速衰减（避免永久占据高优先级）
+
+```
+urgency = 0.3 × exp(-0.02 × days_since_creation)
+
+其中:
+  days_since_creation = (now - created_at).days
+  上限: urgency ≤ 0.3 (无截止日项永远不超过0.3)
+```
+
+#### 2.10.3 Importance 计算
+
+**基于 Brief.score 归一化**:
+
+```
+importance = brief_score / 100
+
+其中:
+  brief_score: 关系推进卡的评分（0-100），综合考量:
+    - 关系阶段深度（越深越重要）
+    - 互动频率（越高越重要）
+    - 待兑现承诺数（越多越重要）
+  无关联 Brief 时: importance = 0.5 (中性默认值)
+```
+
+#### 2.10.4 Phase 1 四维模型
+
+**公式**: `Score = 0.3 × urgency + 0.35 × importance + 0.2 × dependency + 0.15 × context_match`
+
+| 维度 | 权重 | 含义 | 说明 |
+|------|------|------|------|
+| urgency | 0.30 | 紧急程度 | 同PoC衰减模型 |
+| importance | 0.35 | 重要程度 | 同PoC Brief归一化 |
+| dependency | 0.20 | 依赖阻塞度 | 被多少Todo依赖，阻塞越多越优先 |
+| context_match | 0.15 | 上下文匹配度 | 与当前时间/地点/最近交互的匹配度 |
+
+#### 2.10.5 伪代码
+
+```python
+import math
+from datetime import datetime, timezone
+from typing import Optional
+
+
+class PriorityScorer:
+    """动态优先级评分引擎"""
+
+    # PoC 二维权重
+    POC_WEIGHTS = {"urgency": 0.4, "importance": 0.6}
+
+    # Phase1 四维权重
+    PHASE1_WEIGHTS = {
+        "urgency": 0.30,
+        "importance": 0.35,
+        "dependency": 0.20,
+        "context_match": 0.15,
+    }
+
+    # 衰减系数
+    URGENCY_LAMBDA = 0.1       # 有截止日的衰减系数
+    NO_DUE_LAMBDA = 0.02       # 无截止日的慢衰减系数
+    NO_DUE_URGENCY_CAP = 0.3   # 无截止日紧急度上限
+
+    def calculate_score(self, todo, brief=None, phase: str = "poc") -> dict:
+        """计算动态优先级分数"""
+        urgency = self._calc_urgency(todo)
+        importance = self._calc_importance(todo, brief)
+
+        if phase == "poc":
+            weights = self.POC_WEIGHTS
+            raw = urgency * weights["urgency"] + importance * weights["importance"]
+        else:
+            dependency = self._calc_dependency(todo)
+            context_match = self._calc_context_match(todo)
+            weights = self.PHASE1_WEIGHTS
+            raw = (
+                urgency * weights["urgency"]
+                + importance * weights["importance"]
+                + dependency * weights["dependency"]
+                + context_match * weights["context_match"]
+            )
+
+        dynamic_score = round(raw * 100, 2)
+
+        return {
+            "dynamic_score": dynamic_score,
+            "urgency": round(urgency, 4),
+            "importance": round(importance, 4),
+            "score_calculated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    def _calc_urgency(self, todo) -> float:
+        """紧急度计算"""
+        now = datetime.now(timezone.utc)
+        due_date = getattr(todo, "due_date", None)
+
+        if due_date is not None:
+            days_until_due = (due_date - now).days
+            if days_until_due <= 0:
+                return 1.0
+            return math.exp(-self.URGENCY_LAMBDA * days_until_due)
+        else:
+            created_at = getattr(todo, "created_at", now)
+            days_since_creation = max(0, (now - created_at).days)
+            return min(
+                self.NO_DUE_URGENCY_CAP,
+                self.NO_DUE_URGENCY_CAP * math.exp(-self.NO_DUE_LAMBDA * days_since_creation),
+            )
+
+    def _calc_importance(self, todo, brief=None) -> float:
+        """重要度计算"""
+        if brief is not None:
+            brief_score = getattr(brief, "score", 50)
+            return min(1.0, max(0.0, brief_score / 100))
+        return 0.5  # 无Brief时中性默认值
+
+    def _calc_dependency(self, todo) -> float:
+        """依赖阻塞度（Phase1）"""
+        # 查询有多少Todo依赖此Todo完成
+        # blocked_count / MAX_EXPECTED_BLOCKS 归一化
+        return 0.0  # PoC占位
+
+    def _calc_context_match(self, todo) -> float:
+        """上下文匹配度（Phase1）"""
+        # 基于当前时间/地点/最近交互的匹配度
+        return 0.0  # PoC占位
+```
+
+---
+
+### 2.11 ImplicitFeedbackCollector 算法（v2.5 新增）
+
+> **核心原则**: 完成顺序 = 真实优先级信号。用户先完成哪个 Todo，说明那个 Todo 在用户心中真正更重要。
+
+#### 2.11.1 on_todo_completed 处理
+
+当用户完成一个 Todo 时：
+
+1. **记录 completed_rank**: 为当前用户的已完成 Todo 分配递增序号
+   ```
+   completed_rank = MAX(completed_rank WHERE user_id = current_user) + 1
+   ```
+
+2. **调整人物权重**: 根据 completed_rank 调整关联人物的优先级权重
+
+   | completed_rank | 权重调整 | 说明 |
+   |----------------|---------|------|
+   | rank ≤ 3 | +0.05 | 前3名完成，说明此人相关事项真正紧急重要 |
+   | rank ≤ 10 | +0.02 | 前10名完成，有一定优先级信号 |
+   | rank > 10 | 0 | 排名靠后，不调整权重 |
+
+3. **写入 score_audit_logs**: 记录分数变更的触发原因和计算因子
+
+#### 2.11.2 daily_rebalance 每日再平衡
+
+每日凌晨定时任务，基于全天完成模式重新计算权重：
+
+```
+1. 收集当日所有 completed_todo 及其 completed_rank
+2. 按 related_entity_id 分组，计算每个实体的"优先完成度":
+   entity_priority_score = Σ(1 / completed_rank) for all todos of this entity
+3. 归一化到 [0, 1] 范围
+4. 与现有权重做指数移动平均(EMA)融合:
+   new_weight = α × entity_priority_score + (1 - α) × old_weight
+   α = 0.3 (EMA平滑系数)
+5. 更新 person 的 priority_weight 字段
+6. 触发 PriorityScorer 重新计算相关 Todo 的 dynamic_score
+```
+
+#### 2.11.3 Phase 1 扩展: 负面反馈
+
+**长按"以后少提醒"按钮**: 显式负面反馈信号
+
+| 操作 | 效果 | 权重调整 |
+|------|------|---------|
+| 长按"以后少提醒" | 该类型/该人物的 Todo 优先级降低 | -0.10 |
+| 连续3次"以后少提醒" | 该人物进入"冷关注"列表 | -0.30 |
+| 用户手动恢复 | 取消"冷关注"标记 | 恢复至调整前 |
+
+#### 2.11.4 伪代码
+
+```python
+from datetime import datetime, timezone
+from typing import Optional
+
+
+class ImplicitFeedbackCollector:
+    """隐式反馈收集器——通过完成顺序学习真实优先级"""
+
+    # 权重调整规则
+    RANK_WEIGHT_MAP = [
+        (3, 0.05),    # rank ≤ 3 → +0.05
+        (10, 0.02),   # rank ≤ 10 → +0.02
+        (float("inf"), 0.0),  # rank > 10 → 0
+    ]
+
+    # EMA 平滑系数
+    EMA_ALPHA = 0.3
+
+    # 负面反馈权重
+    NEGATIVE_FEEDBACK_WEIGHT = -0.10
+    COLD_ATTENTION_THRESHOLD = 3
+    COLD_ATTENTION_WEIGHT = -0.30
+
+    def __init__(self, db=None, scorer=None):
+        self.db = db
+        self.scorer = scorer
+
+    async def on_todo_completed(self, todo, user_id: str) -> dict:
+        """Todo完成时的隐式反馈处理"""
+        # 1. 分配 completed_rank
+        max_rank = await self._get_max_rank(user_id)
+        completed_rank = max_rank + 1
+
+        # 2. 更新 Todo 的 completed_rank
+        todo.completed_rank = completed_rank
+
+        # 3. 调整关联人物权重
+        weight_adjustment = self._get_weight_adjustment(completed_rank)
+        related_entity_id = getattr(todo, "related_entity_id", None)
+
+        if related_entity_id and weight_adjustment > 0:
+            await self._adjust_person_weight(related_entity_id, weight_adjustment)
+
+        # 4. 写入审计日志
+        await self._write_audit_log(
+            todo_id=todo.id,
+            user_id=user_id,
+            old_score=getattr(todo, "dynamic_score", None),
+            new_score=None,  # 将由 daily_rebalance 重新计算
+            factors={
+                "completed_rank": completed_rank,
+                "weight_adjustment": weight_adjustment,
+                "entity_id": related_entity_id,
+            },
+            triggered_by="implicit_feedback",
+        )
+
+        return {
+            "completed_rank": completed_rank,
+            "weight_adjustment": weight_adjustment,
+            "entity_id": related_entity_id,
+        }
+
+    async def daily_rebalance(self, user_id: str) -> dict:
+        """每日再平衡——基于全天完成模式重新计算权重"""
+        # 1. 收集当日完成记录
+        completed_today = await self._get_completed_today(user_id)
+
+        if not completed_today:
+            return {"rebalanced": False, "reason": "no_completions"}
+
+        # 2. 按实体分组计算优先完成度
+        entity_scores = {}
+        for todo in completed_today:
+            entity_id = getattr(todo, "related_entity_id", None)
+            if entity_id and todo.completed_rank:
+                if entity_id not in entity_scores:
+                    entity_scores[entity_id] = 0.0
+                entity_scores[entity_id] += 1.0 / todo.completed_rank
+
+        # 3. 归一化
+        max_score = max(entity_scores.values()) if entity_scores else 1.0
+        for eid in entity_scores:
+            entity_scores[eid] = entity_scores[eid] / max_score
+
+        # 4. EMA 融合并更新
+        updated_entities = []
+        for entity_id, new_score in entity_scores.items():
+            old_weight = await self._get_person_weight(entity_id)
+            blended = self.EMA_ALPHA * new_score + (1 - self.EMA_ALPHA) * old_weight
+            await self._set_person_weight(entity_id, blended)
+            updated_entities.append({
+                "entity_id": entity_id,
+                "old_weight": round(old_weight, 4),
+                "new_weight": round(blended, 4),
+            })
+
+        # 5. 触发 PriorityScorer 重算
+        if self.scorer:
+            await self.scorer.recalculate_for_user(user_id)
+
+        return {
+            "rebalanced": True,
+            "entities_updated": len(updated_entities),
+            "details": updated_entities,
+        }
+
+    async def on_negative_feedback(self, todo, user_id: str) -> dict:
+        """Phase1: 负面反馈处理（长按"以后少提醒"）"""
+        related_entity_id = getattr(todo, "related_entity_id", None)
+        if not related_entity_id:
+            return {"adjusted": False}
+
+        # 检查连续负面反馈次数
+        negative_count = await self._get_negative_feedback_count(related_entity_id, user_id)
+
+        if negative_count + 1 >= self.COLD_ATTENTION_THRESHOLD:
+            weight = self.COLD_ATTENTION_WEIGHT
+            await self._mark_cold_attention(related_entity_id, user_id)
+        else:
+            weight = self.NEGATIVE_FEEDBACK_WEIGHT
+
+        await self._adjust_person_weight(related_entity_id, weight)
+
+        return {
+            "adjusted": True,
+            "entity_id": related_entity_id,
+            "weight_change": weight,
+            "negative_count": negative_count + 1,
+        }
+
+    def _get_weight_adjustment(self, completed_rank: int) -> float:
+        """根据完成序号获取权重调整值"""
+        for threshold, weight in self.RANK_WEIGHT_MAP:
+            if completed_rank <= threshold:
+                return weight
+        return 0.0
+
+    # --- 以下为数据库操作占位 ---
+
+    async def _get_max_rank(self, user_id: str) -> int:
+        return await self.db.execute_scalar(
+            "SELECT COALESCE(MAX(completed_rank), 0) FROM todos WHERE user_id = :uid",
+            {"uid": user_id},
+        )
+
+    async def _adjust_person_weight(self, entity_id: str, delta: float):
+        pass  # 更新 person 的 priority_weight
+
+    async def _get_person_weight(self, entity_id: str) -> float:
+        return 0.5  # 默认中性权重
+
+    async def _set_person_weight(self, entity_id: str, weight: float):
+        pass  # 写入更新
+
+    async def _write_audit_log(self, **kwargs):
+        pass  # 写入 score_audit_logs
+
+    async def _get_completed_today(self, user_id: str) -> list:
+        return []  # 查询当日完成的Todo
+
+    async def _get_negative_feedback_count(self, entity_id: str, user_id: str) -> int:
+        return 0  # 查询连续负面反馈次数
+
+    async def _mark_cold_attention(self, entity_id: str, user_id: str):
+        pass  # 标记冷关注
+```
+
+---
+
+### 2.12 Concern/Capability 解析规则（v2.5 新增）
+
+> **定位**: 为 Person 实体的 concerns 和 capabilities 字段提供结构化解析规范，支撑 topic_overlap 关联发现的召回与精度。
+
+#### 2.12.1 JSON 格式定义
+
+```json
+{
+  "concerns": [
+    {
+      "tag": "人才招聘",
+      "detail": "正在寻找有5年经验的AI算法工程师，prefer CV方向",
+      "source_event_id": "uuid-of-event"
+    }
+  ],
+  "capabilities": [
+    {
+      "tag": "技术选型",
+      "detail": "在微服务架构选型上有丰富经验，主导过3次技术栈迁移",
+      "source_event_id": "uuid-of-event"
+    }
+  ]
+}
+```
+
+**字段说明**:
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| tag | string | 是 | 受控词汇表中的分类标签 |
+| detail | string | 是 | 自由文本，描述具体细节 |
+| source_event_id | string(UUID) | 是 | 来源事件ID，用于追溯 |
+
+#### 2.12.2 Tag 受控词汇表
+
+**concerns 标签**:
+
+| 标签 | 含义 | 典型场景 |
+|------|------|---------|
+| 会议效率 | 会议组织与效率问题 | "会议太多没时间干活" |
+| 资金需求 | 融资/资金周转需求 | "正在找天使轮" |
+| 人才招聘 | 招人/团队扩充需求 | "缺前端开发" |
+| 技术选型 | 技术架构/选型决策 | "考虑从单体迁移到微服务" |
+| 市场拓展 | 市场/客户拓展需求 | "想进入东南亚市场" |
+| 产品方向 | 产品策略/方向决策 | "不确定是否做B端" |
+| 合作伙伴 | 寻找合作方/供应商 | "需要靠谱的云服务商" |
+| 合规风控 | 法律/合规/风控问题 | "数据合规要求越来越严" |
+| 组织管理 | 团队管理/组织架构 | "技术团队扩张太快管理跟不上" |
+| 个人成长 | 学习/培训/职业发展 | "想学产品思维" |
+
+**capabilities 标签**:
+
+| 标签 | 含义 | 典型场景 |
+|------|------|---------|
+| 技术选型 | 技术架构决策能力 | "主导过3次技术栈迁移" |
+| 融资经验 | 融资/投资对接经验 | "帮3个项目拿到A轮" |
+| 行业资源 | 行业人脉/资源 | "电商圈人脉广" |
+| 团队搭建 | 团队组建/管理经验 | "从0搭建过50人技术团队" |
+| 市场策略 | 市场分析/策略制定 | "操盘过3个产品从0到1" |
+| 政策解读 | 政策/法规解读能力 | "对数据安全法规很熟" |
+| 供应链 | 供应链管理经验 | "有成熟的供应商网络" |
+| 国际化 | 海外市场经验 | "做过东南亚本地化" |
+
+#### 2.12.3 解析流程
+
+```
+raw_text 输入
+    │
+    ▼
+LLM 提取
+    │  Prompt: "从以下文本中提取人物的关注点(concerns)和能力(capabilities)，
+    │           每条需映射到受控词汇表的tag，并补充detail描述"
+    │
+    ▼
+Tag 映射
+    │  1. LLM 输出的 tag 先与受控词汇表做精确匹配
+    │  2. 精确匹配失败 → 做语义相似度匹配（阈值 ≥ 0.8）
+    │  3. 语义匹配也失败 → 保留原始 tag 作为自由文本（fallback）
+    │
+    ▼
+结构化输出
+    [{tag, detail, source_event_id}, ...]
+```
+
+**LLM Prompt 模板**:
+
+```
+从以下文本中提取人物的关注点(concerns)和能力(capabilities)。
+
+受控词汇表(concerns): 会议效率, 资金需求, 人才招聘, 技术选型, 市场拓展, 产品方向, 合作伙伴, 合规风控, 组织管理, 个人成长
+受控词汇表(capabilities): 技术选型, 融资经验, 行业资源, 团队搭建, 市场策略, 政策解读, 供应链, 国际化
+
+规则:
+1. 每条提取结果必须映射到受控词汇表中的tag
+2. 如果无法映射，使用最接近的tag并在detail中说明差异
+3. detail为自由文本，描述具体细节（≤200字）
+4. 返回JSON数组格式
+
+文本: "{raw_text}"
+```
+
+#### 2.12.4 匹配策略: topic_overlap 关联发现
+
+**两阶段匹配**:
+
+| 阶段 | 使用字段 | 目的 | 方法 |
+|------|---------|------|------|
+| 召回(Recall) | tag | 快速筛选候选关联 | tag 精确匹配，命中即纳入候选 |
+| 精度(Precision) | detail | 精确判断关联质量 | detail 文本相似度（Jaccard / embedding），低于阈值则降级 |
+
+**示例**:
+
+```
+Person A: concerns = [{tag: "人才招聘", detail: "找AI算法工程师"}]
+Person B: capabilities = [{tag: "团队搭建", detail: "搭建过AI算法团队"}]
+
+召回: tag "人才招聘" 与 "团队搭建" 不精确匹配 → 语义相似度 0.75 < 0.8 → 不召回
+（Phase1: 使用embedding后可能召回，因为语义相关）
+
+Person A: concerns = [{tag: "技术选型", detail: "考虑微服务迁移"}]
+Person B: capabilities = [{tag: "技术选型", detail: "主导过3次微服务迁移"}]
+
+召回: tag "技术选型" 精确匹配 → 纳入候选
+精度: detail 相似度 0.85 ≥ 阈值 → 确认关联，confidence = 0.85
+```
+
+---
+
+### 2.13 DependencyAnalyzer 算法（v2.6 新增, F-55）
+
+> **定位**: 依赖性全图谱路径分析——从Association图谱中提取承诺依赖链，检测阻塞关系，量化Todo的依赖阻塞度。
+
+#### 2.13.1 核心思路
+
+当用户对某Entity做出承诺(my_promise)后，该Entity对用户的承诺(their_promise)可能成为前置条件。DependencyAnalyzer从Association图谱中提取同一Entity下的承诺依赖链，通过BFS遍历检测阻塞关系，计算依赖阻塞得分。
+
+**依赖图构建规则**:
+- 同一Entity下，`my_promise` → `their_promise` 构成一条依赖边
+- 含义：我的承诺依赖对方先兑现其承诺
+- 间接依赖：支持3跳（A→B→C→D），超过3跳截断
+
+#### 2.13.2 得分公式
+
+```
+dependency_score = Σ(1/depth) × min(1.0, blocked_count × 0.3)
+
+其中:
+  depth: 依赖链中的跳数（1/2/3）
+  blocked_count: 被此Todo阻塞的其他Todo数量
+  0.3: 单个阻塞项的权重系数
+
+示例:
+  - Todo A 被 2 个Todo依赖，无间接依赖 → dependency_score = 1 × min(1.0, 2×0.3) = 0.6
+  - Todo B 被 1 个Todo依赖，且有1条2跳间接依赖 → dependency_score = (1 + 0.5) × min(1.0, 1×0.3) = 0.45
+```
+
+#### 2.13.3 伪代码
+
+```python
+from collections import deque
+from typing import Dict, List, Set, Tuple
+
+
+class DependencyAnalyzer:
+    """依赖性全图谱路径分析引擎（F-55）"""
+
+    MAX_DEPTH = 3  # 间接依赖最大跳数
+    BLOCK_WEIGHT = 0.3  # 单个阻塞项权重
+
+    def __init__(self, db=None):
+        self.db = db
+
+    async def _build_promise_dependency_graph(self, user_id: str) -> Dict[str, List[str]]:
+        """
+        构建承诺依赖图
+        规则: 同一Entity下 my_promise → their_promise 构成依赖边
+
+        返回: {todo_id: [依赖的todo_id列表]}
+        """
+        # 查询用户所有promise类型Todo
+        todos = await self.db.fetch_all(
+            """SELECT t.id, t.related_entity_id, t.action_type
+               FROM todos t
+               WHERE t.user_id = :uid
+                 AND t.todo_type = 'promise'
+                 AND t.status IN ('pending', 'in_progress')""",
+            {"uid": user_id},
+        )
+
+        # 按Entity分组
+        entity_todos: Dict[str, dict] = {}  # entity_id → {"my": [], "their": []}
+        for todo in todos:
+            eid = todo["related_entity_id"]
+            if eid not in entity_todos:
+                entity_todos[eid] = {"my": [], "their": []}
+            if todo["action_type"] == "my_promise":
+                entity_todos[eid]["my"].append(str(todo["id"]))
+            elif todo["action_type"] == "their_promise":
+                entity_todos[eid]["their"].append(str(todo["id"]))
+
+        # 构建依赖边: my_promise → their_promise（同一Entity下）
+        graph: Dict[str, List[str]] = {}
+        for eid, groups in entity_todos.items():
+            for my_id in groups["my"]:
+                if my_id not in graph:
+                    graph[my_id] = []
+                graph[my_id].extend(groups["their"])
+
+        return graph
+
+    async def _find_blocking_chains(
+        self, todo_id: str, graph: Dict[str, List[str]]
+    ) -> Tuple[int, List[int]]:
+        """
+        BFS遍历查找阻塞链
+        返回: (blocked_count, depth_counts)
+          - blocked_count: 被此Todo直接/间接阻塞的Todo总数
+          - depth_counts: 每层深度阻塞的Todo数量 [depth1_count, depth2_count, depth3_count]
+        """
+        visited: Set[str] = set()
+        queue = deque()
+        queue.append((todo_id, 1))  # (node, depth)
+        blocked_count = 0
+        depth_counts = [0, 0, 0]  # depth 1, 2, 3
+
+        while queue:
+            current, depth = queue.popleft()
+            if depth > self.MAX_DEPTH:
+                continue
+            for neighbor in graph.get(current, []):
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    blocked_count += 1
+                    if depth <= 3:
+                        depth_counts[depth - 1] += 1
+                    queue.append((neighbor, depth + 1))
+
+        return blocked_count, depth_counts
+
+    async def _count_blocked_todos(self, todo_id: str, graph: Dict[str, List[str]]) -> int:
+        """统计被此Todo阻塞的Todo数量"""
+        blocked_count, _ = await self._find_blocking_chains(todo_id, graph)
+        return blocked_count
+
+    async def compute_dependency_score(self, todo_id: str, user_id: str) -> dict:
+        """
+        计算单个Todo的依赖阻塞度得分
+
+        返回: {
+            "dependency_score": float,
+            "blocked_count": int,
+            "depth_distribution": [d1, d2, d3],
+            "dependency_raw": {...}  # 原始计算因子，用于审计
+        }
+        """
+        graph = await self._build_promise_dependency_graph(user_id)
+        blocked_count, depth_counts = await self._find_blocking_chains(todo_id, graph)
+
+        # 计算得分: Σ(1/depth) × min(1.0, blocked_count × 0.3)
+        depth_weight_sum = 0.0
+        for i, count in enumerate(depth_counts):
+            depth = i + 1
+            depth_weight_sum += (1.0 / depth) * count
+
+        score = depth_weight_sum * min(1.0, blocked_count * self.BLOCK_WEIGHT)
+        score = min(1.0, score)  # 上限截断
+
+        return {
+            "dependency_score": round(score, 4),
+            "blocked_count": blocked_count,
+            "depth_distribution": depth_counts,
+            "dependency_raw": {
+                "depth_weight_sum": round(depth_weight_sum, 4),
+                "blocked_count": blocked_count,
+                "block_weight": self.BLOCK_WEIGHT,
+                "max_depth": self.MAX_DEPTH,
+            },
+        }
+```
+
+#### 2.13.4 与 PriorityScorer 的集成
+
+DependencyAnalyzer 的输出 `dependency_score` 直接作为 PriorityScorer Phase1 四维模型的第三维度（权重0.20）:
+
+```
+Score = 0.30 × urgency + 0.35 × importance + 0.20 × dependency + 0.15 × context_match
+                                                         ↑
+                                              DependencyAnalyzer.compute_dependency_score()
+```
+
+#### 2.13.5 PoC vs Phase1 差异
+
+| 特性 | PoC | Phase1 |
+|------|-----|--------|
+| 依赖图构建 | 不启用，dependency_score=0.0 | 启用，从Association图谱实时构建 |
+| 间接依赖 | 不计算 | 支持最多3跳 |
+| 阻塞检测 | 不检测 | BFS遍历检测 |
+| 得分审计 | 不记录 | dependency_raw写入score_audit_logs |
+
+---
+
+### 2.14 ContextMatcher 算法（v2.6 新增, F-56）
+
+> **定位**: 场景匹配Event表驱动——扫描未来24h meeting/call事件，匹配关联Entity的Todo，提升即将见面人物的Todo优先级。
+
+#### 2.14.1 核心思路
+
+用户即将与某Entity见面时，与该Entity相关的Todo应当获得更高的优先级。ContextMatcher扫描未来24小时内的meeting/call事件，提取事件关联的Entity列表，匹配这些Entity下的待办Todo，计算场景匹配得分。
+
+#### 2.14.2 得分公式
+
+```
+context_score = max(0, 1 - hours_until_meeting / 24)
+
+其中:
+  hours_until_meeting: 距离最近一次见面的时间（小时）
+  窗口: 24小时（超过24h的事件不参与计算）
+  线性衰减: 越近的会议得分越高
+
+示例:
+  - 2小时后有会议 → context_score = max(0, 1 - 2/24) = 0.917
+  - 12小时后有会议 → context_score = max(0, 1 - 12/24) = 0.5
+  - 24小时后有会议 → context_score = max(0, 1 - 24/24) = 0.0
+  - 无即将到来的会议 → context_score = 0.0
+```
+
+#### 2.14.3 匹配逻辑
+
+```
+匹配条件: Todo.related_entity_id ∈ upcoming_event.entities
+
+即: 如果某个Todo关联的Entity出现在未来24h的meeting/call事件的参与者列表中，
+则该Todo获得场景匹配加分。
+```
+
+#### 2.14.4 伪代码
+
+```python
+from datetime import datetime, timezone, timedelta
+from typing import Dict, List, Optional
+
+
+class ContextMatcher:
+    """场景匹配Event表驱动引擎（F-56）"""
+
+    CONTEXT_WINDOW_HOURS = 24  # 场景匹配窗口
+
+    def __init__(self, db=None):
+        self.db = db
+
+    async def get_upcoming_context(
+        self, user_id: str
+    ) -> Dict[str, dict]:
+        """
+        获取用户未来24h即将见面的Entity及关联Todo
+
+        返回: {
+            entity_id: {
+                "nearest_meeting_at": "2026-06-06T14:00:00Z",
+                "hours_until": 2.5,
+                "event_title": "供应链优化方案讨论",
+                "related_todos": [todo_id, ...]
+            },
+            ...
+        }
+        """
+        now = datetime.now(timezone.utc)
+        window_end = now + timedelta(hours=self.CONTEXT_WINDOW_HOURS)
+
+        # 查询未来24h的meeting/call事件
+        events = await self.db.fetch_all(
+            """SELECT e.id, e.title, e.timestamp, e.metadata
+               FROM events e
+               WHERE e.user_id = :uid
+                 AND e.event_type IN ('meeting', 'call')
+                 AND e.timestamp >= :now
+                 AND e.timestamp <= :window_end
+               ORDER BY e.timestamp ASC""",
+            {"uid": user_id, "now": now, "window_end": window_end},
+        )
+
+        # 提取每个事件的关联Entity
+        context_map: Dict[str, dict] = {}
+        for event in events:
+            # 从metadata或event_entities提取参与者Entity
+            entities = self._extract_event_entities(event)
+            hours_until = (event["timestamp"] - now).total_seconds() / 3600
+
+            for entity_id in entities:
+                eid = str(entity_id)
+                # 保留最近的会议时间
+                if eid not in context_map or hours_until < context_map[eid]["hours_until"]:
+                    # 查询该Entity的待办Todo
+                    related_todos = await self._get_entity_pending_todos(eid, user_id)
+                    context_map[eid] = {
+                        "nearest_meeting_at": event["timestamp"].isoformat(),
+                        "hours_until": round(hours_until, 2),
+                        "event_title": event["title"],
+                        "related_todos": related_todos,
+                    }
+
+        return context_map
+
+    async def compute_context_score(self, todo_id: str, user_id: str) -> dict:
+        """
+        计算单个Todo的场景匹配得分
+
+        返回: {
+            "context_score": float,
+            "matched_event": {...} | None,
+            "context_raw": {...}  # 原始计算因子，用于审计
+        }
+        """
+        # 获取Todo关联的Entity
+        todo = await self.db.fetch_one(
+            """SELECT related_entity_id FROM todos WHERE id = :tid""",
+            {"tid": todo_id},
+        )
+        if not todo or not todo["related_entity_id"]:
+            return {
+                "context_score": 0.0,
+                "matched_event": None,
+                "context_raw": {"reason": "no_related_entity"},
+            }
+
+        entity_id = str(todo["related_entity_id"])
+        context_map = await self.get_upcoming_context(user_id)
+
+        if entity_id not in context_map:
+            return {
+                "context_score": 0.0,
+                "matched_event": None,
+                "context_raw": {"reason": "no_upcoming_meeting", "entity_id": entity_id},
+            }
+
+        ctx = context_map[entity_id]
+        hours_until = ctx["hours_until"]
+        score = max(0.0, 1.0 - hours_until / self.CONTEXT_WINDOW_HOURS)
+
+        return {
+            "context_score": round(score, 4),
+            "matched_event": {
+                "event_title": ctx["event_title"],
+                "nearest_meeting_at": ctx["nearest_meeting_at"],
+                "hours_until": hours_until,
+            },
+            "context_raw": {
+                "entity_id": entity_id,
+                "hours_until": hours_until,
+                "window_hours": self.CONTEXT_WINDOW_HOURS,
+                "formula": "max(0, 1 - hours_until / 24)",
+            },
+        }
+
+    def _extract_event_entities(self, event: dict) -> List[str]:
+        """从事件中提取关联Entity ID列表"""
+        metadata = event.get("metadata") or {}
+        participants = metadata.get("participants", [])
+        # 实际实现中需将participants名称解析为entity_id
+        # 此处返回已解析的entity_id列表
+        return metadata.get("entity_ids", [])
+
+    async def _get_entity_pending_todos(self, entity_id: str, user_id: str) -> List[str]:
+        """获取指定Entity的待办Todo ID列表"""
+        rows = await self.db.fetch_all(
+            """SELECT id FROM todos
+               WHERE related_entity_id = :eid
+                 AND user_id = :uid
+                 AND status IN ('pending', 'in_progress')""",
+            {"eid": entity_id, "uid": user_id},
+        )
+        return [str(r["id"]) for r in rows]
+```
+
+#### 2.14.5 与 PriorityScorer 的集成
+
+ContextMatcher 的输出 `context_score` 直接作为 PriorityScorer Phase1 四维模型的第四维度（权重0.15）:
+
+```
+Score = 0.30 × urgency + 0.35 × importance + 0.20 × dependency + 0.15 × context_match
+                                                                          ↑
+                                                              ContextMatcher.compute_context_score()
+```
+
+#### 2.14.6 PoC vs Phase1 差异
+
+| 特性 | PoC | Phase1 |
+|------|-----|--------|
+| 场景匹配 | 不启用，context_score=0.0 | 启用，扫描未来24h事件 |
+| 窗口 | 不计算 | 24小时 |
+| Entity匹配 | 不匹配 | Todo.related_entity_id ∈ upcoming_event.entities |
+| 得分审计 | 不记录 | context_raw写入score_audit_logs |
 
 ---
 
@@ -2361,7 +3237,7 @@ Event Ingest Pipeline (v2.0):
 
 ---
 
-*本文档为EventLink算法设计v2.0完整版。所有算法与8条铁律保持一致，字段名使用todo_type（非todo_nature）、callability（非availability），敏感度为2级（matchable/no_match），明确排除RBAC/多租户/团队协作/他人资源匹配/原生APP。v2.0新增：InputScope分类器(§0)、Promise双向动作识别(§4.2a)、Todo降噪(§4.9)、RelationshipStage状态机(§6)、Pipeline Step0/8(§9)、关联发现HOT/COLD分离(§7.5)。[0.2.1新增]：NLU意图识别引擎(§11, F-50)。参考基线：技术设计v2.5 §4。*
+*本文档为EventLink算法设计v2.6完整版。所有算法与8条铁律保持一致，字段名使用todo_type（非todo_nature）、callability（非availability），敏感度为2级（matchable/no_match），明确排除RBAC/多租户/团队协作/他人资源匹配/原生APP。v2.0新增：InputScope分类器(§0)、Promise双向动作识别(§4.2a)、Todo降噪(§4.9)、RelationshipStage状态机(§6)、Pipeline Step0/8(§9)、关联发现HOT/COLD分离(§7.5)。[0.2.1新增]：NLU意图识别引擎(§11, F-50)。[v2.5新增]：PriorityScorer算法(§2.10)、ImplicitFeedbackCollector算法(§2.11)、Concern/Capability解析规则(§2.12)。[v2.6新增]：DependencyAnalyzer算法(§2.13, F-55)、ContextMatcher算法(§2.14, F-56)。参考基线：技术设计v2.6 §4。*
 
 ---
 

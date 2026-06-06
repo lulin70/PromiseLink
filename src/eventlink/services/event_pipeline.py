@@ -358,6 +358,31 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
             todos_enriched=len(fresh_todos),
         )
 
+        # ── Step 8.5: Phase 1 four-dimensional priority scoring (F-55+F-56) ──
+        _t85 = time.monotonic()
+        try:
+            from eventlink.services.priority_scorer import PriorityScorerV2
+            scorer_v2 = PriorityScorerV2()
+            async with AsyncSessionLocal() as score_session:
+                for todo in fresh_todos:
+                    try:
+                        score_result = await scorer_v2.score_with_context(todo, score_session)
+                        todo.dynamic_score = score_result.score
+                        todo.score_calculated_at = datetime.now(timezone.utc)
+                    except Exception as score_err:
+                        logger.warning("pipeline_step8_5_score_failed",
+                            todo_id=str(todo.id), error=str(score_err))
+                await score_session.commit()
+        except Exception as scorer_err:
+            logger.warning("pipeline_step8_5_scorer_init_failed", error=str(scorer_err))
+
+        result.step_timings["step8_5_priority_scoring"] = time.monotonic() - _t85
+
+        logger.info("pipeline_step8_5_priority_scored",
+            event_id=str(event_id),
+            todos_scored=len(fresh_todos),
+        )
+
         # Step 9: Send notifications for new todos
         try:
             from eventlink.services.notification_service import notification_service

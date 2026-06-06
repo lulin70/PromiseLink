@@ -1,7 +1,7 @@
 # EventLink 安全设计文档
 
-> **版本**: 0.2.0 (POC阶段)
-> **日期**: 2026-06-04
+> **版本**: v2.6 (POC阶段)
+> **日期**: 2026-06-06
 > **阶段**: POC (0.2.x series)
 > **设计师**: 架构师 + 安全工程师
 > **参考**: PRD v4.3, 技术设计 v2.5 §8 (§3.1a + §8.0.3), API设计 v1.0, 数据库设计 v1.0
@@ -1683,6 +1683,436 @@ async def get_voice_session(session_id: UUID, current_user: User) -> VoiceSessio
 
 > **与§6.5 TTS播报安全的延续关系**：§6.5 定义了三级隐私播报策略（basic/standard/strict），§6.6.5 的"TTS自动PII模糊化"是该策略在车载场景的强制应用——驾车环境下默认采用 strict 级别播报，无需用户手动切换。
 
+### 6.7 Insight Engine安全专项 [v2.5新增]
+
+> **背景**：Insight Engine（PriorityScorer + ImplicitFeedbackCollector）引入动态优先级评分和隐式反馈机制，新增攻击面包括评分操纵、隐式反馈伪造、动态评分API滥用。
+
+#### 6.7.1 评分操纵防护
+
+| 防护措施 | 说明 | 实施阶段 |
+|----------|------|----------|
+| **completed_rank单调递增** | completed_rank只能递增，不能回填。设置新rank时校验 `new_rank > current_rank`，否则拒绝并记录审计日志 | PoC+ |
+| **评分审计日志** | 评分计算结果写入 `score_audit_logs` 审计表，记录：user_id, todo_id, old_score, new_score, calculated_at, calculation_params | PoC+ |
+| **异常评分波动检测** | 单日评分波动>20%触发告警。计算方式：`abs(new_score - old_score) / old_score > 0.2` 时写入 `security_anomaly` 审计事件 | Phase1+ |
+
+```python
+class PriorityScorerSecurity:
+    """评分安全守卫"""
+
+    async def validate_rank_monotonic(self, todo_id: str, new_rank: int) -> bool:
+        """校验completed_rank单调递增"""
+        todo = await self.repo.get_todo(todo_id)
+        if todo.completed_rank and new_rank <= todo.completed_rank:
+            await self.audit_log("rank_monotonic_violation", {
+                "todo_id": todo_id,
+                "current_rank": todo.completed_rank,
+                "attempted_rank": new_rank,
+            })
+            raise SecurityException(
+                f"completed_rank只能递增: current={todo.completed_rank}, attempted={new_rank}"
+            )
+        return True
+
+    async def detect_score_anomaly(self, user_id: str, old_score: float, new_score: float):
+        """检测异常评分波动"""
+        if old_score > 0 and abs(new_score - old_score) / old_score > 0.2:
+            await self.audit_log("score_anomaly", {
+                "user_id": user_id,
+                "old_score": old_score,
+                "new_score": new_score,
+                "fluctuation": f"{abs(new_score - old_score) / old_score * 100:.1f}%",
+            })
+```
+
+**score_audit_logs表DDL**：
+
+```sql
+CREATE TABLE score_audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    todo_id UUID NOT NULL,
+    old_score FLOAT,
+    new_score FLOAT NOT NULL,
+    urgency FLOAT,
+    importance FLOAT,
+    calculation_params JSONB,    -- 评分参数快照
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    INDEX idx_score_audit_user_time (user_id, created_at)
+);
+```
+
+#### 6.7.2 隐式反馈完整性
+
+| 防护措施 | 说明 | 实施阶段 |
+|----------|------|----------|
+| **completed_rank与completed_at一致性校验** | 完成排名与完成时间戳必须一致：rank靠前的todo其completed_at不应晚于rank靠后的todo | PoC+ |
+| **批量伪造完成事件防护** | 完成操作速率限制：≤30次/分钟/user_id。超过限制返回429 | PoC+ |
+| **完成事件时间窗口校验** | completed_at不能是未来时间，不能早于todo创建时间 | PoC+ |
+
+```python
+class ImplicitFeedbackSecurity:
+    """隐式反馈安全守卫"""
+
+    COMPLETION_RATE_LIMIT = 30  # 次/分钟
+
+    async def validate_completion_consistency(self, user_id: str, completions: list):
+        """校验completed_rank与completed_at一致性"""
+        sorted_by_rank = sorted(completions, key=lambda x: x.completed_rank)
+        for i in range(len(sorted_by_rank) - 1):
+            curr = sorted_by_rank[i]
+            next_item = sorted_by_rank[i + 1]
+            if curr.completed_at > next_item.completed_at:
+                await self.audit_log("completion_consistency_violation", {
+                    "user_id": user_id,
+                    "todo_a": {"id": curr.id, "rank": curr.completed_rank, "at": curr.completed_at},
+                    "todo_b": {"id": next_item.id, "rank": next_item.completed_rank, "at": next_item.completed_at},
+                })
+
+    async def check_completion_rate(self, user_id: str) -> bool:
+        """检查完成操作速率"""
+        key = f"completion_rate:{user_id}"
+        count = await self.redis.incr(key)
+        if count == 1:
+            await self.redis.expire(key, 60)
+        if count > self.COMPLETION_RATE_LIMIT:
+            raise HTTPException(429, "完成操作过于频繁")
+        return True
+```
+
+#### 6.7.3 动态评分API安全
+
+| API端点 | 安全约束 | 限流规则 |
+|---------|----------|----------|
+| `POST /api/v1/insights/calculate` | 只能计算自己的优先级（user_id隔离），JWT中提取user_id与请求参数user_id校验一致 | 10次/分钟/user_id |
+| `GET /api/v1/insights/scores` | 只能查看自己的评分结果，强制user_id过滤 | 30次/分钟/user_id |
+| `GET /api/v1/insights/audit-logs` | 只能查看自己的审计日志，强制user_id过滤 | 10次/分钟/user_id |
+
+```python
+@app.post("/api/v1/insights/calculate")
+@depends(RateLimiter(times=10, seconds=60))
+async def calculate_priority(user_id: str = Depends(get_current_user)):
+    """动态评分API - 强制user_id隔离"""
+    # user_id从JWT提取，不接受请求参数覆盖
+    scores = await priority_scorer.calculate_all(user_id)
+    return {"scores": scores, "calculated_at": datetime.utcnow().isoformat()}
+```
+
+### 6.8 DataSourceAdapter安全专项 [v2.5新增]
+
+> **背景**：DataSourceAdapter接口支持多源数据接入（邮件、日历、微信等），引入新的攻击面包括API密钥泄露、出站流量滥用、供应链攻击。
+
+#### 6.8.1 Adapter配置安全
+
+| 安全措施 | 说明 | 实施阶段 |
+|----------|------|----------|
+| **API密钥加密存储** | Adapter配置中的API密钥使用AES-256-GCM加密存储，复用§3.1字段加密机制。密钥不得明文出现在配置文件、日志或API响应中 | Phase1+ |
+| **Adapter白名单机制** | 仅允许注册的Adapter类型运行，未注册Adapter的配置被拒绝。白名单存储在数据库 `adapter_registry` 表中 | Phase1+ |
+| **同步频率限制** | Adapter同步最小间隔15分钟，防止频繁调用外部API。配置中 `sync_interval_minutes` 必须 ≥ 15 | Phase1+ |
+
+```python
+class AdapterConfigSecurity:
+    """Adapter配置安全"""
+
+    MIN_SYNC_INTERVAL = 15  # 分钟
+
+    ALLOWED_ADAPTERS = {
+        "email_imap",      # 邮件(IMAP)
+        "calendar_caldav", # 日历(CalDAV)
+        "wechat_official", # 微信公众号
+    }
+
+    async def validate_adapter_config(self, adapter_type: str, config: dict) -> bool:
+        """校验Adapter配置"""
+        # 白名单检查
+        if adapter_type not in self.ALLOWED_ADAPTERS:
+            raise HTTPException(400, f"不支持的Adapter类型: {adapter_type}")
+
+        # 同步频率检查
+        interval = config.get("sync_interval_minutes", 15)
+        if interval < self.MIN_SYNC_INTERVAL:
+            raise HTTPException(400, f"同步间隔不能小于{self.MIN_SYNC_INTERVAL}分钟")
+
+        # API密钥加密存储
+        if "api_key" in config:
+            config["api_key_encrypted"] = self.encryptor.encrypt(config.pop("api_key"))
+
+        return True
+```
+
+#### 6.8.2 出站流量控制
+
+| 安全措施 | 说明 | 实施阶段 |
+|----------|------|----------|
+| **外部API调用白名单** | Adapter仅允许调用白名单内的域名。白名单配置在 `adapter_registry.allowed_domains` 中 | Phase1+ |
+| **请求审计日志** | 所有外部API调用记录审计日志：adapter_type, url, method, status_code, response_time, timestamp | Phase1+ |
+| **响应内容过滤** | 外部API响应经过 `sanitize_llm_input()` 清洗后再入库，防止注入攻击 | Phase1+ |
+
+```python
+class OutboundTrafficSecurity:
+    """出站流量安全"""
+
+    async def validate_outbound_url(self, adapter_type: str, url: str) -> bool:
+        """校验出站URL白名单"""
+        adapter = await self.get_adapter_registry(adapter_type)
+        from urllib.parse import urlparse
+        domain = urlparse(url).netloc
+        if domain not in adapter.allowed_domains:
+            await self.audit_log("outbound_url_blocked", {
+                "adapter_type": adapter_type,
+                "domain": domain,
+                "url": url,
+            })
+            raise HTTPException(403, f"出站请求域名不在白名单: {domain}")
+        return True
+```
+
+#### 6.8.3 供应链安全
+
+| 安全措施 | 说明 | 实施阶段 |
+|----------|------|----------|
+| **依赖锁定+哈希校验** | `requirements.txt` 使用精确版本号（`==`）+ hash校验，防止依赖投毒 | PoC+ |
+| **CI/CD集成漏洞扫描** | 每次PR触发 `pip-audit` + `bandit` + `trivy` 扫描，Critical/High漏洞阻断合并 | PoC+ |
+| **Adapter审核流程** | 新Adapter上线前必须经过安全审核：代码审查 + 依赖扫描 + 渗透测试 | Phase1+ |
+
+> **与§10.4依赖安全评估的关系**：§6.8.3的供应链安全是§10.4在Adapter场景的具体实施，Adapter作为外部集成点需要额外的审核流程。
+
+### 6.9 Concern/Capability数据保护 [v2.5新增]
+
+> **背景**：concerns/capabilities包含敏感个人信息（痛点、需求、专长），需要字段级保护。与§3.7 concern数据安全形成互补：§3.7关注concern的存储安全，§6.9关注concerns/capabilities的完整数据保护链路。
+
+#### 6.9.1 数据敏感性分析
+
+| 数据类型 | 敏感级别 | 风险说明 |
+|----------|----------|----------|
+| concerns（关注点/痛点） | **高** | 暴露他人真实需求、痛点、困境，属于敏感个人信息 |
+| capabilities（能力/资源） | **中** | 暴露他人专长、资源、可提供价值，可能被滥用 |
+| tag（受控词表分类） | **低** | 仅分类标签，不包含具体内容 |
+
+#### 6.9.2 分阶段保护策略
+
+| 阶段 | concerns保护 | capabilities保护 | 说明 |
+|------|-------------|-----------------|------|
+| **PoC** | 依赖现有PII脱敏机制（`redact_pii_from_text()`） | 同左 | 最小可行保护 |
+| **Phase1** | pgcrypto字段加密（复用§3.3方案） | pgcrypto字段加密 | 与phone/email同级别保护 |
+| **Phase2** | TDE透明加密 + 字段级访问控制 | TDE透明加密 | 增强保护 |
+
+#### 6.9.3 行级安全策略（user_id隔离）
+
+concerns/capabilities遵循与§2.3相同的单用户数据隔离原则：
+
+```python
+class ConcernCapabilityRepository:
+    """concerns/capabilities数据访问 - 强制user_id隔离"""
+
+    async def get_concerns(self, db, user_id: str, entity_id: str) -> list:
+        """获取concerns - 强制user_id过滤"""
+        result = await db.execute(
+            select(Entity).where(
+                Entity.user_id == user_id,    # 强制隔离
+                Entity.id == entity_id
+            )
+        )
+        entity = result.scalar_one_or_none()
+        if entity and entity.properties.get("concerns"):
+            return entity.properties["concerns"]
+        return []
+
+    async def update_concerns(self, db, user_id: str, entity_id: str, concerns: list):
+        """更新concerns - 强制user_id过滤 + 审计日志"""
+        result = await db.execute(
+            select(Entity).where(
+                Entity.user_id == user_id,
+                Entity.id == entity_id
+            )
+        )
+        entity = result.scalar_one_or_none()
+        if not entity:
+            raise HTTPException(404, "实体不存在或无权访问")
+
+        entity.properties["concerns"] = concerns
+        await self.audit_log("concerns_updated", {
+            "user_id": user_id,
+            "entity_id": entity_id,
+            "concern_count": len(concerns),
+        })
+```
+
+> **与§3.7 concern/promise/contribution数据安全的关系**：§3.7定义了concern的加密存储规则和脱敏发送规则，§6.9在此基础上扩展了capabilities的保护策略和分阶段实施方案，两者互补。
+
+### 6.10 DependencyAnalyzer安全专项 [v2.6新增]
+
+> **背景**：F-55依赖性全图谱路径分析引入DependencyAnalyzer，通过遍历my_promise→their_promise依赖链计算dependency_score。新增攻击面包括依赖图注入、阻塞链DoS、依赖性得分操纵。
+
+#### 6.10.1 依赖图注入防护
+
+| 防护措施 | 说明 | 实施阶段 |
+|----------|------|----------|
+| **action_type系统设置** | my_promise/their_promise的action_type必须由Pipeline Step 8(PromiseBidirectionalHandler)设置，不可由用户直接修改 | PoC+ |
+| **action_type枚举校验** | 写入Todo时校验action_type必须在合法枚举值内，非法值拒绝写入 | PoC+ |
+| **依赖边创建审计** | 每条my_promise→their_promise依赖边的创建记录审计日志：user_id, todo_id, linked_todo_id, action_type, created_at | PoC+ |
+
+```python
+class DependencyGraphSecurity:
+    """依赖图安全守卫"""
+
+    SYSTEM_SET_ACTION_TYPES = {"my_promise", "their_promise"}
+
+    async def validate_action_type_source(self, todo_id: str, action_type: str, source: str) -> bool:
+        """校验promise类型action_type必须由系统设置"""
+        if action_type in self.SYSTEM_SET_ACTION_TYPES:
+            if source != "pipeline_step_8":
+                await self.audit_log("action_type_injection_blocked", {
+                    "todo_id": todo_id,
+                    "action_type": action_type,
+                    "attempted_source": source,
+                })
+                raise SecurityException(
+                    f"action_type '{action_type}' 只能由Pipeline Step 8设置，不可由用户直接修改"
+                )
+        return True
+```
+
+#### 6.10.2 阻塞链深度限制
+
+| 防护措施 | 说明 | 实施阶段 |
+|----------|------|----------|
+| **MAX_DEPTH=3** | 依赖链遍历最大深度为3，超过3跳的链路截断，防止超深链遍历消耗资源（DoS防护） | PoC+ |
+| **深度截断审计** | 链路被截断时记录审计日志：user_id, todo_id, actual_depth, max_depth | PoC+ |
+| **遍历超时保护** | 单次依赖图遍历超时时间≤2秒，超时返回已计算的部分结果 | Phase1+ |
+
+```python
+class DependencyAnalyzerSecurity:
+    """依赖分析安全守卫"""
+
+    MAX_DEPTH = 3
+    TRAVERSAL_TIMEOUT_MS = 2000
+
+    async def validate_chain_depth(self, chain_depth: int, todo_id: str, user_id: str) -> bool:
+        """校验依赖链深度"""
+        if chain_depth > self.MAX_DEPTH:
+            await self.audit_log("chain_depth_truncated", {
+                "user_id": user_id,
+                "todo_id": todo_id,
+                "actual_depth": chain_depth,
+                "max_depth": self.MAX_DEPTH,
+            })
+            return False  # 截断
+        return True
+```
+
+#### 6.10.3 依赖性得分操纵防护
+
+| 防护措施 | 说明 | 实施阶段 |
+|----------|------|----------|
+| **dependency_score系统计算** | dependency_score由DependencyAnalyzer算法计算，用户无法直接设置该字段 | PoC+ |
+| **得分范围校验** | dependency_score必须在[0, 1]范围内，超出范围的计算结果被截断 | PoC+ |
+| **得分计算审计** | 每次dependency_score计算记录审计日志：user_id, todo_id, chain_count, raw_score, final_score | PoC+ |
+
+```python
+class DependencyScoreSecurity:
+    """依赖性得分安全守卫"""
+
+    async def validate_score_source(self, todo_id: str, score: float, source: str) -> bool:
+        """校验dependency_score必须由系统计算"""
+        if source != "dependency_analyzer":
+            await self.audit_log("score_injection_blocked", {
+                "todo_id": todo_id,
+                "attempted_score": score,
+                "attempted_source": source,
+            })
+            raise SecurityException("dependency_score只能由DependencyAnalyzer计算，不可由用户直接设置")
+
+    def clamp_score(self, raw_score: float) -> float:
+        """得分范围截断至[0, 1]"""
+        return max(0.0, min(1.0, raw_score))
+```
+
+### 6.11 ContextMatcher安全专项 [v2.6新增]
+
+> **背景**：F-56场景匹配Event表驱动引入ContextMatcher，通过查询即将到来的Event匹配关联Todo提升context_score。新增攻击面包括跨用户数据泄露、全表扫描DoS、隐私信息越权访问。
+
+#### 6.11.1 场景匹配数据隔离
+
+| 防护措施 | 说明 | 实施阶段 |
+|----------|------|----------|
+| **user_id强制过滤** | ContextMatcher只查询当前user_id的Event和Entity，复用§2.3单用户数据隔离机制 | PoC+ |
+| **related_entity_id归属校验** | 查询关联Entity时校验entity_id归属于当前user_id，防止越权访问 | PoC+ |
+| **查询结果脱敏** | 匹配结果中的Event.raw_text在返回前调用`redact_pii_from_text()`脱敏 | PoC+ |
+
+```python
+class ContextMatcherSecurity:
+    """场景匹配安全守卫"""
+
+    async def validate_entity_ownership(self, entity_id: str, user_id: str) -> bool:
+        """校验entity归属于当前用户"""
+        entity = await self.repo.get_entity(entity_id, user_id)
+        if not entity:
+            await self.audit_log("entity_ownership_violation", {
+                "user_id": user_id,
+                "entity_id": entity_id,
+            })
+            raise HTTPException(403, "无权访问该实体")
+        return True
+```
+
+#### 6.11.2 时间窗口限制
+
+| 防护措施 | 说明 | 实施阶段 |
+|----------|------|----------|
+| **24h查询窗口** | get_upcoming_context仅查询未来24小时内的Event，防止全表扫描消耗资源 | PoC+ |
+| **窗口参数不可覆盖** | 时间窗口参数由系统固定，不接受客户端传入，防止恶意扩大查询范围 | PoC+ |
+| **查询频率限制** | 同一用户场景匹配查询≤30次/分钟，防止滥用 | Phase1+ |
+
+```python
+class ContextMatcherSecurity:
+    """场景匹配安全守卫"""
+
+    UPCOMING_WINDOW_HOURS = 24  # 固定24h窗口，不可由客户端覆盖
+
+    async def get_upcoming_context(self, user_id: str, entity_id: str) -> list:
+        """获取即将到来的上下文 - 固定24h窗口"""
+        # 时间窗口参数由系统固定，不接受客户端传入
+        cutoff = datetime.utcnow() + timedelta(hours=self.UPCOMING_WINDOW_HOURS)
+        events = await self.repo.get_events_in_window(
+            user_id=user_id,
+            entity_id=entity_id,
+            start=datetime.utcnow(),
+            end=cutoff,
+        )
+        return events
+```
+
+#### 6.11.3 即将见面信息隐私
+
+| 防护措施 | 说明 | 实施阶段 |
+|----------|------|----------|
+| **get_upcoming_context仅返回当前用户数据** | 即将见面信息只返回当前user_id的Event和Entity，不泄露其他用户的日程 | PoC+ |
+| **context_score系统计算** | context_score由ContextMatcher算法计算，用户无法直接设置 | PoC+ |
+| **匹配结果不暴露他人信息** | 匹配结果中的参与者信息仅返回当前用户视角的数据，不返回其他参与者的私有信息 | PoC+ |
+
+```python
+class ContextMatcherSecurity:
+    """场景匹配安全守卫"""
+
+    async def filter_match_result(self, user_id: str, match_result: dict) -> dict:
+        """过滤匹配结果，确保不暴露他人私有信息"""
+        # 仅保留当前用户视角的数据
+        filtered = {
+            "todo_id": match_result["todo_id"],
+            "context_score": match_result["context_score"],
+            "upcoming_events": [
+                {
+                    "event_id": e["event_id"],
+                    "title": e["title"],
+                    "start_time": e["start_time"],
+                    # 不返回其他参与者的私有信息
+                }
+                for e in match_result.get("upcoming_events", [])
+            ],
+        }
+        return filtered
+```
+
 ---
 
 ## 7. 数据主权
@@ -2115,10 +2545,12 @@ trivy image --severity HIGH,CRITICAL eventlink:latest  # 仅报告高危
 | v1.1 | 2026-06-03 | Todo类型重命名(opportunity→cooperation_signal等)；新增§3.6 concern/promise/contribution数据安全；新增§4.6 AI输出安全约束 | 架构师 + 安全工程师 |
 | v2.0 | 2026-06-04 | **v2.0大版本更新（10项D3变更）**：①版本头更新参考PRD v4.3+技术设计v2.5 §8 ②§3.6新增PII检测正则规则表(6种PII+3条注意事项+redact_pii_from_text实现) ③§2.1b新增JWT HS256认证规范(Payload结构+4项安全约束) ④§1.2 STRIDE威胁模型替换为简化版(含实施状态追踪+分阶段重点) ⑤§5.6新增input_scope SC-01输入分类越权防护 ⑥§4.7新增evidence_quote LLM输出证据字段安全处理(4层安全措施) ⑦§1.1 Non-goals从3项扩展至8项 ⑧§6.5新增TTS语音播报安全评估(隐私分级+推送安全+缓存安全) ⑨§7.2a新增数据导出安全(PII脱敏+频率限制+审计日志) ⑩§10.4新增依赖安全评估(核心依赖风险表+管理策略+Dependabot配置) | 架构师 + 安全工程师 |
 | v2.0[0.2.1] | 2026-06-05 | **F-50 语音助手安全专项（增量更新）**：§6.6新增Voice Assistant安全专项(5个子节) ①§6.6.1 Voice API端点安全(POST /voice/session + GET /voice/tts安全约束表 + sanitize_voice_input清洗函数) ②§6.6.2 NLU Prompt Injection防护(威胁模型+攻击示例+4层纵深防护+安全Prompt模板) ③§6.6.3 ASR数据隐私策略(5类数据存储策略表+保留期限+用户权利) ④§6.6.4 voice_sessions数据访问控制(RBAC归属校验代码+敏感字段脱敏) ⑤§6.6.5车载场景特殊安全考虑(4种驾驶场景风险缓解表)。复用已有组件：JWT中间件/redact_pii_from_text/RBAC/user_scope | 架构师 + 安全工程师 |
+| v2.5 | 2026-06-06 | **Insight Engine + DataSourceAdapter + Concern/Capability安全专项**：①§6.7新增Insight Engine安全专项(评分操纵防护+隐式反馈完整性+动态评分API安全+score_audit_logs表DDL) ②§6.8新增DataSourceAdapter安全专项(Adapter配置安全+出站流量控制+供应链安全) ③§6.9新增Concern/Capability数据保护(敏感性分析+分阶段保护策略+行级安全策略) | 架构师 + 安全工程师 |
+| v2.6 | 2026-06-06 | **F-55/F-56安全专项**：①§6.10新增DependencyAnalyzer安全专项(依赖图注入防护+阻塞链深度限制MAX_DEPTH=3+依赖性得分操纵防护) ②§6.11新增ContextMatcher安全专项(场景匹配数据隔离+24h时间窗口限制+即将见面信息隐私) | 架构师 + 安全工程师 |
 
 ---
 
-> **文档状态**: ✅ v2.0[0.2.1] 更新完成（F-50 Voice Assistant 安全专项已落地）
+> **文档状态**: ✅ v2.6 更新完成（F-55 DependencyAnalyzer + F-56 ContextMatcher 安全专项已落地）
 > **下次审查**: Phase1开发启动前
 > **安全负责人**: 架构师
 > **对齐文档**: 技术设计 v2.5 §3.1a + §8.0.3
