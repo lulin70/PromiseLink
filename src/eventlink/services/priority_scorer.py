@@ -3,7 +3,10 @@
 Implements F-51: Two-dimensional priority model (urgency + importance).
 Score = 0.4 × urgency + 0.6 × importance
 
-Design reference: Algorithm_Design_v1.md v2.5 §2.10
+Implements F-55+F-56: Phase 1 four-dimensional priority model.
+Score = 0.3×urgency + 0.35×importance + 0.2×dependency + 0.15×context
+
+Design reference: Algorithm_Design_v1.md v2.5 §2.10, Tech Design v2.7 §4.10.1a
 """
 
 from dataclasses import dataclass
@@ -192,6 +195,115 @@ class PriorityScorer:
 
         logger.info(
             "batch_priority_scored",
+            count=len(todos),
+            avg_score=sum(r.score for r in results) / len(results) if results else 0,
+        )
+
+        return results
+
+
+# ── Phase 1: Four-Dimensional Scorer (F-55 + F-56) ──
+
+
+class PriorityScorerV2(PriorityScorer):
+    """Phase 1 four-dimensional priority scorer.
+
+    Extends PoC two-dimensional scorer with:
+    - F-55: Dependency (full graph path analysis)
+    - F-56: Context match (Event table driven)
+
+    Score = 0.3×urgency + 0.35×importance + 0.2×dependency + 0.15×context
+    """
+
+    WEIGHTS_PHASE1 = {
+        "urgency": 0.3,
+        "importance": 0.35,
+        "dependency": 0.2,
+        "context": 0.15,
+    }
+
+    def __init__(self):
+        super().__init__()
+        from eventlink.services.dependency_analyzer import DependencyAnalyzer
+        from eventlink.services.context_matcher import ContextMatcher
+
+        self.dependency_analyzer = DependencyAnalyzer()
+        self.context_matcher = ContextMatcher()
+
+    async def score_with_context(self, todo, session, brief=None) -> PriorityScore:
+        """Four-dimensional scoring (requires session for graph queries).
+
+        Args:
+            todo: Todo ORM instance
+            session: AsyncSession for DB queries
+            brief: Optional RelationshipBrief (unused in Phase 1)
+
+        Returns:
+            PriorityScore with four-dimensional breakdown
+        """
+        now = datetime.now(timezone.utc)
+
+        # Dimensions 1-2: PoC baseline
+        urgency = self._calc_urgency(todo.due_date, now)
+        importance = self._calc_importance(todo.todo_type)
+
+        # Dimension 3: Dependency (F-55)
+        dependency = await self.dependency_analyzer.compute_dependency_score(
+            todo, session
+        )
+
+        # Dimension 4: Context match (F-56)
+        context = await self.context_matcher.compute_context_score(todo, session)
+
+        # Composite score
+        score = (
+            self.WEIGHTS_PHASE1["urgency"] * urgency
+            + self.WEIGHTS_PHASE1["importance"] * importance
+            + self.WEIGHTS_PHASE1["dependency"] * dependency
+            + self.WEIGHTS_PHASE1["context"] * context
+        )
+
+        # Priority tiebreaker (same as PoC)
+        priority_adj = 0.05 * (3 - todo.priority) / 2
+        score = max(0.0, min(1.0, score + priority_adj))
+
+        return PriorityScore(
+            score=round(score, 4),
+            urgency=round(urgency, 4),
+            importance=round(importance, 4),
+            breakdown={
+                "urgency_raw": urgency,
+                "importance_raw": importance,
+                "dependency_raw": dependency,
+                "context_raw": context,
+                "weights": self.WEIGHTS_PHASE1,
+                "priority_adjustment": round(priority_adj, 4),
+                "todo_type": todo.todo_type,
+                "due_date": todo.due_date.isoformat() if todo.due_date else None,
+            },
+        )
+
+    async def batch_score_with_context(self, todos, session) -> list[PriorityScore]:
+        """Score multiple todos with four-dimensional model.
+
+        Args:
+            todos: List of Todo ORM instances
+            session: AsyncSession
+
+        Returns:
+            List of PriorityScore results
+        """
+        results = []
+        for todo in todos:
+            result = await self.score_with_context(todo, session)
+            todo.dynamic_score = result.score
+            todo.score_calculated_at = datetime.now(timezone.utc)
+            results.append(result)
+
+        await session.commit()
+
+        logger.info(
+            "batch_phase1_scored",
             count=len(todos),
             avg_score=sum(r.score for r in results) / len(results) if results else 0,
         )
