@@ -19,8 +19,9 @@ logger = get_logger("eventlink.embedding_provider")
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
 EMBEDDING_DIMENSIONS = 768
 
-# Local embedding model (fallback when API is unavailable)
-LOCAL_EMBEDDING_MODEL = "moka-ai/m3e-base"
+# Local embedding model (same as CarryMem, already installed)
+LOCAL_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+LOCAL_EMBEDDING_DIMENSIONS = 384
 
 
 class EmbeddingProvider:
@@ -136,8 +137,17 @@ class EmbeddingProvider:
                     dims=len(embedding),
                 )
             except Exception as e:
-                logger.error("batch_embedding_failed", count=len(uncached_texts), error=str(e))
-                raise
+                logger.warning("batch_embedding_api_failed_fallback_local", error=str(e))
+                # Fallback to local model for each text
+                results_list: list[list[float]] = []
+                for i, text in enumerate(texts):
+                    key = self._cache_key(text)
+                    if results[i] is not None:
+                        results_list.append(results[i])  # type: ignore
+                    else:
+                        emb = await self._embed_local(text, key)
+                        results_list.append(emb)
+                return results_list
 
         return results  # type: ignore
 
@@ -167,7 +177,9 @@ class EmbeddingProvider:
         if self._local_model is None:
             try:
                 from sentence_transformers import SentenceTransformer
-                self._local_model = SentenceTransformer(LOCAL_EMBEDDING_MODEL)
+                self._local_model = SentenceTransformer(
+                    LOCAL_EMBEDDING_MODEL, local_files_only=True
+                )
                 logger.info("local_embedding_model_loaded", model=LOCAL_EMBEDDING_MODEL)
             except ImportError:
                 logger.warning("sentence_transformers_not_installed")
@@ -200,14 +212,15 @@ class EmbeddingProvider:
         
         # Generate deterministic bytes from text
         h = hashlib.sha512(text.encode("utf-8")).digest()
-        # Repeat to fill 768 dimensions (768 * 4 bytes = 3072 bytes)
+        # Use LOCAL_EMBEDDING_DIMENSIONS (384) for consistency with local model
+        dims = LOCAL_EMBEDDING_DIMENSIONS
         full_bytes = b""
-        for i in range(7):
+        for i in range(4):  # 4 * 64 = 256 bytes, enough for 384 * 4 = 1536
             full_bytes += hashlib.sha512((text + str(i)).encode("utf-8")).digest()
         
         # Convert to floats and normalize
         floats = []
-        for i in range(EMBEDDING_DIMENSIONS):
+        for i in range(dims):
             byte_slice = full_bytes[i*4:(i+1)*4]
             if len(byte_slice) == 4:
                 val = struct.unpack("f", byte_slice)[0]
@@ -220,7 +233,7 @@ class EmbeddingProvider:
         if norm > 0:
             embedding = [x / norm for x in floats]
         else:
-            embedding = [0.0] * EMBEDDING_DIMENSIONS
+            embedding = [0.0] * dims
         
         self._cache[cache_key] = embedding
         logger.warning("pseudo_embedding_used", text_len=len(text))

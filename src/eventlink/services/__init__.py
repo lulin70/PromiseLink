@@ -10,6 +10,7 @@ from eventlink.services.data_source_adapter import (
     get_adapter,
     register_adapter,
 )
+from eventlink.services.embedding_provider import EmbeddingProvider, EMBEDDING_DIMENSIONS
 from eventlink.services.entity_extractor import EntityExtractor, ExtractionResult, ExtractedPerson
 from eventlink.services.entity_resolution import EntityResolutionEngine, ResolutionAction, ResolutionResult
 from eventlink.services.event_pipeline import PipelineResult, process_event_with_short_transactions
@@ -25,6 +26,7 @@ from eventlink.services.memory_provider import (
     create_memory_provider,
 )
 from eventlink.services.promise_fulfillment import PromiseFulfillmentEngine, SensitivityFilter
+from eventlink.services.semantic_search import SemanticSearchEngine
 from eventlink.services.todo_generator import TodoGenerator, GeneratedTodo
 from eventlink.services.todo_state_machine import TodoStateMachine
 
@@ -37,6 +39,8 @@ __all__ = [
     "WeChatAdapter",
     "get_adapter",
     "register_adapter",
+    "EmbeddingProvider",
+    "EMBEDDING_DIMENSIONS",
     "EntityExtractor",
     "ExtractionResult",
     "ExtractedPerson",
@@ -56,6 +60,7 @@ __all__ = [
     "create_memory_provider",
     "PromiseFulfillmentEngine",
     "SensitivityFilter",
+    "SemanticSearchEngine",
     "TodoGenerator",
     "GeneratedTodo",
     "TodoStateMachine",

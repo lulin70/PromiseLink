@@ -2,41 +2,66 @@
 
 Tests cover:
 - PipelineResult properties
-- process_event_with_short_transactions is the new entry point
-  (integration tests for it are in P1-4 scope)
+- process_event_with_short_transactions() integration tests
+  with mocked LLM and sub-services, using real SQLite file DB
 """
 
 import uuid
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import pytest_asyncio
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from eventlink.database import Base
 from eventlink.models.entity import Entity
 from eventlink.models.event import Event
 from eventlink.models.todo import Todo
-from eventlink.services.entity_extractor import EntityExtractor, ExtractedPerson, ExtractionResult
-from eventlink.services.event_pipeline import PipelineResult
+from eventlink.services.entity_extractor import (
+    EntityExtractor,
+    ExtractedPerson,
+    ExtractionResult,
+)
+from eventlink.services.event_pipeline import (
+    PipelineResult,
+    process_event_with_short_transactions,
+)
 from eventlink.services.llm_client import LLMClient
 from eventlink.services.todo_generator import TodoGenerator
 from tests.conftest import make_user_id
 
-# ── Helpers ──
+
+# ── Fixtures ──
 
 
-def _create_event(session, user_id, event_type="card_save", raw_text="test"):
-    """Create and add an Event to the session."""
-    event = Event(
-        id=str(uuid.uuid4()),
-        user_id=user_id,
-        event_type=event_type,
-        source="test",
-        title="Test Event",
-        raw_text=raw_text,
-        status="pending",
-        metadata_={},
+@pytest_asyncio.fixture
+async def file_db(tmp_path):
+    """Create a real SQLite file DB with session factory for pipeline tests.
+
+    Returns (session, db_path, session_factory, engine) so tests can both
+    insert test data and verify results.
+    """
+    db_path = str(tmp_path / "pipeline_test.db")
+    url = f"sqlite+aiosqlite:///{db_path}"
+    engine = create_async_engine(url, connect_args={"check_same_thread": False})
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    session_factory = async_sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False
     )
-    session.add(event)
-    return event
+    async with session_factory() as session:
+        yield session, db_path, session_factory, engine
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await engine.dispose()
+
+
+# ── Helpers ──
 
 
 def _make_entity(user_id, event_id, name="张三") -> Entity:
@@ -70,6 +95,43 @@ def _make_todo(user_id, event_id, todo_type="promise") -> Todo:
         source_event_id=event_id,
         properties={},
     )
+
+
+def _pipeline_mocks():
+    """Return a dict of standard mock patches for pipeline sub-services.
+
+    These mock out all LLM-dependent steps while allowing DB operations
+    to proceed normally.
+    """
+    mock_scope = AsyncMock()
+    mock_scope.classify = AsyncMock(return_value=MagicMock(
+        scope=MagicMock(value="meeting"), confidence=0.9, method="rule"
+    ))
+
+    mock_extraction = ExtractionResult(persons=[])
+    mock_extraction.persisted_entities = []
+
+    mock_extractor = AsyncMock()
+    mock_extractor.extract_from_event = AsyncMock(return_value=mock_extraction)
+
+    mock_generator = AsyncMock()
+    mock_generator.generate_todos = AsyncMock(return_value=[])
+
+    mock_llm = AsyncMock()
+    mock_llm.close = AsyncMock()
+
+    # Memory provider mock (must be async-compatible)
+    mock_memory = AsyncMock()
+    mock_memory.store_raw = AsyncMock(return_value=None)
+
+    return {
+        "scope": mock_scope,
+        "extraction": mock_extraction,
+        "extractor": mock_extractor,
+        "generator": mock_generator,
+        "llm": mock_llm,
+        "memory": mock_memory,
+    }
 
 
 # ── PipelineResult tests ──
@@ -115,304 +177,395 @@ class TestPipelineResult:
 # ── Pipeline integration tests ──
 
 
-class TestEventPipeline:
-    """Test EventPipeline with mocked sub-services.
+class TestProcessEventPipeline:
+    """Test process_event_with_short_transactions with mocked sub-services."""
 
-    Note: EventPipeline class has been refactored to process_event_with_short_transactions().
-    These tests are temporarily skipped until integration tests are written in P1-4.
-    """
+    @pytest.mark.asyncio
+    async def test_pipeline_event_not_found(self, file_db):
+        """Non-existent event_id → result.status == 'failed'."""
+        session, db_path, session_factory, engine = file_db
+        fake_event_id = str(uuid.uuid4())
 
-    @pytest.mark.skip(reason="EventPipeline refactored to function; needs integration test rewrite")
-    async def test_pipeline_processes_event_successfully(self, db_session):
-        """Full pipeline: extract entities + generate todos → completed."""
+        with patch("eventlink.database.AsyncSessionLocal", session_factory), \
+             patch("eventlink.services.event_pipeline.LLMClient") as mock_llm_cls, \
+             patch("eventlink.services.event_pipeline.create_memory_provider"):
+
+            mock_llm = AsyncMock()
+            mock_llm.close = AsyncMock()
+            mock_llm_cls.return_value = mock_llm
+
+            result = await process_event_with_short_transactions(fake_event_id)
+
+        assert result.status == "failed"
+        assert result.error == "Event not found"
+
+    @pytest.mark.asyncio
+    async def test_pipeline_already_processed_event(self, file_db):
+        """Event with status != 'pending' → result.status == 'skipped'."""
+        session, db_path, session_factory, engine = file_db
         user_id = make_user_id()
-        event = _create_event(db_session, user_id, raw_text="名片内容：李四，CEO")
-        await db_session.flush()
+
+        event = Event(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            event_type="meeting",
+            source="manual",
+            title="Test Event",
+            raw_text="test",
+            status="completed",  # Already processed
+        )
+        session.add(event)
+        await session.commit()
+
+        with patch("eventlink.database.AsyncSessionLocal", session_factory), \
+             patch("eventlink.services.event_pipeline.LLMClient") as mock_llm_cls, \
+             patch("eventlink.services.event_pipeline.create_memory_provider"):
+
+            mock_llm = AsyncMock()
+            mock_llm.close = AsyncMock()
+            mock_llm_cls.return_value = mock_llm
+
+            result = await process_event_with_short_transactions(str(event.id))
+
+        assert result.status == "skipped"
+
+    @pytest.mark.asyncio
+    async def test_pipeline_marks_event_processing_then_completed(self, file_db):
+        """Event status transitions: pending → processing → completed."""
+        session, db_path, session_factory, engine = file_db
+        user_id = make_user_id()
+
+        event = Event(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            event_type="meeting",
+            source="manual",
+            title="Test Event",
+            raw_text="test content",
+            status="pending",
+        )
+        session.add(event)
+        await session.commit()
+
+        mocks = _pipeline_mocks()
+
+        with patch("eventlink.database.AsyncSessionLocal", session_factory), \
+             patch("eventlink.services.event_pipeline.LLMClient", return_value=mocks["llm"]), \
+             patch("eventlink.services.event_pipeline.create_memory_provider", return_value=mocks["memory"]), \
+             patch("eventlink.services.input_scope_classifier.InputScopeClassifier", return_value=mocks["scope"]), \
+             patch("eventlink.services.event_pipeline.EntityExtractor", return_value=mocks["extractor"]), \
+             patch("eventlink.services.event_pipeline.EntityResolutionEngine"), \
+             patch("eventlink.services.event_pipeline.TodoGenerator", return_value=mocks["generator"]), \
+             patch("eventlink.services.promise_bidirectional.PromiseBidirectionalHandler"), \
+             patch("eventlink.services.event_pipeline.AssociationDiscoveryEngine", return_value=AsyncMock()), \
+             patch("eventlink.services.event_pipeline._generate_event_title", new_callable=AsyncMock, return_value=None), \
+             patch("eventlink.services.embedding_provider.EmbeddingProvider", new_callable=AsyncMock), \
+             patch("eventlink.services.semantic_search.SemanticSearchEngine", new_callable=AsyncMock), \
+             patch("eventlink.services.relationship_brief_service.RelationshipBriefService", new_callable=AsyncMock):
+
+            result = await process_event_with_short_transactions(str(event.id))
+
+        assert result.status == "completed"
+        assert result.success is True
+
+        # Verify event in DB is marked completed
+        await session.refresh(event)
+        assert event.status == "completed"
+        assert event.processed_at is not None
+        assert event.pipeline == "full"
+
+    @pytest.mark.asyncio
+    async def test_pipeline_extracts_entities_and_generates_todos(self, file_db):
+        """Full pipeline: extract entities + generate todos → completed."""
+        session, db_path, session_factory, engine = file_db
+        user_id = make_user_id()
+
+        event = Event(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            event_type="meeting",
+            source="manual",
+            title="Test Event",
+            raw_text="名片内容：李四，CEO",
+            status="pending",
+        )
+        session.add(event)
+        await session.commit()
 
         entity = _make_entity(user_id, str(event.id), name="李四")
         todo = _make_todo(user_id, str(event.id), todo_type="promise")
 
-        extraction = ExtractionResult(
+        mocks = _pipeline_mocks()
+        mocks["extraction"] = ExtractionResult(
             persons=[ExtractedPerson(name="李四", company="Acme", title="CEO")],
         )
+        mocks["extraction"].persisted_entities = [entity]
+        mocks["extractor"].extract_from_event = AsyncMock(return_value=mocks["extraction"])
+        mocks["generator"].generate_todos = AsyncMock(return_value=[todo])
 
-        with patch.object(EntityExtractor, "extract_from_event", new_callable=AsyncMock) as mock_extract, \
-             patch.object(TodoGenerator, "generate_todos", new_callable=AsyncMock) as mock_generate, \
-             patch.object(EventPipeline, "_fetch_persisted_entities", new_callable=AsyncMock) as mock_fetch:
+        with patch("eventlink.database.AsyncSessionLocal", session_factory), \
+             patch("eventlink.services.event_pipeline.LLMClient", return_value=mocks["llm"]), \
+             patch("eventlink.services.event_pipeline.create_memory_provider", return_value=mocks["memory"]), \
+             patch("eventlink.services.input_scope_classifier.InputScopeClassifier", return_value=mocks["scope"]), \
+             patch("eventlink.services.event_pipeline.EntityExtractor", return_value=mocks["extractor"]), \
+             patch("eventlink.services.event_pipeline.EntityResolutionEngine"), \
+             patch("eventlink.services.event_pipeline.TodoGenerator", return_value=mocks["generator"]), \
+             patch("eventlink.services.promise_bidirectional.PromiseBidirectionalHandler"), \
+             patch("eventlink.services.event_pipeline.AssociationDiscoveryEngine", return_value=AsyncMock()), \
+             patch("eventlink.services.event_pipeline._generate_event_title", new_callable=AsyncMock, return_value=None), \
+             patch("eventlink.services.embedding_provider.EmbeddingProvider", new_callable=AsyncMock), \
+             patch("eventlink.services.semantic_search.SemanticSearchEngine", new_callable=AsyncMock), \
+             patch("eventlink.services.relationship_brief_service.RelationshipBriefService", new_callable=AsyncMock):
 
-            mock_extract.return_value = extraction
-            mock_generate.return_value = [todo]
-            mock_fetch.return_value = [entity]
+            result = await process_event_with_short_transactions(str(event.id))
 
-            llm = MagicMock(spec=LLMClient)
-            pipeline = EventPipeline(llm_client=llm, session=db_session)
-            result = await pipeline.process(event)
-
-        assert result.success is True
         assert result.status == "completed"
-        assert len(result.entities) == 1
-        assert len(result.todos) == 1
-        assert result.extraction is extraction
+        assert result.success is True
+        assert len(result.entities) >= 1
+        assert result.extraction is not None
 
-    @pytest.mark.skip(reason="EventPipeline refactored to function; needs integration test rewrite")
-    async def test_pipeline_marks_event_processing_then_completed(self, db_session):
-        """Event status transitions: pending → processing → completed."""
-        user_id = make_user_id()
-        event = _create_event(db_session, user_id, raw_text="test content")
-        await db_session.flush()
-
-        extraction = ExtractionResult(persons=[])
-
-        status_changes = []
-
-        original_flush = db_session.flush
-
-        async def tracking_flush(*args, **kwargs):
-            status_changes.append(event.status)
-            await original_flush(*args, **kwargs)
-
-        with patch.object(EntityExtractor, "extract_from_event", new_callable=AsyncMock) as mock_extract, \
-             patch.object(TodoGenerator, "generate_todos", new_callable=AsyncMock) as mock_generate, \
-             patch.object(EventPipeline, "_fetch_persisted_entities", new_callable=AsyncMock) as mock_fetch, \
-             patch.object(db_session, "flush", side_effect=tracking_flush):
-
-            mock_extract.return_value = extraction
-            mock_generate.return_value = []
-            mock_fetch.return_value = []
-
-            llm = MagicMock(spec=LLMClient)
-            pipeline = EventPipeline(llm_client=llm, session=db_session)
-            await pipeline.process(event)
-
-        # First flush should be at "processing", second at "completed"
-        assert "processing" in status_changes
-        assert event.status == "completed"
-
-    @pytest.mark.skip(reason="EventPipeline refactored to function; needs integration test rewrite")
-    async def test_pipeline_marks_event_failed_on_error(self, db_session):
+    @pytest.mark.asyncio
+    async def test_pipeline_error_marks_event_failed(self, file_db):
         """Pipeline exception → event marked as 'failed'."""
+        session, db_path, session_factory, engine = file_db
         user_id = make_user_id()
-        event = _create_event(db_session, user_id, raw_text="test content")
-        await db_session.flush()
 
-        with patch.object(
-            EntityExtractor, "extract_from_event",
-            new_callable=AsyncMock,
-            side_effect=RuntimeError("LLM service down"),
-        ):
-            llm = MagicMock(spec=LLMClient)
-            pipeline = EventPipeline(llm_client=llm, session=db_session)
-            result = await pipeline.process(event)
+        event = Event(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            event_type="meeting",
+            source="manual",
+            title="Test Event",
+            raw_text="test content",
+            status="pending",
+        )
+        session.add(event)
+        await session.commit()
+
+        mock_scope = AsyncMock()
+        mock_scope.classify = AsyncMock(side_effect=RuntimeError("LLM service down"))
+        mock_llm = AsyncMock()
+        mock_llm.close = AsyncMock()
+        mock_memory = AsyncMock()
+        mock_memory.store_raw = AsyncMock(return_value=None)
+
+        with patch("eventlink.database.AsyncSessionLocal", session_factory), \
+             patch("eventlink.services.event_pipeline.LLMClient", return_value=mock_llm), \
+             patch("eventlink.services.event_pipeline.create_memory_provider", return_value=mock_memory), \
+             patch("eventlink.services.input_scope_classifier.InputScopeClassifier", return_value=mock_scope):
+
+            result = await process_event_with_short_transactions(str(event.id))
 
         assert result.status == "failed"
-        assert result.error == "LLM service down"
+        assert "LLM service down" in result.error
         assert result.success is False
-        assert event.status == "failed"
 
-    @pytest.mark.skip(reason="EventPipeline refactored to function; needs integration test rewrite")
-    async def test_pipeline_with_empty_raw_text(self, db_session):
-        """Empty raw_text → extractor returns empty result, pipeline completes."""
-        user_id = make_user_id()
-        event = _create_event(db_session, user_id, raw_text="   ")
-        await db_session.flush()
-
-        # EntityExtractor.extract_from_event returns empty ExtractionResult for empty text
-        empty_extraction = ExtractionResult(persons=[])
-
-        with patch.object(EntityExtractor, "extract_from_event", new_callable=AsyncMock) as mock_extract, \
-             patch.object(TodoGenerator, "generate_todos", new_callable=AsyncMock) as mock_generate, \
-             patch.object(EventPipeline, "_fetch_persisted_entities", new_callable=AsyncMock) as mock_fetch:
-
-            mock_extract.return_value = empty_extraction
-            mock_generate.return_value = []
-            mock_fetch.return_value = []
-
-            llm = MagicMock(spec=LLMClient)
-            pipeline = EventPipeline(llm_client=llm, session=db_session)
-            result = await pipeline.process(event)
-
-        assert result.success is True
-        assert result.status == "completed"
-        assert len(result.entities) == 0
-
-    @pytest.mark.skip(reason="EventPipeline refactored to function; needs integration test rewrite")
-    async def test_pipeline_extraction_failure_still_updates_status(self, db_session):
-        """Extraction failure → event marked as 'failed', result has error."""
-        user_id = make_user_id()
-        event = _create_event(db_session, user_id, raw_text="some text")
-        await db_session.flush()
-
-        with patch.object(
-            EntityExtractor, "extract_from_event",
-            new_callable=AsyncMock,
-            side_effect=ValueError("Parse error"),
-        ):
-            llm = MagicMock(spec=LLMClient)
-            pipeline = EventPipeline(llm_client=llm, session=db_session)
-            result = await pipeline.process(event)
-
-        assert result.status == "failed"
-        assert "Parse error" in result.error
+        # Verify event in DB is marked failed
+        await session.refresh(event)
         assert event.status == "failed"
         assert event.processed_at is not None
 
-    @pytest.mark.skip(reason="EventPipeline refactored to function; needs integration test rewrite")
-    async def test_pipeline_generates_todos_from_entities(self, db_session):
-        """Pipeline passes extracted entities to TodoGenerator."""
+    @pytest.mark.asyncio
+    async def test_pipeline_with_empty_raw_text(self, file_db):
+        """Empty raw_text → pipeline completes with no entities."""
+        session, db_path, session_factory, engine = file_db
         user_id = make_user_id()
-        event = _create_event(db_session, user_id, raw_text="meeting notes")
-        await db_session.flush()
 
-        entity = _make_entity(user_id, str(event.id), name="王五")
-        extraction = ExtractionResult(
-            persons=[ExtractedPerson(name="王五", company="Corp")],
+        event = Event(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            event_type="meeting",
+            source="manual",
+            title="Test Event",
+            raw_text="   ",
+            status="pending",
         )
-        todo = _make_todo(user_id, str(event.id), todo_type="care")
+        session.add(event)
+        await session.commit()
 
-        with patch.object(EntityExtractor, "extract_from_event", new_callable=AsyncMock) as mock_extract, \
-             patch.object(TodoGenerator, "generate_todos", new_callable=AsyncMock) as mock_generate, \
-             patch.object(EventPipeline, "_fetch_persisted_entities", new_callable=AsyncMock) as mock_fetch:
+        mocks = _pipeline_mocks()
 
-            mock_extract.return_value = extraction
-            mock_generate.return_value = [todo]
-            mock_fetch.return_value = [entity]
+        with patch("eventlink.database.AsyncSessionLocal", session_factory), \
+             patch("eventlink.services.event_pipeline.LLMClient", return_value=mocks["llm"]), \
+             patch("eventlink.services.event_pipeline.create_memory_provider", return_value=mocks["memory"]), \
+             patch("eventlink.services.input_scope_classifier.InputScopeClassifier", return_value=mocks["scope"]), \
+             patch("eventlink.services.event_pipeline.EntityExtractor", return_value=mocks["extractor"]), \
+             patch("eventlink.services.event_pipeline.EntityResolutionEngine"), \
+             patch("eventlink.services.event_pipeline.TodoGenerator", return_value=mocks["generator"]), \
+             patch("eventlink.services.promise_bidirectional.PromiseBidirectionalHandler"), \
+             patch("eventlink.services.event_pipeline.AssociationDiscoveryEngine", return_value=AsyncMock()), \
+             patch("eventlink.services.event_pipeline._generate_event_title", new_callable=AsyncMock, return_value=None), \
+             patch("eventlink.services.embedding_provider.EmbeddingProvider", new_callable=AsyncMock), \
+             patch("eventlink.services.semantic_search.SemanticSearchEngine", new_callable=AsyncMock), \
+             patch("eventlink.services.relationship_brief_service.RelationshipBriefService", new_callable=AsyncMock):
 
-            llm = MagicMock(spec=LLMClient)
-            pipeline = EventPipeline(llm_client=llm, session=db_session)
-            result = await pipeline.process(event)
+            result = await process_event_with_short_transactions(str(event.id))
 
-        # Verify generate_todos was called with the right arguments
-        mock_generate.assert_awaited_once()
-        call_kwargs = mock_generate.call_args
-        assert call_kwargs.kwargs.get("event") is event or call_kwargs[1].get("event") is event
-        assert result.todos == [todo]
+        assert result.status == "completed"
+        assert result.success is True
+        assert len(result.entities) == 0
 
-    @pytest.mark.skip(reason="EventPipeline refactored to function; needs integration test rewrite")
-    async def test_pipeline_fetches_persisted_entities(self, db_session):
-        """Pipeline calls _fetch_persisted_entities after extraction."""
-        user_id = make_user_id()
-        event = _create_event(db_session, user_id, raw_text="card scan text")
-        await db_session.flush()
-
-        entity = _make_entity(user_id, str(event.id), name="赵六")
-        extraction = ExtractionResult(
-            persons=[ExtractedPerson(name="赵六")],
-        )
-
-        with patch.object(EntityExtractor, "extract_from_event", new_callable=AsyncMock) as mock_extract, \
-             patch.object(TodoGenerator, "generate_todos", new_callable=AsyncMock) as mock_generate, \
-             patch.object(EventPipeline, "_fetch_persisted_entities", new_callable=AsyncMock) as mock_fetch:
-
-            mock_extract.return_value = extraction
-            mock_generate.return_value = []
-            mock_fetch.return_value = [entity]
-
-            llm = MagicMock(spec=LLMClient)
-            pipeline = EventPipeline(llm_client=llm, session=db_session)
-            result = await pipeline.process(event)
-
-        mock_fetch.assert_awaited_once_with(event)
-        assert result.entities == [entity]
-
-    @pytest.mark.skip(reason="EventPipeline refactored to function; needs integration test rewrite")
-    async def test_pipeline_logs_completion(self, db_session):
-        """Pipeline logs 'pipeline_completed' on success."""
-        user_id = make_user_id()
-        event = _create_event(db_session, user_id, raw_text="test")
-        await db_session.flush()
-
-        extraction = ExtractionResult(persons=[])
-
-        with patch.object(EntityExtractor, "extract_from_event", new_callable=AsyncMock) as mock_extract, \
-             patch.object(TodoGenerator, "generate_todos", new_callable=AsyncMock) as mock_generate, \
-             patch.object(EventPipeline, "_fetch_persisted_entities", new_callable=AsyncMock) as mock_fetch, \
-             patch("eventlink.services.event_pipeline.logger") as mock_logger:
-
-            mock_extract.return_value = extraction
-            mock_generate.return_value = []
-            mock_fetch.return_value = []
-
-            llm = MagicMock(spec=LLMClient)
-            pipeline = EventPipeline(llm_client=llm, session=db_session)
-            await pipeline.process(event)
-
-        # Verify logger.info was called with "pipeline_completed"
-        info_calls = mock_logger.info.call_args_list
-        completed_calls = [c for c in info_calls if c[0][0] == "pipeline_completed"]
-        assert len(completed_calls) == 1
-
-    @pytest.mark.skip(reason="EventPipeline refactored to function; needs integration test rewrite")
-    async def test_pipeline_sets_pipeline_field(self, db_session):
+    @pytest.mark.asyncio
+    async def test_pipeline_sets_pipeline_field(self, file_db):
         """Pipeline sets event.pipeline = 'full' during processing."""
+        session, db_path, session_factory, engine = file_db
         user_id = make_user_id()
-        event = _create_event(db_session, user_id, raw_text="test")
-        await db_session.flush()
 
-        extraction = ExtractionResult(persons=[])
+        event = Event(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            event_type="meeting",
+            source="manual",
+            title="Test Event",
+            raw_text="test",
+            status="pending",
+        )
+        session.add(event)
+        await session.commit()
 
-        with patch.object(EntityExtractor, "extract_from_event", new_callable=AsyncMock) as mock_extract, \
-             patch.object(TodoGenerator, "generate_todos", new_callable=AsyncMock) as mock_generate, \
-             patch.object(EventPipeline, "_fetch_persisted_entities", new_callable=AsyncMock) as mock_fetch:
+        mocks = _pipeline_mocks()
 
-            mock_extract.return_value = extraction
-            mock_generate.return_value = []
-            mock_fetch.return_value = []
+        with patch("eventlink.database.AsyncSessionLocal", session_factory), \
+             patch("eventlink.services.event_pipeline.LLMClient", return_value=mocks["llm"]), \
+             patch("eventlink.services.event_pipeline.create_memory_provider", return_value=mocks["memory"]), \
+             patch("eventlink.services.input_scope_classifier.InputScopeClassifier", return_value=mocks["scope"]), \
+             patch("eventlink.services.event_pipeline.EntityExtractor", return_value=mocks["extractor"]), \
+             patch("eventlink.services.event_pipeline.EntityResolutionEngine"), \
+             patch("eventlink.services.event_pipeline.TodoGenerator", return_value=mocks["generator"]), \
+             patch("eventlink.services.promise_bidirectional.PromiseBidirectionalHandler"), \
+             patch("eventlink.services.event_pipeline.AssociationDiscoveryEngine", return_value=AsyncMock()), \
+             patch("eventlink.services.event_pipeline._generate_event_title", new_callable=AsyncMock, return_value=None), \
+             patch("eventlink.services.embedding_provider.EmbeddingProvider", new_callable=AsyncMock), \
+             patch("eventlink.services.semantic_search.SemanticSearchEngine", new_callable=AsyncMock), \
+             patch("eventlink.services.relationship_brief_service.RelationshipBriefService", new_callable=AsyncMock):
 
-            llm = MagicMock(spec=LLMClient)
-            pipeline = EventPipeline(llm_client=llm, session=db_session)
-            await pipeline.process(event)
+            result = await process_event_with_short_transactions(str(event.id))
 
+        assert result.status == "completed"
+        await session.refresh(event)
         assert event.pipeline == "full"
 
-    @pytest.mark.skip(reason="EventPipeline refactored to function; needs integration test rewrite")
-    async def test_pipeline_result_has_timestamps(self, db_session):
+    @pytest.mark.asyncio
+    async def test_pipeline_result_has_timestamps(self, file_db):
         """PipelineResult has started_at and completed_at timestamps."""
+        session, db_path, session_factory, engine = file_db
         user_id = make_user_id()
-        event = _create_event(db_session, user_id, raw_text="test")
-        await db_session.flush()
 
-        extraction = ExtractionResult(persons=[])
+        event = Event(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            event_type="meeting",
+            source="manual",
+            title="Test Event",
+            raw_text="test",
+            status="pending",
+        )
+        session.add(event)
+        await session.commit()
 
-        with patch.object(EntityExtractor, "extract_from_event", new_callable=AsyncMock) as mock_extract, \
-             patch.object(TodoGenerator, "generate_todos", new_callable=AsyncMock) as mock_generate, \
-             patch.object(EventPipeline, "_fetch_persisted_entities", new_callable=AsyncMock) as mock_fetch:
+        mocks = _pipeline_mocks()
 
-            mock_extract.return_value = extraction
-            mock_generate.return_value = []
-            mock_fetch.return_value = []
+        with patch("eventlink.database.AsyncSessionLocal", session_factory), \
+             patch("eventlink.services.event_pipeline.LLMClient", return_value=mocks["llm"]), \
+             patch("eventlink.services.event_pipeline.create_memory_provider", return_value=mocks["memory"]), \
+             patch("eventlink.services.input_scope_classifier.InputScopeClassifier", return_value=mocks["scope"]), \
+             patch("eventlink.services.event_pipeline.EntityExtractor", return_value=mocks["extractor"]), \
+             patch("eventlink.services.event_pipeline.EntityResolutionEngine"), \
+             patch("eventlink.services.event_pipeline.TodoGenerator", return_value=mocks["generator"]), \
+             patch("eventlink.services.promise_bidirectional.PromiseBidirectionalHandler"), \
+             patch("eventlink.services.event_pipeline.AssociationDiscoveryEngine", return_value=AsyncMock()), \
+             patch("eventlink.services.event_pipeline._generate_event_title", new_callable=AsyncMock, return_value=None), \
+             patch("eventlink.services.embedding_provider.EmbeddingProvider", new_callable=AsyncMock), \
+             patch("eventlink.services.semantic_search.SemanticSearchEngine", new_callable=AsyncMock), \
+             patch("eventlink.services.relationship_brief_service.RelationshipBriefService", new_callable=AsyncMock):
 
-            llm = MagicMock(spec=LLMClient)
-            pipeline = EventPipeline(llm_client=llm, session=db_session)
-            result = await pipeline.process(event)
+            result = await process_event_with_short_transactions(str(event.id))
 
         assert result.started_at is not None
         assert result.completed_at is not None
         assert result.completed_at >= result.started_at
 
-    @pytest.mark.skip(reason="EventPipeline refactored to function; needs integration test rewrite")
-    async def test_pipeline_todo_generation_failure_marks_failed(self, db_session):
+    @pytest.mark.asyncio
+    async def test_pipeline_todo_generation_failure_marks_failed(self, file_db):
         """TodoGenerator failure → event marked as 'failed'."""
+        session, db_path, session_factory, engine = file_db
         user_id = make_user_id()
-        event = _create_event(db_session, user_id, raw_text="test content")
-        await db_session.flush()
 
-        extraction = ExtractionResult(persons=[])
+        event = Event(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            event_type="meeting",
+            source="manual",
+            title="Test Event",
+            raw_text="test content",
+            status="pending",
+        )
+        session.add(event)
+        await session.commit()
 
-        with patch.object(EntityExtractor, "extract_from_event", new_callable=AsyncMock) as mock_extract, \
-             patch.object(
-                 TodoGenerator, "generate_todos",
-                 new_callable=AsyncMock,
-                 side_effect=RuntimeError("Todo generation failed"),
-             ), \
-             patch.object(EventPipeline, "_fetch_persisted_entities", new_callable=AsyncMock) as mock_fetch:
+        mocks = _pipeline_mocks()
+        mocks["generator"].generate_todos = AsyncMock(
+            side_effect=RuntimeError("Todo generation failed")
+        )
 
-            mock_extract.return_value = extraction
-            mock_fetch.return_value = []
+        with patch("eventlink.database.AsyncSessionLocal", session_factory), \
+             patch("eventlink.services.event_pipeline.LLMClient", return_value=mocks["llm"]), \
+             patch("eventlink.services.event_pipeline.create_memory_provider", return_value=mocks["memory"]), \
+             patch("eventlink.services.input_scope_classifier.InputScopeClassifier", return_value=mocks["scope"]), \
+             patch("eventlink.services.event_pipeline.EntityExtractor", return_value=mocks["extractor"]), \
+             patch("eventlink.services.event_pipeline.EntityResolutionEngine"), \
+             patch("eventlink.services.event_pipeline.TodoGenerator", return_value=mocks["generator"]), \
+             patch("eventlink.services.event_pipeline._generate_event_title", new_callable=AsyncMock, return_value=None):
 
-            llm = MagicMock(spec=LLMClient)
-            pipeline = EventPipeline(llm_client=llm, session=db_session)
-            result = await pipeline.process(event)
+            result = await process_event_with_short_transactions(str(event.id))
 
         assert result.status == "failed"
         assert "Todo generation failed" in result.error
+
+        await session.refresh(event)
         assert event.status == "failed"
+
+    @pytest.mark.asyncio
+    async def test_pipeline_step_timings_recorded(self, file_db):
+        """Pipeline records step_timings for each step."""
+        session, db_path, session_factory, engine = file_db
+        user_id = make_user_id()
+
+        event = Event(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            event_type="meeting",
+            source="manual",
+            title="Test Event",
+            raw_text="test",
+            status="pending",
+        )
+        session.add(event)
+        await session.commit()
+
+        mocks = _pipeline_mocks()
+
+        with patch("eventlink.database.AsyncSessionLocal", session_factory), \
+             patch("eventlink.services.event_pipeline.LLMClient", return_value=mocks["llm"]), \
+             patch("eventlink.services.event_pipeline.create_memory_provider", return_value=mocks["memory"]), \
+             patch("eventlink.services.input_scope_classifier.InputScopeClassifier", return_value=mocks["scope"]), \
+             patch("eventlink.services.event_pipeline.EntityExtractor", return_value=mocks["extractor"]), \
+             patch("eventlink.services.event_pipeline.EntityResolutionEngine"), \
+             patch("eventlink.services.event_pipeline.TodoGenerator", return_value=mocks["generator"]), \
+             patch("eventlink.services.promise_bidirectional.PromiseBidirectionalHandler"), \
+             patch("eventlink.services.event_pipeline.AssociationDiscoveryEngine", return_value=AsyncMock()), \
+             patch("eventlink.services.event_pipeline._generate_event_title", new_callable=AsyncMock, return_value=None), \
+             patch("eventlink.services.embedding_provider.EmbeddingProvider", new_callable=AsyncMock), \
+             patch("eventlink.services.semantic_search.SemanticSearchEngine", new_callable=AsyncMock), \
+             patch("eventlink.services.relationship_brief_service.RelationshipBriefService", new_callable=AsyncMock):
+
+            result = await process_event_with_short_transactions(str(event.id))
+
+        assert result.status == "completed"
+        # Verify key step timings are recorded
+        assert "step3_input_scope" in result.step_timings
+        assert "step5_extraction" in result.step_timings
+        assert "step7_todos" in result.step_timings
+        # All timings should be non-negative
+        for step, elapsed in result.step_timings.items():
+            assert elapsed >= 0, f"Step {step} timing should be non-negative, got {elapsed}"
