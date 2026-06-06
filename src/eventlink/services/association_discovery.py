@@ -892,14 +892,32 @@ class AssociationDiscoveryEngine:
         props_a = a.properties or {}
         props_b = b.properties or {}
 
-        res_a = set(
-            c.lower() for c in (props_a.get("resource", {}) or {}).get("capabilities", [])
-        )
-        res_b = set(
-            c.lower() for c in (props_b.get("resource", {}) or {}).get("capabilities", [])
-        )
-        demand_a = set(d.lower() for d in (props_a.get("concern") or []))
-        demand_b = set(d.lower() for d in (props_b.get("concern") or []))
+        # Normalize capabilities: support both str list and dict list (F-53)
+        def _norm_capabilities(props: dict) -> set[str]:
+            caps = (props.get("resource", {}) or {}).get("capabilities", [])
+            result = set()
+            for c in caps:
+                if isinstance(c, dict):
+                    result.add(c.get("category", "").lower())
+                elif isinstance(c, str):
+                    result.add(c.lower())
+            return result
+
+        # Normalize concern: support both str list and dict list (F-53)
+        def _norm_concern(props: dict) -> set[str]:
+            items = props.get("concern") or []
+            result = set()
+            for d in items:
+                if isinstance(d, dict):
+                    result.add(d.get("category", "").lower())
+                elif isinstance(d, str):
+                    result.add(d.lower())
+            return result
+
+        res_a = _norm_capabilities(props_a)
+        res_b = _norm_capabilities(props_b)
+        demand_a = _norm_concern(props_a)
+        demand_b = _norm_concern(props_b)
 
         # Bidirectional: A's resource → B's demand, AND B's resource → A's demand
         matches = []
