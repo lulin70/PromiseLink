@@ -5172,7 +5172,7 @@ Response: {data: [{embedding: [0.001, -0.002, ...], index: 0}]}
     ↓
 SHA256(text) → cache[text_hash] = embedding
     ↓
-struct.pack(768f, *embedding) → vector_embeddings.embedding BLOB
+struct.pack({dims}f, *embedding) → vector_embeddings.embedding BLOB  # dims由_actual_dims动态检测(API 768/本地 384)
 ```
 
 **性能预估**:
@@ -5265,7 +5265,7 @@ def create_search_engine(embedding_provider, db_path):
 | 迁移步骤 | 说明 | 风险 |
 |----------|------|------|
 | 1. 安装pgvector | `CREATE EXTENSION vector` | 低 |
-| 2. 创建新表 | vector(768)列替代BLOB | 中（需数据迁移） |
+| 2. 创建新表 | vector(768)列替代BLOB（PoC本地模式为384维BLOB） | 中（需数据迁移） |
 | 3. 数据迁移 | BLOB→vector转换脚本 | 中（停机窗口） |
 | 4. 索引构建 | IVFFlat/HNSW索引 | 低 |
 | 5. 切换查询 | Python余弦→`<=>`操作符 | 低 |

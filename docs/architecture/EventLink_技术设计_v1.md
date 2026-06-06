@@ -2072,7 +2072,7 @@ CREATE TABLE vector_embeddings (
     target_type TEXT NOT NULL,  -- "entity" | "event"
     target_id TEXT NOT NULL,
     user_id TEXT NOT NULL,
-    embedding BLOB NOT NULL,    -- 768维float32序列化
+    embedding BLOB NOT NULL,    -- API模式768维/本地降级384维float32序列化
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -2083,12 +2083,12 @@ CREATE INDEX idx_vector_user_type ON vector_embeddings(user_id, target_type);
 
 ```sql
 CREATE VIRTUAL TABLE vec_entities USING vec0(
-    embedding float[768],
+    embedding float[384],  -- PoC使用本地模型384维
     entity_id TEXT
 );
 ```
 
-**迁移路径**：Phase 2 → pgvector时，BLOB → `vector(768)` 列类型，SQL查询语法从sqlite-vec函数替换为pgvector的 `<=>` 操作符。
+**迁移路径**：Phase 2 → pgvector时，BLOB → `vector(768)` 列类型（PoC本地模式为384维BLOB），SQL查询语法从sqlite-vec函数替换为pgvector的 `<=>` 操作符。
 
 #### 4.12.4 关联发现增强（F-58）
 
@@ -3883,7 +3883,7 @@ class SemanticSearchEngine:
 |------|------|----------|------|
 | v2.6 | 2026-06-06 | 新增洞察引擎层+数据接入层架构：①§2.1架构图新增Insight Engine服务②§2.2服务拆分表新增Insight Engine行③§3.1 todos表DDL新增completed_rank/dynamic_score/score_calculated_at字段+索引④§4.10新增洞察引擎设计（动态评分器PriorityScorer+隐式反馈收集器ImplicitFeedbackCollector+Todo模型扩展+API变更）⑤§4.11新增数据接入层设计（DataSourceAdapter接口+邮件场景数据流+微信生态约束） | CarryMem团队 |
 | v2.7 | 2026-06-06 | Phase 1动态优先级四维演进：①§4.10.1a新增Phase 1四维评分器详细设计（依赖性全图谱路径分析+场景匹配Event表驱动）②依赖性算法：有向依赖图+阻塞链检测+3跳间接依赖+dependency_score=Σ(1/depth)×blocked_weight③场景匹配算法：未来24h meeting/call扫描+Entity匹配+context_score=max(0,1-hours/24)④权重配置Phase1(0.3/0.35/0.2/0.15) | CarryMem团队 |
-| v2.8 | 2026-06-06 | 向量化语义能力设计（对应PRD v4.7）：①§4.12新增向量化语义引擎设计（5子节）②§4.12.1 EmbeddingProvider（Moka AI API+text-embedding-3-small+768维+缓存策略+批量接口）③§4.12.2 SemanticSearchEngine（语义搜索接口+SearchResult+余弦相似度）④§4.12.3 sqlite-vec存储设计（vector_embeddings表+vec_entities虚拟表+Phase2迁移pgvector路径）⑤§4.12.4 关联发现增强F-58（混合得分0.7×structured+0.3×semantic+阈值0.7）⑥§4.12.5 Pipeline集成点（Step5.5 Entity embedding+Step11.5语义相似度增强） | CarryMem团队 |
+| v2.8 | 2026-06-06 | 向量化语义能力设计（对应PRD v4.7）：①§4.12新增向量化语义引擎设计（5子节）②§4.12.1 EmbeddingProvider（Moka AI API+text-embedding-3-small+API模式768维/本地降级384维+缓存策略+批量接口）③§4.12.2 SemanticSearchEngine（语义搜索接口+SearchResult+余弦相似度）④§4.12.3 sqlite-vec存储设计（vector_embeddings表+vec_entities虚拟表+Phase2迁移pgvector路径）⑤§4.12.4 关联发现增强F-58（混合得分0.7×structured+0.3×semantic+阈值0.7）⑥§4.12.5 Pipeline集成点（Step5.5 Entity embedding+Step11.5语义相似度增强） | CarryMem团队 |
 | v1.0 | 2026-06-02 | 初始版本：4表数据模型+5步引擎+CarryMem解耦+YAML配置化+API设计 | CarryMem团队 |
 | v1.1 | 2026-06-02 | 小程序整合：§2.1架构图+§2.2 Mini/Notify服务+§2.3前端架构+H5通信协议+TTS服务 | CarryMem团队 |
 | v1.2 | 2026-06-02 | 7角色审核P0修复：①临时授权码模式替代明文token②语音录入/TTS走小程序原生③TTS播报模板+隐私分级④微信推送分级⑤PG列索引+CarryMem协议补充+JWT认证+资源预估 | CarryMem团队 |
