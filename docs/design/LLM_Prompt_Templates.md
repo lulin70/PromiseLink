@@ -1,8 +1,8 @@
 # EventLink LLM Prompt模板库
 
-> **版本**: 0.3.1 (POC阶段, F-55/F-56纯算法实现，无新增LLM模板)
+> **版本**: 0.4.0 (POC阶段, F-57/F-58新增Template 24)
 > **最后更新**: 2026-06-06
-> **模板总数**: 23个 (模板0-14 + 模板15-21 + [0.3.0新增]模板22-23共2个)
+> **模板总数**: 24个 (模板0-14 + 模板15-21 + 模板22-23 + [0.4.0新增]模板24共1个)
 > **阶段**: POC (0.3.x series)
 > **来源**: Integration_Design_v2.5 §3.2-3.6 + PRD_v4.3 prompts/ 目录提取
 > **用途**: P8实现LLM集成时的直接参考文档，开发者无需翻阅2564行集成设计文档
@@ -55,6 +55,7 @@ result = await llm.call(
 | 模板21 NLG-行动建议回答 | moka/claude-sonnet-4-6 | [F-50 1.2新增]关系优先级→行动建议生成 |
 | 模板22 Concern/Capability提取 | moka/claude-sonnet-4-6 | [0.3.0新增]Person实体关注点+能力提取,受控词表+自由文本 |
 | 模板23 Event标题生成 | moka/claude-sonnet-4-6 | [0.3.0新增]raw_text→简洁事件标题,≤20字 |
+| 模板24 Entity文本组合(Embedding) | 无LLM(纯文本组合) | [0.4.0新增]Entity属性→标准文本,供EmbeddingProvider输入 |
 
 ### AI输出语言规则（所有模板必须遵守）
 
@@ -2014,6 +2015,110 @@ Action类型（必须从6种中选择最匹配的一种）：
 
 ---
 
+## 24. 模板24：Entity文本组合（Embedding输入） [0.4.0新增]
+
+**用途**: 在语义搜索（F-57）和关联发现语义增强（F-58）阶段，将Entity属性组合为标准文本，作为EmbeddingProvider的输入。此模板不是LLM调用，而是文本组合规则，确保embedding输入的一致性和可复现性。
+
+**LLM**: 无（纯文本组合规则，不调用LLM）
+
+**输入变量**:
+
+| 变量 | 类型 | 说明 |
+|------|------|------|
+| name | string | 实体名称 |
+| company | string | 公司（可选） |
+| industry | string | 行业（可选） |
+| concerns | list[dict] | 关注点列表，每项含tag和detail |
+| capabilities | list[dict] | 能力列表，每项含tag和detail |
+
+**组合规则**:
+
+```
+格式: "姓名: {name} | 公司: {company} | 行业: {industry} | 关注: {concern_tag} - {concern_detail} | 能力: {capability_tag} - {capability_detail}"
+```
+
+**空字段处理规则**:
+1. 空字段跳过，不输出空标签（如"关注: - "）
+2. concerns/capabilities为多值时，用分号分隔多个条目
+3. 同一字段的tag和detail用" - "连接；仅有tag时省略" - "
+4. 最终文本去除首尾多余分隔符" | "
+
+**实现代码**:
+
+```python
+def compose_entity_text(entity) -> str:
+    """将Entity属性组合为embedding输入文本（Template 24）"""
+    parts = []
+
+    # 基本信息
+    if entity.name:
+        parts.append(f"姓名: {entity.name}")
+    if entity.company:
+        parts.append(f"公司: {entity.company}")
+    if entity.industry:
+        parts.append(f"行业: {entity.industry}")
+
+    # 关注点
+    props = entity.properties or {}
+    concerns = props.get("concerns", [])
+    if concerns:
+        concern_strs = []
+        for c in concerns:
+            tag = c.get("tag", "")
+            detail = c.get("detail", "")
+            if tag and detail:
+                concern_strs.append(f"{tag} - {detail}")
+            elif tag:
+                concern_strs.append(tag)
+        if concern_strs:
+            parts.append(f"关注: {'; '.join(concern_strs)}")
+
+    # 能力
+    capabilities = props.get("capabilities", [])
+    if capabilities:
+        cap_strs = []
+        for c in capabilities:
+            tag = c.get("tag", "")
+            detail = c.get("detail", "")
+            if tag and detail:
+                cap_strs.append(f"{tag} - {detail}")
+            elif tag:
+                cap_strs.append(tag)
+        if cap_strs:
+            parts.append(f"能力: {'; '.join(cap_strs)}")
+
+    return " | ".join(parts)
+```
+
+**输出示例**:
+
+| Entity属性 | 组合文本 |
+|-----------|---------|
+| 张三, AI公司, 科技, concern=[{tag:"AI落地", detail:"找合作伙伴"}], capability=[{tag:"技术架构", detail:"10年经验"}] | 姓名: 张三 \| 公司: AI公司 \| 行业: 科技 \| 关注: AI落地 - 找合作伙伴 \| 能力: 技术架构 - 10年经验 |
+| 李四, 无公司, 金融, concern=[], capability=[{tag:"风控"}] | 姓名: 李四 \| 行业: 金融 \| 能力: 风控 |
+| 王五, 无公司, 无行业, concern=[{tag:"会议效率"}], capability=[] | 姓名: 王五 \| 关注: 会议效率 |
+
+**Event文本组合规则**（辅助）:
+
+```python
+def compose_event_text(event) -> str:
+    """将Event属性组合为embedding输入文本"""
+    parts = []
+
+    if event.title:
+        parts.append(event.title)
+    if event.participants:
+        parts.append(f"参与者: {', '.join(event.participants)}")
+    if event.event_type:
+        parts.append(f"类型: {event.event_type}")
+    if event.summary:
+        parts.append(f"关键内容: {event.summary}")
+
+    return " | ".join(parts)
+```
+
+---
+
 ## 附录A：重试与降级策略
 
 | 参数 | 值 | 说明 |
@@ -2110,3 +2215,4 @@ async def call_with_retry(prompt: str, model: str = "moka/claude-sonnet-4-6") ->
 | 0.2.1 | 2026-06-05 | [F-50新增]模板16(NLU意图识别)+模板17-21(NLG回答生成)共6个模板;新增附录C(F-50架构说明);原附录C重编号为附录D;模板总数15→21 |
 | 0.3.0 | 2026-06-06 | [Insight Engine新增]模板22(Concern/Capability提取,受控词表+自由文本)+模板23(Event标题生成,≤20字);模型选择策略表新增2行;模板总数21→23 |
 | 0.3.1 | 2026-06-06 | F-55(依赖性全图谱路径分析)/F-56(场景匹配Event表驱动)为纯算法实现，无新增LLM模板 |
+| 0.4.0 | 2026-06-06 | [F-57/F-58新增]模板24(Entity文本组合Embedding输入,纯文本组合规则不调用LLM,含空字段处理+多值分号分隔+Event文本组合辅助规则);模型选择策略表新增1行;模板总数23→24 |

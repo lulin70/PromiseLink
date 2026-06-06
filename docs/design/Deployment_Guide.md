@@ -1,6 +1,6 @@
 # EventLink 部署指南
 
-> **版本**: 0.3.1（POC阶段 — Insight Engine + 依赖性/场景匹配 部署）
+> **版本**: 0.4.0（POC阶段 — Insight Engine + 依赖性/场景匹配 + 语义搜索 部署）
 > **日期**: 2026-06-06
 > **定位**: AI驱动的个人商务关系经营助手 — 先成就关系，再促成合作
 > **参考**: 技术设计 v2.5 §9（部署架构与数据主权）、§8.0.5（监控指标）、§8.0.6（数据库迁移策略）
@@ -1724,6 +1724,124 @@ if __name__ == "__main__":
 
 **降级行为**：当DependencyAnalyzer或ContextMatcher初始化失败时，PriorityScorerV2自动回退到PoC公式（0.4×urgency + 0.6×importance），确保评分不中断。
 
+### 12.8 EmbeddingProvider部署 [0.4.0新增]
+
+#### 12.8.1 sqlite-vec安装
+
+```bash
+# 安装sqlite-vec（可选，加速向量搜索）
+pip install sqlite-vec
+
+# 验证安装
+python -c "import sqlite_vec; print('sqlite-vec available')"
+
+# 如果安装失败（编译环境问题），系统自动降级为Python余弦相似度
+# 不影响功能，仅性能略降
+```
+
+**安装验证清单**:
+
+| 检查项 | 命令 | 期望结果 |
+|--------|------|---------|
+| sqlite-vec安装 | `pip show sqlite-vec` | 版本号显示 |
+| Python导入 | `python -c "import sqlite_vec"` | 无报错 |
+| 降级测试 | 卸载sqlite-vec后启动服务 | 日志显示"降级为Python余弦相似度" |
+
+#### 12.8.2 API Key配置
+
+```bash
+# .env 文件追加（复用LLM_API_KEY，无需新增独立密钥）
+LLM_API_KEY=sk-your-moka-ai-key-here
+
+# EmbeddingProvider自动复用LLM_API_KEY
+# 调用 https://api.moka-ai.com/v1/embeddings
+```
+
+**配置验证**:
+
+```bash
+# 验证API Key可用
+curl -X POST https://api.moka-ai.com/v1/embeddings \
+  -H "Authorization: Bearer $LLM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "text-embedding-3-small", "input": ["测试"]}'
+```
+
+#### 12.8.3 缓存策略
+
+| 参数 | PoC值 | Phase1值 | 说明 |
+|------|-------|---------|------|
+| 缓存位置 | 内存dict | Redis | PoC重启清空，Phase1持久化 |
+| 缓存键 | SHA256(text) | SHA256(text) | 确保相同文本命中缓存 |
+| 缓存TTL | 无（重启清空） | 7天 | Phase1自动过期 |
+| 缓存大小 | 无限制 | 100MB上限 | Phase1内存保护 |
+
+### 12.9 SemanticSearchEngine部署 [0.4.0新增]
+
+#### 12.9.1 索引构建
+
+```bash
+# Pipeline自动触发：Entity创建/更新时自动生成embedding
+# 无需手动触发
+
+# 手动重建索引（首次部署或数据修复时）
+curl -X POST http://localhost:8000/api/v1/search/reindex \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"scope": "full", "target_types": ["entity", "event"]}'
+```
+
+**索引构建性能预估**:
+
+| 数据量 | 嵌入时间 | 存储空间 | 说明 |
+|--------|---------|---------|------|
+| 100条 | ~10s | ~300KB | PoC典型规模 |
+| 500条 | ~50s | ~1.5MB | Phase1初期 |
+| 2000条 | ~3min | ~6MB | Phase1中期 |
+
+#### 12.9.2 降级模式
+
+当sqlite-vec不可用时，SemanticSearchEngine自动降级为Python余弦相似度计算：
+
+```python
+# 自动降级日志示例
+# INFO: sqlite-vec不可用，降级为Python余弦相似度
+# INFO: 搜索方法: python_cosine, 延迟: 50ms/1000条
+```
+
+**降级性能对比**:
+
+| 指标 | sqlite-vec | Python余弦 | 差异 |
+|------|-----------|-----------|------|
+| 1000条搜索延迟 | ~5ms | ~50ms | 10x |
+| 内存占用 | 低 | 中（numpy数组） | 略高 |
+| 精度 | float32 | float64 | Python更高 |
+| 安装复杂度 | 需编译 | 零依赖 | Python更简单 |
+
+#### 12.9.3 Phase 2迁移（pgvector）
+
+```bash
+# Phase 2: PostgreSQL + pgvector
+# 1. 安装pgvector扩展
+psql -c "CREATE EXTENSION IF NOT EXISTS vector;"
+
+# 2. 数据迁移脚本
+python scripts/migrate_embeddings_to_pg.py
+
+# 3. 构建IVFFlat索引
+psql -c "CREATE INDEX idx_vec_cosine ON vector_embeddings
+         USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);"
+```
+
+**迁移检查清单**:
+
+| 步骤 | 命令 | 验证 |
+|------|------|------|
+| pgvector安装 | `SELECT extversion FROM pg_extension WHERE extname='vector'` | 版本号 |
+| 数据迁移 | `SELECT COUNT(*) FROM vector_embeddings` | 条目数一致 |
+| 索引构建 | `EXPLAIN ANALYZE SELECT ... ORDER BY embedding <=> ...` | 使用索引扫描 |
+| 功能验证 | `POST /api/v1/search/semantic` | search_method="pgvector" |
+
 ---
 
 ## 版本历史
@@ -1735,10 +1853,11 @@ if __name__ == "__main__":
 | **0.2.0+F-50** | **2026-06-05** | **F-50语音助手部署内容：①§2.1 新增edge-tts Python依赖+ffmpeg/sox系统依赖 ②§2.3 Dockerfile Runtime阶段追加edge-tts安装+TTS缓存目录创建 ③§2.4 docker-compose新增TTS缓存volume mount+3项Voice环境变量(TTS_VOICE_NAME/TTS_RATE/VOICE_ENABLED) ④§5.1.1 新增4项Voice专用Prometheus指标(延迟/置信度/ASR错误/TTS缓存命中率)+查询示例+Grafana面板建议 ⑤§8.5 新增Voice Service运维手册(排查/调优参数/安全检查清单) ⑥§9.1 环境变量表追加6项Voice变量** | **DevSquad** |
 | **0.3.0** | **2026-06-06** | **DevSquad Review更新 — Insight Engine部署：①§12.1 优先级评分定时任务(PoC: cron每小时执行recalculate_scores脚本 + Phase1: Celery Beat/APScheduler方案对比+推荐APScheduler) ②§12.2 pgcrypto扩展Phase1(CREATE EXTENSION安装+验证+Alembic迁移脚本006+AES-256-GCM加密策略+ENCRYPTION_KEY安全注入) ③§12.3 Adapter同步任务Phase1(Email每15分钟/Calendar每30分钟+后台Worker配置+APScheduler集成+速率限制) ④§12.4 监控指标4项(eventlink_priority_score_calculations_total/eventlink_implicit_feedback_adjustments_total/eventlink_adapter_sync_duration_seconds/eventlink_adapter_sync_errors_total+Prometheus查询示例+Grafana面板建议)** |
 | **0.3.1** | **2026-06-06** | **F-55/F-56 依赖性与场景匹配部署：①§12.5 DependencyAnalyzer部署[0.3.1新增](纯Python算法+SQL查询+无额外容器/无额外cron/无外部依赖+性能预估<500ms) ②§12.6 ContextMatcher部署[0.3.1新增](Event表索引优化CREATE INDEX idx_events_context ON events(user_id,event_type,created_at)+Alembic迁移脚本007+索引效果预估+纯Python算法无额外容器) ③§12.7 PriorityScorerV2定时评分任务[0.3.1新增](复用现有cron每小时整点+recalculate_scores脚本升级为V2四维评分+降级策略回退PoC公式)** | **DevSquad** |
+| **0.4.0** | **2026-06-06** | **F-57/F-58 语义搜索与关联发现增强部署：①§12.8 EmbeddingProvider部署[0.4.0新增] — 12.8.1 sqlite-vec安装(pip install sqlite-vec+安装验证清单+自动降级) 12.8.2 API Key配置(复用LLM_API_KEY+curl验证命令) 12.8.3 缓存策略(PoC内存dict重启清空/Phase1 Redis TTL=7天) ②§12.9 SemanticSearchEngine部署[0.4.0新增] — 12.9.1 索引构建(Pipeline自动触发+手动reindex API+性能预估100条~10s) 12.9.2 降级模式(sqlite-vec不可用时Python余弦相似度+性能对比5ms vs 50ms) 12.9.3 Phase2迁移(pgvector+IVFFlat索引+迁移检查清单)** | **DevSquad** |
 
 ---
 
-> **文档状态**: ✅ 0.3.1 POC阶段版本完成（Insight Engine + 依赖性/场景匹配 部署）
+> **文档状态**: ✅ 0.4.0 POC阶段版本完成（Insight Engine + 依赖性/场景匹配 + 语义搜索 部署）
 > **下次审查**: Phase1开发启动前 / CI/CD CD部分上线前
 > **维护负责人**: DevSquad架构师
 > **适用阶段**: PoC（当前）→ Phase1（下一里程碑）
