@@ -414,6 +414,50 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
             todos_enriched=len(fresh_todos),
         )
 
+        # ── Step 8.3: Resource overuse detection (F-39) ──
+        _t83 = time.monotonic()
+        try:
+            from eventlink.services.resource_overuse_detector import ResourceOveruseDetector
+
+            overuse_detector = ResourceOveruseDetector()
+            async with AsyncSessionLocal() as overuse_session:
+                # Re-query todos with action_type set by Step 8
+                overuse_todo_q = await overuse_session.execute(
+                    select(Todo).where(Todo.source_event_id == str(event_id))
+                )
+                overuse_todos = list(overuse_todo_q.scalars().all())
+
+                # Collect unique (user_id, related_entity_id) pairs for "索取型" todos
+                checked_entities: set[str] = set()
+                for todo in overuse_todos:
+                    if (
+                        todo.action_type == "their_promise"
+                        and todo.related_entity_id
+                        and str(todo.related_entity_id) not in checked_entities
+                    ):
+                        checked_entities.add(str(todo.related_entity_id))
+                        try:
+                            await overuse_detector.check_and_create_warning_todo(
+                                user_id=str(todo.user_id),
+                                target_entity_id=str(todo.related_entity_id),
+                                source_event_id=str(event_id),
+                                session=overuse_session,
+                            )
+                        except Exception as overuse_err:
+                            logger.warning("pipeline_step8_3_overuse_check_failed",
+                                entity_id=str(todo.related_entity_id),
+                                error=str(overuse_err))
+
+                await overuse_session.commit()
+        except Exception as overuse_init_err:
+            logger.warning("pipeline_step8_3_overuse_init_failed", error=str(overuse_init_err))
+
+        result.step_timings["step8_3_resource_overuse"] = time.monotonic() - _t83
+
+        logger.info("pipeline_step8_3_resource_overuse",
+            event_id=str(event_id),
+        )
+
         # ── Step 8.5: Phase 1 four-dimensional priority scoring (F-55+F-56) ──
         _t85 = time.monotonic()
         try:

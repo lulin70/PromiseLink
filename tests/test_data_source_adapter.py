@@ -88,7 +88,7 @@ class TestManualAdapter:
 
 
 class TestEmailAdapter:
-    """Test EmailAdapter PoC skeleton."""
+    """Test EmailAdapter — now delegates to full implementation."""
 
     @pytest.mark.asyncio
     async def test_email_adapter_source_type(self):
@@ -97,18 +97,18 @@ class TestEmailAdapter:
         assert adapter.source_type == "email"
 
     @pytest.mark.asyncio
-    async def test_email_adapter_fetch_returns_empty(self):
-        """Verify EmailAdapter.fetch_new_events returns empty list (PoC)."""
+    async def test_email_adapter_fetch_returns_empty_when_not_connected(self):
+        """Verify EmailAdapter.fetch_new_events returns empty list when not connected."""
         adapter = EmailAdapter()
         events = await adapter.fetch_new_events()
         assert events == []
 
     @pytest.mark.asyncio
-    async def test_email_adapter_acknowledge(self):
-        """Verify EmailAdapter.acknowledge returns True (PoC)."""
+    async def test_email_adapter_acknowledge_returns_false_when_not_connected(self):
+        """Verify EmailAdapter.acknowledge returns False when not connected."""
         adapter = EmailAdapter()
         result = await adapter.acknowledge("msg_123")
-        assert result is True
+        assert result is False
 
 
 class TestWeChatAdapter:

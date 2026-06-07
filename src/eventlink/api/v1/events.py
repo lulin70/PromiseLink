@@ -107,7 +107,7 @@ async def create_event(
     new_request_id()
     
     # Validate event type
-    valid_types = ["card_save", "meeting", "call", "manual"]
+    valid_types = ["card_save", "meeting", "call", "manual", "email", "wechat_forward"]
     if request.event_type not in valid_types:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

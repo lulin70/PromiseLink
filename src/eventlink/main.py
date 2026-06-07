@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from eventlink.api.v1 import associations, auth, dashboard, entities, events, health, relationship_briefs, todos, voice
+from eventlink.api.v1 import associations, auth, dashboard, demand_input, email_sync, entities, events, export, health, import_csv, relationship_briefs, todos, voice, voice_query, wechat_forward
 from eventlink.config import get_settings
 from eventlink.core.exceptions import BusinessError, EventLinkError, LLMError
 from eventlink.database import close_db, init_db
@@ -133,6 +133,12 @@ app.include_router(todos.router, prefix=settings.api_prefix, tags=["Todos"])
 app.include_router(dashboard.router, prefix=settings.api_prefix, tags=["Dashboard"])
 app.include_router(relationship_briefs.router, prefix=settings.api_prefix, tags=["RelationshipBriefs"])
 app.include_router(voice.router, prefix=settings.api_prefix, tags=["Voice"])
+app.include_router(voice_query.router, prefix=settings.api_prefix, tags=["Voice"])
+app.include_router(demand_input.router, prefix=settings.api_prefix, tags=["DemandInput"])
+app.include_router(export.router, prefix=settings.api_prefix, tags=["Export"])
+app.include_router(import_csv.router, prefix=settings.api_prefix, tags=["Import"])
+app.include_router(email_sync.router, prefix=settings.api_prefix, tags=["Email"])
+app.include_router(wechat_forward.router, prefix=settings.api_prefix, tags=["WeChatForward"])
 
 
 @app.get("/")

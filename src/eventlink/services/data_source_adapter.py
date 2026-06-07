@@ -76,31 +76,9 @@ class DataSourceAdapter(ABC):
         ...
 
 
-class EmailAdapter(DataSourceAdapter):
-    """Email data source adapter — PoC skeleton.
-
-    Full implementation deferred to Phase 1.
-    PoC scope: Interface definition + basic structure only.
-    """
-
-    @property
-    def source_type(self) -> str:
-        return "email"
-
-    def __init__(self, config: dict[str, Any] | None = None):
-        self.config = config or {}
-
-    async def fetch_new_events(self, since: datetime | None = None) -> list[RawEvent]:
-        """PoC: Not yet connected to real email provider.
-
-        Phase 1 will implement IMAP/Gmail API integration.
-        """
-        logger.info("email_adapter_fetch_skipped", reason="PoC_skeleton")
-        return []
-
-    async def acknowledge(self, source_id: str) -> bool:
-        """PoC: No-op."""
-        return True
+# EmailAdapter is now implemented in email_adapter.py
+# Import it here for registry and backward compatibility
+from eventlink.services.email_adapter import EmailAdapter  # noqa: F401 — re-exported
 
 
 class WeChatAdapter(DataSourceAdapter):
