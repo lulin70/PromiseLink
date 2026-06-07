@@ -75,7 +75,7 @@ class Event(Base):
     # Constraints
     __table_args__ = (
         CheckConstraint(
-            "event_type IN ('card_save', 'meeting', 'call', 'manual')",
+            "event_type IN ('card_save', 'meeting', 'call', 'manual', 'email', 'wechat_forward')",
             name="event_type_check",
         ),
         CheckConstraint(
