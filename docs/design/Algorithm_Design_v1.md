@@ -1,12 +1,13 @@
 # EventLink 算法设计文档
 
-> **版本**: 0.2.7 (POC阶段)
-> **日期**: 2026-06-06
+> **版本**: 0.2.8 (POC阶段)
+> **日期**: 2026-06-07
 > **阶段**: POC (0.2.x series)
 > **定位**: AI驱动的**个人商务关系经营助手**（非"资源匹配平台"）
 > **参考**: 技术设计 v2.7 §4
 > **状态**: ✅ 独立完整版，含详细算法与Python实现
 > **v2.7变更**: 新增EmbeddingProvider算法(§2.15, F-57)、SemanticSearchEngine算法(§2.16, F-57)、关联发现语义增强算法(§2.17, F-58)
+> **v2.8变更**: 新增ResourceOveruseDetector算法(§2.18, F-39)、VoiceQueryService算法(§2.19, F-50)、WeChatForwardAdapter算法(§2.20, PRD §5.17)
 
 ---
 
@@ -2106,6 +2107,223 @@ class AssociationDiscoveryEngine:
 | 存储 | BLOB + Python计算 | pgvector + 索引加速 |
 | 监控 | 无 | 语义增强命中率/延迟 |
 
+### 2.18 ResourceOveruseDetector 算法（v2.8 新增, F-39）
+
+#### 2.18.1 算法概述
+
+ResourceOveruseDetector 检测用户是否对同一实体发出过多"索取型"请求，防止关系透支。在30天滚动窗口内，若对同一实体的 `their_promise` 类型Todo计数≥3，则触发警告。
+
+**核心类**: `ResourceOveruseDetector`
+
+**设计原则**:
+1. **仅计数索取型**: 只计算 `action_type=their_promise` 的Todo，不计算 `my_promise`/`my_followup` 等给予型
+2. **30天滚动窗口**: 超出窗口的请求不计数
+3. **去重**: 同一(user, entity, 30天窗口)只生成一条警告Todo
+4. **severity分级**: 3-5次=warning，≥6次=critical
+
+#### 2.18.2 算法逻辑
+
+```python
+OVERUSE_THRESHOLD = 3    # 触发警告的阈值
+WINDOW_DAYS = 30         # 滚动窗口天数
+REQUEST_ACTION_TYPES = {"their_promise"}  # 索取型action_type
+
+class ResourceOveruseDetector:
+    async def check_overuse(self, user_id, target_entity_id, session):
+        window_start = datetime.now(UTC) - timedelta(days=WINDOW_DAYS)
+
+        # 查询30天内对同一实体的索取型Todo
+        request_todos = await session.execute(
+            select(Todo).where(
+                Todo.user_id == user_id,
+                Todo.related_entity_id == target_entity_id,
+                Todo.action_type.in_(REQUEST_ACTION_TYPES),
+                Todo.created_at >= window_start,
+            )
+        )
+        request_count = len(request_todos.scalars().all())
+
+        if request_count < OVERUSE_THRESHOLD:
+            return None  # 未超阈值
+
+        # severity分级
+        severity = "warning"
+        if request_count >= OVERUSE_THRESHOLD + 3:  # ≥6次
+            severity = "critical"
+
+        return OveruseWarning(
+            entity_id=target_entity_id,
+            request_count=request_count,
+            window_days=WINDOW_DAYS,
+            severity=severity,
+        )
+```
+
+#### 2.18.3 警告Todo生成
+
+触发时生成 `todo_type=risk` 的Todo，properties包含:
+
+```json
+{
+  "risk_type": "resource_overuse",
+  "target_entity_id": "uuid",
+  "request_count": 4,
+  "window_days": 30,
+  "severity": "warning"
+}
+```
+
+**去重逻辑**: 查询同一(user, entity, 30天窗口)内是否已存在 `risk_type=resource_overuse` 的Todo，存在则跳过。
+
+#### 2.18.4 性能考量
+
+| 数据规模 | 查询复杂度 | 预估延迟 |
+|---------|-----------|---------|
+| 单用户1000条Todo | O(N) where N=该实体相关Todo | < 10ms |
+| Phase1 10000条Todo | SQL索引加速 | < 50ms |
+
+**索引建议**: `idx_todos_entity_action_created ON todos(user_id, related_entity_id, action_type, created_at)`
+
+### 2.19 VoiceQueryService 算法（v2.8 新增, F-50）
+
+#### 2.19.1 算法概述
+
+VoiceQueryService 实现语音查询的三阶段Pipeline: NLU意图识别 → DB查询 → NLG回答生成。与§11 NLU引擎互补，§11定义了NLU分类算法，本节定义完整的查询执行链路。
+
+**核心类**: `VoiceQueryService.execute_query()`
+
+#### 2.19.2 三阶段Pipeline
+
+```
+用户语音文本
+    ↓
+Stage 1: NLU意图识别 (复用§11 IntentClassifier)
+    → IntentResult(intent, confidence, slots)
+    ↓
+Stage 2: DB查询 (按意图路由)
+    → schedule_query → query_schedule()
+    → promise_tracker → query_promises()
+    → relationship_status → query_relationship()
+    ↓
+Stage 3: NLG回答生成 (复用NLGGenerator)
+    → 自然语言回答文本
+```
+
+#### 2.19.3 查询路由实现
+
+```python
+async def execute_query(session, user_id, intent, slots) -> dict:
+    """按意图路由到对应查询函数"""
+    if intent == VoiceIntent.SCHEDULE_QUERY:
+        return await query_schedule(session, user_id, slots)
+    elif intent == VoiceIntent.PROMISE_TRACKER:
+        return await query_promises(session, user_id, slots)
+    elif intent == VoiceIntent.RELATIONSHIP_STATUS:
+        return await query_relationship(session, user_id, slots)
+    else:
+        return {}
+```
+
+**各意图查询逻辑**:
+
+| 意图 | 查询目标 | SQL/ORM | 返回结构 |
+|------|---------|---------|---------|
+| schedule_query | 当日Event | `SELECT Event WHERE user_id=? AND date(timestamp)=today` | `{meetings: [...], total: N}` |
+| promise_tracker | 待办承诺 | `SELECT Todo WHERE user_id=? AND action_type='my_promise' AND status='pending'` | `{promises: [...], total: N}` |
+| relationship_status | 关系阶段 | `SELECT RelationshipBrief WHERE user_id=? AND person_id=?` | `{stage, next_node, ...}` |
+
+#### 2.19.4 性能目标
+
+| 指标 | 目标 | 说明 |
+|------|------|------|
+| NLU延迟P95 | < 500ms | 规则匹配<50ms + LLM fallback<500ms |
+| DB查询延迟 | < 100ms | 索引优化 |
+| NLG延迟 | < 1s | LLM生成 |
+| 端到端(含TTS) | < 5s | 全链路 |
+
+### 2.20 WeChatForwardAdapter 算法（v2.8 新增, PRD §5.17）
+
+#### 2.20.1 算法概述
+
+WeChatForwardAdapter 将用户转发/粘贴的微信聊天记录解析为结构化Event对象。采用纯规则解析（无LLM依赖），支持群聊和单聊两种格式。
+
+**核心类**: `WeChatForwardAdapter`
+
+#### 2.20.2 微信聊天格式识别
+
+**群聊格式**:
+```
+张三 10:30
+明天下午3点见面聊聊合作
+
+李四 10:32
+好的，我准备一下资料
+```
+
+**单聊格式**（对方消息无名字，只有时间）:
+```
+张三 10:30
+明天见面聊聊
+
+10:32
+好的没问题
+```
+
+#### 2.20.3 正则解析算法
+
+**发言行模式** (`_SPEAKER_LINE_PATTERN`):
+```python
+re.compile(
+    r"^(\S{1,20})\s+"           # 发言人名(1-20非空字符)
+    r"("                         # 时间组开始
+    r"(?:昨天|前天|今天|星期[一二三四五六日天]"
+    r"|周[一二三四五六日天]|上午|下午|晚上)?\s*"  # 可选日期前缀
+    r"\d{1,2}:\d{2}"             # HH:MM
+    r"(?::\d{2})?"               # 可选:SS
+    r")"                         # 时间组结束
+    r"\s*$"
+)
+```
+
+**纯时间行模式** (`_TIME_ONLY_PATTERN`): 单聊中对方消息只有时间没有名字。
+
+#### 2.20.4 解析流程
+
+```
+输入文本 → 按行分割
+    ↓
+逐行匹配发言行模式
+    ├─ 匹配 → 保存前一条消息, 开始新消息
+    ├─ 纯时间行 → 保存前一条消息, 新消息speaker="对方"
+    └─ 内容行 → 追加到当前消息内容
+    ↓
+输出: List[ChatMessage(speaker, time, content)]
+    ↓
+构建Event:
+    event_type = "wechat_forward"
+    source = "wechat_forward"
+    title = "微信转发: {首发言人}等{N}人的对话"
+    metadata = {speakers, message_count, time_range}
+```
+
+#### 2.20.5 降级策略
+
+| 场景 | 处理方式 |
+|------|---------|
+| 无法识别格式 | 整段文本作为单条消息，speaker="未知" |
+| 空输入 | 返回空列表 |
+| 混合格式 | 按已识别格式解析，未识别部分归入最后一条消息 |
+
+#### 2.20.6 性能考量
+
+| 输入规模 | 解析复杂度 | 预估延迟 |
+|---------|-----------|---------|
+| 100行聊天记录 | O(N) | < 5ms |
+| 1000行聊天记录 | O(N) | < 50ms |
+| 512KB文本上限 | O(N) | < 200ms |
+
+**无LLM依赖**: 纯正则解析，无网络调用，延迟可预测。
+
 ---
 
 ## 3. 资源敏感度过滤算法
@@ -3688,7 +3906,7 @@ Event Ingest Pipeline (v2.0):
 
 ---
 
-*本文档为EventLink算法设计v2.6完整版。所有算法与8条铁律保持一致，字段名使用todo_type（非todo_nature）、callability（非availability），敏感度为2级（matchable/no_match），明确排除RBAC/多租户/团队协作/他人资源匹配/原生APP。v2.0新增：InputScope分类器(§0)、Promise双向动作识别(§4.2a)、Todo降噪(§4.9)、RelationshipStage状态机(§6)、Pipeline Step0/8(§9)、关联发现HOT/COLD分离(§7.5)。[0.2.1新增]：NLU意图识别引擎(§11, F-50)。[v2.5新增]：PriorityScorer算法(§2.10)、ImplicitFeedbackCollector算法(§2.11)、Concern/Capability解析规则(§2.12)。[v2.6新增]：DependencyAnalyzer算法(§2.13, F-55)、ContextMatcher算法(§2.14, F-56)。参考基线：技术设计v2.6 §4。*
+*本文档为EventLink算法设计v2.8完整版。所有算法与8条铁律保持一致，字段名使用todo_type（非todo_nature）、callability（非availability），敏感度为2级（matchable/no_match），明确排除RBAC/多租户/团队协作/他人资源匹配/原生APP。v2.0新增：InputScope分类器(§0)、Promise双向动作识别(§4.2a)、Todo降噪(§4.9)、RelationshipStage状态机(§6)、Pipeline Step0/8(§9)、关联发现HOT/COLD分离(§7.5)。[0.2.1新增]：NLU意图识别引擎(§11, F-50)。[v2.5新增]：PriorityScorer算法(§2.10)、ImplicitFeedbackCollector算法(§2.11)、Concern/Capability解析规则(§2.12)。[v2.6新增]：DependencyAnalyzer算法(§2.13, F-55)、ContextMatcher算法(§2.14, F-56)。[v2.7新增]：EmbeddingProvider算法(§2.15, F-57)、SemanticSearchEngine算法(§2.16, F-57)、关联发现语义增强算法(§2.17, F-58)。[v2.8新增]：ResourceOveruseDetector算法(§2.18, F-39)、VoiceQueryService算法(§2.19, F-50)、WeChatForwardAdapter算法(§2.20, PRD §5.17)。参考基线：技术设计v2.7 §4。*
 
 ---
 

@@ -1,12 +1,13 @@
 # EventLink API设计文档
 
-> **版本**: 0.2.7 (POC阶段)
-> **日期**: 2026-06-06
+> **版本**: 0.2.8 (POC阶段)
+> **日期**: 2026-06-07
 > **阶段**: POC (0.2.x series)
 > **设计师**: 架构师 + 开发团队
 > **参考**: PRD v4.3, 技术设计 v2.7 §7
 > **v2.6变更**: Insight Engine API新增priority-breakdown/upcoming-context端点(§3.13)、Todo schema新增dependency_raw/context_raw字段
 > **v2.7变更**: 新增§3.15 Semantic Search API（3个端点+SearchResult schema, F-57/F-58）
+> **v2.8变更**: 新增§3.16 CSV Import API(F-08)、§3.17 Data Export API(F-21)、§3.18 Demand Input API(F-36)、§3.19 Email Sync API(EmailAdapter)、§3.20 WeChat Forward API(WeChatForwardAdapter)、§3.21 Voice Query API(F-50)
 
 ---
 
@@ -2605,6 +2606,208 @@ class ReindexResponse(BaseModel):
     started_at: str
 ```
 
+### 3.16 CSV Import API（v2.8 新增, F-08）
+
+> **[F-08新增] 定位**: 冷启动数据导入，接受CSV文件上传，解析行数据为Entity对象，经EntityResolution去重归一。
+
+#### 3.16.1 导入CSV
+
+**端点**: `POST /api/v1/import/csv`
+
+**请求**: `multipart/form-data`
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| file | UploadFile (.csv) | 是 | CSV文件，UTF-8/GBK编码 |
+
+**CSV格式**: 必需列`name`，可选列`company/title/phone/email/wechat/concern/capability`
+
+**响应**:
+```json
+{
+  "total_rows": 10,
+  "created": 7,
+  "merged": 2,
+  "skipped": 1,
+  "parse_errors": ["Row 5: missing 'name', skipped"]
+}
+```
+
+**处理逻辑**:
+1. 解码文件（UTF-8优先，GBK降级）
+2. 解析CSV（Python csv.DictReader）
+3. 创建sentinel Event（source=csv_import）
+4. 逐行经EntityResolutionEngine归一
+5. 返回导入统计
+
+### 3.17 Data Export API（v2.8 新增, F-21）
+
+> **[F-21新增] 定位**: 用户数据可携带权保障，JSON全量导出用户所有数据。
+
+#### 3.17.1 导出全部数据
+
+**端点**: `GET /api/v1/export/json`
+
+**认证**: JWT Bearer Token
+
+**响应**: `application/json`
+
+```json
+{
+  "export_version": "1.0",
+  "exported_at": "2026-06-07T10:00:00Z",
+  "user_id": "uuid",
+  "events": [...],
+  "entities": [...],
+  "associations": [...],
+  "todos": [...],
+  "vector_embeddings": [...]
+}
+```
+
+**序列化方式**: 使用ORM mapper `column_attrs` 遍历模型属性，处理UUID→str和datetime→ISO格式转换。
+
+**安全**: PII脱敏（复用`redact_pii_from_text()`）、user_id强制隔离、频率限制3次/24h。
+
+### 3.18 Demand Input API（v2.8 新增, F-36）
+
+> **[F-36新增] 定位**: 一句话需求录入，LLM提取需求标签+详情，关联已有Entity或创建orphan_demand。
+
+#### 3.18.1 创建需求
+
+**端点**: `POST /api/v1/demands`
+
+**请求**:
+```json
+{
+  "text": "帮我找一个靠谱的装修团队",
+  "source": "voice",
+  "user_id": "uuid"
+}
+```
+
+**响应**:
+```json
+{
+  "status": "success",
+  "demand_id": "uuid",
+  "extracted": {
+    "tag": "装修",
+    "detail": "找一个靠谱的装修团队",
+    "related_entity_id": "uuid-or-null"
+  }
+}
+```
+
+**处理逻辑**:
+1. LLM提取tag/detail/person_name（降级为关键词正则匹配）
+2. 若匹配到已有Entity → concern追加到Entity.properties
+3. 若无匹配 → 创建orphan_demand Entity（entity_type=topic）
+
+### 3.19 Email Sync API（v2.8 新增, EmailAdapter）
+
+> **[EmailAdapter新增] 定位**: IMAP邮件同步，一封邮件一个Event，进入Pipeline处理。
+
+#### 3.19.1 同步邮件
+
+**端点**: `POST /api/v1/email/sync`
+
+**请求**:
+```json
+{
+  "imap_host": "imap.gmail.com",
+  "email": "user@gmail.com",
+  "password": "app-password",
+  "port": 993,
+  "use_ssl": true,
+  "folder": "INBOX"
+}
+```
+
+**响应**:
+```json
+{
+  "synced_count": 5,
+  "event_ids": ["uuid1", "uuid2", ...],
+  "errors": []
+}
+```
+
+**处理逻辑**:
+1. 连接IMAP服务器（imaplib.IMAP4_SSL）
+2. 获取未读邮件
+3. 每封邮件→一个Event（event_type=email, source=email）
+4. 触发Pipeline异步处理
+
+### 3.20 WeChat Forward API（v2.8 新增, WeChatForwardAdapter）
+
+> **[WeChatForwardAdapter新增] 定位**: 微信聊天记录转发解析，纯规则解析（无LLM），支持群聊/单聊。
+
+#### 3.20.1 转发微信消息
+
+**端点**: `POST /api/v1/wechat/forward`
+
+**请求**:
+```json
+{
+  "text": "张三 10:30\n明天下午3点见面聊聊合作\n\n李四 10:32\n好的，我准备一下资料"
+}
+```
+
+**响应**:
+```json
+{
+  "id": "uuid",
+  "event_type": "wechat_forward",
+  "source": "wechat_forward",
+  "title": "微信转发: 张三等2人的对话",
+  "status": "pending",
+  "speakers": ["张三", "李四"],
+  "message_count": 2,
+  "time_range": "10:30-10:32",
+  "created_at": "2026-06-07T10:00:00Z"
+}
+```
+
+**处理逻辑**:
+1. 正则提取聊天消息（群聊/单聊格式）
+2. 构建Event（event_type=wechat_forward）
+3. 持久化并触发Pipeline异步处理
+
+### 3.21 Voice Query API（v2.8 新增, F-50）
+
+> **[F-50新增] 定位**: 语音查询专用端点，三阶段Pipeline: NLU意图识别→DB查询→NLG回答生成。
+
+#### 3.21.1 语音查询
+
+**端点**: `POST /api/v1/voice/query`
+
+**请求**:
+```json
+{
+  "text": "今天有什么会议",
+  "user_id": "uuid"
+}
+```
+
+**响应**:
+```json
+{
+  "intent": "schedule_query",
+  "confidence": 0.92,
+  "response": "您今天有4场会议。上午9点和张总讨论供应链方案...",
+  "data": {
+    "meetings": [...],
+    "total": 4
+  }
+}
+```
+
+**处理逻辑**:
+1. NLU意图识别（NLUIntentClassifier，规则+LLM两阶段）
+2. 按意图路由DB查询（schedule_query/promise_tracker/relationship_status）
+3. NLG生成自然语言回答
+
 ---
 
 ## 4. 安全策略（v2.0新增）
@@ -4176,7 +4379,8 @@ X-Cache-Hit: true
 | **v2.5** | **2026-06-06** | **Insight Engine + DataSourceAdapter API (v2.5)：**<br/>**① 新增§3.13 Insight Engine API**:<br/>　- GET /api/v1/todos?sort=smart — 按动态评分排序(默认)<br/>　- GET /api/v1/todos?sort=due_date — 按截止时间排序<br/>　- POST /api/v1/insights/calculate — 触发优先级重新计算(scope: all/entity/overdue, 限流10次/分)<br/>　- GET /api/v1/insights/feedback-stats — 获取隐式反馈统计(period: 1d/7d/30d)<br/>**② 新增§3.14 DataSourceAdapter API**:<br/>　- GET /api/v1/adapters — 列出已配置数据源(不返回config_encrypted)<br/>　- POST /api/v1/adapters — 添加新数据源配置(adapter_name枚举5值, config加密存储)<br/>　- POST /api/v1/adapters/{name}/sync — 手动触发同步(异步, 限流5次/分/适配器)<br/>　- DELETE /api/v1/adapters/{name} — 删除数据源配置(manual/voice不可删)<br/>**③ Todo响应schema新增字段**: completed_rank(完成序号) + dynamic_score(动态优先级分, 0-100)<br/>**④ OpenAPI YAML Todo schema更新**: 新增completed_rank(integer, nullable) + dynamic_score(number, 0-100, nullable) |
 | **v2.6** | **2026-06-06** | **F-55/F-56 Insight Engine API扩展 (v2.6)：**<br/>**① §3.13 Insight Engine API新增2个端点**:<br/>　- GET /api/v1/todos/{todo_id}/priority-breakdown — 返回四维评分详情(urgency/importance/dependency/context)，含每个维度的原始得分和计算因子，支持可解释性面板<br/>　- GET /api/v1/users/{user_id}/upcoming-context — 返回未来24h即将见面的Entity及关联Todo，支持会前准备场景<br/>**② Todo schema breakdown字段扩展**: 新增dependency_raw(依赖分析原始因子, F-55) + context_raw(场景匹配原始因子, F-56)<br/>**③ OpenAPI YAML Todo schema更新**: 新增breakdown对象(含urgency/importance/dependency/context四维得分 + dependency_raw/context_raw原始因子) |
 | **v2.7** | **2026-06-06** | **F-57/F-58 语义搜索与关联发现增强 API (v2.7)：**<br/>**① 新增§3.15 Semantic Search API**:<br/>　- POST /api/v1/search/semantic — 语义搜索(query+top_k+target_types+min_similarity，返回SearchResultItem列表含similarity/highlights)<br/>　- GET /api/v1/search/stats — 向量索引统计(total_embeddings/by_type/index_method/cache_size)<br/>　- POST /api/v1/search/reindex — 重建索引(full/incremental，异步202返回task_id，限流2次/小时)<br/>**② 新增SearchResult Schema**: SearchResultItem + SemanticSearchResponse + SearchStatsResponse + ReindexRequest + ReindexResponse<br/>**③ 数据隔离**: user_id从JWT提取，搜索结果按user_id过滤，忽略客户端传入的user_id** |
+| **v2.8** | **2026-06-07** | **F-08/F-21/F-36/F-39/EmailAdapter/WeChatForwardAdapter/F-50 API (v2.8)：**<br/>**① 新增§3.16 CSV Import API(F-08)**: POST /api/v1/import/csv — CSV文件上传导入，EntityResolution去重归一，返回统计<br/>**② 新增§3.17 Data Export API(F-21)**: GET /api/v1/export/json — JSON全量导出，ORM mapper column_attrs序列化，PII脱敏<br/>**③ 新增§3.18 Demand Input API(F-36)**: POST /api/v1/demands — 一句话需求录入，LLM提取+关键词fallback，concern追加到Entity.properties<br/>**④ 新增§3.19 Email Sync API(EmailAdapter)**: POST /api/v1/email/sync — IMAP邮件同步，一封邮件一个Event<br/>**⑤ 新增§3.20 WeChat Forward API(WeChatForwardAdapter)**: POST /api/v1/wechat/forward — 微信聊天记录转发解析，群聊/单聊支持<br/>**⑥ 新增§3.21 Voice Query API(F-50)**: POST /api/v1/voice/query — 语音查询三阶段Pipeline(NLU→DB→NLG)** |
 
 ---
 
-*最后更新: 2026-06-06*
+*最后更新: 2026-06-07*

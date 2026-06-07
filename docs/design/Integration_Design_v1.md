@@ -1,7 +1,7 @@
-# EventLink集成设计文档 v2.7
+# EventLink集成设计文档 v2.8
 
-> **版本**: v2.7（POC阶段 — Insight Engine + DataSourceAdapter + 依赖性/场景匹配 + 语义搜索 集成规格）
-> **日期**: 2026-06-06
+> **版本**: v2.8（POC阶段 — Insight Engine + DataSourceAdapter + 依赖性/场景匹配 + 语义搜索 + CSV/Email/WeChat/VoiceQuery 集成规格）
+> **日期**: 2026-06-07
 > **设计师**: 架构师团队
 > **参考**: PRD v4.3, 技术设计 v2.5, API设计 v1.0, 数据库设计 v2.0, LLM_Prompt_Templates v2.0
 > **状态**: POC阶段 — 共识清单D7-1~D7-11融合修订 + DevSquad Review更新
@@ -5273,7 +5273,163 @@ def create_search_engine(embedding_provider, db_path):
 
 ---
 
-## 15. 版本历史
+## 15. CSV导入集成设计 [v2.8新增, F-08]
+
+### 15.1 集成架构
+
+```
+用户上传CSV文件
+    ↓
+POST /api/v1/import/csv (FastAPI UploadFile)
+    ↓
+_decode_content() — UTF-8优先，GBK降级
+    ↓
+_parse_csv() — Python csv.DictReader解析
+    ↓
+_build_entity_data() — 构建Entity数据字典
+    ↓
+创建sentinel Event (source=csv_import)
+    ↓
+逐行 EntityResolutionEngine.resolve()
+    ├─ CREATE → 新建Entity (status=confirmed)
+    ├─ MERGE → 合并到已有Entity (threshold≥0.85)
+    └─ CONFIRM → 新建provisional Entity (threshold≥0.70)
+    ↓
+返回导入统计 {total_rows, created, merged, skipped, parse_errors}
+```
+
+### 15.2 与Pipeline的关系
+
+CSV导入**不触发完整Pipeline**（不经过EntityExtractor/TodoGenerator），仅执行EntityResolution归一。原因：CSV数据已是结构化信息，无需LLM提取。
+
+### 15.3 与EntityResolution的数据依赖
+
+- 输入: `_build_entity_data()` 构建的字典（name/company/title/properties）
+- 输出: `ResolutionResult` → 决定CREATE/MERGE/CONFIRM
+- 复用: `EntityResolutionEngine` 完整5步算法
+
+---
+
+## 16. 邮件同步集成设计 [v2.8新增, EmailAdapter]
+
+### 16.1 集成架构
+
+```
+IMAP服务器 (imap.gmail.com:993)
+    ↓ SSL/TLS
+EmailAdapter.connect() — imaplib.IMAP4_SSL
+    ↓
+EmailAdapter.fetch_unread() — 搜索UNSEEN邮件
+    ↓
+parse_email_message() — 解析MIME结构
+    ↓
+EmailAdapter.parse_to_event() — 一封邮件→一个RawEvent
+    ↓
+POST /api/v1/email/sync → 创建Event (event_type=email)
+    ↓ BackgroundTasks
+Pipeline处理 (EntityExtractor → TodoGenerator → ...)
+```
+
+### 16.2 与DataSourceAdapter的关系
+
+EmailAdapter继承`DataSourceAdapter`抽象基类，实现:
+- `source_type` → "email"
+- `fetch_new_events()` → 获取未读邮件→RawEvent列表
+- `parse_to_event()` — EmailMessage → RawEvent
+
+### 16.3 与Pipeline的关系
+
+邮件同步**触发完整Pipeline**：邮件body_text作为raw_text进入EntityExtractor，LLM提取Person/承诺/关注点，TodoGenerator生成Todo。
+
+### 16.4 邮件解析细节
+
+| 组件 | 实现 | 说明 |
+|------|------|------|
+| 编码解码 | `email.header.decode_header` | 支持Base64/QP编码的中文主题 |
+| 正文提取 | `_extract_body_text` / `_extract_body_html` | 优先text/plain，降级HTML→纯文本 |
+| 附件处理 | `_extract_attachments` | 仅记录文件名，不下载内容 |
+| 日期解析 | `email.utils.parsedate_to_datetime` | RFC 2822格式 |
+
+---
+
+## 17. 微信转发集成设计 [v2.8新增, WeChatForwardAdapter]
+
+### 17.1 集成架构
+
+```
+用户粘贴/转发微信聊天记录
+    ↓
+POST /api/v1/wechat/forward (text字段)
+    ↓
+WeChatForwardAdapter.parse_forwarded_message()
+    ├─ _extract_chat_messages() — 正则解析
+    ├─ _identify_speakers() — 发言人识别
+    └─ _compute_time_range() — 时间范围计算
+    ↓
+创建Event (event_type=wechat_forward, source=wechat_forward)
+    ↓ BackgroundTasks
+Pipeline处理 (EntityExtractor → TodoGenerator → ...)
+```
+
+### 17.2 与Pipeline的关系
+
+微信转发**触发完整Pipeline**：聊天记录全文作为raw_text进入EntityExtractor，LLM提取Person/承诺/关注点。
+
+### 17.3 格式识别策略
+
+| 格式 | 识别方式 | 示例 |
+|------|---------|------|
+| 群聊 | "名字 时间" 行模式 | "张三 10:30\n消息内容" |
+| 单聊 | 纯时间行模式 | "10:32\n对方消息" |
+| 降级 | 无格式识别 | speaker="未知" |
+
+### 17.4 与DataSourceAdapter的关系
+
+WeChatForwardAdapter在§10 DataSourceAdapter中已定义（adapter_name枚举包含wechat_forward），但实际通过API端点调用而非定时同步。
+
+---
+
+## 18. 语音查询集成设计 [v2.8新增, F-50]
+
+### 18.1 集成架构
+
+```
+用户语音输入
+    ↓ ASR (微信同声传译/Whisper)
+POST /api/v1/voice/query (text字段)
+    ↓
+NLUIntentClassifier.classify() — 规则+LLM两阶段
+    ↓ IntentResult
+VoiceQueryService.execute_query() — 按意图路由DB查询
+    ├─ schedule_query → query_schedule()
+    ├─ promise_tracker → query_promises()
+    └─ relationship_status → query_relationship()
+    ↓
+NLGService.generate_nlu_response() — 自然语言回答生成
+    ↓
+返回 {intent, confidence, response, data}
+```
+
+### 18.2 与现有Voice API的关系
+
+| 端点 | 用途 | 区别 |
+|------|------|------|
+| POST /voice/session | 语音会话管理 | 创建session记录+TTS预生成 |
+| POST /voice/query | 语音查询 | 纯查询+NLG回答，无session管理 |
+
+### 18.3 与Pipeline的关系
+
+语音查询**不触发Event Pipeline**，而是直接查询已有数据。这是只读操作，不产生新的Event/Entity/Todo。
+
+### 18.4 与NLU引擎的数据依赖
+
+- 输入: 用户查询文本
+- 中间: `NLUIntentClassifier` → `IntentResult(intent, confidence, slots)`
+- 输出: DB查询结果 + NLG自然语言回答
+
+---
+
+## 19. 版本历史
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
@@ -5285,7 +5441,8 @@ def create_search_engine(embedding_provider, db_path):
 | **v2.5** | **2026-06-06** | **DevSquad Review更新 — Insight Engine + DataSourceAdapter集成：①§10 DataSourceAdapter集成[v2.5新增] — 10.1 Adapter接口定义(DataSourceAdapter抽象基类+fetch_new_events/authenticate方法+5个具体适配器ManualInputAdapter/VoiceAdapter/EmailAdapter/CalendarAdapter/WeChatForwardAdapter+统一Event输出) ②§10.2 Email集成Phase1(IMAP/Exchange+OAuth2+一封邮件=一个Event+action_type区分方向) ③§10.3 微信集成约束(个人微信无API/企业微信API可用/手动转发PoC方案+语音最低摩擦策略) ④§10.4 供应链安全(依赖锁定哈希校验+CI/CD漏洞扫描+Adapter五阶段审查流程)** |
 | **v2.6** | **2026-06-06** | **F-55/F-56 依赖性与场景匹配集成：①§11 DependencyAnalyzer集成设计[v2.6新增] — 11.1 与Pipeline Step 8.5集成点(Step8 Promise分析后触发→Step9 Todo持久化前) 11.2 与AssociationDiscoveryEngine数据依赖(Entity关联关系→Todo→Entity→Todo依赖链构建) 11.3 依赖图构建算法(BFS遍历+O(N×E)复杂度+N=Todo数/E=Entity关联数+dependency_score公式+性能考量PoC全量/Phase1增量/Phase2 Neo4j) ②§12 ContextMatcher集成设计[v2.6新增] — 12.1 与Pipeline Step 8.5集成点(与DependencyAnalyzer并行执行) 12.2 Event表查询优化(idx_events_context复合索引user_id+event_type+created_at+查询性能预估) 12.3 与PriorityScorerV2调用链(四维评分公式0.25×urgency+0.35×importance+0.20×dependency+0.20×context+降级策略)** |
 | **v2.7** | **2026-06-06** | **F-57/F-58 语义搜索与关联发现增强集成：①§13 EmbeddingProvider集成设计[v2.7新增] — 13.1 与Pipeline Step 5.5集成点(Entity提取后触发嵌入生成) 13.2 Moka AI API调用链(text-embedding-3-small+SHA256缓存+性能预估单条~100ms/批量~2s) 13.3 与AssociationDiscoveryEngine数据依赖(Entity→embed→vector_embeddings→SemanticAssociationEnhancer) ②§14 SemanticSearchEngine集成设计[v2.7新增] — 14.1 双集成点(Step5.5嵌入生成+Step11语义增强) 14.2 sqlite-vec vs Python余弦降级(5ms vs 50ms/1000条) 14.3 Phase2 pgvector迁移路径(6步骤+风险评估)** |
+| **v2.8** | **2026-06-07** | **F-08/F-21/F-36/F-39/EmailAdapter/WeChatForwardAdapter/F-50 集成规格：①§15 CSV导入集成设计[v2.8新增] — 15.1 集成架构(UploadFile→csv.DictReader→EntityResolution→统计) 15.2 与Pipeline关系(不触发完整Pipeline,仅EntityResolution) 15.3 与EntityResolution数据依赖 ②§16 邮件同步集成设计[v2.8新增] — 16.1 集成架构(IMAP→EmailAdapter→Event→Pipeline) 16.2 与DataSourceAdapter关系(继承抽象基类) 16.3 与Pipeline关系(触发完整Pipeline) 16.4 邮件解析细节(编码/正文/附件/日期) ③§17 微信转发集成设计[v2.8新增] — 17.1 集成架构(正则解析→Event→Pipeline) 17.2 与Pipeline关系(触发完整Pipeline) 17.3 格式识别策略(群聊/单聊/降级) 17.4 与DataSourceAdapter关系(API调用非定时同步) ④§18 语音查询集成设计[v2.8新增] — 18.1 集成架构(NLU→DB查询→NLG) 18.2 与现有Voice API关系(session vs query) 18.3 与Pipeline关系(只读不触发Pipeline) 18.4 与NLU引擎数据依赖** |
 
 ---
 
-*v2.7 完成于2026-06-06 — Insight Engine + DataSourceAdapter + 依赖性/场景匹配 + 语义搜索 集成规格*
+*v2.8 完成于2026-06-07 — Insight Engine + DataSourceAdapter + 依赖性/场景匹配 + 语义搜索 + CSV/Email/WeChat/VoiceQuery 集成规格*

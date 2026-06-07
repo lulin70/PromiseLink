@@ -1,13 +1,14 @@
 # EventLink 数据库设计文档
 
-> **版本**: 0.2.7 (POC阶段)
-> **日期**: 2026-06-06
+> **版本**: 0.2.8 (POC阶段)
+> **日期**: 2026-06-07
 > **阶段**: POC (0.2.x series)
 > **设计师**: 架构师团队
 > **参考**: PRD v4.3, 技术设计 v2.7 §3.1
 > **状态**: 李总v1.2+许总POC反馈融合修订
 > **v2.6变更**: score_audit_logs表calculation_factors扩展dependency_score/context_score审计字段
 > **v2.7变更**: 新增vector_embeddings表(F-57)、vec_entities虚拟表(F-57)、语义搜索数据存储
+> **v2.8变更**: Event模型event_type约束新增'email'和'wechat_forward'，Todo模型properties JSONB新增resource_overuse类型
 
 ---
 
@@ -39,7 +40,7 @@ erDiagram
     EVENTS ||--o{ ENTITIES : extracts
     EVENTS {
         uuid id PK
-        varchar event_type "card_save|meeting|call|manual"
+        varchar event_type "card_save|meeting|call|manual|email|wechat_forward"
         varchar source
         varchar title
         timestamptz timestamp
@@ -197,8 +198,8 @@ erDiagram
 | 字段名 | 类型 | 约束 | 默认值 | 说明 |
 |--------|------|------|--------|------|
 | id | UUID | PRIMARY KEY | gen_random_uuid() | 主键 |
-| event_type | VARCHAR(20) | NOT NULL | - | card_save\|meeting\|call\|manual |
-| source | VARCHAR(50) | NOT NULL | - | iamhere\|recording_r1\|manual |
+| event_type | VARCHAR(20) | NOT NULL | - | card_save\|meeting\|call\|manual\|email\|wechat_forward |
+| source | VARCHAR(50) | NOT NULL | - | iamhere\|recording_r1\|manual\|csv_import\|email\|wechat_forward |
 | title | VARCHAR(200) | NOT NULL | - | 事件标题 |
 | timestamp | TIMESTAMPTZ | NOT NULL | - | 事件发生时间 |
 | raw_text | TEXT | NOT NULL | - | 原始文本内容 |
@@ -657,6 +658,18 @@ CREATE UNIQUE INDEX idx_todos_completed_rank ON todos(user_id, completed_rank) W
 
 **risk / followup类型**:
 - 使用通用字段即可，无额外特有字段
+
+**risk类型 — resource_overuse子类型（v2.8新增, F-39）**:
+```json
+{
+  "risk_type": "resource_overuse",
+  "target_entity_id": "uuid-of-target-entity",
+  "request_count": 4,
+  "window_days": 30,
+  "severity": "warning"
+}
+```
+> 当 `risk_type=resource_overuse` 时，表示资源透支检测触发的风险Todo。severity取值: `warning`(3-5次) / `critical`(≥6次)。
 
 **完整context示例（promise类型）**:
 ```json
@@ -1917,8 +1930,9 @@ CREATE INDEX idx_vec_cosine ON vector_embeddings
 | **v2.5** | **2026-06-06** | **Insight Engine + DataSourceAdapter 数据库变更：①todos表新增3字段：completed_rank(完成序号/隐式反馈)、dynamic_score(动态优先级分)、score_calculated_at(评分时间)，含2个CHECK约束(check_dynamic_score_range/check_score_timestamp_valid)和2个索引(idx_todos_dynamic_score/idx_todos_completed_rank)②新增score_audit_logs评分审计日志表（7字段+2索引，triggered_by枚举3值，calculation_factors JSONB结构）③新增adapter_configs数据源适配器配置表（6字段+CHECK约束+唯一约束，adapter_name枚举5值，config_encrypted BYTEA加密存储）④entities.properties JSONB新增concerns/capabilities结构化字段（{tag,detail,source_event_id}格式，无需DDL变更）** |
 | **v2.6** | **2026-06-06** | **F-55/F-56 评分审计扩展：①score_audit_logs.calculation_factors JSONB结构扩展，新增dependency_score/context_score/dependency_raw/context_raw字段，用于审计依赖性全图谱路径分析(F-55)和场景匹配Event表驱动(F-56)的计算因子②todos表确认已有dynamic_score/score_calculated_at/completed_rank字段（F-51/F-52已加），无需新增DDL变更③Phase1启用四维模型后审计日志将完整记录四维得分及原始计算因子** |
 | **v2.7** | **2026-06-06** | **F-57/F-58 语义搜索与关联发现增强：①新增vector_embeddings表（8字段+2索引+唯一约束，target_type枚举entity/event，embedding BLOB存储API模式768维/本地降级384维float32向量，source_text用于缓存校验，user_id数据隔离）②新增vec_entities虚拟表（sqlite-vec vec0扩展，embedding float[384]（PoC本地模型），可选创建，不可用时Python余弦降级）③Phase2迁移DDL（PostgreSQL+pgvector，vector(768)列类型+IVFFlat索引）** |
+| **v2.8** | **2026-06-07** | **F-08/F-21/F-36/F-39/EmailAdapter/WeChatForwardAdapter 数据库变更：①events表event_type枚举扩展新增'email'和'wechat_forward'（无需DDL变更，VARCHAR(20)足够）②events表source枚举扩展新增'csv_import'/'email'/'wechat_forward'（无需DDL变更）③todos表properties JSONB新增resource_overuse子类型结构（risk_type/target_entity_id/request_count/window_days/severity，无需DDL变更）④ER图EVENTS节点event_type注释更新** |
 | v2.1 | TBD | 添加用户反馈表 |
 
 ---
 
-*最后更新: 2026-06-06*
+*最后更新: 2026-06-07*

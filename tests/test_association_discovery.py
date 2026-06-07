@@ -1,7 +1,7 @@
 """Tests for Association Discovery Engine."""
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -359,7 +359,7 @@ class TestApplyTimeDecay:
 
         # Set last_interaction to 180 days ago (one half-life)
         assoc = new_assocs[0]
-        assoc.last_interaction = datetime.utcnow() - timedelta(days=180)
+        assoc.last_interaction = datetime.now(UTC) - timedelta(days=180)
         original_strength = assoc.strength
         await db_session.flush()
 
@@ -390,7 +390,7 @@ class TestApplyTimeDecay:
 
         # Set last_interaction very far back and low strength
         assoc = new_assocs[0]
-        assoc.last_interaction = datetime.utcnow() - timedelta(days=2000)
+        assoc.last_interaction = datetime.now(UTC) - timedelta(days=2000)
         assoc.strength = 0.15
         await db_session.flush()
 

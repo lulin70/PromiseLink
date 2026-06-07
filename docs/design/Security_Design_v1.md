@@ -1,7 +1,7 @@
 # EventLink 安全设计文档
 
-> **版本**: v2.7 (POC阶段)
-> **日期**: 2026-06-06
+> **版本**: v2.8 (POC阶段)
+> **日期**: 2026-06-07
 > **阶段**: POC (0.2.x series)
 > **设计师**: 架构师 + 安全工程师
 > **参考**: PRD v4.3, 技术设计 v2.5 §8 (§3.1a + §8.0.3), API设计 v1.0, 数据库设计 v1.0
@@ -2229,6 +2229,80 @@ class VectorInjectionGuard:
         return True
 ```
 
+### 6.14 CSV导入安全专项 [v2.8新增, F-08]
+
+> **对应功能**: F-08 CSV导入（POST /api/v1/import/csv）
+
+**安全威胁与缓解措施**:
+
+| 威胁 | 缓解措施 | 实施阶段 |
+|------|---------|---------|
+| **CSV注入** | 清除公式前缀（`=+@-`），纯文本化 | PoC+ |
+| **大文件DoS** | 文件大小限制10MB + 行数限制5000 | PoC+ |
+| **编码攻击** | UTF-8优先 + GBK降级，拒绝二进制内容 | PoC+ |
+| **恶意文件名** | 仅接受.csv后缀，忽略路径 | PoC+ |
+| **数据注入** | EntityResolution归一防止重复注入 | PoC+ |
+
+**CSV注入防护**:
+```python
+def _sanitize_csv_value(value: str) -> str:
+    """清除CSV注入公式前缀"""
+    if value and value[0] in ('=', '+', '@', '-', '\t', '\r'):
+        return "'" + value  # 添加单引号前缀转义
+    return value
+```
+
+**文件上传安全检查清单**:
+- [x] 文件后缀校验（.csv only）
+- [x] 文件大小限制（10MB）
+- [x] 空文件拒绝
+- [x] 必需列校验（name）
+- [x] user_id数据隔离
+
+### 6.15 EmailAdapter安全专项 [v2.8新增, EmailAdapter]
+
+> **对应功能**: EmailAdapter邮件同步（POST /api/v1/email/sync）
+
+**安全威胁与缓解措施**:
+
+| 威胁 | 缓解措施 | 实施阶段 |
+|------|---------|---------|
+| **IMAP凭证泄露** | 应用密码存.env，不提交Git；Phase2升级OAuth2 | PoC+ |
+| **邮件内容PII** | Pipeline处理时自动脱敏（复用redact_pii_from_text） | PoC+ |
+| **恶意邮件附件** | 不存储附件，仅提取body_text | PoC+ |
+| **IMAP连接劫持** | 强制SSL/TLS，拒绝非加密连接 | PoC+ |
+| **邮件洪水** | 同步频率限制15分钟/次 + 单次最多100封 | Phase1+ |
+
+**IMAP凭证安全**:
+```python
+# 环境变量注入，不硬编码
+EMAIL_IMAP_HOST = os.getenv("EMAIL_IMAP_HOST")
+EMAIL_APP_PASSWORD = os.getenv("EMAIL_APP_PASSWORD")  # 应用专用密码
+```
+
+**邮件内容安全处理**:
+- 附件: 仅记录文件名列表，不下载/存储附件内容
+- HTML邮件: 提取纯文本body_text，丢弃HTML标签
+- PII: 进入Pipeline后统一脱敏
+
+### 6.16 WeChatForwardAdapter安全专项 [v2.8新增, WeChatForwardAdapter]
+
+> **对应功能**: 微信聊天记录转发（POST /api/v1/wechat/forward）
+
+**安全威胁与缓解措施**:
+
+| 威胁 | 缓解措施 | 实施阶段 |
+|------|---------|---------|
+| **文本长度DoS** | 请求体限制512KB（Pydantic max_length） | PoC+ |
+| **正则ReDoS** | 使用简单正则模式，避免回溯爆炸 | PoC+ |
+| **聊天内容PII** | Pipeline处理时自动脱敏 | PoC+ |
+| **伪造聊天记录** | 无验证（用户自愿输入，信任模型） | — |
+| **XSS注入** | 纯文本存储，前端渲染转义 | PoC+ |
+
+**正则安全**: `_SPEAKER_LINE_PATTERN` 使用 `\S{1,20}` 限制长度，避免回溯。
+
+**数据隔离**: Event创建时强制使用JWT中的user_id，忽略客户端传入值。
+
 ---
 
 ## 7. 数据主权
@@ -2663,11 +2737,12 @@ trivy image --severity HIGH,CRITICAL eventlink:latest  # 仅报告高危
 | v2.0[0.2.1] | 2026-06-05 | **F-50 语音助手安全专项（增量更新）**：§6.6新增Voice Assistant安全专项(5个子节) ①§6.6.1 Voice API端点安全(POST /voice/session + GET /voice/tts安全约束表 + sanitize_voice_input清洗函数) ②§6.6.2 NLU Prompt Injection防护(威胁模型+攻击示例+4层纵深防护+安全Prompt模板) ③§6.6.3 ASR数据隐私策略(5类数据存储策略表+保留期限+用户权利) ④§6.6.4 voice_sessions数据访问控制(RBAC归属校验代码+敏感字段脱敏) ⑤§6.6.5车载场景特殊安全考虑(4种驾驶场景风险缓解表)。复用已有组件：JWT中间件/redact_pii_from_text/RBAC/user_scope | 架构师 + 安全工程师 |
 | v2.5 | 2026-06-06 | **Insight Engine + DataSourceAdapter + Concern/Capability安全专项**：①§6.7新增Insight Engine安全专项(评分操纵防护+隐式反馈完整性+动态评分API安全+score_audit_logs表DDL) ②§6.8新增DataSourceAdapter安全专项(Adapter配置安全+出站流量控制+供应链安全) ③§6.9新增Concern/Capability数据保护(敏感性分析+分阶段保护策略+行级安全策略) | 架构师 + 安全工程师 |
 | v2.6 | 2026-06-06 | **F-55/F-56安全专项**：①§6.10新增DependencyAnalyzer安全专项(依赖图注入防护+阻塞链深度限制MAX_DEPTH=3+依赖性得分操纵防护) ②§6.11新增ContextMatcher安全专项(场景匹配数据隔离+24h时间窗口限制+即将见面信息隐私) |
-| v2.7 | 2026-06-06 | **F-57/F-58安全专项**：①§6.12新增EmbeddingProvider安全专项(API Key复用LLM密钥+.env存储+缓存内存存储重启清空+user_id数据隔离) ②§6.13新增SemanticSearch安全专项(搜索数据隔离user_id强制过滤+JWT提取+sqlite-vec文件权限0o600+向量注入防护系统生成only) | 架构师 + 安全工程师 |
+| v2.7 | 2026-06-06 | **F-57/F-58安全专项**：①§6.12新增EmbeddingProvider安全专项(API Key复用LLM密钥+.env存储+缓存内存存储重启清空+user_id数据隔离) ②§6.13新增SemanticSearch安全专项(搜索数据隔离user_id强制过滤+JWT提取+sqlite-vec文件权限0o600+向量注入防护系统生成only) |
+| v2.8 | 2026-06-07 | **F-08/EmailAdapter/WeChatForwardAdapter安全专项**：①§6.14新增CSV导入安全专项(CSV注入防护+大文件DoS+编码攻击+恶意文件名+数据注入5项威胁缓解) ②§6.15新增EmailAdapter安全专项(IMAP凭证泄露+邮件PII+恶意附件+连接劫持+邮件洪水5项威胁缓解+SSL强制+附件仅记录不存储) ③§6.16新增WeChatForwardAdapter安全专项(文本长度DoS+正则ReDoS+聊天PII+XSS注入4项威胁缓解+512KB限制+简单正则) | 架构师 + 安全工程师 |
 
 ---
 
-> **文档状态**: ✅ v2.7 更新完成（F-57 EmbeddingProvider + F-58 SemanticSearch 安全专项已落地）
+> **文档状态**: ✅ v2.8 更新完成（F-08 CSV导入 + EmailAdapter + WeChatForwardAdapter 安全专项已落地）
 > **下次审查**: Phase1开发启动前
 > **安全负责人**: 架构师
 > **对齐文档**: 技术设计 v2.5 §3.1a + §8.0.3

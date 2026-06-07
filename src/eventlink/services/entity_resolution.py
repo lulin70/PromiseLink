@@ -8,7 +8,7 @@ import json
 from enum import Enum
 from dataclasses import dataclass, field
 from typing import Any, Optional
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -219,7 +219,7 @@ class EntityResolutionEngine:
             # Preserve merge history
             merge_history = existing_props.get("merge_history", [])
             merge_history.append({
-                "merged_at": datetime.utcnow().isoformat(),
+                "merged_at": datetime.now(UTC).isoformat(),
                 "merged_fields": list(new_props.keys()),
             })
             existing_props["merge_history"] = merge_history

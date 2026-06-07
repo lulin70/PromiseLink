@@ -1,7 +1,7 @@
 """Tests for Todo State Machine — 5-state transitions."""
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -138,7 +138,7 @@ class TestTodoStateMachine:
         todo = _create_todo(db_session, user_id)
         await db_session.flush()
 
-        until = datetime.utcnow() + timedelta(hours=24)
+        until = datetime.now(UTC) + timedelta(hours=24)
         result = await sm.transition(todo, "snoozed", snoozed_until=until)
 
         assert result.status == "snoozed"
@@ -151,9 +151,9 @@ class TestTodoStateMachine:
         todo = _create_todo(db_session, user_id, status="in_progress")
         await db_session.flush()
 
-        before = datetime.utcnow()
+        before = datetime.now(UTC)
         result = await sm.transition(todo, "done")
-        after = datetime.utcnow()
+        after = datetime.now(UTC)
 
         assert result.completed_at is not None
         assert before <= result.completed_at <= after
@@ -225,7 +225,7 @@ class TestTodoStateMachine:
         todo = _create_todo(db_session, user_id)
         await db_session.flush()
 
-        until = datetime.utcnow() + timedelta(hours=1)
+        until = datetime.now(UTC) + timedelta(hours=1)
         todo = await sm.transition(todo, "snoozed", snoozed_until=until)
         assert todo.status == "snoozed"
 

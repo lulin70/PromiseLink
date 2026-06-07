@@ -1,7 +1,7 @@
 # EventLink 测试计划文档
 
-> **版本**: v2.7 (POC阶段)
-> **日期**: 2026-06-06
+> **版本**: v2.8 (POC阶段)
+> **日期**: 2026-06-07
 > **阶段**: POC (0.2.x series)
 > **测试周期**: Week 1-3 (POC阶段)
 > **测试负责人**: QA团队
@@ -4218,6 +4218,120 @@ def test_sv05_user_isolation_voice_history():
 
 ---
 
+### 11.10 CSV导入测试用例（F-08）[v2.8新增]
+
+| 用例ID | 测试目标 | 输入 | 期望结果 |
+|--------|---------|------|---------|
+| TC-CSV-001 | 标准CSV导入 | 2行标准CSV（name+company+title） | created=2, merged=0 |
+| TC-CSV-002 | 最小CSV导入 | 仅name列 | created=1 |
+| TC-CSV-003 | 重复名合并 | 同名同公司导入两次 | merged=1 |
+| TC-CSV-004 | UTF-8编码 | 中文CSV UTF-8编码 | 正确解析 |
+| TC-CSV-005 | GBK编码降级 | 中文CSV GBK编码 | 正确解析 |
+| TC-CSV-006 | 空文件上传 | 空CSV文件 | 400错误 |
+| TC-CSV-007 | 非CSV文件 | .txt文件 | 400错误 |
+| TC-CSV-008 | 缺少name列 | CSV无name列 | 400错误 |
+| TC-CSV-009 | 空行跳过 | CSV含空行 | 空行跳过不计 |
+| TC-CSV-010 | concern/capability列 | CSV含concern/capability列 | properties正确存储 |
+| TC-CSV-011 | source_event创建 | 导入后查询Event | source=csv_import |
+| TC-CSV-012 | 大文件限制 | >10MB CSV | 拒绝或截断 |
+| TC-CSV-013 | 导入统计准确性 | 10行3错误 | total=10, skipped=3 |
+| TC-CSV-014 | 同名不同公司 | 同名不同公司 | 不合并，创建新实体 |
+| TC-CSV-015 | EntityResolution集成 | 已有实体+CSV导入 | 自动归一 |
+
+### 11.11 数据导出测试用例（F-21）[v2.8新增]
+
+| 用例ID | 测试目标 | 输入 | 期望结果 |
+|--------|---------|------|---------|
+| TC-EXP-001 | JSON全量导出 | GET /export/json | 包含events/entities/associations/todos/vector_embeddings |
+| TC-EXP-002 | UUID序列化 | 含UUID字段的导出 | UUID转为字符串 |
+| TC-EXP-003 | datetime序列化 | 含datetime字段的导出 | ISO 8601格式 |
+| TC-EXP-004 | user_id隔离 | 不同用户数据 | 仅返回当前用户数据 |
+| TC-EXP-005 | PII脱敏 | 含手机号/邮箱数据 | 脱敏后输出 |
+| TC-EXP-006 | 空数据导出 | 新用户无数据 | 空数组，export_version正确 |
+| TC-EXP-007 | export_version字段 | 任意导出 | "1.0" |
+| TC-EXP-008 | exported_at时间戳 | 任意导出 | ISO格式UTC时间 |
+
+### 11.12 需求录入测试用例（F-36）[v2.8新增]
+
+| 用例ID | 测试目标 | 输入 | 期望结果 |
+|--------|---------|------|---------|
+| TC-DM-001 | LLM提取需求 | "帮我找一个靠谱的装修团队" | tag=装修 |
+| TC-DM-002 | 关键词fallback | LLM不可用时 | 正则匹配tag |
+| TC-DM-003 | 人名提取 | "李总需要融资" | person_name=李总 |
+| TC-DM-004 | concern追加到Entity | 已有李总实体 | concern追加到properties |
+| TC-DM-005 | orphan_demand创建 | 无匹配实体 | entity_type=topic创建 |
+| TC-DM-006 | 无关键词匹配 | "今天天气不错" | tag=其他 |
+| TC-DM-007 | source字段 | source=voice | concern.source=voice |
+| TC-DM-008 | 空文本 | "" | 验证错误 |
+| TC-DM-009 | 超长文本 | >500字 | 正确截断处理 |
+| TC-DM-010 | 多次需求同一人 | 对同一人录入2次需求 | concern列表追加 |
+
+### 11.13 资源透支检测测试用例（F-39）[v2.8新增]
+
+| 用例ID | 测试目标 | 输入 | 期望结果 |
+|--------|---------|------|---------|
+| TC-RO-001 | 低于阈值不触发 | 2次their_promise | 无警告 |
+| TC-RO-002 | 阈值触发 | 3次their_promise | warning |
+| TC-RO-003 | critical级别 | 6次their_promise | critical |
+| TC-RO-004 | my_promise不计数 | 3次my_promise | 无警告 |
+| TC-RO-005 | 混合action_type | 2 their_promise + 2 my_promise | 不触发(仅2次) |
+| TC-RO-006 | 30天窗口外 | 31天前的3次their_promise | 不计数 |
+| TC-RO-007 | 去重 | 已有警告Todo | 不重复创建 |
+| TC-RO-008 | Todo属性 | 触发警告 | todo_type=risk, risk_type=resource_overuse |
+| TC-RO-009 | 不同实体独立 | 对A 3次 + 对B 1次 | 仅A触发 |
+| TC-RO-010 | severity边界 | 5次their_promise | warning(非critical) |
+
+### 11.14 语音查询测试用例（F-50 Voice Query）[v2.8新增]
+
+| 用例ID | 测试目标 | 输入 | 期望结果 |
+|--------|---------|------|---------|
+| TC-VQ-001 | 日程查询意图 | "今天有什么会议" | intent=schedule_query |
+| TC-VQ-002 | 承诺追踪意图 | "我答应谁什么还没做" | intent=promise_tracker |
+| TC-VQ-003 | 关系推进意图 | "张总到哪步了" | intent=relationship_status |
+| TC-VQ-004 | 不确定意图 | "嗯..." | intent=unclear |
+| TC-VQ-005 | 日程查询数据 | 有会议数据 | 返回会议列表 |
+| TC-VQ-006 | 承诺追踪数据 | 有pending承诺 | 返回承诺列表 |
+| TC-VQ-007 | 关系推进数据 | 有RelationshipBrief | 返回阶段信息 |
+| TC-VQ-008 | NLG回答生成 | 日程查询 | 自然语言回答 |
+| TC-VQ-009 | 空查询 | "" | 验证错误 |
+| TC-VQ-010 | 端到端延迟 | 任意查询 | <5s(不含TTS) |
+
+### 11.15 EmailAdapter测试用例 [v2.8新增]
+
+| 用例ID | 测试目标 | 输入 | 期望结果 |
+|--------|---------|------|---------|
+| TC-EM-001 | SSL连接成功 | 正确IMAP配置 | connected=True |
+| TC-EM-002 | 非SSL连接 | use_ssl=false | connected=True |
+| TC-EM-003 | 连接失败 | 错误主机名 | connected=False |
+| TC-EM-004 | 解析邮件到Event | 标准邮件 | event_type=email |
+| TC-EM-005 | 无主题邮件 | subject为空 | title="(无主题)" |
+| TC-EM-006 | 含附件邮件 | 邮件含PDF附件 | metadata.attachments=["report.pdf"] |
+| TC-EM-007 | fetch_new_events | 已连接+未读邮件 | 返回RawEvent列表 |
+| TC-EM-008 | since过滤 | since参数 | 仅返回新于since的邮件 |
+| TC-EM-009 | 未连接时fetch | 未连接 | 返回空列表 |
+| TC-EM-010 | Adapter注册表 | get_adapter("email") | 返回EmailAdapter实例 |
+
+### 11.16 WeChatForwardAdapter测试用例 [v2.8新增]
+
+| 用例ID | 测试目标 | 输入 | 期望结果 |
+|--------|---------|------|---------|
+| TC-WF-001 | 群聊标准格式 | 多发言人+时间 | 3条ChatMessage |
+| TC-WF-002 | 多行消息内容 | 发言人多行内容 | content含所有行 |
+| TC-WF-003 | 单发言人 | 同一人多次发言 | 多条消息同一speaker |
+| TC-WF-004 | 单聊格式 | 时间行无名字 | speaker="对方" |
+| TC-WF-005 | 日期前缀 | "昨天 10:30" | 正确解析时间 |
+| TC-WF-006 | 无法识别格式 | 纯文本无格式 | speaker="未知" |
+| TC-WF-007 | 空输入 | "" | 空列表 |
+| TC-WF-008 | Event创建 | 群聊解析 | event_type=wechat_forward |
+| TC-WF-009 | title生成 | 2人对话 | "微信转发: 张三等2人的对话" |
+| TC-WF-010 | metadata | 群聊解析 | speakers/message_count/time_range |
+| TC-WF-011 | time_range计算 | 10:30和10:35 | "10:30-10:35" |
+| TC-WF-012 | 3人对话 | 3个发言人 | speakers=[张三,李四,王五] |
+| TC-WF-013 | 原始文本保留 | 含特殊字符 | raw_text=原始输入 |
+| TC-WF-014 | 512KB文本 | 大文本 | 正确解析 |
+
+---
+
 ## 12. 测试数据准备
 
 ### 12.1 名片测试数据（10张）
@@ -4620,11 +4734,13 @@ PM初审 → 通过？ → 提交Arch复审
 *② 新增§11 Insight Engine + Security + Concern/Capability测试（10个用例: TC-IE-001~005 + TC-SEC-101~103 + TC-CC-001~002）*
 *③ 原§11~§15重编号为§12~§16*
 
-*v2.6更新于2026-06-06，主要变更：*
-*① 版本号v2.5→v2.6*
-*② 新增§11.4 DependencyAnalyzer测试用例6个（TC-DA-001~006: 非promise/help得分=0 + 直接依赖链 + 间接依赖链 + MAX_DEPTH截断 + 多链累加 + 得分范围）*
-*③ 新增§11.5 ContextMatcher测试用例5个（TC-CM-001~005: 无关联实体得分=0 + 即将meeting提升 + 远期事件低分 + 非meeting/call忽略 + 得分范围）*
-*④ 新增§11.6 PriorityScorerV2集成测试用例2个（TC-PS-001~002: 四维评分公式 + Pipeline Step 8.5集成）*
-*⑤ 新增§11.7 EmbeddingProvider测试用例3个（TC-EM-001~003: 正确维度向量(API 768/本地384) + 缓存命中 + 批量嵌入）*
-*⑥ 新增§11.8 SemanticSearchEngine测试用例4个（TC-SS-001~004: Entity索引存储 + Event索引存储 + 语义搜索排序 + 用户数据隔离）*
-*⑦ 新增§11.9 关联发现语义增强测试用例3个（TC-AE-001~003: 结构化匹配为0时语义降级 + 混合评分公式 + Embedding不可用时优雅降级）*
+*v2.8更新于2026-06-07，主要变更：*
+*① 版本号v2.7→v2.8*
+*② 新增§11.10 CSV导入测试用例15个（TC-CSV-001~015: 标准导入+编码+合并+错误+限制）*
+*③ 新增§11.11 数据导出测试用例8个（TC-EXP-001~008: JSON全量+序列化+隔离+脱敏）*
+*④ 新增§11.12 需求录入测试用例10个（TC-DM-001~010: LLM提取+fallback+concern追加+orphan）*
+*⑤ 新增§11.13 资源透支检测测试用例10个（TC-RO-001~010: 阈值+severity+窗口+去重+独立）*
+*⑥ 新增§11.14 语音查询测试用例10个（TC-VQ-001~010: 意图识别+数据查询+NLG+延迟）*
+*⑦ 新增§11.15 EmailAdapter测试用例10个（TC-EM-001~010: 连接+解析+过滤+注册表）*
+*⑧ 新增§11.16 WeChatForwardAdapter测试用例14个（TC-WF-001~014: 群聊+单聊+降级+Event创建）*
+*⑨ 新增测试用例总计: 15+8+10+10+10+10+14=77个*
