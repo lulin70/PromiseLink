@@ -22,7 +22,7 @@ import os
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
@@ -190,7 +190,7 @@ class NullMemoryProvider:
             entry_id=str(uuid.uuid4()),
             event_id=event_id,
             raw_text=raw_text,
-            stored_at=datetime.utcnow(),
+            stored_at=datetime.now(UTC),
             metadata=metadata or {},
             entity_ids=entity_ids or [],
             summary=summary,
@@ -278,7 +278,7 @@ class FileStoreProvider:
         summary: str = "",
     ) -> MemoryEntry:
         entry_id = str(uuid.uuid4())
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
 
         entry = MemoryEntry(
             entry_id=entry_id,
@@ -470,7 +470,7 @@ class CarryMemProvider:
     ) -> MemoryEntry:
         client = await self._get_client()
         entry_id = str(uuid.uuid4())
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
 
         payload = {
             "entry_id": entry_id,
@@ -573,7 +573,7 @@ class CarryMemProvider:
                         event_id=item.get("event_id", ""),
                         raw_text=item.get("raw_text", ""),
                         stored_at=datetime.fromisoformat(
-                            item.get("stored_at", datetime.utcnow().isoformat())
+                            item.get("stored_at", datetime.now(UTC).isoformat())
                         ),
                         metadata=item.get("metadata", {}),
                         entity_ids=item.get("entity_ids", []),

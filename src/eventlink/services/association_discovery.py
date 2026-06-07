@@ -25,7 +25,7 @@ Cold types (computed on read):
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import and_, select, func as sqlfunc
@@ -383,7 +383,7 @@ class AssociationDiscoveryEngine:
         result = await self.session.execute(stmt)
         associations = list(result.scalars().all())
 
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         updated = 0
 
         for assoc in associations:
@@ -1188,7 +1188,7 @@ class AssociationDiscoveryEngine:
             source_event_id=event_id or str(source_entity.source_event_id or ""),
             properties={
                 "evidence": assoc_data["evidence"],
-                "discovered_at": datetime.utcnow().isoformat(),
+                "discovered_at": datetime.now(UTC).isoformat(),
                 "discovered_by": "AssociationDiscoveryEngine",
             },
         )

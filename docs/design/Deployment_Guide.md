@@ -1,7 +1,7 @@
 # EventLink 部署指南
 
-> **版本**: 0.4.0（POC阶段 — Insight Engine + 依赖性/场景匹配 + 语义搜索 部署）
-> **日期**: 2026-06-06
+> **版本**: 0.4.1（POC阶段 — Insight Engine + 依赖性/场景匹配 + 语义搜索 + EmailAdapter/CSV导入 部署）
+> **日期**: 2026-06-07
 > **定位**: AI驱动的个人商务关系经营助手 — 先成就关系，再促成合作
 > **参考**: 技术设计 v2.5 §9（部署架构与数据主权）、§8.0.5（监控指标）、§8.0.6（数据库迁移策略）
 > **技术栈**: Python 3.11 / FastAPI / httpx async / Pydantic v2
@@ -1842,6 +1842,119 @@ psql -c "CREATE INDEX idx_vec_cosine ON vector_embeddings
 | 索引构建 | `EXPLAIN ANALYZE SELECT ... ORDER BY embedding <=> ...` | 使用索引扫描 |
 | 功能验证 | `POST /api/v1/search/semantic` | search_method="pgvector" |
 
+### 12.10 EmailAdapter IMAP配置 [0.4.1新增]
+
+> **对应功能**: F-36 EmailAdapter邮件同步（PRD §5.17.2）
+> **依赖**: Python标准库 imaplib + email，无额外系统依赖
+
+**IMAP连接配置**:
+
+| 参数 | 环境变量 | 默认值 | 说明 |
+|------|---------|--------|------|
+| IMAP主机 | `EMAIL_IMAP_HOST` | — | 如 imap.gmail.com |
+| IMAP端口 | `EMAIL_IMAP_PORT` | 993 | SSL默认993，非SSL为143 |
+| 邮箱地址 | `EMAIL_ADDRESS` | — | 用户邮箱地址 |
+| 应用密码 | `EMAIL_APP_PASSWORD` | — | 应用专用密码（非登录密码） |
+| 使用SSL | `EMAIL_USE_SSL` | true | Phase 1强制SSL |
+| 收件箱 | `EMAIL_FOLDER` | INBOX | 默认收件箱 |
+
+**常见邮箱IMAP配置**:
+
+| 邮箱 | IMAP主机 | 端口 | 认证方式 |
+|------|---------|------|---------|
+| Gmail | imap.gmail.com | 993 | 应用密码（需开启2FA） |
+| Outlook/Hotmail | outlook.office365.com | 993 | 应用密码 |
+| QQ邮箱 | imap.qq.com | 993 | 授权码 |
+| 163邮箱 | imap.163.com | 993 | 授权码 |
+
+**Docker Compose配置**:
+
+```yaml
+# docker-compose.poc.yml 追加
+services:
+  eventlink:
+    environment:
+      - EMAIL_IMAP_HOST=${EMAIL_IMAP_HOST:-}
+      - EMAIL_IMAP_PORT=${EMAIL_IMAP_PORT:-993}
+      - EMAIL_ADDRESS=${EMAIL_ADDRESS:-}
+      - EMAIL_APP_PASSWORD=${EMAIL_APP_PASSWORD:-}
+      - EMAIL_USE_SSL=${EMAIL_USE_SSL:-true}
+      - EMAIL_FOLDER=${EMAIL_FOLDER:-INBOX}
+```
+
+**同步频率**: Phase 1每15分钟同步一次（复用§12.3 APScheduler配置）。
+
+**安全注意事项**:
+- 应用密码存储在 `.env` 文件中，不提交Git
+- Phase 1使用应用密码，OAuth2推迟到Phase 2
+- IMAP连接强制SSL/TLS
+
+**验证命令**:
+
+```bash
+# 验证IMAP连接
+curl -s http://localhost:8000/api/v1/email/sync \
+  -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"imap_host":"imap.gmail.com","email":"user@gmail.com","password":"app-password"}'
+```
+
+### 12.11 CSV导入文件大小限制配置 [0.4.1新增]
+
+> **对应功能**: F-08 CSV导入（PRD §5.17.1）
+> **依赖**: Python标准库 csv，无额外系统依赖
+
+**文件大小限制**:
+
+| 参数 | 环境变量 | 默认值 | 说明 |
+|------|---------|--------|------|
+| 最大文件大小 | `CSV_MAX_FILE_SIZE_MB` | 10 | 单次导入CSV文件最大MB |
+| 最大行数 | `CSV_MAX_ROWS` | 5000 | 单次导入最大行数 |
+
+**CSV格式要求**:
+
+| 要求 | 说明 |
+|------|------|
+| 必需列 | `name`（姓名） |
+| 可选列 | company, title, phone, email, wechat, concern, capability |
+| 编码 | UTF-8优先，自动降级GBK |
+| 分隔符 | 逗号（标准CSV） |
+| 首行 | 必须为列名头 |
+
+**Nginx上传限制**（Phase 1）:
+
+```nginx
+# nginx.conf 追加
+client_max_body_size 10m;  # 与CSV_MAX_FILE_SIZE_MB对齐
+```
+
+**FastAPI文件上传配置**:
+
+```python
+# 已在 import_csv.py 中实现
+# UploadFile 默认无大小限制，由 Nginx 层控制
+```
+
+**导入性能预估**:
+
+| 行数 | 预估耗时 | 说明 |
+|------|---------|------|
+| 100 | < 2s | 含EntityResolution |
+| 500 | < 8s | 含EntityResolution |
+| 1000 | < 15s | 含EntityResolution |
+| 5000 | < 60s | 含EntityResolution，建议异步 |
+
+**验证命令**:
+
+```bash
+# 验证CSV导入
+curl -s http://localhost:8000/api/v1/import/csv \
+  -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@contacts.csv"
+```
+
 ---
 
 ## 版本历史
@@ -1854,10 +1967,11 @@ psql -c "CREATE INDEX idx_vec_cosine ON vector_embeddings
 | **0.3.0** | **2026-06-06** | **DevSquad Review更新 — Insight Engine部署：①§12.1 优先级评分定时任务(PoC: cron每小时执行recalculate_scores脚本 + Phase1: Celery Beat/APScheduler方案对比+推荐APScheduler) ②§12.2 pgcrypto扩展Phase1(CREATE EXTENSION安装+验证+Alembic迁移脚本006+AES-256-GCM加密策略+ENCRYPTION_KEY安全注入) ③§12.3 Adapter同步任务Phase1(Email每15分钟/Calendar每30分钟+后台Worker配置+APScheduler集成+速率限制) ④§12.4 监控指标4项(eventlink_priority_score_calculations_total/eventlink_implicit_feedback_adjustments_total/eventlink_adapter_sync_duration_seconds/eventlink_adapter_sync_errors_total+Prometheus查询示例+Grafana面板建议)** |
 | **0.3.1** | **2026-06-06** | **F-55/F-56 依赖性与场景匹配部署：①§12.5 DependencyAnalyzer部署[0.3.1新增](纯Python算法+SQL查询+无额外容器/无额外cron/无外部依赖+性能预估<500ms) ②§12.6 ContextMatcher部署[0.3.1新增](Event表索引优化CREATE INDEX idx_events_context ON events(user_id,event_type,created_at)+Alembic迁移脚本007+索引效果预估+纯Python算法无额外容器) ③§12.7 PriorityScorerV2定时评分任务[0.3.1新增](复用现有cron每小时整点+recalculate_scores脚本升级为V2四维评分+降级策略回退PoC公式)** | **DevSquad** |
 | **0.4.0** | **2026-06-06** | **F-57/F-58 语义搜索与关联发现增强部署：①§12.8 EmbeddingProvider部署[0.4.0新增] — 12.8.1 sqlite-vec安装(pip install sqlite-vec+安装验证清单+自动降级) 12.8.2 API Key配置(复用LLM_API_KEY+curl验证命令) 12.8.3 缓存策略(PoC内存dict重启清空/Phase1 Redis TTL=7天) ②§12.9 SemanticSearchEngine部署[0.4.0新增] — 12.9.1 索引构建(Pipeline自动触发+手动reindex API+性能预估100条~10s) 12.9.2 降级模式(sqlite-vec不可用时Python余弦相似度+性能对比5ms vs 50ms) 12.9.3 Phase2迁移(pgvector+IVFFlat索引+迁移检查清单)** | **DevSquad** |
+| **0.4.1** | **2026-06-07** | **F-08/F-36 EmailAdapter/CSV导入部署：①§12.10 EmailAdapter IMAP配置[0.4.1新增] — IMAP连接参数6项环境变量+常见邮箱配置表(Gmail/Outlook/QQ/163)+Docker Compose配置+SSL强制+Phase1应用密码/Phase2 OAuth2+同步频率15分钟+验证命令 ②§12.11 CSV导入文件大小限制配置[0.4.1新增] — 文件大小10MB/行数5000限制+CSV格式要求5项+Nginx上传限制对齐+导入性能预估4档+验证命令** | **DevSquad** |
 
 ---
 
-> **文档状态**: ✅ 0.4.0 POC阶段版本完成（Insight Engine + 依赖性/场景匹配 + 语义搜索 部署）
+> **文档状态**: ✅ 0.4.1 POC阶段版本完成（Insight Engine + 依赖性/场景匹配 + 语义搜索 + EmailAdapter/CSV导入 部署）
 > **下次审查**: Phase1开发启动前 / CI/CD CD部分上线前
 > **维护负责人**: DevSquad架构师
 > **适用阶段**: PoC（当前）→ Phase1（下一里程碑）

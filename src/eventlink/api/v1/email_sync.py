@@ -5,11 +5,11 @@ Fetches unread emails from IMAP and creates Events in the pipeline.
 """
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from eventlink.core.auth import get_optional_user_id
@@ -32,8 +32,8 @@ class EmailSyncRequest(BaseModel):
     port: int = Field(default=993, description="IMAP port")
     use_ssl: bool = Field(default=True, description="Use SSL/TLS connection")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "imap_host": "imap.gmail.com",
                 "email": "user@gmail.com",
@@ -43,6 +43,7 @@ class EmailSyncRequest(BaseModel):
                 "use_ssl": True,
             }
         }
+    )
 
 
 class EmailSyncResponse(BaseModel):
@@ -103,7 +104,7 @@ async def sync_emails(
                     source="email",
                     title=raw_event.title or "(无主题)",
                     raw_text=raw_event.raw_text,
-                    timestamp=raw_event.occurred_at or datetime.utcnow(),
+                    timestamp=raw_event.occurred_at or datetime.now(UTC),
                     metadata_=raw_event.metadata,
                     status="pending",
                 )

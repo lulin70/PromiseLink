@@ -5,7 +5,7 @@ States: pending, in_progress, snoozed, done, dismissed
 Transitions with side effects (feedback, completed_at, snooze scheduling).
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional
 
 from sqlalchemy import select
@@ -86,7 +86,7 @@ class TodoStateMachine:
 
         old_status = todo.status
         todo.status = new_status
-        todo.updated_at = datetime.utcnow()
+        todo.updated_at = datetime.now(UTC)
 
         # ── Side Effects ──
 
@@ -96,7 +96,7 @@ class TodoStateMachine:
             await self._schedule_recovery(todo, old_status, snoozed_until)
 
         if new_status == "done":
-            todo.completed_at = datetime.utcnow()
+            todo.completed_at = datetime.now(UTC)
             todo.feedback = feedback or "useful"
 
         if new_status == "dismissed":
@@ -121,7 +121,7 @@ class TodoStateMachine:
         Returns:
             Number of recovered todos.
         """
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         stmt = select(SnoozeSchedule).where(SnoozeSchedule.recover_at <= now)
         result = await self.session.execute(stmt)
         schedules = list(result.scalars().all())
@@ -135,7 +135,7 @@ class TodoStateMachine:
             todo = await self.session.get(Todo, todo_id)
             if todo and todo.status == "snoozed":
                 todo.status = original_status
-                todo.updated_at = datetime.utcnow()
+                todo.updated_at = datetime.now(UTC)
                 recovered += 1
                 logger.info(
                     "snooze_recovered",

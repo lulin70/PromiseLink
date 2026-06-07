@@ -1,7 +1,7 @@
 """Event endpoints for receiving and managing input events."""
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -33,8 +33,8 @@ class EventCreateRequest(BaseModel):
     raw_text: str | None = Field(default=None, description="Raw text content (max 500KB)")
     metadata: dict[str, Any] | None = Field(default=None, description="Additional metadata")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "event_type": "card_save",
                 "source": "iamhere_app",
@@ -47,6 +47,7 @@ class EventCreateRequest(BaseModel):
                 }
             }
         }
+    )
 
 
 class EventResponse(BaseModel):
@@ -61,8 +62,7 @@ class EventResponse(BaseModel):
     status: str
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EventDetailResponse(EventResponse):
@@ -127,7 +127,7 @@ async def create_event(
         event_type=request.event_type,
         source=request.source,
         title=request.title,
-        timestamp=request.timestamp or datetime.utcnow(),
+        timestamp=request.timestamp or datetime.now(UTC),
         raw_text=request.raw_text,
         metadata_=request.metadata,
         status="pending",
