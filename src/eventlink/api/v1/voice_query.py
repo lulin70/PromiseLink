@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from eventlink.core.auth import get_optional_user_id
+from eventlink.core.auth import get_current_user_id
 from eventlink.core.logging import get_logger, new_request_id
 from eventlink.database import get_async_session
 from eventlink.services.llm_client import LLMClient
@@ -55,7 +55,7 @@ class VoiceQueryResponse(BaseModel):
 async def voice_query(
     body: VoiceQueryRequest,
     session: AsyncSession = Depends(get_async_session),
-    auth_user_id: str = Depends(get_optional_user_id),
+    auth_user_id: str = Depends(get_current_user_id),
 ) -> VoiceQueryResponse:
     """Process a voice query: classify intent, query DB, generate NLG response.
 

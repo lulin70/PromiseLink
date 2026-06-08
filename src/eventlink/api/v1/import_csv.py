@@ -11,7 +11,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from eventlink.core.auth import get_optional_user_id
+from eventlink.core.auth import get_current_user_id
 from eventlink.core.logging import get_logger, new_request_id
 from eventlink.database import get_async_session
 from eventlink.models.entity import Entity
@@ -108,7 +108,7 @@ def _build_entity_data(row: dict) -> dict:
 async def import_csv(
     file: UploadFile,
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ):
     """Import entities from a CSV file.
 

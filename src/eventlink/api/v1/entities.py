@@ -8,8 +8,9 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from eventlink.api.dependencies import rate_limit_dependency
 from eventlink.api.v1.schemas import PaginatedResponse
-from eventlink.core.auth import get_optional_user_id
+from eventlink.core.auth import get_current_user_id
 from eventlink.core.crypto import decrypt_pii_in_properties, encrypt_pii_in_properties
 from eventlink.core.logging import get_logger, new_request_id
 from eventlink.database import get_async_session
@@ -19,7 +20,7 @@ from eventlink.models.todo import Todo
 from eventlink.models.association import Association
 
 logger = get_logger("eventlink.api.entities")
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(rate_limit_dependency)])
 
 
 # ── Pydantic Models ──
@@ -63,7 +64,7 @@ async def list_entities(
     limit: int = 100,
     offset: int = 0,
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ):
     """List entities with optional filtering and pagination."""
     new_request_id()
@@ -105,7 +106,7 @@ async def list_entities(
 async def get_entity(
     entity_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ):
     """Get detailed information about a specific entity."""
     new_request_id()
@@ -133,7 +134,7 @@ async def update_entity(
     entity_id: uuid.UUID,
     request: EntityUpdateRequest,
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ):
     """Update an entity's fields."""
     new_request_id()
@@ -174,7 +175,7 @@ async def update_entity(
 async def delete_entity(
     entity_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ):
     """Delete an entity and its associations."""
     new_request_id()
@@ -259,7 +260,7 @@ class EntityHistoryResponse(BaseModel):
 async def get_entity_history(
     entity_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ):
     """Get the complete interaction history for a specific entity.
 

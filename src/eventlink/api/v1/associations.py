@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from eventlink.api.v1.schemas import PaginatedResponse
-from eventlink.core.auth import get_optional_user_id
+from eventlink.core.auth import get_current_user_id
 from eventlink.core.logging import get_logger, new_request_id
 from eventlink.database import get_async_session
 from eventlink.models.association import Association
@@ -47,7 +47,7 @@ async def list_associations(
     limit: int = 20,
     offset: int = 0,
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ):
     """List associations with optional filtering."""
     new_request_id()

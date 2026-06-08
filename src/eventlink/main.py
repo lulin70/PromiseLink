@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from eventlink.api.v1 import associations, auth, dashboard, demand_input, email_sync, entities, events, export, health, import_csv, relationship_briefs, todos, voice, voice_query, wechat_forward
+from eventlink.api.v1 import associations, auth, dashboard, demand_input, email_sync, entities, events, export, health, import_csv, media, privacy, relationship_briefs, todos, voice, voice_query, wechat_forward
 from eventlink.config import get_settings
 from eventlink.core.exceptions import BusinessError, EventLinkError, LLMError
 from eventlink.database import close_db, init_db
@@ -139,6 +139,8 @@ app.include_router(export.router, prefix=settings.api_prefix, tags=["Export"])
 app.include_router(import_csv.router, prefix=settings.api_prefix, tags=["Import"])
 app.include_router(email_sync.router, prefix=settings.api_prefix, tags=["Email"])
 app.include_router(wechat_forward.router, prefix=settings.api_prefix, tags=["WeChatForward"])
+app.include_router(media.router, prefix=settings.api_prefix, tags=["Media"])
+app.include_router(privacy.router, prefix=settings.api_prefix, tags=["Privacy"])
 
 
 @app.get("/")

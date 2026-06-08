@@ -14,7 +14,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from eventlink.core.auth import get_optional_user_id
+from eventlink.api.dependencies import rate_limit_llm_dependency
+from eventlink.core.auth import get_current_user_id
 from eventlink.core.logging import get_logger, new_request_id
 from eventlink.database import get_async_session
 from eventlink.models.voice_session import VoiceSession, VoiceTurn
@@ -22,7 +23,7 @@ from eventlink.services.llm_client import LLMClient
 from eventlink.services.nlu_intent_classifier import NLUIntentClassifier, VoiceIntent
 
 logger = get_logger("eventlink.api.voice")
-router = APIRouter(prefix="/voice", tags=["Voice"])
+router = APIRouter(prefix="/voice", tags=["Voice"], dependencies=[Depends(rate_limit_llm_dependency)])
 
 
 # ── Pydantic Models ──
@@ -79,7 +80,7 @@ class VoiceSessionListResponse(BaseModel):
 async def create_voice_session(
     body: VoiceSessionRequest,
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ) -> VoiceSessionResponse:
     """Create a new voice session with NLU classification.
 
@@ -151,7 +152,7 @@ async def list_voice_sessions(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ) -> VoiceSessionListResponse:
     """List the current user's voice sessions with pagination."""
     new_request_id()
@@ -201,7 +202,7 @@ async def list_voice_sessions(
 )
 async def delete_voice_sessions(
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ) -> dict:
     """Delete all voice data for the current user (GDPR compliance)."""
     new_request_id()

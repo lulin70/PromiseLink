@@ -14,6 +14,7 @@ router = APIRouter()
 
 class LoginRequest(BaseModel):
     user_id: str  # PoC阶段：直接用user_id登录，Phase 1改为微信登录
+    poc_secret: str = Field(default="", description="PoC环境专用密钥，生产环境禁用此端点")
 
 
 class LoginResponse(BaseModel):
@@ -24,7 +25,13 @@ class LoginResponse(BaseModel):
 
 @router.post("/auth/login", response_model=LoginResponse)
 async def login(request: LoginRequest):
-    """PoC login: 直接用user_id获取token。Phase 1改为微信OAuth。"""
+    """PoC login: 需要poc_secret验证。生产环境应禁用此端点，使用微信OAuth。"""
+    import os
+    poc_secret = os.environ.get("EVENTLINK_POC_SECRET", "")
+    if not poc_secret:
+        raise HTTPException(status_code=403, detail="PoC login is disabled. Use /auth/wechat/login.")
+    if request.poc_secret != poc_secret:
+        raise HTTPException(status_code=401, detail="Invalid PoC secret")
     token = create_access_token(request.user_id)
     return LoginResponse(access_token=token, user_id=request.user_id)
 

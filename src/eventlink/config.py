@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
+    poc_anonymous_access: bool = Field(default=False, description="PoC only: allow unauthenticated access with default user")
 
     # LLM Provider
     llm_provider: str = "moka_ai"  # anthropic, openai, moka_ai
@@ -84,6 +85,19 @@ class Settings(BaseSettings):
     # Opportunity Matching
     opportunity_match_strong_threshold: float = 0.80
     opportunity_match_potential_threshold: float = 0.60
+
+    # Media Services (ASR/TTS/OCR)
+    asr_provider: str = "moka_ai"
+    tts_provider: str = "moka_ai"
+    ocr_provider: str = "moka_ai"
+    media_max_audio_size_mb: int = 25
+    media_max_image_size_mb: int = 10
+
+    # Rate Limiting
+    rate_limit_enabled: bool = True
+    rate_limit_authenticated: int = 60
+    rate_limit_unauthenticated: int = 10
+    rate_limit_llm: int = 20
 
     # Performance
     max_workers: int = 4

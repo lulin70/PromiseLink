@@ -16,12 +16,19 @@ PII_PREFIX = "enc:"  # Prefix to identify encrypted values
 
 
 def _derive_key() -> bytes:
-    """Derive a 256-bit key from secret_key using PBKDF2."""
+    """Derive a 256-bit key from secret_key using PBKDF2.
+
+    Uses secret_key as salt source (deterministic per deployment but unique per instance).
+    Each deployment with a different secret_key produces a different derived key.
+    """
     settings = get_settings()
+    # Use secret_key as both password and salt source — deterministic per deployment,
+    # but unique per instance (unlike a hardcoded salt shared across all deployments)
+    salt = hashlib.sha256(settings.secret_key.encode()).digest()
     return hashlib.pbkdf2_hmac(
         "sha256",
         settings.secret_key.encode(),
-        b"eventlink-pii-salt",  # Fixed salt for deterministic key derivation
+        salt,
         100_000,
     )
 

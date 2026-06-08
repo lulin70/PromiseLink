@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from eventlink.api.v1.schemas import PaginatedResponse
-from eventlink.core.auth import get_optional_user_id
+from eventlink.core.auth import get_current_user_id
 from eventlink.core.logging import get_logger, new_request_id
 from eventlink.database import get_async_session
 from eventlink.models.entity import Entity
@@ -235,7 +235,7 @@ class RelationshipBriefAggregatedResponse(BaseModel):
 async def get_relationship_brief(
     entity_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ):
     """Get the relationship progress tracking card for a specific person entity."""
     new_request_id()
@@ -257,7 +257,7 @@ async def get_relationship_brief(
 async def get_relationship_brief_aggregated(
     entity_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ):
     """Get aggregated relationship brief with structured 12-module view.
 
@@ -391,7 +391,7 @@ async def list_relationship_briefs(
     limit: int = 50,
     offset: int = 0,
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ):
     """List all relationship briefs for the current user.
 
@@ -422,7 +422,7 @@ async def update_relationship_brief(
     brief_id: uuid.UUID,
     body: UpdateRelationshipBriefRequest,
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ):
     """Partially update a relationship brief with optimistic locking.
 

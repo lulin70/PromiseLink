@@ -19,6 +19,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
+from eventlink.core.auth import get_current_user_id
 from eventlink.database import Base, get_async_session
 from eventlink.main import app
 from eventlink.models.association import Association
@@ -82,6 +83,7 @@ async def client(db_session):
         yield db_session
 
     app.dependency_overrides[get_async_session] = override_get_async_session
+    app.dependency_overrides[get_current_user_id] = lambda: TEST_USER_ID
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

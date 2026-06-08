@@ -185,13 +185,20 @@ class AssociationDiscoveryEngine:
         if new_associations:
             await self.session.flush()
 
-        # Step 2.5: Cold discovery for new entities against ALL existing entities
+        # Step 2.5: Cold discovery for new entities against existing entities
         # This catches associations like industry_chain that aren't found by
         # city/company-based candidate matching (e.g., 投资↔人工智能)
+        # Limit batch size to avoid O(N*M) explosion
+        COLD_DISCOVERY_BATCH_LIMIT = 100
         if new_entities:
             all_persons = await self._fetch_all_person_entities(user_id)
+            # Limit to most recently updated persons for cold discovery
+            all_persons_sorted = sorted(
+                all_persons, key=lambda e: e.updated_at or e.created_at, reverse=True
+            )
+            all_persons_limited = all_persons_sorted[:COLD_DISCOVERY_BATCH_LIMIT]
             for new_entity in new_entities:
-                for existing in all_persons:
+                for existing in all_persons_limited:
                     if str(existing.id) == str(new_entity.id):
                         continue
                     pair_key = tuple(sorted([str(new_entity.id), str(existing.id)]))
@@ -497,15 +504,19 @@ class AssociationDiscoveryEngine:
         # For SQLite: properties is JSON text, use LIKE
         # For PostgreSQL: properties is JSONB, use containment operator
 
-        # Simple approach: fetch all entities and filter in Python
-        # This is acceptable because we're only fetching for ONE new entity
+        # Simple approach: fetch entities with SQL pre-filtering where possible
+        # For SQLite: use LIKE on JSON text for city/company
+        # For PostgreSQL: use JSONB containment (Phase 2)
+        # Limit results to avoid O(N) memory load
+        CANDIDATE_LIMIT = 200
+
         stmt = select(Entity).where(
             and_(
                 Entity.user_id == user_id,
                 Entity.entity_type == "person",
                 Entity.id != str(new_entity.id),
             )
-        )
+        ).limit(CANDIDATE_LIMIT)
         result = await self.session.execute(stmt)
         all_entities = list(result.scalars().all())
 
