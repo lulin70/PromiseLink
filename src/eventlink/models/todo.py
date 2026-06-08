@@ -108,6 +108,15 @@ class Todo(Base):
     dynamic_score: Mapped[float | None] = mapped_column(nullable=True)
     score_calculated_at: Mapped[datetime | None] = mapped_column()
 
+    # F-59: User priority override (v4.6)
+    priority_override: Mapped[str | None] = mapped_column(
+        String(10), nullable=True, comment="User-set priority: high/medium/low, null=use AI score"
+    )
+    priority_source: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="ai", server_default="ai",
+        comment="Priority source: ai or user"
+    )
+
     # F-52: Implicit feedback tracking (v4.5)
     completed_rank: Mapped[int | None] = mapped_column(nullable=True)
 
@@ -142,6 +151,14 @@ class Todo(Base):
         CheckConstraint(
             "completed_rank IS NULL OR completed_rank >= 0",
             name="completed_rank_check",
+        ),
+        CheckConstraint(
+            "priority_override IS NULL OR priority_override IN ('high', 'medium', 'low')",
+            name="priority_override_check",
+        ),
+        CheckConstraint(
+            "priority_source IN ('ai', 'user')",
+            name="priority_source_check",
         ),
     )
 

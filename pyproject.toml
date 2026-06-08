@@ -1,6 +1,6 @@
 [project]
 name = "eventlink"
-version = "0.3.0"
+version = "0.4.8"
 description = "AI-driven personal business relationship management assistant (EventLink)"
 authors = [{name = "CarryMem Team", email = "team@carrymem.com"}]
 readme = "README.md"
@@ -68,3 +68,6 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "--cov=eventlink --cov-report=term-missing --cov-report=html"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]

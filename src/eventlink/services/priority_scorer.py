@@ -42,6 +42,10 @@ URGENCY_NO_DUE = 0.3        # no due date
 W_URGENCY = 0.4
 W_IMPORTANCE = 0.6
 
+# Score version identifiers
+SCORE_VERSION_POC = "poc_v1"
+SCORE_VERSION_PHASE1 = "phase1_v1"
+
 
 @dataclass
 class PriorityScore:
@@ -52,11 +56,51 @@ class PriorityScore:
     breakdown: dict[str, Any]  # detailed breakdown for audit
 
 
+async def _write_audit_log(
+    session,
+    todo,
+    old_score: float | None,
+    new_score: float,
+    score_version: str,
+    calculated_by: str,
+    triggered_by: str,
+    calculation_factors: dict[str, Any],
+) -> None:
+    """Write a ScoreAuditLog entry for a score change.
+
+    Args:
+        session: AsyncSession for committing changes
+        todo: Todo ORM instance
+        old_score: Previous dynamic_score (may be None on first calculation)
+        new_score: Newly calculated score
+        score_version: Model version tag (poc_v1 / phase1_v1)
+        calculated_by: Scorer class name
+        triggered_by: What triggered this recalculation
+        calculation_factors: Detailed breakdown dict
+    """
+    from eventlink.models.score_audit_log import ScoreAuditLog
+
+    audit_entry = ScoreAuditLog(
+        todo_id=todo.id,
+        user_id=todo.user_id,
+        old_score=old_score,
+        new_score=new_score,
+        score_version=score_version,
+        calculation_factors=calculation_factors,
+        calculated_by=calculated_by,
+        triggered_by=triggered_by,
+    )
+    session.add(audit_entry)
+
+
 class PriorityScorer:
     """Calculate dynamic priority scores for Todos.
 
     Two-dimensional model: Score = 0.4 × urgency + 0.6 × importance
     """
+
+    SCORE_VERSION = SCORE_VERSION_POC
+    CALCULATED_BY = "PriorityScorer"
 
     def calculate(
         self,
@@ -141,6 +185,8 @@ class PriorityScorer:
     async def score_and_update_todo(self, todo, session) -> float:
         """Score a Todo ORM object and update its dynamic_score field.
 
+        Also writes a ScoreAuditLog entry for traceability.
+
         Args:
             todo: Todo ORM instance
             session: AsyncSession for committing changes
@@ -154,9 +200,22 @@ class PriorityScorer:
             priority=todo.priority,
         )
 
+        old_score = todo.dynamic_score
         todo.dynamic_score = result.score
         # Also store score_calculated_at
         todo.score_calculated_at = datetime.now(timezone.utc)
+
+        # Write audit log
+        await _write_audit_log(
+            session=session,
+            todo=todo,
+            old_score=old_score,
+            new_score=result.score,
+            score_version=self.SCORE_VERSION,
+            calculated_by=self.CALCULATED_BY,
+            triggered_by="scorer_update",
+            calculation_factors=result.breakdown,
+        )
 
         await session.commit()
 
@@ -173,6 +232,8 @@ class PriorityScorer:
     async def batch_score_todos(self, todos, session) -> list[PriorityScore]:
         """Score multiple todos in batch.
 
+        Also writes ScoreAuditLog entries for each todo.
+
         Args:
             todos: List of Todo ORM instances
             session: AsyncSession
@@ -187,8 +248,22 @@ class PriorityScorer:
                 due_date=todo.due_date,
                 priority=todo.priority,
             )
+            old_score = todo.dynamic_score
             todo.dynamic_score = result.score
             todo.score_calculated_at = datetime.now(timezone.utc)
+
+            # Write audit log
+            await _write_audit_log(
+                session=session,
+                todo=todo,
+                old_score=old_score,
+                new_score=result.score,
+                score_version=self.SCORE_VERSION,
+                calculated_by=self.CALCULATED_BY,
+                triggered_by="scorer_update",
+                calculation_factors=result.breakdown,
+            )
+
             results.append(result)
 
         await session.commit()
@@ -214,6 +289,9 @@ class PriorityScorerV2(PriorityScorer):
 
     Score = 0.3×urgency + 0.35×importance + 0.2×dependency + 0.15×context
     """
+
+    SCORE_VERSION = SCORE_VERSION_PHASE1
+    CALCULATED_BY = "PriorityScorerV2"
 
     WEIGHTS_PHASE1 = {
         "urgency": 0.3,
@@ -283,8 +361,50 @@ class PriorityScorerV2(PriorityScorer):
             },
         )
 
+    async def score_and_update_todo_v2(self, todo, session) -> float:
+        """Score a Todo with four-dimensional model and update + audit log.
+
+        Args:
+            todo: Todo ORM instance
+            session: AsyncSession for committing changes
+
+        Returns:
+            The calculated dynamic_score
+        """
+        result = await self.score_with_context(todo, session)
+
+        old_score = todo.dynamic_score
+        todo.dynamic_score = result.score
+        todo.score_calculated_at = datetime.now(timezone.utc)
+
+        # Write audit log
+        await _write_audit_log(
+            session=session,
+            todo=todo,
+            old_score=old_score,
+            new_score=result.score,
+            score_version=self.SCORE_VERSION,
+            calculated_by=self.CALCULATED_BY,
+            triggered_by="scorer_update",
+            calculation_factors=result.breakdown,
+        )
+
+        await session.commit()
+
+        logger.info(
+            "phase1_priority_scored",
+            todo_id=str(todo.id),
+            score=result.score,
+            urgency=result.urgency,
+            importance=result.importance,
+        )
+
+        return result.score
+
     async def batch_score_with_context(self, todos, session) -> list[PriorityScore]:
         """Score multiple todos with four-dimensional model.
+
+        Also writes ScoreAuditLog entries for each todo.
 
         Args:
             todos: List of Todo ORM instances
@@ -296,8 +416,22 @@ class PriorityScorerV2(PriorityScorer):
         results = []
         for todo in todos:
             result = await self.score_with_context(todo, session)
+            old_score = todo.dynamic_score
             todo.dynamic_score = result.score
             todo.score_calculated_at = datetime.now(timezone.utc)
+
+            # Write audit log
+            await _write_audit_log(
+                session=session,
+                todo=todo,
+                old_score=old_score,
+                new_score=result.score,
+                score_version=self.SCORE_VERSION,
+                calculated_by=self.CALCULATED_BY,
+                triggered_by="scorer_update",
+                calculation_factors=result.breakdown,
+            )
+
             results.append(result)
 
         await session.commit()

@@ -972,3 +972,323 @@ class TestAPIAggregatedBrief:
             f"/api/v1/persons/{fake_id}/relationship-brief/aggregated"
         )
         assert response.status_code == 404
+
+
+# ── Additional Coverage Tests ──────────────────────────────────
+
+
+class TestGetAssociationsForEntity:
+    """Test _get_associations_for_entity hot and cold discovery."""
+
+    @pytest.mark.asyncio
+    async def test_get_associations_for_entity_hot(self, db_session: AsyncSession):
+        """Test hot association query returns correct associations."""
+        service = RelationshipBriefService(db_session)
+        user_id = make_user_id()
+
+        # Create event + entities
+        event = Event(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            event_type="manual",
+            source="test",
+            title="dummy",
+            status="completed",
+        )
+        db_session.add(event)
+        await db_session.flush()
+
+        entity_a = Entity(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            entity_type="person",
+            name="实体A",
+            canonical_name="实体A",
+            source_event_id=str(event.id),
+        )
+        entity_b = Entity(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            entity_type="person",
+            name="实体B",
+            canonical_name="实体B",
+            source_event_id=str(event.id),
+        )
+        db_session.add_all([entity_a, entity_b])
+        await db_session.flush()
+
+        from eventlink.models.association import Association
+
+        assoc = Association(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            source_entity_id=str(entity_a.id),
+            target_entity_id=str(entity_b.id),
+            source_event_id=str(event.id),
+            association_type="industry_chain",
+            strength=0.8,
+            confidence=0.9,
+            properties={"evidence": {"relation": "potential_investor_startup"}},
+        )
+        db_session.add(assoc)
+        await db_session.commit()
+
+        entries = await service._get_associations_for_entity(str(entity_a.id))
+
+        assert len(entries) >= 1
+        hot_entry = next(
+            (e for e in entries if e["association_type"] == "industry_chain"), None
+        )
+        assert hot_entry is not None
+        assert hot_entry["other_entity_name"] == "实体B"
+        assert hot_entry["evidence"]["relation"] == "potential_investor_startup"
+
+    @pytest.mark.asyncio
+    async def test_get_associations_for_entity_cold_discovery(
+        self, db_session: AsyncSession
+    ):
+        """Test cold association discovery is triggered."""
+        service = RelationshipBriefService(db_session)
+        user_id = make_user_id()
+
+        event = Event(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            event_type="manual",
+            source="test",
+            title="dummy",
+            status="completed",
+        )
+        db_session.add(event)
+        await db_session.flush()
+
+        entity_a = Entity(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            entity_type="person",
+            name="冷发现A",
+            canonical_name="冷发现A",
+            properties={"basic": {"city": "北京", "company": "XX公司"}},
+            source_event_id=str(event.id),
+        )
+        entity_b = Entity(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            entity_type="person",
+            name="冷发现B",
+            canonical_name="冷发现B",
+            properties={"basic": {"city": "北京", "company": "YY公司"}},
+            source_event_id=str(event.id),
+        )
+        db_session.add_all([entity_a, entity_b])
+        await db_session.commit()
+
+        # Cold discovery may or may not produce results depending on
+        # AssociationDiscoveryEngine, but the method should not raise
+        entries = await service._get_associations_for_entity(str(entity_a.id))
+
+        # At minimum, it should return a list (possibly empty if no hot assocs)
+        assert isinstance(entries, list)
+
+
+class TestUpdateBriefPartial:
+    """Test update_brief_partial with notes and recalculation."""
+
+    @pytest.mark.asyncio
+    async def test_update_brief_partial_notes(self, db_session: AsyncSession):
+        """Test partial update with notes field."""
+        service = RelationshipBriefService(db_session)
+        user_id = make_user_id()
+        person_id = await create_person_entity(db_session, user_id=user_id)
+
+        brief, _ = await service.get_or_create_brief(user_id, person_id)
+        await db_session.commit()
+
+        version_before = brief.version
+        updated = await service.update_brief_partial(
+            brief_id=str(brief.id),
+            notes="重要客户，需重点维护",
+        )
+
+        assert updated.brief_data.get("notes") == "重要客户，需重点维护"
+        assert updated.version == version_before + 1
+
+    @pytest.mark.asyncio
+    async def test_update_brief_partial_recalculate(self, db_session: AsyncSession):
+        """Test partial update recalculates strength_score and next_actions."""
+        service = RelationshipBriefService(db_session)
+        user_id = make_user_id()
+        person_id = await create_person_entity(db_session, user_id=user_id)
+
+        brief, _ = await service.get_or_create_brief(user_id, person_id)
+        await db_session.commit()
+
+        updated = await service.update_brief_partial(
+            brief_id=str(brief.id),
+            brief_data_partial={
+                "interaction_freq": {"total_count": 10, "last_30_days": 5},
+                "their_concerns": ["成本问题"],
+            },
+        )
+
+        # strength_score should be recalculated
+        assert updated.brief_data.get("strength_score", 0) > 0
+        # next_actions should be regenerated
+        assert isinstance(updated.brief_data.get("next_actions"), list)
+
+
+class TestExtractMyContributions:
+    """Test _extract_my_contributions with help type todo."""
+
+    def test_extract_my_contributions_help_todo(self):
+        """Test _extract_my_contributions with help type todo."""
+        todos = [
+            make_todo(todo_type="help", title="帮助对方搭建技术架构"),
+            make_todo(todo_type="care", title="关心对方项目进展"),
+            make_todo(todo_type="help", title="提供市场分析报告"),
+        ]
+
+        contributions = RelationshipBriefService._extract_my_contributions(todos)
+
+        assert len(contributions) == 2
+        assert any("技术架构" in c for c in contributions)
+        assert any("市场分析" in c for c in contributions)
+
+
+class TestExtractCooperationSignals:
+    """Test _extract_cooperation_signals extraction."""
+
+    def test_extract_cooperation_signals(self):
+        """Test _extract_cooperation_signals extraction."""
+        todos = [
+            make_todo(
+                todo_type="cooperation_signal",
+                title="引荐张三和李四（投资-创业链）",
+            ),
+            make_todo(todo_type="followup", title="跟进项目"),
+        ]
+
+        signals = RelationshipBriefService._extract_cooperation_signals(todos)
+
+        assert len(signals) == 1
+        assert "引荐" in signals[0]
+
+
+class TestExtractRiskFlags:
+    """Test _extract_risk_flags extraction."""
+
+    def test_extract_risk_flags(self):
+        """Test _extract_risk_flags extraction."""
+        todos = [
+            make_todo(todo_type="risk", title="对方公司经营异常"),
+            make_todo(todo_type="care", title="关心对方状态"),
+        ]
+
+        flags = RelationshipBriefService._extract_risk_flags(todos)
+
+        assert len(flags) == 1
+        assert "经营异常" in flags[0]
+
+
+class TestNextActionsAssociationBased:
+    """Test association-based next actions generation."""
+
+    def test_next_actions_association_based_industry_chain(self):
+        """Test association-based next actions for industry_chain."""
+        data = {
+            "basic_info": {"name": "张三"},
+            "relationship_stage": "value_response",
+            "last_interaction": {
+                "date": datetime.now(timezone.utc).isoformat(),
+            },
+            "open_promises": {"my_promises": [], "their_promises": []},
+            "their_concerns": [],
+        }
+        associations = [
+            {
+                "association_type": "industry_chain",
+                "other_entity_name": "李四",
+                "evidence": {"relation": "potential_investor_startup"},
+                "confidence": 0.9,
+            }
+        ]
+
+        actions = RelationshipBriefService._generate_next_actions(data, associations)
+
+        action_texts = [a["action"] for a in actions]
+        assert any("引荐" in t and "投资-创业链" in t for t in action_texts)
+
+    def test_next_actions_association_based_supply_demand(self):
+        """Test association-based next actions for supply_demand."""
+        data = {
+            "basic_info": {"name": "供应商A"},
+            "relationship_stage": "value_response",
+            "last_interaction": {
+                "date": datetime.now(timezone.utc).isoformat(),
+            },
+            "open_promises": {"my_promises": [], "their_promises": []},
+            "their_concerns": [],
+        }
+        associations = [
+            {
+                "association_type": "supply_demand",
+                "other_entity_name": "需求方B",
+                "evidence": {
+                    "matches": [
+                        {
+                            "supplier": "供应商A",
+                            "requester": "需求方B",
+                            "matched_items": ["GPU服务器"],
+                        }
+                    ]
+                },
+                "confidence": 0.8,
+            }
+        ]
+
+        actions = RelationshipBriefService._generate_next_actions(data, associations)
+
+        action_texts = [a["action"] for a in actions]
+        assert any("可帮助" in t for t in action_texts)
+
+    def test_next_actions_default_fallback(self):
+        """Test default '保持定期联系' fallback action."""
+        data = {
+            "basic_info": {"name": "测试人"},
+            "relationship_stage": "new_connection",
+            "last_interaction": {
+                "date": datetime.now(timezone.utc).isoformat(),
+            },
+            "open_promises": {"my_promises": [], "their_promises": []},
+            "their_concerns": [],
+        }
+
+        actions = RelationshipBriefService._generate_next_actions(data, None)
+
+        # No overdue promises, no stale interaction, no special stage
+        # → should get default fallback
+        action_texts = [a["action"] for a in actions]
+        assert any("保持定期联系" in t for t in action_texts)
+
+
+class TestBasicInfoFallbackDBQuery:
+    """Test basic_info fallback when entity not in entities param."""
+
+    @pytest.mark.asyncio
+    async def test_basic_info_fallback_db_query(self, db_session: AsyncSession):
+        """Test basic_info fallback when entity not in entities param."""
+        service = RelationshipBriefService(db_session)
+        user_id = make_user_id()
+        person_id = await create_person_entity(
+            db_session, user_id=user_id, name="数据库回退人"
+        )
+
+        event = make_event(user_id=user_id)
+        # Pass empty entities list — should trigger DB fallback
+        result = await service.update_brief_from_event(
+            user_id, person_id, event, entities=[]
+        )
+
+        basic_info = result.brief.brief_data.get("basic_info", {})
+        assert basic_info.get("name") == "数据库回退人"
+        assert "basic_info" in result.modules_updated
