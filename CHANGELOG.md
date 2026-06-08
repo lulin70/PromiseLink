@@ -2,6 +2,36 @@
 
 All notable changes to EventLink will be documented in this file.
 
+## [0.3.0] - 2026-06-08
+
+### Added
+- **Security Fixes (C1-C5)**: 5个Critical安全修复
+  - C1: poc_anonymous_access IP白名单+审计日志
+  - C2: _semantic_similarity_fallback asyncio.to_thread()防事件循环阻塞
+  - C3: _fetch_all_person_entities LIMIT分页(5000/500)防OOM
+  - C4: SIGTERM/SIGINT信号处理+30秒优雅关闭
+  - C5: poc_secret改用hmac.compare_digest()防时序攻击
+- **High Priority Fixes (#6-#15)**: 10个High/Medium问题修复
+  - #6: Association端点添加user_id校验防越权访问
+  - #7: ilike搜索转义SQL通配符防注入
+  - #8: Voice API LLMClient传入config防运行时崩溃
+  - #9: dashboard datetime.now()改用timezone.utc
+  - #10: ValueError改为HTTPException(400)防500错误
+  - #11: Dashboard N+1查询优化为批量查询
+  - #12: _get_existing_pair_set仅查询必要列
+  - #13: JWT添加iss/aud声明防跨服务重放
+  - #14: 版本号统一为0.3.0
+  - #15: CHANGELOG测试数量同步更新
+- **Architecture**: 7个cold discoverer统一为async
+- **TTS**: 三级降级策略(微信原生→后端API→纯文字)
+- **Miniapp**: Taro+React+TypeScript小程序前端
+
+### Stats
+- 866 tests passed, 0 failed | 74% coverage
+- Software version: 0.2.0 (POC) → 0.3.0 (Phase 1 complete)
+
+---
+
 ## [0.2.0] - 2026-06-06
 
 ### Added

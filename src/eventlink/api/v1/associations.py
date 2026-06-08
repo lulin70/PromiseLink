@@ -82,11 +82,15 @@ async def list_associations(
 async def get_association(
     association_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user_id),
 ):
     """Get a specific association by ID."""
     new_request_id()
 
-    stmt = select(Association).where(Association.id == str(association_id))
+    stmt = select(Association).where(
+        Association.id == str(association_id),
+        Association.user_id == user_id,
+    )
     result = await session.execute(stmt)
     association = result.scalar_one_or_none()
 

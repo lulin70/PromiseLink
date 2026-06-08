@@ -118,20 +118,33 @@ async def get_day_view(
     )
     events = event_result.scalars().all()
 
+    # Batch fetch entity names and todo counts (avoid N+1 queries)
+    event_ids = [str(evt.id) for evt in events]
+    entity_map: dict[str, list[str]] = {}
+    todo_count_map: dict[str, int] = {}
+
+    if event_ids:
+        # Batch: entity names per event
+        entity_result = await session.execute(
+            select(Entity.source_event_id, Entity.name)
+            .where(Entity.source_event_id.in_(event_ids), Entity.entity_type == "person")
+        )
+        for source_event_id, name in entity_result.fetchall():
+            entity_map.setdefault(source_event_id, []).append(name)
+
+        # Batch: todo counts per event
+        todo_count_result = await session.execute(
+            select(Todo.source_event_id, func.count())
+            .where(Todo.source_event_id.in_(event_ids))
+            .group_by(Todo.source_event_id)
+        )
+        todo_count_map = dict(todo_count_result.fetchall())
+
     # Build event items with entity names and todo counts
     event_items = []
     for evt in events:
-        # Get related person entities for this event
-        entity_result = await session.execute(
-            select(Entity.name).where(Entity.source_event_id == str(evt.id)).where(Entity.entity_type == "person")
-        )
-        entity_names = [row[0] for row in entity_result.fetchall()]
-
-        # Count todos for this event
-        todo_count_result = await session.execute(
-            select(func.count()).select_from(Todo).where(Todo.source_event_id == str(evt.id))
-        )
-        todo_count = todo_count_result.scalar() or 0
+        entity_names = entity_map.get(str(evt.id), [])
+        todo_count = todo_count_map.get(str(evt.id), 0)
 
         time_str = evt.timestamp.strftime("%H:%M") if evt.timestamp else None
         event_items.append(
@@ -158,18 +171,20 @@ async def get_day_view(
     )
     todos = todo_result.scalars().all()
 
+    # Batch fetch related entity names (avoid N+1 queries)
+    related_entity_ids = [str(td.related_entity_id) for td in todos if td.related_entity_id]
+    entity_name_map: dict[str, str] = {}
+    if related_entity_ids:
+        name_result = await session.execute(
+            select(Entity.id, Entity.name).where(Entity.id.in_(related_entity_ids))
+        )
+        entity_name_map = {str(row[0]): row[1] for row in name_result.fetchall()}
+
     today_for_overdue = date.today()
     todo_items = []
     for td in todos:
         # Resolve related person name from entity
-        related_person_name = None
-        if td.related_entity_id:
-            entity_result = await session.execute(
-                select(Entity.name).where(Entity.id == str(td.related_entity_id))
-            )
-            row = entity_result.one_or_none()
-            if row:
-                related_person_name = row[0]
+        related_person_name = entity_name_map.get(str(td.related_entity_id)) if td.related_entity_id else None
 
         # Determine if overdue
         is_overdue = False
@@ -250,7 +265,7 @@ async def get_range_view(
         range_start = parse_natural_date(start_date).start_date
         range_end = parse_natural_date(end_date).start_date
     else:
-        raise ValueError("必须提供 range_text 或 start_date + end_date")
+        raise HTTPException(status_code=400, detail="必须提供 range_text 或 start_date + end_date")
 
     logger.info(
         "range_view_request",
@@ -398,7 +413,7 @@ async def get_morning_brief(
     key_persons = [row[0] for row in person_result.fetchall()]
 
     # Build greeting and summary
-    hour = datetime.now().hour
+    hour = datetime.now(timezone.utc).hour
     if hour < 12:
         greeting = "早上好"
     elif hour < 18:
