@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from eventlink.core.auth import get_optional_user_id
+from eventlink.core.auth import get_current_user_id
 from eventlink.core.logging import get_logger, new_request_id
 from eventlink.database import get_async_session
 from eventlink.models.association import Association
@@ -90,7 +90,7 @@ def _fetch_vector_embeddings(user_id: str) -> list[dict]:
 async def export_user_data(
     user_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
-    authenticated_user_id: str = Depends(get_optional_user_id),
+    authenticated_user_id: str = Depends(get_current_user_id),
 ):
     """Export all data owned by *user_id* as a structured JSON document.
 

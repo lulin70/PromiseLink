@@ -13,7 +13,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from eventlink.core.auth import get_optional_user_id
+from eventlink.core.auth import get_current_user_id
 from eventlink.database import Base, get_async_session
 from eventlink.main import app
 from eventlink.models.association import Association
@@ -72,7 +72,7 @@ async def client(db_session, db_engine):
         yield db_session
 
     app.dependency_overrides[get_async_session] = override_get_async_session
-    app.dependency_overrides[get_optional_user_id] = lambda: TEST_USER_ID
+    app.dependency_overrides[get_current_user_id] = lambda: TEST_USER_ID
 
     # Mock the background pipeline to avoid real LLM calls
     async def mock_process_event(event_id):

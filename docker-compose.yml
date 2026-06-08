@@ -8,19 +8,28 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=sqlite:///./data/eventlink.db
-      - DEBUG=true
+      - DATABASE_URL=postgresql+asyncpg://eventlink:eventlink_password@postgres:5432/eventlink
+      - APP_ENV=staging
+      - DEBUG=false
       - LOG_LEVEL=INFO
-      - REDIS_ENABLED=false
+      - REDIS_ENABLED=true
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-staging}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - EVENTLINK_POC_SECRET=${EVENTLINK_POC_SECRET:-}
     volumes:
-      - ./src:/app/src
       - ./data:/app/data
-      - ./.env:/app/.env
-    command: python -m uvicorn eventlink.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: uvicorn eventlink.main:app --host 0.0.0.0 --port 8000 --workers 2
     networks:
       - eventlink-network
+    restart: unless-stopped
 
-  # PostgreSQL (optional, for phase 1)
+  # PostgreSQL
   postgres:
     image: postgres:15-alpine
     container_name: eventlink-postgres
@@ -34,10 +43,14 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - eventlink-network
-    profiles:
-      - postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eventlink"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
-  # Redis (optional, for caching)
+  # Redis
   redis:
     image: redis:7-alpine
     container_name: eventlink-redis
@@ -45,8 +58,12 @@ services:
       - "6379:6379"
     networks:
       - eventlink-network
-    profiles:
-      - redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
 volumes:
   postgres_data:

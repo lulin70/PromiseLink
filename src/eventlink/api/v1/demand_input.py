@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from eventlink.config import get_settings
-from eventlink.core.auth import get_optional_user_id
+from eventlink.core.auth import get_current_user_id
 from eventlink.core.logging import get_logger, new_request_id
 from eventlink.database import get_async_session
 from eventlink.models.entity import Entity
@@ -122,7 +122,7 @@ def _fallback_extract(text: str) -> dict:
 async def create_demand(
     body: DemandInputRequest,
     session: AsyncSession = Depends(get_async_session),
-    authenticated_user_id: str = Depends(get_optional_user_id),
+    authenticated_user_id: str = Depends(get_current_user_id),
 ) -> DemandInputResponse:
     """Accept a one-line demand input (voice or text).
 

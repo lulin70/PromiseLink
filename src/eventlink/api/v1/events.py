@@ -9,8 +9,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from eventlink.api.dependencies import rate_limit_dependency
 from eventlink.api.v1.schemas import PaginatedResponse
-from eventlink.core.auth import get_optional_user_id
+from eventlink.core.auth import get_current_user_id
 from eventlink.core.logging import get_logger, new_request_id
 from eventlink.database import get_async_session
 from eventlink.models import Event
@@ -19,7 +20,7 @@ from eventlink.models.entity import Entity
 from eventlink.models.todo import Todo
 
 logger = get_logger("eventlink.api.events")
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(rate_limit_dependency)])
 
 
 # Request/Response schemas
@@ -89,7 +90,7 @@ async def create_event(
     request: EventCreateRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ):
     """
     Create a new event from external source and trigger processing pipeline.
@@ -168,7 +169,7 @@ async def list_events(
     limit: int = 100,
     offset: int = 0,
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ):
     """
     List events with optional filtering.
@@ -206,7 +207,7 @@ async def list_events(
 async def get_event(
     event_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ):
     """
     Get detailed information about a specific event.
@@ -232,7 +233,7 @@ async def get_event(
 async def delete_event(
     event_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ):
     """
     Delete an event.

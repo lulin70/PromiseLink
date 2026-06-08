@@ -383,11 +383,11 @@ def api_client(db_session: AsyncSession):
     """Create an httpx AsyncClient with DB dependency overridden."""
     from httpx import ASGITransport, AsyncClient
     from eventlink.database import get_async_session
-    from eventlink.core.auth import get_optional_user_id
+    from eventlink.core.auth import get_current_user_id
     from eventlink.main import app
 
     app.dependency_overrides[get_async_session] = lambda: db_session  # type: ignore[return-value]
-    app.dependency_overrides[get_optional_user_id] = lambda: TEST_USER_ID
+    app.dependency_overrides[get_current_user_id] = lambda: TEST_USER_ID
 
     transport = ASGITransport(app=app)
     client = AsyncClient(transport=transport, base_url="http://test")
@@ -546,10 +546,10 @@ class TestAPIRBAC:
 
         # Switch auth to a different user
         from eventlink.main import app as main_app
-        from eventlink.core.auth import get_optional_user_id
+        from eventlink.core.auth import get_current_user_id
 
         other_user_id = "99999999-9999-9999-9999-999999999999"
-        main_app.dependency_overrides[get_optional_user_id] = lambda: other_user_id
+        main_app.dependency_overrides[get_current_user_id] = lambda: other_user_id
 
         try:
             response = await api_client.patch(
@@ -565,7 +565,7 @@ class TestAPIRBAC:
             resp_data = response.json()
             assert "not found" in str(resp_data).lower() or "access denied" in str(resp_data).lower()
         finally:
-            main_app.dependency_overrides[get_optional_user_id] = lambda: TEST_USER_ID
+            main_app.dependency_overrides[get_current_user_id] = lambda: TEST_USER_ID
 
 
 # ── Additional Edge Case Tests ────────────────────────────────

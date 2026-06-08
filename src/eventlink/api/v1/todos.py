@@ -8,15 +8,16 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from eventlink.api.dependencies import rate_limit_dependency
 from eventlink.api.v1.schemas import PaginatedResponse
-from eventlink.core.auth import get_optional_user_id
+from eventlink.core.auth import get_current_user_id
 from eventlink.core.logging import get_logger, new_request_id
 from eventlink.database import get_async_session
 from eventlink.models.todo import Todo
 from eventlink.services.todo_state_machine import TodoStateMachine
 
 logger = get_logger("eventlink.api.todos")
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(rate_limit_dependency)])
 
 
 # ── Pydantic Models ──
@@ -62,7 +63,7 @@ async def list_todos(
     limit: int = 100,
     offset: int = 0,
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ):
     """List todos with optional filtering, sorting, and pagination.
 
@@ -115,7 +116,7 @@ async def list_todos(
 async def get_todo(
     todo_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ):
     """Get detailed information about a specific todo."""
     new_request_id()
@@ -139,7 +140,7 @@ async def update_todo(
     todo_id: uuid.UUID,
     request: TodoUpdateRequest,
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ):
     """Update a todo (including state transitions via TodoStateMachine)."""
     new_request_id()
@@ -185,7 +186,7 @@ async def update_todo(
 async def delete_todo(
     todo_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ):
     """Delete a todo."""
     new_request_id()

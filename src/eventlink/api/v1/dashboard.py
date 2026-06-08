@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from eventlink.core.auth import get_optional_user_id
+from eventlink.core.auth import get_current_user_id
 from eventlink.core.logging import get_logger, new_request_id
 from eventlink.core.natural_date import parse_natural_date, NaturalDateResult
 from eventlink.database import get_async_session
@@ -83,7 +83,7 @@ async def get_day_view(
         None, alias="date", description="自然语言日期: 今天/明天/2026-06-04"
     ),
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ) -> DayViewResponse:
     """Get day view dashboard for a specific date.
 
@@ -233,7 +233,7 @@ async def get_range_view(
     end_date: str | None = Query(None),
     range_text: str | None = Query(None, description="如 '本周'/'下周'"),
     session: AsyncSession = Depends(get_async_session),
-    user_id: str = Depends(get_optional_user_id),
+    user_id: str = Depends(get_current_user_id),
 ) -> dict:
     """Get multi-day range view (Phase 1.2).
 

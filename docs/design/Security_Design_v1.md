@@ -1,7 +1,7 @@
 # EventLink 安全设计文档
 
-> **版本**: v2.8 (POC阶段)
-> **日期**: 2026-06-07
+> **版本**: v2.9 (POC阶段)
+> **日期**: 2026-06-08
 > **阶段**: POC (0.2.x series)
 > **设计师**: 架构师 + 安全工程师
 > **参考**: PRD v4.3, 技术设计 v2.5 §8 (§3.1a + §8.0.3), API设计 v1.0, 数据库设计 v1.0
@@ -429,6 +429,48 @@ sequenceDiagram
     
     Note over H5: 页面关闭时sessionStorage自动清除
 ```
+
+### 2.6 安全修复记录 (2026-06-08, v2.9新增)
+
+#### 2.6.1 PoC登录密钥验证 (CRITICAL修复)
+
+**问题**: `/auth/login` 端点允许任意 `user_id` 获取JWT token，无任何验证。
+
+**修复**: 新增 `EVENTLINK_POC_SECRET` 环境变量验证。未设置此变量时，PoC登录端点完全禁用，返回403。设置后，请求需携带正确的 `poc_secret` 才能获取token。
+
+**影响文件**: `api/v1/auth.py`
+
+#### 2.6.2 强制JWT认证 (CRITICAL修复)
+
+**问题**: `get_optional_user_id` 在无token时返回固定测试用户ID `"00000000-0000-0000-0000-000000000001"`，导致所有未认证请求共享同一身份。
+
+**修复**:
+- 新增 `get_current_user_id` 依赖，无token时返回401
+- 所有13个API端点从 `get_optional_user_id` 迁移至 `get_current_user_id`
+- `get_optional_user_id` 返回 `str | None`，保留用于可选认证场景
+- 新增 `poc_anonymous_access` 配置项（默认False），PoC环境可显式开启匿名访问
+
+**影响文件**: `core/auth.py`, 13个API路由文件
+
+#### 2.6.3 PBKDF2动态盐值派生 (CRITICAL修复)
+
+**问题**: `crypto.py` 使用硬编码固定盐值 `b"eventlink-pii-salt"`，所有部署实例共享同一盐。
+
+**修复**: 盐值从 `secret_key` 的SHA256哈希派生，每个部署实例（不同secret_key）产生不同的派生盐。
+
+**影响文件**: `core/crypto.py`
+
+**注意**: 此修复会导致已有加密数据无法解密。升级时需先导出数据→修改secret_key→重新加密导入。
+
+#### 2.6.4 API速率限制 (HIGH, F-24)
+
+**实现**: 滑动窗口限流器，Redis后端+内存回退。
+- 认证用户: 60请求/分钟
+- 未认证: 10请求/分钟
+- LLM端点(/voice/, /media/): 20请求/分钟
+- 超限返回429 + Retry-After header
+
+**影响文件**: `core/rate_limiter.py`, `api/dependencies.py`
 
 ---
 
@@ -2739,10 +2781,11 @@ trivy image --severity HIGH,CRITICAL eventlink:latest  # 仅报告高危
 | v2.6 | 2026-06-06 | **F-55/F-56安全专项**：①§6.10新增DependencyAnalyzer安全专项(依赖图注入防护+阻塞链深度限制MAX_DEPTH=3+依赖性得分操纵防护) ②§6.11新增ContextMatcher安全专项(场景匹配数据隔离+24h时间窗口限制+即将见面信息隐私) |
 | v2.7 | 2026-06-06 | **F-57/F-58安全专项**：①§6.12新增EmbeddingProvider安全专项(API Key复用LLM密钥+.env存储+缓存内存存储重启清空+user_id数据隔离) ②§6.13新增SemanticSearch安全专项(搜索数据隔离user_id强制过滤+JWT提取+sqlite-vec文件权限0o600+向量注入防护系统生成only) |
 | v2.8 | 2026-06-07 | **F-08/EmailAdapter/WeChatForwardAdapter安全专项**：①§6.14新增CSV导入安全专项(CSV注入防护+大文件DoS+编码攻击+恶意文件名+数据注入5项威胁缓解) ②§6.15新增EmailAdapter安全专项(IMAP凭证泄露+邮件PII+恶意附件+连接劫持+邮件洪水5项威胁缓解+SSL强制+附件仅记录不存储) ③§6.16新增WeChatForwardAdapter安全专项(文本长度DoS+正则ReDoS+聊天PII+XSS注入4项威胁缓解+512KB限制+简单正则) | 架构师 + 安全工程师 |
+| v2.9 | 2026-06-08 | **安全修复记录**：①§2.6新增安全修复记录章节 ②2.6.1 PoC登录密钥验证CRITICAL修复(EVENTLINK_POC_SECRET环境变量) ③2.6.2 强制JWT认证CRITICAL修复(get_current_user_id+13端点迁移+poc_anonymous_access) ④2.6.3 PBKDF2动态盐值派生CRITICAL修复(SHA256哈希派生替代硬编码盐值) ⑤2.6.4 API速率限制HIGH修复(滑动窗口限流器+Redis后端+三级限流60/10/20) | 架构师 + 安全工程师 |
 
 ---
 
-> **文档状态**: ✅ v2.8 更新完成（F-08 CSV导入 + EmailAdapter + WeChatForwardAdapter 安全专项已落地）
+> **文档状态**: ✅ v2.9 更新完成（安全修复记录：PoC登录密钥验证 + 强制JWT认证 + PBKDF2动态盐值派生 + API速率限制）
 > **下次审查**: Phase1开发启动前
 > **安全负责人**: 架构师
 > **对齐文档**: 技术设计 v2.5 §3.1a + §8.0.3

@@ -3,6 +3,7 @@
 import os
 import uuid
 
+import pytest
 import pytest_asyncio
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -11,6 +12,15 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 os.environ.setdefault("DATABASE_URL", "sqlite:///test.db")
 
 from eventlink.database import Base
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits():
+    """Reset in-memory rate limiter state before each test."""
+    from eventlink.core.rate_limiter import reset_rate_limits
+    reset_rate_limits()
+    yield
+    reset_rate_limits()
 
 
 @pytest_asyncio.fixture

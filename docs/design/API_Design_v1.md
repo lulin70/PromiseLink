@@ -1,13 +1,14 @@
 # EventLink API设计文档
 
-> **版本**: 0.2.8 (POC阶段)
-> **日期**: 2026-06-07
+> **版本**: 0.2.9 (POC阶段)
+> **日期**: 2026-06-08
 > **阶段**: POC (0.2.x series)
 > **设计师**: 架构师 + 开发团队
 > **参考**: PRD v4.3, 技术设计 v2.7 §7
 > **v2.6变更**: Insight Engine API新增priority-breakdown/upcoming-context端点(§3.13)、Todo schema新增dependency_raw/context_raw字段
 > **v2.7变更**: 新增§3.15 Semantic Search API（3个端点+SearchResult schema, F-57/F-58）
 > **v2.8变更**: 新增§3.16 CSV Import API(F-08)、§3.17 Data Export API(F-21)、§3.18 Demand Input API(F-36)、§3.19 Email Sync API(EmailAdapter)、§3.20 WeChat Forward API(WeChatForwardAdapter)、§3.21 Voice Query API(F-50)
+> **v2.9变更**: 新增§3.22 Media API(ASR/TTS/OCR/ocr-event, PRD v4.8)、§3.23 Privacy API(GDPR合规, 数据查看/导出/删除)
 
 ---
 
@@ -2808,6 +2809,129 @@ class ReindexResponse(BaseModel):
 2. 按意图路由DB查询（schedule_query/promise_tracker/relationship_status）
 3. NLG生成自然语言回答
 
+### §3.22 Media API (v2.9新增)
+
+> **架构决策修订** (PRD v4.8): EventLink提供媒体处理服务(ASR/TTS/OCR)，但严格解耦。媒体文件仅内存处理，不持久化存储。
+
+#### 3.22.1 POST /api/v1/media/asr
+
+语音识别：上传音频文件，返回转写文字。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| audio | file | ✅ | 音频文件(mp3/wav)，最大25MB |
+
+**Response 200**:
+```json
+{ "text": "我今天有几个待办", "confidence": 0.95, "provider": "moka_ai" }
+```
+
+**限流**: LLM端点限流(20次/分钟)
+
+#### 3.22.2 POST /api/v1/media/tts
+
+文字转语音：接收文本，返回MP3音频流。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| text | string | ✅ | 待合成文字，最大4096字符 |
+| voice | string | ❌ | 语音风格，默认"alloy" |
+
+**Response 200**: audio/mp3 流式响应
+
+**限流**: LLM端点限流(20次/分钟)
+
+#### 3.22.3 POST /api/v1/media/ocr
+
+图片文字识别：上传图片，返回提取文字和结构化数据。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| image | file | ✅ | 图片文件(jpg/png)，最大10MB |
+
+**Response 200**:
+```json
+{
+  "text": "张三\nCTO\nABC科技有限公司\n13800138000\nzhangsan@abc.com",
+  "structured_data": {
+    "names": ["张三"],
+    "companies": ["ABC科技有限公司"],
+    "titles": ["CTO"],
+    "phone": ["13800138000"],
+    "email": ["zhangsan@abc.com"],
+    "notes": []
+  },
+  "provider": "moka_ai"
+}
+```
+
+**限流**: LLM端点限流(20次/分钟)
+
+#### 3.22.4 POST /api/v1/media/ocr-event
+
+OCR + 自动创建Event：上传图片，OCR识别后自动创建互动记录并触发Pipeline。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| image | file | ✅ | 图片文件(jpg/png)，最大10MB |
+
+**Response 200**:
+```json
+{
+  "event_id": "uuid",
+  "ocr_text": "张三\nCTO\nABC科技有限公司",
+  "structured_data": { "names": ["张三"], ... }
+}
+```
+
+**限流**: LLM端点限流(20次/分钟)
+
+#### 3.22.5 安全约束
+
+- 所有端点需JWT认证
+- 媒体文件仅内存处理，不写入持久化存储
+- ASR/TTS/OCR处理后原始文件立即释放
+- TTS音频流式返回，不落盘
+- 文件大小限制：音频25MB，图片10MB
+
+### §3.23 Privacy API (v2.9新增)
+
+GDPR合规端点，支持数据查看、导出、删除。
+
+#### 3.23.1 GET /api/v1/privacy/data-summary
+
+返回用户数据统计摘要。
+
+**Response 200**:
+```json
+{
+  "user_id": "uuid",
+  "events": 42,
+  "entities": 28,
+  "todos": 15,
+  "associations": 35,
+  "voice_sessions": 8
+}
+```
+
+#### 3.23.2 DELETE /api/v1/privacy/user-data
+
+删除用户所有数据（GDPR被遗忘权）。按FK依赖顺序删除。
+
+**Response 200**:
+```json
+{ "deleted": { "events": 42, "entities": 28, ... }, "message": "All user data deleted" }
+```
+
+#### 3.23.3 POST /api/v1/privacy/export
+
+触发全量数据导出。
+
+**Response 200**:
+```json
+{ "download_url": "/api/v1/export/{user_id}", "format": "json" }
+```
+
 ---
 
 ## 4. 安全策略（v2.0新增）
@@ -4380,7 +4504,8 @@ X-Cache-Hit: true
 | **v2.6** | **2026-06-06** | **F-55/F-56 Insight Engine API扩展 (v2.6)：**<br/>**① §3.13 Insight Engine API新增2个端点**:<br/>　- GET /api/v1/todos/{todo_id}/priority-breakdown — 返回四维评分详情(urgency/importance/dependency/context)，含每个维度的原始得分和计算因子，支持可解释性面板<br/>　- GET /api/v1/users/{user_id}/upcoming-context — 返回未来24h即将见面的Entity及关联Todo，支持会前准备场景<br/>**② Todo schema breakdown字段扩展**: 新增dependency_raw(依赖分析原始因子, F-55) + context_raw(场景匹配原始因子, F-56)<br/>**③ OpenAPI YAML Todo schema更新**: 新增breakdown对象(含urgency/importance/dependency/context四维得分 + dependency_raw/context_raw原始因子) |
 | **v2.7** | **2026-06-06** | **F-57/F-58 语义搜索与关联发现增强 API (v2.7)：**<br/>**① 新增§3.15 Semantic Search API**:<br/>　- POST /api/v1/search/semantic — 语义搜索(query+top_k+target_types+min_similarity，返回SearchResultItem列表含similarity/highlights)<br/>　- GET /api/v1/search/stats — 向量索引统计(total_embeddings/by_type/index_method/cache_size)<br/>　- POST /api/v1/search/reindex — 重建索引(full/incremental，异步202返回task_id，限流2次/小时)<br/>**② 新增SearchResult Schema**: SearchResultItem + SemanticSearchResponse + SearchStatsResponse + ReindexRequest + ReindexResponse<br/>**③ 数据隔离**: user_id从JWT提取，搜索结果按user_id过滤，忽略客户端传入的user_id** |
 | **v2.8** | **2026-06-07** | **F-08/F-21/F-36/F-39/EmailAdapter/WeChatForwardAdapter/F-50 API (v2.8)：**<br/>**① 新增§3.16 CSV Import API(F-08)**: POST /api/v1/import/csv — CSV文件上传导入，EntityResolution去重归一，返回统计<br/>**② 新增§3.17 Data Export API(F-21)**: GET /api/v1/export/json — JSON全量导出，ORM mapper column_attrs序列化，PII脱敏<br/>**③ 新增§3.18 Demand Input API(F-36)**: POST /api/v1/demands — 一句话需求录入，LLM提取+关键词fallback，concern追加到Entity.properties<br/>**④ 新增§3.19 Email Sync API(EmailAdapter)**: POST /api/v1/email/sync — IMAP邮件同步，一封邮件一个Event<br/>**⑤ 新增§3.20 WeChat Forward API(WeChatForwardAdapter)**: POST /api/v1/wechat/forward — 微信聊天记录转发解析，群聊/单聊支持<br/>**⑥ 新增§3.21 Voice Query API(F-50)**: POST /api/v1/voice/query — 语音查询三阶段Pipeline(NLU→DB→NLG)** |
+| **v2.9** | **2026-06-08** | **Media API + Privacy API (v2.9)：**<br/>**① 新增§3.22 Media API(PRD v4.8)**: POST /api/v1/media/asr(语音识别) + POST /api/v1/media/tts(文字转语音) + POST /api/v1/media/ocr(图片文字识别) + POST /api/v1/media/ocr-event(OCR+自动创建Event) + 安全约束(仅内存处理/不持久化/JWT认证/文件大小限制)<br/>**② 新增§3.23 Privacy API(GDPR合规)**: GET /api/v1/privacy/data-summary(数据统计摘要) + DELETE /api/v1/privacy/user-data(被遗忘权删除) + POST /api/v1/privacy/export(全量数据导出) |
 
 ---
 
-*最后更新: 2026-06-07*
+*最后更新: 2026-06-08*

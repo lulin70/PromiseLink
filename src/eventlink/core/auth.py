@@ -37,18 +37,28 @@ async def get_current_user_id(
 
 async def get_optional_user_id(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)]
-) -> str:
-    """Extract user_id from JWT token. Returns test user if no token (PoC compat)."""
-    TEST_USER_ID = "00000000-0000-0000-0000-000000000001"
+) -> str | None:
+    """Extract user_id from JWT token.
 
+    Returns None if no valid token. Callers must handle None appropriately.
+    For PoC compatibility, set EVENTLINK_POC_ANONYMOUS_ACCESS=true to allow
+    a default user ID when no token is provided.
+    """
     if credentials is None:
-        return TEST_USER_ID
+        settings = get_settings()
+        if settings.poc_anonymous_access:
+            import structlog
+            logger = structlog.get_logger()
+            logger.warning("poc_anonymous_access enabled - using default user_id")
+            return "00000000-0000-0000-0000-000000000001"
+        return None
 
     token = credentials.credentials
-    payload = verify_token(token)
+    try:
+        payload = verify_token(token)
+    except HTTPException:
+        return None
     user_id: str | None = payload.get("sub")
-    if user_id is None:
-        return TEST_USER_ID
     return user_id
 
 
