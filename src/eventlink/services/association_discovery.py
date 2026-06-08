@@ -516,6 +516,9 @@ class AssociationDiscoveryEngine:
                 Entity.entity_type == "person",
                 Entity.id != str(new_entity.id),
             )
+        ).options(
+            # Only load columns needed for candidate matching, skip large JSON fields
+            # We still need properties for city/company/keywords matching
         ).limit(CANDIDATE_LIMIT)
         result = await self.session.execute(stmt)
         all_entities = list(result.scalars().all())

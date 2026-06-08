@@ -4,11 +4,17 @@ Algorithm Design §1: exact_match → alias_match → fuzzy_match → context_ma
 Thresholds: AUTO_MERGE ≥ 0.85, CONFIRM ≥ 0.70, CREATE < 0.70
 """
 
+from __future__ import annotations
+
 import json
 from enum import Enum
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 from datetime import UTC, datetime
+
+if TYPE_CHECKING:
+    from eventlink.services.llm_client import LLMClient
+    from eventlink.services.llm_provider import LLMProvider
 
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -61,7 +67,7 @@ class EntityResolutionEngine:
         session: AsyncSession,
         auto_merge_threshold: float = 0.85,
         confirm_threshold: float = 0.70,
-        llm_client: Any = None,
+        llm_client: LLMProvider | LLMClient | None = None,
     ):
         self.session = session
         self.auto_merge_threshold = auto_merge_threshold

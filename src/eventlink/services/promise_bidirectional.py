@@ -15,12 +15,19 @@ Strategy:
 4. Evidence extraction: Extract direct quote from event text supporting the promise
 """
 
+from __future__ import annotations
+
 import re
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from eventlink.core.logging import get_logger
+
+if TYPE_CHECKING:
+    from eventlink.services.llm_client import LLMClient
+    from eventlink.services.llm_provider import LLMProvider
 from eventlink.models.entity import Entity
 from eventlink.models.event import Event
 from eventlink.models.todo import Todo
@@ -113,7 +120,7 @@ class PromiseBidirectionalHandler:
     4. Evidence extraction from event raw_text
     """
 
-    def __init__(self, llm_client) -> None:
+    def __init__(self, llm_client: LLMProvider | LLMClient) -> None:
         """Initialize with LLM client for fallback analysis.
 
         Args:
