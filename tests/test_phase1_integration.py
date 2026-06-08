@@ -148,7 +148,7 @@ async def test_semantic_search_index_and_search(real_db_path):
     assert "ent-1" in top_ids, "AI investment entity should be found"
 
     # Verify stats
-    stats = engine.get_stats(user_id=user_id)
+    stats = await engine.get_stats(user_id=user_id)
     assert stats["total_embeddings"] == 2
 
 

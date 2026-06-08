@@ -642,18 +642,28 @@ class AssociationDiscoveryEngine:
         for company, group in company_map.items():
             if len(group) < 2:
                 continue
+            # Pre-build work_history company → entity_id inverted index for ex_colleague check
+            work_company_index: dict[str, list[int]] = {}
+            for idx, entity in enumerate(group):
+                history = (entity.properties or {}).get("work_history", [])
+                for h in history:
+                    h_company = h.get("company") or ""
+                    if h_company:
+                        work_company_index.setdefault(h_company, []).append(idx)
+
             for i in range(len(group)):
                 for j in range(i + 1, len(group)):
                     pair_key = tuple(sorted([str(group[i].id), str(group[j].id)]))
                     if pair_key in existing_pair_keys:
                         continue
-                    # Check for ex_colleague
+                    # Check for ex_colleague using inverted index
+                    is_ex_colleague = False
                     history_i = (group[i].properties or {}).get("work_history", [])
-                    history_j = (group[j].properties or {}).get("work_history", [])
-                    is_ex_colleague = any(
-                        (ha.get("company") or "") == (hb.get("company") or "") and ha.get("company")
-                        for ha in history_i for hb in history_j
-                    )
+                    for ha in history_i:
+                        ha_company = ha.get("company") or ""
+                        if ha_company and ha_company in work_company_index and j in work_company_index[ha_company]:
+                            is_ex_colleague = True
+                            break
 
                     if is_ex_colleague:
                         confidence = 0.9

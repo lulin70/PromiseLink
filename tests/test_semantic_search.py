@@ -343,16 +343,16 @@ class TestSemanticSearchEngine:
         await engine.index_entity("ent-2", "text3", "user-2")
 
         # Total stats
-        stats = engine.get_stats()
+        stats = await engine.get_stats()
         assert stats["total_embeddings"] == 3
         assert stats["vec_available"] is False
         assert stats["dimensions"] == EMBEDDING_DIMENSIONS
 
         # User-scoped stats
-        stats_user1 = engine.get_stats(user_id="user-1")
+        stats_user1 = await engine.get_stats(user_id="user-1")
         assert stats_user1["total_embeddings"] == 2
 
-        stats_user2 = engine.get_stats(user_id="user-2")
+        stats_user2 = await engine.get_stats(user_id="user-2")
         assert stats_user2["total_embeddings"] == 1
 
     @pytest.mark.asyncio
@@ -365,5 +365,5 @@ class TestSemanticSearchEngine:
         await engine.index_entity("ent-1", "first text", "user-1")
         await engine.index_entity("ent-1", "updated text", "user-1")
 
-        stats = engine.get_stats(user_id="user-1")
+        stats = await engine.get_stats(user_id="user-1")
         assert stats["total_embeddings"] == 1

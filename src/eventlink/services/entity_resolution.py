@@ -332,7 +332,7 @@ class EntityResolutionEngine:
                 count=len(candidates),
             )
 
-        stmt = select(Entity).where(base_conditions)
+        stmt = select(Entity).where(base_conditions).limit(500)
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 

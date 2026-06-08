@@ -7,6 +7,8 @@ Provides caching for:
 """
 
 import json
+import time
+from collections import OrderedDict
 from typing import Any
 
 from eventlink.config import get_settings
@@ -15,6 +17,8 @@ from eventlink.core.logging import get_logger
 logger = get_logger("eventlink.redis")
 
 _redis_client = None
+
+_MEMORY_CACHE_MAX_SIZE = 1000
 
 async def get_redis():
     """Get or create Redis client (singleton)."""
@@ -48,7 +52,8 @@ class CacheService:
     """Application-level cache service with Redis backend and in-memory fallback."""
 
     def __init__(self):
-        self._memory_cache: dict[str, Any] = {}
+        # OrderedDict for LRU-like eviction; stores (value, expire_at) tuples
+        self._memory_cache: OrderedDict[str, tuple[Any, float]] = OrderedDict()
 
     async def get(self, key: str) -> Any | None:
         """Get cached value by key."""
@@ -61,7 +66,17 @@ class CacheService:
             except Exception as e:
                 logger.warning("redis_get_failed", key=key, error=str(e))
         # Fallback to memory cache
-        return self._memory_cache.get(key)
+        entry = self._memory_cache.get(key)
+        if entry is None:
+            return None
+        value, expire_at = entry
+        if expire_at > 0 and time.time() > expire_at:
+            # Entry has expired
+            del self._memory_cache[key]
+            return None
+        # Move to end to mark as recently used
+        self._memory_cache.move_to_end(key)
+        return value
 
     async def set(self, key: str, value: Any, ttl: int = 3600) -> None:
         """Set cached value with TTL in seconds."""
@@ -72,8 +87,13 @@ class CacheService:
                 return
             except Exception as e:
                 logger.warning("redis_set_failed", key=key, error=str(e))
-        # Fallback to memory cache (no TTL)
-        self._memory_cache[key] = value
+        # Fallback to memory cache with TTL
+        expire_at = time.time() + ttl if ttl > 0 else 0
+        self._memory_cache[key] = (value, expire_at)
+        self._memory_cache.move_to_end(key)
+        # Evict oldest entries when over capacity
+        while len(self._memory_cache) > _MEMORY_CACHE_MAX_SIZE:
+            self._memory_cache.popitem(last=False)
 
     async def delete(self, key: str) -> None:
         """Delete cached value."""

@@ -31,7 +31,6 @@ router = APIRouter(prefix="/voice", tags=["Voice"])
 class VoiceQueryRequest(BaseModel):
     """Request body for voice query."""
 
-    user_id: str = Field(default="", description="用户ID，为空时使用认证用户ID")
     text: str = Field(..., min_length=1, max_length=2000, description="语音转写的用户查询文字")
 
 
@@ -65,8 +64,8 @@ async def voice_query(
     """
     new_request_id()
 
-    # Use body user_id if provided, otherwise fall back to auth user_id
-    user_id = body.user_id or auth_user_id
+    # Use authenticated user_id directly
+    user_id = auth_user_id
 
     logger.info(
         "voice_query_received",

@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from eventlink.config import get_settings
 from eventlink.core.auth import get_current_user_id
 from eventlink.core.logging import get_logger, new_request_id
+from eventlink.core.text_utils import sanitize_llm_input
 from eventlink.database import get_async_session
 from eventlink.models.entity import Entity
 from eventlink.models.event import Event
@@ -34,7 +35,6 @@ settings = get_settings()
 class DemandInputRequest(BaseModel):
     """Request body for demand input."""
 
-    user_id: str = Field(..., min_length=1, description="用户ID")
     text: str = Field(..., min_length=1, max_length=2000, description="需求文本")
     source: str = Field(default="text", pattern="^(voice|text)$", description="输入来源: voice/text")
 
@@ -134,13 +134,13 @@ async def create_demand(
 
     logger.info(
         "demand_input_received",
-        user_id=body.user_id,
+        user_id=authenticated_user_id,
         text_preview=body.text[:100],
         source=body.source,
     )
 
-    # Use authenticated user_id, fall back to body.user_id
-    user_id = authenticated_user_id or body.user_id
+    # Use authenticated user_id directly
+    user_id = authenticated_user_id
 
     # ── Step 1: Extract demand info via LLM ──
     extracted = await _extract_demand(body.text)
@@ -246,7 +246,7 @@ async def _extract_demand(text: str) -> dict:
     """Extract demand info from text using LLM, with keyword fallback."""
     try:
         llm_client = LLMClient(config=settings)
-        prompt = _DEMAND_EXTRACTION_PROMPT.format(text=text)
+        prompt = _DEMAND_EXTRACTION_PROMPT.format(text=sanitize_llm_input(text))
         result = await llm_client.call_json(prompt, max_tokens=200, temperature=0.1)
 
         # Validate required fields
