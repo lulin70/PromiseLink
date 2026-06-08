@@ -151,10 +151,14 @@ async def tts_endpoint(
         )
 
     if result.audio_bytes is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="TTS service unavailable",
-        )
+        # Server TTS unavailable — return text with client TTS flag
+        # Frontend should use WeChat Mini Program native TTS plugin
+        return {
+            "text": body.text,
+            "use_client_tts": True,
+            "provider": result.provider,
+            "message": "Server TTS unavailable, use client-side TTS (e.g. WeChat plugin)",
+        }
 
     from fastapi.responses import Response
 
@@ -165,6 +169,7 @@ async def tts_endpoint(
             "Content-Disposition": "attachment; filename=tts_output.mp3",
             "X-Provider": result.provider,
             "X-Duration-Ms": str(result.duration_ms or 0),
+            "X-Use-Client-TTS": "false",
         },
     )
 
