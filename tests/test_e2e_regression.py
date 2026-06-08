@@ -426,7 +426,7 @@ async def test_e2e_association_with_dict_concern(db_session):
 
     # Test _discover_supply_demand with dict-format concern
     engine = AssociationDiscoveryEngine(session=db_session)
-    score, evidence = engine._discover_supply_demand(entity_a, entity_b)
+    score, evidence = await engine._discover_supply_demand(entity_a, entity_b)
 
     # Should find supply-demand match (A's resource → B's concern, etc.)
     assert isinstance(score, float)

@@ -1,6 +1,7 @@
 """Authentication endpoints."""
 
 import hashlib
+import hmac
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -30,7 +31,8 @@ async def login(request: LoginRequest):
     poc_secret = os.environ.get("EVENTLINK_POC_SECRET", "")
     if not poc_secret:
         raise HTTPException(status_code=403, detail="PoC login is disabled. Use /auth/wechat/login.")
-    if request.poc_secret != poc_secret:
+    # Use constant-time comparison to prevent timing attacks
+    if not hmac.compare_digest(request.poc_secret, poc_secret):
         raise HTTPException(status_code=401, detail="Invalid PoC secret")
     token = create_access_token(request.user_id)
     return LoginResponse(access_token=token, user_id=request.user_id)

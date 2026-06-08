@@ -1,5 +1,7 @@
 """FastAPI application entry point."""
 
+import asyncio
+import signal
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -13,23 +15,68 @@ from eventlink.database import close_db, init_db
 
 settings = get_settings()
 
+# Graceful shutdown state
+_shutdown_event = asyncio.Event()
+_pending_tasks: set[asyncio.Task] = set()
+
+
+def _track_task(task: asyncio.Task):
+    """Track background tasks for graceful shutdown."""
+    _pending_tasks.add(task)
+    task.add_done_callback(_pending_tasks.discard)
+
+
+def _signal_handler(signum, frame):
+    """Handle SIGTERM/SIGINT for graceful shutdown."""
+    import structlog
+    logger = structlog.get_logger()
+    logger.info("shutdown_signal_received", signal=signum, pending_tasks=len(_pending_tasks))
+    _shutdown_event.set()
+
+
+# Register signal handlers
+signal.signal(signal.SIGTERM, _signal_handler)
+signal.signal(signal.SIGINT, _signal_handler)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager."""
+    """Application lifespan manager with graceful shutdown."""
     # Startup
-    print("🚀 EventLink starting up...")
+    import structlog
+    logger = structlog.get_logger()
+    logger.info("eventlink_starting")
     await init_db()
-    print("✅ Database initialized")
+    logger.info("database_initialized")
 
     yield
 
-    # Shutdown
-    print("🛑 EventLink shutting down...")
+    # Shutdown — drain pending tasks
+    logger.info("eventlink_shutting_down", pending_tasks=len(_pending_tasks))
+
+    if _pending_tasks:
+        logger.info("waiting_for_pending_tasks", count=len(_pending_tasks))
+        # Wait up to 30 seconds for pending tasks to complete
+        try:
+            done, pending = await asyncio.wait(
+                _pending_tasks, timeout=30.0
+            )
+            if pending:
+                logger.warning(
+                    "cancelling_pending_tasks",
+                    cancelled_count=len(pending),
+                )
+                for task in pending:
+                    task.cancel()
+                # Wait for cancellation to propagate
+                await asyncio.gather(*pending, return_exceptions=True)
+        except Exception as e:
+            logger.error("shutdown_task_error", error=str(e))
+
     from eventlink.core.redis import close_redis
     await close_redis()
     await close_db()
-    print("✅ Database connections closed")
+    logger.info("shutdown_complete")
 
 
 app = FastAPI(
