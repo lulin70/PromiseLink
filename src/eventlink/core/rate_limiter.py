@@ -40,6 +40,15 @@ class InMemorySlidingWindow:
         now = time.time()
         window_start = now - WINDOW_SECONDS
 
+        # Periodic cleanup: when total keys exceed 1000, remove keys with no valid timestamps
+        if len(self._windows) > 1000:
+            expired_keys = [
+                k for k, timestamps in self._windows.items()
+                if not timestamps or all(ts <= window_start for ts in timestamps)
+            ]
+            for k in expired_keys:
+                del self._windows[k]
+
         # Remove expired entries
         timestamps = self._windows[key]
         self._windows[key] = [ts for ts in timestamps if ts > window_start]

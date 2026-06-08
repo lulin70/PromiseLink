@@ -6,6 +6,7 @@ Uses sqlite-vec extension for vector similarity search.
 Design reference: EventLink_技术设计_v1.md v2.8 §4.12.2
 """
 
+import asyncio
 import sqlite3
 import struct
 from dataclasses import dataclass, field
@@ -129,7 +130,7 @@ class SemanticSearchEngine:
         embedding = await self.provider.embed(text)
         if self._actual_dims is None:
             self._actual_dims = len(embedding)
-        self._store_embedding("entity", entity_id, embedding, user_id, text)
+        await self._store_embedding("entity", entity_id, embedding, user_id, text)
 
     async def index_event(self, event_id: str, text: str, user_id: str) -> None:
         """Index an Event's text for semantic search.
@@ -142,9 +143,9 @@ class SemanticSearchEngine:
         embedding = await self.provider.embed(text)
         if self._actual_dims is None:
             self._actual_dims = len(embedding)
-        self._store_embedding("event", event_id, embedding, user_id, text)
+        await self._store_embedding("event", event_id, embedding, user_id, text)
 
-    def _store_embedding(
+    async def _store_embedding(
         self,
         target_type: str,
         target_id: str,
@@ -154,37 +155,42 @@ class SemanticSearchEngine:
     ) -> None:
         """Store an embedding in the database."""
         blob = self._embedding_to_blob(embedding)
-        conn = sqlite3.connect(self.db_path)
-        try:
-            conn.execute("""
-                INSERT OR REPLACE INTO vector_embeddings
-                    (target_type, target_id, user_id, embedding, source_text, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                target_type,
-                target_id,
-                user_id,
-                blob,
-                source_text,
-                datetime.now(UTC).isoformat(),
-            ))
+        vec_available = self._vec_available
 
-            # Also insert into vec virtual table if available
-            if self._vec_available:
+        def _do_store():
+            conn = sqlite3.connect(self.db_path)
+            try:
                 conn.execute("""
-                    INSERT OR REPLACE INTO vec_entities (embedding, target_id, user_id)
-                    VALUES (?, ?, ?)
-                """, (blob, f"{target_type}:{target_id}", user_id))
+                    INSERT OR REPLACE INTO vector_embeddings
+                        (target_type, target_id, user_id, embedding, source_text, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    target_type,
+                    target_id,
+                    user_id,
+                    blob,
+                    source_text,
+                    datetime.now(UTC).isoformat(),
+                ))
 
-            conn.commit()
-            logger.debug(
-                "embedding_stored",
-                target_type=target_type,
-                target_id=target_id,
-                dims=len(embedding),
-            )
-        finally:
-            conn.close()
+                # Also insert into vec virtual table if available
+                if vec_available:
+                    conn.execute("""
+                        INSERT OR REPLACE INTO vec_entities (embedding, target_id, user_id)
+                        VALUES (?, ?, ?)
+                    """, (blob, f"{target_type}:{target_id}", user_id))
+
+                conn.commit()
+                logger.debug(
+                    "embedding_stored",
+                    target_type=target_type,
+                    target_id=target_id,
+                    dims=len(embedding),
+                )
+            finally:
+                conn.close()
+
+        await asyncio.to_thread(_do_store)
 
     async def search(
         self, query: str, user_id: str, top_k: int = 10
@@ -204,67 +210,77 @@ class SemanticSearchEngine:
         if self._vec_available:
             return await self._search_with_vec(query_embedding, user_id, top_k)
         else:
-            return self._search_with_python(query_embedding, user_id, top_k)
+            return await self._search_with_python(query_embedding, user_id, top_k)
 
     async def _search_with_vec(
         self, query_embedding: list[float], user_id: str, top_k: int
     ) -> list[SearchResult]:
         """Search using sqlite-vec virtual table."""
-        conn = sqlite3.connect(self.db_path)
-        try:
-            results = conn.execute("""
-                SELECT
-                    vec_entities.target_id,
-                    1 - vec_entities.distance AS similarity
-                FROM vec_entities
-                WHERE vec_entities.user_id = ?
-                ORDER BY vec_entities.distance
-                LIMIT ?
-            """, (user_id, top_k)).fetchall()
+        db_path = self.db_path
 
-            search_results = []
-            for target_id_str, similarity in results:
-                # Parse "type:id" format
-                parts = target_id_str.split(":", 1)
-                if len(parts) == 2:
-                    target_type, target_id = parts
-                    search_results.append(SearchResult(
+        def _do_search():
+            conn = sqlite3.connect(db_path)
+            try:
+                results = conn.execute("""
+                    SELECT
+                        vec_entities.target_id,
+                        1 - vec_entities.distance AS similarity
+                    FROM vec_entities
+                    WHERE vec_entities.user_id = ?
+                    ORDER BY vec_entities.distance
+                    LIMIT ?
+                """, (user_id, top_k)).fetchall()
+
+                search_results = []
+                for target_id_str, similarity in results:
+                    # Parse "type:id" format
+                    parts = target_id_str.split(":", 1)
+                    if len(parts) == 2:
+                        target_type, target_id = parts
+                        search_results.append(SearchResult(
+                            target_type=target_type,
+                            target_id=target_id,
+                            score=round(similarity, 4),
+                        ))
+
+                return search_results
+            finally:
+                conn.close()
+
+        return await asyncio.to_thread(_do_search)
+
+    async def _search_with_python(
+        self, query_embedding: list[float], user_id: str, top_k: int
+    ) -> list[SearchResult]:
+        """Fallback search using Python cosine similarity."""
+        db_path = self.db_path
+
+        def _do_search():
+            conn = sqlite3.connect(db_path)
+            try:
+                rows = conn.execute("""
+                    SELECT target_type, target_id, embedding
+                    FROM vector_embeddings
+                    WHERE user_id = ?
+                """, (user_id,)).fetchall()
+
+                results = []
+                for target_type, target_id, blob in rows:
+                    stored_embedding = self._blob_to_embedding(blob)
+                    similarity = self._cosine_similarity(query_embedding, stored_embedding)
+                    results.append(SearchResult(
                         target_type=target_type,
                         target_id=target_id,
                         score=round(similarity, 4),
                     ))
 
-            return search_results
-        finally:
-            conn.close()
+                # Sort by similarity descending
+                results.sort(key=lambda r: r.score, reverse=True)
+                return results[:top_k]
+            finally:
+                conn.close()
 
-    def _search_with_python(
-        self, query_embedding: list[float], user_id: str, top_k: int
-    ) -> list[SearchResult]:
-        """Fallback search using Python cosine similarity."""
-        conn = sqlite3.connect(self.db_path)
-        try:
-            rows = conn.execute("""
-                SELECT target_type, target_id, embedding
-                FROM vector_embeddings
-                WHERE user_id = ?
-            """, (user_id,)).fetchall()
-
-            results = []
-            for target_type, target_id, blob in rows:
-                stored_embedding = self._blob_to_embedding(blob)
-                similarity = self._cosine_similarity(query_embedding, stored_embedding)
-                results.append(SearchResult(
-                    target_type=target_type,
-                    target_id=target_id,
-                    score=round(similarity, 4),
-                ))
-
-            # Sort by similarity descending
-            results.sort(key=lambda r: r.score, reverse=True)
-            return results[:top_k]
-        finally:
-            conn.close()
+        return await asyncio.to_thread(_do_search)
 
     @staticmethod
     def _cosine_similarity(a: list[float], b: list[float]) -> float:
@@ -276,24 +292,31 @@ class SemanticSearchEngine:
             return 0.0
         return dot / (norm_a * norm_b)
 
-    def get_stats(self, user_id: str | None = None) -> dict:
+    async def get_stats(self, user_id: str | None = None) -> dict:
         """Get indexing statistics."""
-        conn = sqlite3.connect(self.db_path)
-        try:
-            if user_id:
-                count = conn.execute(
-                    "SELECT COUNT(*) FROM vector_embeddings WHERE user_id = ?",
-                    (user_id,)
-                ).fetchone()[0]
-            else:
-                count = conn.execute(
-                    "SELECT COUNT(*) FROM vector_embeddings"
-                ).fetchone()[0]
+        db_path = self.db_path
+        actual_dims = self._actual_dims
+        vec_available = self._vec_available
 
-            return {
-                "total_embeddings": count,
-                "vec_available": self._vec_available,
-                "dimensions": self._actual_dims or LOCAL_EMBEDDING_DIMENSIONS,
-            }
-        finally:
-            conn.close()
+        def _do_stats():
+            conn = sqlite3.connect(db_path)
+            try:
+                if user_id:
+                    count = conn.execute(
+                        "SELECT COUNT(*) FROM vector_embeddings WHERE user_id = ?",
+                        (user_id,)
+                    ).fetchone()[0]
+                else:
+                    count = conn.execute(
+                        "SELECT COUNT(*) FROM vector_embeddings"
+                    ).fetchone()[0]
+
+                return {
+                    "total_embeddings": count,
+                    "vec_available": vec_available,
+                    "dimensions": actual_dims or LOCAL_EMBEDDING_DIMENSIONS,
+                }
+            finally:
+                conn.close()
+
+        return await asyncio.to_thread(_do_stats)

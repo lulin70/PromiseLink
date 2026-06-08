@@ -4,6 +4,7 @@ Provides a structured JSON export of all user-owned data for data
 portability and compliance (Phase 1 PRD requirement).
 """
 
+import asyncio
 import sqlite3
 import uuid
 from datetime import UTC, datetime
@@ -145,7 +146,7 @@ async def export_user_data(
     todos = todos_result.scalars().all()
 
     # ── Vector embeddings (separate SQLite DB) ──
-    vector_embeddings = _fetch_vector_embeddings(user_id_str)
+    vector_embeddings = await asyncio.to_thread(_fetch_vector_embeddings, user_id_str)
 
     # ── Assemble export payload ──
     export_data = {
