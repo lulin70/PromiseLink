@@ -15,11 +15,17 @@ Implements 12-module relationship brief generation and management:
   12. notes               - Manual notes
 """
 
+from __future__ import annotations
+
 import copy
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from eventlink.services.llm_client import LLMClient
+    from eventlink.services.llm_provider import LLMProvider
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -63,7 +69,7 @@ class RelationshipBriefService:
     def __init__(
         self,
         session: AsyncSession,
-        llm_client: Any | None = None,
+        llm_client: LLMProvider | LLMClient | None = None,
     ) -> None:
         self.session = session
         self.llm_client = llm_client

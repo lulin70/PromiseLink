@@ -1,8 +1,8 @@
 # EventLink API设计文档
 
-> **版本**: 0.2.9 (POC阶段)
+> **版本**: v2.10 (POC阶段)
 > **日期**: 2026-06-08
-> **阶段**: POC (0.2.x series)
+> **阶段**: POC (v2.x series)
 > **设计师**: 架构师 + 开发团队
 > **参考**: PRD v4.3, 技术设计 v2.7 §7
 > **v2.6变更**: Insight Engine API新增priority-breakdown/upcoming-context端点(§3.13)、Todo schema新增dependency_raw/context_raw字段
@@ -34,7 +34,86 @@
 
 ## 2. 认证与授权
 
-### 2.1 临时授权码模式（小程序→H5）
+> **实现状态**: ✅已实现 2 个 | 📋Phase 2 3 个 | ⚠️路径差异 0 个
+
+### 2.0 当前实现（PoC阶段）
+
+> **定位**: PoC阶段使用的简化认证方案，直接签发JWT，无需临时授权码。
+
+#### 2.0.1 PoC阶段登录 ✅ **已实现**
+
+**端点**: `POST /api/v1/auth/login`
+
+**请求**:
+```json
+{
+  "user_id": "uuid-of-user",
+  "poc_secret": "shared-secret-for-poc"
+}
+```
+
+**响应**:
+```json
+{
+  "access_token": "eyJhbGc...",
+  "token_type": "Bearer",
+  "expires_in": 86400
+}
+```
+
+**说明**:
+- PoC阶段简化认证，使用共享密钥验证
+- 生产环境将替换为完整认证流程
+
+#### 2.0.2 微信小程序登录 ✅ **已实现**
+
+**端点**: `POST /api/v1/auth/wechat/login`
+
+**请求**:
+```json
+{
+  "code": "wechat-login-code"
+}
+```
+
+**响应**:
+```json
+{
+  "access_token": "eyJhbGc...",
+  "token_type": "Bearer",
+  "expires_in": 86400
+}
+```
+
+**说明**:
+- 接收微信小程序 `wx.login()` 获取的 code
+- 服务端调用微信API换取 openid
+- 根据 openid 查找或创建用户，签发JWT
+
+#### 2.0.3 JWT Payload（当前实现）
+
+**Payload结构**:
+```json
+{
+  "sub": "user_id (UUID)",
+  "iat": 1622619900,
+  "exp": 1622706300,
+  "iss": "eventlink",
+  "aud": "eventlink-api"
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `sub` | string (UUID) | 用户唯一标识，对应 user_id |
+| `iat` | integer | 签发时间（Unix时间戳） |
+| `exp` | integer | 过期时间（Unix时间戳，默认24小时） |
+| `iss` | string | 签发者，固定为 `"eventlink"` |
+| `aud` | string | 受众，固定为 `"eventlink-api"` |
+
+### 2.1 临时授权码模式（小程序→H5）📋 **Phase 2 规划**
+
+> **定位**: Phase 2 完整认证方案，支持小程序→H5跨端授权。当前PoC阶段使用 §2.0 简化方案。
 
 ```mermaid
 sequenceDiagram
@@ -50,7 +129,7 @@ sequenceDiagram
     H5->>H5: 保存token到sessionStorage
 ```
 
-#### 2.1.1 生成授权码
+#### 2.1.1 生成授权码 📋 **Phase 2**
 
 **端点**: `POST /api/v1/auth/ticket`
 
@@ -76,7 +155,7 @@ sequenceDiagram
 - Ticket存储在Redis，60秒有效
 - 单次使用（exchange后自动删除）
 
-#### 2.1.2 交换Token
+#### 2.1.2 交换Token 📋 **Phase 2**
 
 **端点**: `POST /api/v1/auth/exchange`
 
@@ -104,7 +183,8 @@ sequenceDiagram
   "user_id": "uuid",
   "exp": 1622620800,
   "iat": 1622619900,
-  "iss": "eventlink"
+  "iss": "eventlink",
+  "aud": "eventlink-api"
 }
 ```
 
@@ -144,7 +224,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 | SC-JWT-3 | Refresh Token旋转 | 每次刷新生成新token对，旧token立即失效 | 防止token重放攻击 |
 | SC-JWT-4 | CORS白名单 | 跨域请求仅允许配置的Origin列表 | **禁止使用 `*` 通配符** |
 
-**Token刷新**: `POST /api/v1/auth/refresh`
+**Token刷新**: `POST /api/v1/auth/refresh` 📋 **Phase 2**
 
 ---
 
@@ -152,7 +232,9 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ### 3.1 Events API
 
-#### 3.1.1 创建事件
+> **实现状态**: ✅已实现 2 个 | 📋Phase 2 0 个 | ⚠️路径差异 0 个
+
+#### 3.1.1 创建事件 ✅ **已实现**
 
 **端点**: `POST /api/v1/events`
 
@@ -207,7 +289,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-#### 3.1.2 查询事件
+#### 3.1.2 查询事件 ✅ **已实现**
 
 **端点**: `GET /api/v1/events/{id}`
 
@@ -236,7 +318,9 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ### 3.2 Entities API
 
-#### 3.2.1 搜索实体
+> **实现状态**: ✅已实现 3 个 | 📋Phase 2 4 个 | ⚠️路径差异 0 个
+
+#### 3.2.1 搜索实体 ✅ **已实现**
 
 **端点**: `GET /api/v1/entities`
 
@@ -276,7 +360,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-#### 3.2.2 实体详情（含画像）
+#### 3.2.2 实体详情（含画像） ✅ **已实现**
 
 **端点**: `GET /api/v1/entities/{id}`
 
@@ -347,7 +431,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-#### 3.2.3 修正实体信息
+#### 3.2.3 修正实体信息 ✅ **已实现**
 
 **端点**: `PATCH /api/v1/entities/{id}`
 
@@ -365,7 +449,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 
 **响应**: `200 OK`（返回更新后的实体）
 
-#### 3.2.4 修改资源敏感度
+#### 3.2.4 修改资源敏感度 📋 **Phase 2**
 
 **端点**: `PATCH /api/v1/entities/{id}/sensitivity`
 
@@ -400,7 +484,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-#### 3.2.5 添加/确认关注点
+#### 3.2.5 添加/确认关注点 📋 **Phase 2**
 
 **端点**: `PATCH /api/v1/entities/{id}/concern`
 
@@ -432,7 +516,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-#### 3.2.6 添加/更新承诺
+#### 3.2.6 添加/更新承诺 📋 **Phase 2**
 
 **端点**: `PATCH /api/v1/entities/{id}/promise`
 
@@ -465,7 +549,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-#### 3.2.7 记录帮助
+#### 3.2.7 记录帮助 📋 **Phase 2**
 
 **端点**: `PATCH /api/v1/entities/{id}/contribution`
 
@@ -498,7 +582,9 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ### 3.3 Associations API
 
-#### 3.3.1 查询关联
+> **实现状态**: ✅已实现 1 个 | 📋Phase 2 1 个 | ⚠️路径差异 0 个
+
+#### 3.3.1 查询关联 ✅ **已实现**
 
 **端点**: `GET /api/v1/associations`
 
@@ -536,7 +622,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-#### 3.3.2 实体关系图谱
+#### 3.3.2 实体关系图谱 📋 **Phase 2**
 
 **端点**: `GET /api/v1/entities/{id}/graph`
 
@@ -574,7 +660,9 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ### 3.4 Todos API
 
-#### 3.4.1 待办列表
+> **实现状态**: ✅已实现 2 个 | 📋Phase 2 2 个 | ⚠️路径差异 0 个
+
+#### 3.4.1 待办列表 ✅ **已实现**
 
 **端点**: `GET /api/v1/todos`
 
@@ -587,7 +675,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
   - `smart` — （默认）按动态评分(dynamic_score)降序排列，分数高的优先展示
   - `due_date` — 按截止时间升序排列，最紧急的优先
 - **[v2.5新增] `view`**: 视图类型（可选，见§3.9.4）
-- **[0.2.1更新] `summary_level`**: 摘要级别（可选）。枚举值：
+- **[v2.1更新] `summary_level`**: 摘要级别（可选）。枚举值：
   - `brief` — （默认）标准Todo列表格式，适合Dashboard展示
   - `detail` — 完整信息，包含完整context和关联数据
   - `voice` — 自然语言摘要，适合TTS语音输出。当 `summary_level=voice` 时响应额外返回 `voice_summary` 字段（已格式化的自然语言回答文本）
@@ -736,7 +824,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-> **[0.2.1更新]** 当 `summary_level=voice` 时，响应额外返回 `voice_summary` 字段（已PII脱敏的自然语言摘要文本，可直接用于TTS合成）：
+> **[v2.1更新]** 当 `summary_level=voice` 时，响应额外返回 `voice_summary` 字段（已PII脱敏的自然语言摘要文本，可直接用于TTS合成）：
 ```json
 {
   "total": 6,
@@ -745,7 +833,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-#### 3.4.2 更新Todo状态
+#### 3.4.2 更新Todo状态 ✅ **已实现**
 
 **端点**: `PATCH /api/v1/todos/{id}`
 
@@ -769,7 +857,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 
 **响应**: `200 OK`（返回更新后的Todo）
 
-#### 3.4.3 Todo反馈闭环
+#### 3.4.3 Todo反馈闭环 📋 **Phase 2**
 
 **端点**: `POST /api/v1/todos/{id}/feedback`
 
@@ -789,7 +877,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-#### 3.4.4 Snooze延迟
+#### 3.4.4 Snooze延迟 📋 **Phase 2**
 
 **端点**: `POST /api/v1/todos/{id}/snooze`
 
@@ -941,7 +1029,11 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ### 3.5 Digest API（摘要）
 
-#### 3.5.1 早晨简报
+> **实现状态**: ✅已实现 0 个 | 📋Phase 2 1 个 | ⚠️路径差异 1 个
+
+#### 3.5.1 早晨简报 ⚠️ **路径差异**
+
+> **说明**: 文档路径为 `/api/v1/digest/morning`，实际实现路径为 `/api/v1/dashboard/morning-brief`。
 
 **端点**: `GET /api/v1/digest/morning`
 
@@ -974,7 +1066,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-#### 3.5.2 晚间总结
+#### 3.5.2 晚间总结 📋 **Phase 2**
 
 **端点**: `GET /api/v1/digest/evening`
 
@@ -1002,7 +1094,9 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ### 3.6 Mini Program API（小程序专用）
 
-#### 3.6.1 今日会议
+> **实现状态**: ✅已实现 0 个 | 📋Phase 2 4 个 | ⚠️路径差异 0 个
+
+#### 3.6.1 今日会议 📋 **Phase 2**
 
 **端点**: `GET /api/v1/mini/today`
 
@@ -1026,7 +1120,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-#### 3.6.2 人物速览
+#### 3.6.2 人物速览 📋 **Phase 2**
 
 **端点**: `GET /api/v1/mini/person/{id}`
 
@@ -1047,7 +1141,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-#### 3.6.3 TTS语音播报
+#### 3.6.3 TTS语音播报 📋 **Phase 2**
 
 **端点**: `GET /api/v1/mini/person/{id}/tts`
 
@@ -1060,7 +1154,7 @@ Content-Type: audio/mpeg
 Content-Length: 45678
 ```
 
-#### 3.6.4 语音录入
+#### 3.6.4 语音录入 📋 **Phase 2**
 
 **端点**: `POST /api/v1/mini/voice-input`
 
@@ -1083,6 +1177,8 @@ language: zh-CN
 
 ### 3.7 Resources API（资源管理）
 
+> **实现状态**: ✅已实现 0 个 | 📋Phase 2 4 个 | ⚠️路径差异 0 个
+
 > **⚠️ F-05 暂停声明（Phase 2）**: 商机匹配相关API在 Phase 1 暂不实现。以下端点标记为 **Phase 2**：
 > - `GET /api/v1/resources/match` — 资源匹配查询（单边匹配+六维加权评分算法）
 > - 商机匹配度五维算法（keyword/industry/topic/llm/history/callability）
@@ -1092,7 +1188,7 @@ language: zh-CN
 
 > **定位**: 资源管理是AI驱动的个人商务关系经营助手的核心能力，支持单边匹配——"我的需求匹配我人脉的供给"。
 
-#### 3.7.1 查看实体资源列表
+#### 3.7.1 查看实体资源列表 📋 **Phase 2**
 
 **端点**: `GET /api/v1/entities/{id}/resources`
 
@@ -1133,7 +1229,7 @@ language: zh-CN
 }
 ```
 
-#### 3.7.2 添加资源标签
+#### 3.7.2 添加资源标签 📋 **Phase 2**
 
 **端点**: `POST /api/v1/entities/{id}/resources`
 
@@ -1168,7 +1264,7 @@ language: zh-CN
 }
 ```
 
-#### 3.7.3 删除资源标签
+#### 3.7.3 删除资源标签 📋 **Phase 2**
 
 **端点**: `DELETE /api/v1/entities/{id}/resources/{resource_id}`
 
@@ -1189,7 +1285,7 @@ language: zh-CN
 }
 ```
 
-#### 3.7.4 资源匹配查询
+#### 3.7.4 资源匹配查询 📋 **Phase 2**
 
 **端点**: `GET /api/v1/resources/match`
 
@@ -1277,6 +1373,7 @@ language: zh-CN
 ### 3.8 AI输出语言规则
 
 > **定位**: 所有LLM生成的响应必须遵循统一的语言规则，确保用户能清晰区分AI推断与事实，并对敏感结论保持审慎。
+> **说明**: 本节为规则定义，非API端点。
 
 #### 3.8.1 规则概述
 
@@ -1370,8 +1467,9 @@ language: zh-CN
 ### 3.9 Dashboard & 关系推进卡 API（v2.0新增，P0端点）
 
 > **定位**: v2.3/v2.4 新增的P0核心端点，支撑关系经营闭环。
+> **实现状态**: ✅已实现 1 个 | 📋Phase 2 1 个 | ⚠️路径差异 1 个
 
-#### 3.9.1 获取关系推进卡
+#### 3.9.1 获取关系推进卡 ✅ **已实现**
 
 **端点**: `GET /api/v1/persons/{id}/relationship-brief`
 
@@ -1380,7 +1478,7 @@ language: zh-CN
 **路径参数**:
 - `id`: 人物实体ID（UUID）
 
-**[0.2.1更新] 查询参数**:
+**[v2.1更新] 查询参数**:
 - `summary_level`: 摘要级别（可选）。枚举值：
   - `brief` — （默认）完整12模块详情，适合关系推进卡页面展示
   - `detail` — 扩展信息，包含更多历史交互数据
@@ -1439,9 +1537,11 @@ language: zh-CN
 }
 ```
 
-> **[0.2.1更新]** `voice_summary` 字段仅在 `summary_level=voice` 时返回，为已PII脱敏的自然语言摘要文本，可直接用于TTS合成。
+> **[v2.1更新]** `voice_summary` 字段仅在 `summary_level=voice` 时返回，为已PII脱敏的自然语言摘要文本，可直接用于TTS合成。
 
-#### 3.9.2 用户确认阶段变更（含乐观锁）
+#### 3.9.2 用户确认阶段变更（含乐观锁） ⚠️ **路径差异**
+
+> **说明**: 文档路径为 `PATCH /api/v1/persons/{id}/relationship-brief/stage`，实际实现路径为 `PATCH /api/v1/relationship-briefs/{id}`。
 
 **端点**: `PATCH /api/v1/persons/{id}/relationship-brief/stage`
 
@@ -1526,7 +1626,7 @@ language: zh-CN
 }
 ```
 
-#### 3.9.3 今日Dashboard
+#### 3.9.3 今日Dashboard 📋 **Phase 2**
 
 **端点**: `GET /api/v1/dashboard/today`
 
@@ -1594,7 +1694,9 @@ language: zh-CN
 
 ### 3.10 记录贡献与反馈 API（v2.0新增）
 
-#### 3.10.1 记录已提供的帮助/回应
+> **实现状态**: ✅已实现 0 个 | 📋Phase 2 2 个 | ⚠️路径差异 0 个
+
+#### 3.10.1 记录已提供的帮助/回应 📋 **Phase 2**
 
 **端点**: `POST /api/v1/contributions`
 
@@ -1633,7 +1735,7 @@ language: zh-CN
 }
 ```
 
-#### 3.10.2 记录反馈与下一步
+#### 3.10.2 记录反馈与下一步 📋 **Phase 2**
 
 **端点**: `POST /api/v1/feedbacks`
 
@@ -1699,17 +1801,19 @@ language: zh-CN
 
 ### 3.11 日视图API（F-49, Phase 1, v2.0新增）
 
-**端点**: `GET /api/v1/dashboard/day-view?date=YYYY-MM-DD`
+> **实现状态**: ✅已实现 1 个 | 📋Phase 2 0 个 | ⚠️路径差异 0 个
+
+**端点**: `GET /api/v1/dashboard/day-view?date=YYYY-MM-DD` ✅ **已实现**
 
 **说明**: 按日期聚合展示当日所有会议分组、参与人、关联Todo和关键词摘要。用于日历视图和时间线展示。
 
 **查询参数**:
 - `date`: 查询日期（必填，格式 YYYY-MM-DD，默认今天）
-- **[0.2.1更新] `summary_level`**: 摘要级别（可选）。枚举值：
+- **[v2.1更新] `summary_level`**: 摘要级别（可选）。枚举值：
   - `brief` — （默认）一句话摘要，适合Dashboard卡片展示
   - `detail` — 完整列表，适合日历详情页
   - `voice` — 自然语言段落，适合TTS语音输出。当 `summary_level=voice` 时响应额外返回 `answer_paragraph` 字段（已格式化的自然语言回答文本）
-- **[0.2.1更新] `natural_date`**: 自然语言日期（可选）。NLU解析后的自然语言日期表达，服务端转为具体date值。枚举值：`"今天"` | `"明天"` | `"后天"` | `"本周"` | `"下周"`
+- **[v2.1更新] `natural_date`**: 自然语言日期（可选）。NLU解析后的自然语言日期表达，服务端转为具体date值。枚举值：`"今天"` | `"明天"` | `"后天"` | `"本周"` | `"下周"`
 
 **响应**: `200 OK`
 ```json
@@ -1744,7 +1848,7 @@ language: zh-CN
 }
 ```
 
-> **[0.2.1更新]** `answer_paragraph` 字段仅在 `summary_level=voice` 时返回，为已PII脱敏的自然语言段落文本，可直接用于TTS合成。
+> **[v2.1更新]** `answer_paragraph` 字段仅在 `summary_level=voice` 时返回，为已PII脱敏的自然语言段落文本，可直接用于TTS合成。
 
 **实现要点**:
 - events 表按 `user_id + date(timestamp)` GROUP BY
@@ -1755,10 +1859,11 @@ language: zh-CN
 
 ---
 
-### 3.12 Voice Assistant API（F-50, Phase 1.1, v0.2.1新增）
+### 3.12 Voice Assistant API（F-50, Phase 1.1, v2.1新增）
 
 > **[F-50新增] 定位**: 语音问答交互层，接收ASR识别后的文本，经NLU意图识别后调用对应业务API，返回自然语言答案+预生成TTS音频URL。Phase 1.1为一次性会话模式（无多轮对话）。
 > **关键约束**: 不存储原始音频；TTS输出需PII脱敏（复用 `redact_pii_from_text()`）；所有端点需JWT认证。
+> **实现状态**: ✅已实现 1 个 | 📋Phase 2 2 个 | ⚠️路径差异 0 个
 
 #### 3.12.1 NLU意图枚举定义
 
@@ -1819,7 +1924,7 @@ class VoiceSessionResponse(BaseModel):
     suggest_questions: Optional[List[str]] = Field(None, description="当intent=unclear时提供建议问题")
 ```
 
-#### 3.12.3 创建语音问答会话
+#### 3.12.3 创建语音问答会话 ✅ **已实现**
 
 **[F-50新增] 端点**: `POST /api/v1/voice/session`
 
@@ -1895,7 +2000,7 @@ class VoiceSessionResponse(BaseModel):
 6. 返回 session_id + answer_text + tts_url + source_data
 ```
 
-#### 3.12.4 获取TTS音频
+#### 3.12.4 获取TTS音频 📋 **Phase 2**
 
 **[F-50新增] 端点**: `GET /api/v1/voice/tts/{session_id}`
 
@@ -1925,7 +2030,7 @@ Cache-Control: private, max-age=300
 - Cache-Control设为private（不经过共享缓存）
 - 音频文件不持久化存储，TTL过期后自动删除
 
-#### 3.12.5 语音回答质量反馈
+#### 3.12.5 语音回答质量反馈 📋 **Phase 2**
 
 **[F-50新增] 端点**: `POST /api/v1/voice/feedback`
 
@@ -1970,8 +2075,9 @@ Cache-Control: private, max-age=300
 ### 3.13 Insight Engine API（v2.5 新增）
 
 > **定位**: Insight Engine 将 Todo 从"被动记录"升级为"主动服务"，基于动态优先级评分和隐式反馈驱动用户注意力。
+> **实现状态**: ✅已实现 2 个 | 📋Phase 2 4 个 | ⚠️路径差异 0 个
 
-#### 3.13.1 按动态评分排序的 Todo 列表
+#### 3.13.1 按动态评分排序的 Todo 列表 ✅ **已实现**
 
 **端点**: `GET /api/v1/todos?sort=smart`
 
@@ -1987,7 +2093,7 @@ Cache-Control: private, max-age=300
 
 **示例**: `GET /api/v1/todos?sort=smart&status=pending`
 
-#### 3.13.2 按截止时间排序的 Todo 列表
+#### 3.13.2 按截止时间排序的 Todo 列表 ✅ **已实现**
 
 **端点**: `GET /api/v1/todos?sort=due_date`
 
@@ -2003,7 +2109,7 @@ Cache-Control: private, max-age=300
 
 **示例**: `GET /api/v1/todos?sort=due_date&status=pending`
 
-#### 3.13.3 触发优先级重新计算
+#### 3.13.3 触发优先级重新计算 📋 **Phase 2**
 
 **端点**: `POST /api/v1/insights/calculate`
 
@@ -2059,7 +2165,7 @@ Cache-Control: private, max-age=300
 | 422 | E1003 | scope=entity 但未提供 entity_id |
 | 429 | E3000 | 超过限流（10次/分钟） |
 
-#### 3.13.4 获取隐式反馈统计
+#### 3.13.4 获取隐式反馈统计 📋 **Phase 2**
 
 **端点**: `GET /api/v1/insights/feedback-stats`
 
@@ -2114,7 +2220,7 @@ Cache-Control: private, max-age=300
 | 401 | E2000 | 未认证 |
 | 404 | E1001 | entity_id 不存在 |
 
-#### 3.13.5 获取Todo优先级评分详情（v2.6 新增, F-55/F-56）
+#### 3.13.5 获取Todo优先级评分详情（v2.6 新增, F-55/F-56） 📋 **Phase 2**
 
 **端点**: `GET /api/v1/todos/{todo_id}/priority-breakdown`
 
@@ -2192,7 +2298,7 @@ Cache-Control: private, max-age=300
 | 401 | E2000 | 未认证 |
 | 404 | E1001 | todo_id 不存在 |
 
-#### 3.13.6 获取即将见面的Entity及关联Todo（v2.6 新增, F-56）
+#### 3.13.6 获取即将见面的Entity及关联Todo（v2.6 新增, F-56） 📋 **Phase 2**
 
 **端点**: `GET /api/v1/users/{user_id}/upcoming-context`
 
@@ -2273,8 +2379,9 @@ Cache-Control: private, max-age=300
 ### 3.14 DataSourceAdapter API（v2.5 新增）
 
 > **定位**: 多数据源适配器管理接口，支持用户配置和同步不同来源的数据（微信转发、邮件、日历等）。
+> **实现状态**: ✅已实现 0 个 | 📋Phase 2 4 个 | ⚠️路径差异 0 个
 
-#### 3.14.1 列出已配置的数据源
+#### 3.14.1 列出已配置的数据源 📋 **Phase 2**
 
 **端点**: `GET /api/v1/adapters`
 
@@ -2316,7 +2423,7 @@ Cache-Control: private, max-age=300
 
 > **安全约束**: 响应中不返回 `config_encrypted` 字段内容，防止密钥泄露。
 
-#### 3.14.2 添加新数据源配置
+#### 3.14.2 添加新数据源配置 📋 **Phase 2**
 
 **端点**: `POST /api/v1/adapters`
 
@@ -2361,7 +2468,7 @@ Cache-Control: private, max-age=300
 | 409 | E1002 | 该用户已配置同名适配器（UNIQUE约束冲突） |
 | 422 | E1003 | adapter_name 不在合法枚举值内 |
 
-#### 3.14.3 手动触发同步
+#### 3.14.3 手动触发同步 📋 **Phase 2**
 
 **端点**: `POST /api/v1/adapters/{name}/sync`
 
@@ -2404,7 +2511,7 @@ Cache-Control: private, max-age=300
 | 409 | E1002 | 已有同步任务在执行中 |
 | 429 | E3000 | 超过限流（5次/分钟/适配器） |
 
-#### 3.14.4 删除数据源配置
+#### 3.14.4 删除数据源配置 📋 **Phase 2**
 
 **端点**: `DELETE /api/v1/adapters/{name}`
 
@@ -2430,8 +2537,9 @@ Cache-Control: private, max-age=300
 ### 3.15 Semantic Search API（v2.7 新增, F-57/F-58）
 
 > **定位**: 提供基于向量嵌入的语义搜索能力，支持Entity/Event的自然语言查询，同时为关联发现提供语义增强（F-58）。
+> **实现状态**: ✅已实现 0 个 | 📋Phase 2 3 个 | ⚠️路径差异 0 个
 
-#### 3.15.1 语义搜索
+#### 3.15.1 语义搜索 📋 **Phase 2**
 
 **端点**: `POST /api/v1/search/semantic`
 
@@ -2491,7 +2599,7 @@ Cache-Control: private, max-age=300
 | 401 | E2000 | 未认证 |
 | 503 | E4000 | 语义搜索服务不可用（embedding API故障） |
 
-#### 3.15.2 向量索引统计
+#### 3.15.2 向量索引统计 📋 **Phase 2**
 
 **端点**: `GET /api/v1/search/stats`
 
@@ -2519,7 +2627,7 @@ Cache-Control: private, max-age=300
 }
 ```
 
-#### 3.15.3 重建索引
+#### 3.15.3 重建索引 📋 **Phase 2**
 
 **端点**: `POST /api/v1/search/reindex`
 
@@ -2610,8 +2718,9 @@ class ReindexResponse(BaseModel):
 ### 3.16 CSV Import API（v2.8 新增, F-08）
 
 > **[F-08新增] 定位**: 冷启动数据导入，接受CSV文件上传，解析行数据为Entity对象，经EntityResolution去重归一。
+> **实现状态**: ✅已实现 1 个 | 📋Phase 2 0 个 | ⚠️路径差异 0 个
 
-#### 3.16.1 导入CSV
+#### 3.16.1 导入CSV ✅ **已实现**
 
 **端点**: `POST /api/v1/import/csv`
 
@@ -2644,8 +2753,9 @@ class ReindexResponse(BaseModel):
 ### 3.17 Data Export API（v2.8 新增, F-21）
 
 > **[F-21新增] 定位**: 用户数据可携带权保障，JSON全量导出用户所有数据。
+> **实现状态**: ✅已实现 1 个 | 📋Phase 2 0 个 | ⚠️路径差异 0 个
 
-#### 3.17.1 导出全部数据
+#### 3.17.1 导出全部数据 ✅ **已实现**
 
 **端点**: `GET /api/v1/export/json`
 
@@ -2673,8 +2783,9 @@ class ReindexResponse(BaseModel):
 ### 3.18 Demand Input API（v2.8 新增, F-36）
 
 > **[F-36新增] 定位**: 一句话需求录入，LLM提取需求标签+详情，关联已有Entity或创建orphan_demand。
+> **实现状态**: ✅已实现 1 个 | 📋Phase 2 0 个 | ⚠️路径差异 0 个
 
-#### 3.18.1 创建需求
+#### 3.18.1 创建需求 ✅ **已实现**
 
 **端点**: `POST /api/v1/demands`
 
@@ -2708,8 +2819,9 @@ class ReindexResponse(BaseModel):
 ### 3.19 Email Sync API（v2.8 新增, EmailAdapter）
 
 > **[EmailAdapter新增] 定位**: IMAP邮件同步，一封邮件一个Event，进入Pipeline处理。
+> **实现状态**: ✅已实现 1 个 | 📋Phase 2 0 个 | ⚠️路径差异 0 个
 
-#### 3.19.1 同步邮件
+#### 3.19.1 同步邮件 ✅ **已实现**
 
 **端点**: `POST /api/v1/email/sync`
 
@@ -2743,8 +2855,9 @@ class ReindexResponse(BaseModel):
 ### 3.20 WeChat Forward API（v2.8 新增, WeChatForwardAdapter）
 
 > **[WeChatForwardAdapter新增] 定位**: 微信聊天记录转发解析，纯规则解析（无LLM），支持群聊/单聊。
+> **实现状态**: ✅已实现 1 个 | 📋Phase 2 0 个 | ⚠️路径差异 0 个
 
-#### 3.20.1 转发微信消息
+#### 3.20.1 转发微信消息 ✅ **已实现**
 
 **端点**: `POST /api/v1/wechat/forward`
 
@@ -2778,8 +2891,9 @@ class ReindexResponse(BaseModel):
 ### 3.21 Voice Query API（v2.8 新增, F-50）
 
 > **[F-50新增] 定位**: 语音查询专用端点，三阶段Pipeline: NLU意图识别→DB查询→NLG回答生成。
+> **实现状态**: ✅已实现 1 个 | 📋Phase 2 0 个 | ⚠️路径差异 0 个
 
-#### 3.21.1 语音查询
+#### 3.21.1 语音查询 ✅ **已实现**
 
 **端点**: `POST /api/v1/voice/query`
 
@@ -2812,8 +2926,9 @@ class ReindexResponse(BaseModel):
 ### §3.22 Media API (v2.9新增)
 
 > **架构决策修订** (PRD v4.8): EventLink提供媒体处理服务(ASR/TTS/OCR)，但严格解耦。媒体文件仅内存处理，不持久化存储。
+> **实现状态**: ✅已实现 4 个 | 📋Phase 2 0 个 | ⚠️路径差异 0 个
 
-#### 3.22.1 POST /api/v1/media/asr
+#### 3.22.1 POST /api/v1/media/asr ✅ **已实现**
 
 语音识别：上传音频文件，返回转写文字。
 
@@ -2828,7 +2943,7 @@ class ReindexResponse(BaseModel):
 
 **限流**: LLM端点限流(20次/分钟)
 
-#### 3.22.2 POST /api/v1/media/tts
+#### 3.22.2 POST /api/v1/media/tts ✅ **已实现**
 
 文字转语音：接收文本，返回MP3音频流。
 
@@ -2841,7 +2956,7 @@ class ReindexResponse(BaseModel):
 
 **限流**: LLM端点限流(20次/分钟)
 
-#### 3.22.3 POST /api/v1/media/ocr
+#### 3.22.3 POST /api/v1/media/ocr ✅ **已实现**
 
 图片文字识别：上传图片，返回提取文字和结构化数据。
 
@@ -2867,7 +2982,7 @@ class ReindexResponse(BaseModel):
 
 **限流**: LLM端点限流(20次/分钟)
 
-#### 3.22.4 POST /api/v1/media/ocr-event
+#### 3.22.4 POST /api/v1/media/ocr-event ✅ **已实现**
 
 OCR + 自动创建Event：上传图片，OCR识别后自动创建互动记录并触发Pipeline。
 
@@ -2898,38 +3013,49 @@ OCR + 自动创建Event：上传图片，OCR识别后自动创建互动记录并
 
 GDPR合规端点，支持数据查看、导出、删除。
 
-#### 3.23.1 GET /api/v1/privacy/data-summary
+> **实现状态**: ✅已实现 3 个 | 📋Phase 2 0 个 | ⚠️路径差异 0 个
+
+#### 3.23.1 GET /api/v1/privacy/data-summary ✅ **已实现**
 
 返回用户数据统计摘要。
 
 **Response 200**:
 ```json
 {
-  "user_id": "uuid",
-  "events": 42,
-  "entities": 28,
-  "todos": 15,
-  "associations": 35,
-  "voice_sessions": 8
+  "events": 0,
+  "entities": 0,
+  "todos": 0,
+  "associations": 0,
+  "voice_sessions": 0
 }
 ```
 
-#### 3.23.2 DELETE /api/v1/privacy/user-data
+#### 3.23.2 DELETE /api/v1/privacy/user-data ✅ **已实现**
 
 删除用户所有数据（GDPR被遗忘权）。按FK依赖顺序删除。
 
 **Response 200**:
 ```json
-{ "deleted": { "events": 42, "entities": 28, ... }, "message": "All user data deleted" }
+{
+  "deleted": true,
+  "events_deleted": 0,
+  "entities_deleted": 0,
+  "todos_deleted": 0,
+  "associations_deleted": 0,
+  "voice_sessions_deleted": 0
+}
 ```
 
-#### 3.23.3 POST /api/v1/privacy/export
+#### 3.23.3 POST /api/v1/privacy/export ✅ **已实现**
 
 触发全量数据导出。
 
 **Response 200**:
 ```json
-{ "download_url": "/api/v1/export/{user_id}", "format": "json" }
+{
+  "download_url": "/api/v1/export/{user_id}",
+  "message": "Export initiated successfully"
+}
 ```
 
 ---
@@ -2951,8 +3077,8 @@ GDPR合规端点，支持数据查看、导出、删除。
 | `GET /api/v1/digest/morning` / `evening` | 所有文本字段 | 摘要中的所有内容 |
 | `GET /api/v1/mini/person/{id}` | `key_points`, `associations_summary` | 小程序人物速览 |
 | `GET /api/v1/data/export` | **全部PII字段** | 数据导出（CSV/JSON均适用） |
-| **[0.2.1新增]** `POST /api/v1/voice/session` | `answer_text` | 语音回答文本（TTS合成前脱敏） |
-| **[0.2.1新增]** `GET /api/v1/voice/tts/{session_id}` | 音频内容 | TTS音频（合成源文本已脱敏） |
+| **[v2.1新增]** `POST /api/v1/voice/session` | `answer_text` | 语音回答文本（TTS合成前脱敏） |
+| **[v2.1新增]** `GET /api/v1/voice/tts/{session_id}` | 音频内容 | TTS音频（合成源文本已脱敏） |
 
 **不执行脱敏的端点**:
 - `POST /api/v1/events` — 接收原始输入，存储前做 sanitize 清洗但不脱敏
@@ -3026,9 +3152,9 @@ def resolve_input_scope(client_scope: str | None, raw_text: str, event_type: str
     return result  # {scope, confidence, reason}
 ```
 
-### 4.3 数据导出API（GDPR数据携带权, Phase 1提前）
+### 4.3 数据导出API（GDPR数据携带权, Phase 2） 📋 **Phase 2**
 
-**端点**: `GET /api/v1/data/export?format=json|csv`
+**端点**: `GET /api/v1/data/export?format=json|csv` 📋 **Phase 2**
 
 **说明**: 支持用户导出其全量个人数据，满足 GDPR 式"数据携带权"(Right to Data Portability)。原计划 Phase 2 实现，提前至 Phase 1。
 
@@ -4499,12 +4625,13 @@ X-Cache-Hit: true
 | v1.2 | 2026-06-03 | Todo类型重命名（opportunity→cooperation_signal, context→care, action→promise, pending_confirm→followup, resource_maint→help）；Entities API新增concern/promise/contribution字段及三个PATCH端点（concern/promise/contribution）；Todos API新增promise/care/cooperation_signal类型详细示例；新增§3.8 AI输出语言规则（confidence_level/is_ai_inference/requires_confirmation）；OpenAPI规范同步更新（TodoType枚举、新增Concern/Promise/Contribution/AIInferenceMarker schema） |
 | v1.3 | 2026-06-03 | §8 API版本管理策略全面补齐：三层版本号（SemVer）+ 版本协商机制 + 兼容性规则 + 废弃流程（12个月过渡期）+ 多版本共存（FastAPI路由层）+ Alembic数据库迁移策略 + 客户端SDK版本策略 + 版本变更日志规范 |
 | **v2.0** | **2026-06-04** | **v2.0大版本升级（参考 PRD v4.3 + 技术设计 v2.5 §7）：**<br/>**① D2-1** 版本头更新<br/>**② D2-2 新增6个P0 API端点**: GET relationship-brief / PATCH stage(乐观锁) / GET dashboard/today / GET todos?view=my-responses / POST contributions / POST feedbacks<br/>**③ D2-3 日视图API (F-49)**: GET /api/v1/dashboard/day-view<br/>**④ D2-4 现有端点变更**: POST /events增加input_scope字段 / PATCH /todos增加action_type+promisor_id+beneficiary_id / GET /entities返回值增加relationship_stage<br/>**⑤ D2-5 JWT认证加固**: Payload结构(sub/iat/exp/role) + 4项安全约束(Secret≥256/黑名单/Refresh旋转/CORS白名单)<br/>**⑥ D2-6 PII脱敏行为**: 标注7类端点执行redact_pii_from_text() + 5种PII掩码规则<br/>**⑦ D2-7 SC-01安全约束**: input_scope服务端强制校验，永远不以客户端值为准<br/>**⑧ D2-8 错误码扩展**: E1004 INVALID_INPUT_SCOPE(400) + E1005 OPTIMISTIC_LOCK_CONFLICT(409)<br/>**⑨ D2-9 数据导出API**: GET /api/v1/data/export?format=json\|csv（GDPR数据携带权，Phase 1提前）<br/>**⑩ D2-10 F-05暂停声明**: 商机匹配相关API标记Phase 2 |
-| **v0.2.1** | **2026-06-05** | **[F-50新增] 语音助手API (Voice Assistant, Phase 1.1)：**<br/>**① F50-1 新增§3.12 Voice Assistant API章节**:<br/>　- POST /api/v1/voice/session — 创建语音问答会话(NLU意图识别→业务API调用→自然语言回答→TTS预生成)<br/>　- GET /api/v1/voice/tts/{session_id} — 获取预生成TTS音频(MP3流, Cache-Control private max-age=300)<br/>　- POST /api/v1/voice/feedback — 语音回答质量反馈(NLU模型优化用)<br/>**② F50-2 NLU意图枚举 VoiceIntent**: schedule_query/promise_tracker/relationship_status(P0) + schedule_range/action_suggestion(P1) + conversation_review/knowledge_retrieval(P2) + unclear<br/>**③ F50-3 VoiceSessionCreate/VoiceSessionResponse 数据模型定义**<br/>**④ F50-4 现有端点变更** — summary_level参数(三档: brief/detail/voice):<br/>　- GET /api/v1/dashboard/day-view(F-49) + natural_date参数("今天"|"明天"|"后天"|"本周"|"下游") → answer_paragraph字段<br/>　- GET /api/v1/persons/{id}/relationship-brief(F-47) → voice_summary字段<br/>　- GET /api/v1/todos → voice_summary字段<br/>**⑤ F50-5 PII脱敏清单扩展**: POST /voice/session(answer_text) + GET /voice/tts(音频内容)<br/>**关键约束**: 不存储原始音频; TTS输出PII脱敏; 所有端点JWT认证; TTL=5分钟音频缓存 |
+| **v2.1** | **2026-06-05** | **[F-50新增] 语音助手API (Voice Assistant, Phase 1.1)：**<br/>**① F50-1 新增§3.12 Voice Assistant API章节**:<br/>　- POST /api/v1/voice/session — 创建语音问答会话(NLU意图识别→业务API调用→自然语言回答→TTS预生成)<br/>　- GET /api/v1/voice/tts/{session_id} — 获取预生成TTS音频(MP3流, Cache-Control private max-age=300)<br/>　- POST /api/v1/voice/feedback — 语音回答质量反馈(NLU模型优化用)<br/>**② F50-2 NLU意图枚举 VoiceIntent**: schedule_query/promise_tracker/relationship_status(P0) + schedule_range/action_suggestion(P1) + conversation_review/knowledge_retrieval(P2) + unclear<br/>**③ F50-3 VoiceSessionCreate/VoiceSessionResponse 数据模型定义**<br/>**④ F50-4 现有端点变更** — summary_level参数(三档: brief/detail/voice):<br/>　- GET /api/v1/dashboard/day-view(F-49) + natural_date参数("今天"|"明天"|"后天"|"本周"|"下游") → answer_paragraph字段<br/>　- GET /api/v1/persons/{id}/relationship-brief(F-47) → voice_summary字段<br/>　- GET /api/v1/todos → voice_summary字段<br/>**⑤ F50-5 PII脱敏清单扩展**: POST /voice/session(answer_text) + GET /voice/tts(音频内容)<br/>**关键约束**: 不存储原始音频; TTS输出PII脱敏; 所有端点JWT认证; TTL=5分钟音频缓存 |
 | **v2.5** | **2026-06-06** | **Insight Engine + DataSourceAdapter API (v2.5)：**<br/>**① 新增§3.13 Insight Engine API**:<br/>　- GET /api/v1/todos?sort=smart — 按动态评分排序(默认)<br/>　- GET /api/v1/todos?sort=due_date — 按截止时间排序<br/>　- POST /api/v1/insights/calculate — 触发优先级重新计算(scope: all/entity/overdue, 限流10次/分)<br/>　- GET /api/v1/insights/feedback-stats — 获取隐式反馈统计(period: 1d/7d/30d)<br/>**② 新增§3.14 DataSourceAdapter API**:<br/>　- GET /api/v1/adapters — 列出已配置数据源(不返回config_encrypted)<br/>　- POST /api/v1/adapters — 添加新数据源配置(adapter_name枚举5值, config加密存储)<br/>　- POST /api/v1/adapters/{name}/sync — 手动触发同步(异步, 限流5次/分/适配器)<br/>　- DELETE /api/v1/adapters/{name} — 删除数据源配置(manual/voice不可删)<br/>**③ Todo响应schema新增字段**: completed_rank(完成序号) + dynamic_score(动态优先级分, 0-100)<br/>**④ OpenAPI YAML Todo schema更新**: 新增completed_rank(integer, nullable) + dynamic_score(number, 0-100, nullable) |
 | **v2.6** | **2026-06-06** | **F-55/F-56 Insight Engine API扩展 (v2.6)：**<br/>**① §3.13 Insight Engine API新增2个端点**:<br/>　- GET /api/v1/todos/{todo_id}/priority-breakdown — 返回四维评分详情(urgency/importance/dependency/context)，含每个维度的原始得分和计算因子，支持可解释性面板<br/>　- GET /api/v1/users/{user_id}/upcoming-context — 返回未来24h即将见面的Entity及关联Todo，支持会前准备场景<br/>**② Todo schema breakdown字段扩展**: 新增dependency_raw(依赖分析原始因子, F-55) + context_raw(场景匹配原始因子, F-56)<br/>**③ OpenAPI YAML Todo schema更新**: 新增breakdown对象(含urgency/importance/dependency/context四维得分 + dependency_raw/context_raw原始因子) |
 | **v2.7** | **2026-06-06** | **F-57/F-58 语义搜索与关联发现增强 API (v2.7)：**<br/>**① 新增§3.15 Semantic Search API**:<br/>　- POST /api/v1/search/semantic — 语义搜索(query+top_k+target_types+min_similarity，返回SearchResultItem列表含similarity/highlights)<br/>　- GET /api/v1/search/stats — 向量索引统计(total_embeddings/by_type/index_method/cache_size)<br/>　- POST /api/v1/search/reindex — 重建索引(full/incremental，异步202返回task_id，限流2次/小时)<br/>**② 新增SearchResult Schema**: SearchResultItem + SemanticSearchResponse + SearchStatsResponse + ReindexRequest + ReindexResponse<br/>**③ 数据隔离**: user_id从JWT提取，搜索结果按user_id过滤，忽略客户端传入的user_id** |
 | **v2.8** | **2026-06-07** | **F-08/F-21/F-36/F-39/EmailAdapter/WeChatForwardAdapter/F-50 API (v2.8)：**<br/>**① 新增§3.16 CSV Import API(F-08)**: POST /api/v1/import/csv — CSV文件上传导入，EntityResolution去重归一，返回统计<br/>**② 新增§3.17 Data Export API(F-21)**: GET /api/v1/export/json — JSON全量导出，ORM mapper column_attrs序列化，PII脱敏<br/>**③ 新增§3.18 Demand Input API(F-36)**: POST /api/v1/demands — 一句话需求录入，LLM提取+关键词fallback，concern追加到Entity.properties<br/>**④ 新增§3.19 Email Sync API(EmailAdapter)**: POST /api/v1/email/sync — IMAP邮件同步，一封邮件一个Event<br/>**⑤ 新增§3.20 WeChat Forward API(WeChatForwardAdapter)**: POST /api/v1/wechat/forward — 微信聊天记录转发解析，群聊/单聊支持<br/>**⑥ 新增§3.21 Voice Query API(F-50)**: POST /api/v1/voice/query — 语音查询三阶段Pipeline(NLU→DB→NLG)** |
 | **v2.9** | **2026-06-08** | **Media API + Privacy API (v2.9)：**<br/>**① 新增§3.22 Media API(PRD v4.8)**: POST /api/v1/media/asr(语音识别) + POST /api/v1/media/tts(文字转语音) + POST /api/v1/media/ocr(图片文字识别) + POST /api/v1/media/ocr-event(OCR+自动创建Event) + 安全约束(仅内存处理/不持久化/JWT认证/文件大小限制)<br/>**② 新增§3.23 Privacy API(GDPR合规)**: GET /api/v1/privacy/data-summary(数据统计摘要) + DELETE /api/v1/privacy/user-data(被遗忘权删除) + POST /api/v1/privacy/export(全量数据导出) |
+| **v2.10** | **2026-06-08** | **文档一致性修复与实现状态标注 (v2.10)：**<br/>**① D4 版本号格式统一**: 头部版本从"0.2.9"修正为"v2.10"，阶段标识从"0.2.x series"修正为"v2.x series"<br/>**② D1 API端点实现状态标注**: 为所有端点添加实现状态标签(✅已实现/📋Phase 2/⚠️路径差异)，每个API章节添加实现状态统计摘要<br/>**③ D5 认证部分更新**: 新增§2.0当前实现(PoC登录+微信登录)，原§2.1临时授权码模式标记为📋Phase 2规划，JWT Payload新增aud:"eventlink-api"声明<br/>**④ D6 Privacy API响应格式更新**: data-summary删除user_id字段、user-data响应改为deleted+各类型计数、export响应新增message字段 |
 
 ---
 

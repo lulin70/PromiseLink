@@ -14,11 +14,18 @@ Uses 3 LLM prompts:
 - Template 12: Care extraction (other party's concerns)
 """
 
+from __future__ import annotations
+
 import asyncio
 import json
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from eventlink.services.llm_client import LLMClient
+    from eventlink.services.llm_provider import LLMProvider
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -98,7 +105,7 @@ class TodoGenerator:
     - manual: promise + care + followup
     """
 
-    def __init__(self, llm_client, session: AsyncSession):
+    def __init__(self, llm_client: LLMProvider | LLMClient, session: AsyncSession):
         self.llm = llm_client
         self.session = session
 

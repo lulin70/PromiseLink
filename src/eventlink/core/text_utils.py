@@ -100,3 +100,54 @@ def sanitize_llm_input(text: str, max_len: int = 8000) -> str:
             text = pattern.sub("", text)
 
     return text.strip()
+
+
+def redact_pii_from_text(text: str) -> str:
+    """Redact PII (Personally Identifiable Information) from text.
+
+    Detects and masks: phone numbers, email addresses, ID card numbers,
+    bank card numbers, and WeChat IDs.
+
+    Args:
+        text: Input text that may contain PII
+
+    Returns:
+        Text with PII replaced by masked versions
+    """
+    if not text:
+        return text
+
+    # 1. 手机号: 1[3-9]开头的11位数字
+    def _redact_phone(m: re.Match) -> str:
+        phone = m.group(0)
+        return f"{phone[:3]}****{phone[7:]}"
+    text = re.sub(r"(?<!\d)1[3-9]\d{9}(?!\d)", _redact_phone, text)
+
+    # 2. 邮箱
+    def _redact_email(m: re.Match) -> str:
+        local = m.group(1)
+        domain = m.group(2)
+        return f"{local[0]}***@{domain}"
+    text = re.sub(r"([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})", _redact_email, text)
+
+    # 3. 身份证号: 18位，最后一位可能是X
+    def _redact_id_card(m: re.Match) -> str:
+        card = m.group(0)
+        return f"{card[:3]}***********{card[14:]}"
+    text = re.sub(r"(?<!\d)[1-9]\d{5}(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx](?!\d)", _redact_id_card, text)
+
+    # 4. 银行卡号: 16-19位纯数字
+    def _redact_bank_card(m: re.Match) -> str:
+        card = m.group(0)
+        return f"********{card[-4:]}"
+    text = re.sub(r"(?<!\d)\d{16,19}(?!\d)", _redact_bank_card, text)
+
+    # 5. 微信号: 6-20位，字母开头，字母数字下划线，谨慎匹配
+    def _redact_wechat(m: re.Match) -> str:
+        label = m.group(1)
+        sep = m.group(2)
+        wid = m.group(3)
+        return f"{label}{sep}wx_***{wid[-2:]}"
+    text = re.sub(r"(微信号|微信|wechat|WeChat)([:\s：]+)([a-zA-Z][a-zA-Z0-9_]{5,19})", _redact_wechat, text)
+
+    return text

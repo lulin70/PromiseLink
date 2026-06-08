@@ -6,11 +6,17 @@ Phase1 adds care dimension, Phase2 enables full 6-dimension matching.
 Algorithm Design §2 + §3.5
 """
 
+from __future__ import annotations
+
 import json
 import math
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from eventlink.services.llm_client import LLMClient
+    from eventlink.services.llm_provider import LLMProvider
 
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -96,7 +102,7 @@ class PromiseFulfillmentEngine:
     def __init__(
         self,
         session: AsyncSession,
-        llm_client: Any = None,
+        llm_client: LLMProvider | LLMClient | None = None,
         config: Optional[dict] = None,
         stage: str = "poc",
     ):

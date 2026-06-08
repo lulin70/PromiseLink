@@ -12,6 +12,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from eventlink.api.dependencies import rate_limit_llm_dependency
 from eventlink.core.auth import get_current_user_id
 from eventlink.core.logging import get_logger, new_request_id
 from eventlink.database import get_async_session
@@ -19,7 +20,20 @@ from eventlink.models.event import Event
 from eventlink.services.email_adapter import EmailAdapter
 
 logger = get_logger("eventlink.api.email_sync")
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(rate_limit_llm_dependency)])
+
+# IMAP host whitelist — only allow known email providers
+ALLOWED_IMAP_HOSTS = {
+    "imap.gmail.com", "imap.mail.gmail.com",
+    "imap.outlook.com", "imap-mail.outlook.com", "outlook.office365.com",
+    "imap.qq.com", "imap.exmail.qq.com",
+    "imap.163.com", "imap.126.com",
+    "imap.yahoo.com", "imap.mail.yahoo.com",
+    "imap.sina.com", "imap.sohu.com",
+    "imap.aliyun.com", "imap.mxhichina.com",
+    "imap.icloud.com", "imap.mail.me.com",
+    "imap.exchange.com",
+}
 
 
 class EmailSyncRequest(BaseModel):
@@ -69,6 +83,14 @@ async def sync_emails(
     processing pipeline asynchronously.
     """
     new_request_id()
+
+    # IMAP host whitelist check (prevent SSRF)
+    if request.imap_host.lower() not in ALLOWED_IMAP_HOSTS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"IMAP host '{request.imap_host}' is not in the allowed list. "
+                   f"Allowed hosts: {', '.join(sorted(ALLOWED_IMAP_HOSTS)[:5])}...",
+        )
 
     adapter = EmailAdapter()
 
