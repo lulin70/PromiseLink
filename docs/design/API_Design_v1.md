@@ -1029,6 +1029,8 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ### 3.5 Digest API（摘要）
 
+> **📋 未实现，Phase1规划**：Digest API 尚未实现独立端点，相关功能将在 Phase1 中开发。
+
 > **实现状态**: ✅已实现 0 个 | 📋Phase 2 1 个 | ⚠️路径差异 1 个
 
 #### 3.5.1 早晨简报 ⚠️ **路径差异**
@@ -1176,6 +1178,8 @@ language: zh-CN
 ---
 
 ### 3.7 Resources API（资源管理）
+
+> **📋 未实现，Phase2规划**：Resources API 尚未实现，商机匹配功能(F-05)已暂停，将在 Phase2 条件性重启。
 
 > **实现状态**: ✅已实现 0 个 | 📋Phase 2 4 个 | ⚠️路径差异 0 个
 
@@ -1694,6 +1698,8 @@ language: zh-CN
 
 ### 3.10 记录贡献与反馈 API（v2.0新增）
 
+> **📋 未实现，Phase1规划**：贡献与反馈 API 尚未实现独立端点，相关功能将在 Phase1 中开发。
+
 > **实现状态**: ✅已实现 0 个 | 📋Phase 2 2 个 | ⚠️路径差异 0 个
 
 #### 3.10.1 记录已提供的帮助/回应 📋 **Phase 2**
@@ -2075,6 +2081,8 @@ Cache-Control: private, max-age=300
 ### 3.13 Insight Engine API（v2.5 新增）
 
 > **定位**: Insight Engine 将 Todo 从"被动记录"升级为"主动服务"，基于动态优先级评分和隐式反馈驱动用户注意力。
+> **📋 部分实现（集成在dashboard.py）**：Insight Engine 的核心功能（动态优先级评分、隐式反馈）已在 `services/priority_scorer.py` 和 `services/implicit_feedback.py` 中实现，API 端点集成在 `api/v1/dashboard.py` 中，未创建独立 `/insights` 端点。
+
 > **实现状态**: ✅已实现 2 个 | 📋Phase 2 4 个 | ⚠️路径差异 0 个
 
 #### 3.13.1 按动态评分排序的 Todo 列表 ✅ **已实现**
@@ -2379,6 +2387,8 @@ Cache-Control: private, max-age=300
 ### 3.14 DataSourceAdapter API（v2.5 新增）
 
 > **定位**: 多数据源适配器管理接口，支持用户配置和同步不同来源的数据（微信转发、邮件、日历等）。
+> **📋 部分实现（集成在对应Adapter端点）**：DataSourceAdapter 接口已在 `services/data_source_adapter.py` 中定义，具体 Adapter（EmailAdapter、WeChatForwardAdapter）已实现，但独立的 `/adapters` 管理端点未创建，功能集成在 `api/v1/email_sync.py` 和 `api/v1/wechat_forward.py` 中。
+
 > **实现状态**: ✅已实现 0 个 | 📋Phase 2 4 个 | ⚠️路径差异 0 个
 
 #### 3.14.1 列出已配置的数据源 📋 **Phase 2**
@@ -2537,6 +2547,8 @@ Cache-Control: private, max-age=300
 ### 3.15 Semantic Search API（v2.7 新增, F-57/F-58）
 
 > **定位**: 提供基于向量嵌入的语义搜索能力，支持Entity/Event的自然语言查询，同时为关联发现提供语义增强（F-58）。
+> **📋 未实现独立端点，功能集成在entities.py**：语义搜索的核心功能（EmbeddingProvider + SemanticSearch）已在 `services/embedding_provider.py` 和 `services/semantic_search.py` 中实现，但独立的 `/search/semantic` 端点未创建，搜索功能集成在 `api/v1/entities.py` 的列表查询中。
+
 > **实现状态**: ✅已实现 0 个 | 📋Phase 2 3 个 | ⚠️路径差异 0 个
 
 #### 3.15.1 语义搜索 📋 **Phase 2**

@@ -721,20 +721,38 @@ CREATE UNIQUE INDEX idx_users_email ON users(email) WHERE email IS NOT NULL;
 
 ---
 
-### 3.5b ScoreAuditLogs表（评分审计日志表）[v2.5新增]
+### 3.5b ScoreAuditLogs表（评分审计日志表）[v2.5新增, v2.9实现]
 
 **用途**: 记录 Todo 动态优先级分数的变更历史，支撑 Insight Engine 的可解释性和调试。
 
+**实现状态**: ✅ 已实现（ORM模型: `models/score_audit_log.py`, 评分器集成: `services/priority_scorer.py`）
+
 | 字段名 | 类型 | 约束 | 默认值 | 说明 |
 |--------|------|------|--------|------|
-| id | BIGSERIAL | PRIMARY KEY | - | 主键 |
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | - | 主键（SQLite兼容，PG用BIGSERIAL） |
 | todo_id | UUID | NOT NULL, FK(todos.id) | - | 关联Todo ID |
 | user_id | UUID | NOT NULL | - | 用户ID |
 | old_score | FLOAT | - | NULL | 变更前分数 |
 | new_score | FLOAT | NOT NULL | - | 变更后分数 |
+| score_version | VARCHAR(20) | NOT NULL | - | 评分模型版本（poc_v1/phase1_v1） |
 | calculation_factors | JSONB | NOT NULL | - | 计算因子快照 |
+| calculated_by | VARCHAR(50) | NOT NULL | - | 计算器标识（PriorityScorer/PriorityScorerV2） |
 | triggered_by | VARCHAR(50) | NOT NULL | - | 触发来源 |
 | created_at | TIMESTAMPTZ | NOT NULL | NOW() | 创建时间 |
+
+**score_version枚举说明**:
+
+| 值 | 说明 |
+|----|------|
+| `poc_v1` | PoC二维模型（urgency + importance） |
+| `phase1_v1` | Phase1四维模型（urgency + importance + dependency + context） |
+
+**calculated_by枚举说明**:
+
+| 值 | 说明 |
+|----|------|
+| `PriorityScorer` | PoC二维评分器 |
+| `PriorityScorerV2` | Phase1四维评分器 |
 
 **triggered_by枚举说明**:
 
@@ -743,6 +761,7 @@ CREATE UNIQUE INDEX idx_users_email ON users(email) WHERE email IS NOT NULL;
 | `implicit_feedback` | 隐式反馈触发（完成顺序变化） |
 | `manual_recalc` | 手动触发重新计算 |
 | `scheduled_job` | 定时任务触发（daily_rebalance） |
+| `scorer_update` | 评分器主动更新（score_and_update_todo） |
 
 **索引**:
 ```sql
@@ -1931,8 +1950,9 @@ CREATE INDEX idx_vec_cosine ON vector_embeddings
 | **v2.6** | **2026-06-06** | **F-55/F-56 评分审计扩展：①score_audit_logs.calculation_factors JSONB结构扩展，新增dependency_score/context_score/dependency_raw/context_raw字段，用于审计依赖性全图谱路径分析(F-55)和场景匹配Event表驱动(F-56)的计算因子②todos表确认已有dynamic_score/score_calculated_at/completed_rank字段（F-51/F-52已加），无需新增DDL变更③Phase1启用四维模型后审计日志将完整记录四维得分及原始计算因子** |
 | **v2.7** | **2026-06-06** | **F-57/F-58 语义搜索与关联发现增强：①新增vector_embeddings表（8字段+2索引+唯一约束，target_type枚举entity/event，embedding BLOB存储API模式768维/本地降级384维float32向量，source_text用于缓存校验，user_id数据隔离）②新增vec_entities虚拟表（sqlite-vec vec0扩展，embedding float[384]（PoC本地模型），可选创建，不可用时Python余弦降级）③Phase2迁移DDL（PostgreSQL+pgvector，vector(768)列类型+IVFFlat索引）** |
 | **v2.8** | **2026-06-07** | **F-08/F-21/F-36/F-39/EmailAdapter/WeChatForwardAdapter 数据库变更：①events表event_type枚举扩展新增'email'和'wechat_forward'（无需DDL变更，VARCHAR(20)足够）②events表source枚举扩展新增'csv_import'/'email'/'wechat_forward'（无需DDL变更）③todos表properties JSONB新增resource_overuse子类型结构（risk_type/target_entity_id/request_count/window_days/severity，无需DDL变更）④ER图EVENTS节点event_type注释更新** |
+| **v2.9** | **2026-06-08** | **score_audit_logs表实现：①score_audit_logs表新增score_version字段（VARCHAR(20)，评分模型版本poc_v1/phase1_v1）②新增calculated_by字段（VARCHAR(50)，计算器标识PriorityScorer/PriorityScorerV2）③triggered_by枚举新增scorer_update值④主键改为INTEGER AUTOINCREMENT（SQLite兼容）⑤标记实现状态为已实现** |
 | v2.1 | TBD | 添加用户反馈表 |
 
 ---
 
-*最后更新: 2026-06-07*
+*最后更新: 2026-06-08*

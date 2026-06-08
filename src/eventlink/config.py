@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     # Application
     app_name: str = "EventLink"
-    app_version: str = "0.3.0"
+    app_version: str = "0.4.8"
     app_env: str = "development"
     debug: bool = False
     log_level: str = "INFO"

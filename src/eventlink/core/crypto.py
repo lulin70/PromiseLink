@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from eventlink.config import get_settings
 
 PII_FIELDS = {"phone", "email"}
-PII_PREFIX = "enc:"  # Prefix to identify encrypted values
+PII_PREFIX = "ENC:"  # Prefix to identify encrypted values
 
 
 def _derive_key() -> bytes:

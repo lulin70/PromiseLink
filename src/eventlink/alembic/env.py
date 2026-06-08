@@ -15,6 +15,7 @@ from eventlink.models.event import Event
 from eventlink.models.entity import Entity
 from eventlink.models.todo import Todo, SnoozeSchedule
 from eventlink.models.association import Association
+from eventlink.models.score_audit_log import ScoreAuditLog
 
 config = context.config
 

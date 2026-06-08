@@ -113,6 +113,7 @@ def create_access_token(user_id: str) -> str:
     )
     to_encode = {
         "sub": user_id,
+        "iat": datetime.now(timezone.utc),
         "exp": expire,
         "iss": "eventlink",
         "aud": "eventlink-api",

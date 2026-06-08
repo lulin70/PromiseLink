@@ -194,10 +194,13 @@ with open("keys/public.pem", "wb") as f:
 {
   "sub": "user_id (UUID)",
   "iat": "签发时间 (Unix timestamp)",
-  "exp": "过期时间 (默认24h)",
-  "role": "user (预留扩展)"
+  "exp": "过期时间 (默认15分钟)",
+  "iss": "eventlink",
+  "aud": "eventlink-api"
 }
 ```
+
+> **与代码实现的对齐说明**：代码 `auth.py` 中 `create_access_token()` 的 payload 包含 sub/exp/iss/aud 四个字段，iat 由 `python-jose` 库自动添加。统一规范为 sub, iat, exp, iss, aud 五个字段。
 
 **4项安全约束**：
 
@@ -233,8 +236,9 @@ def create_access_token(user_id: str, secret: str) -> str:
     payload = {
         "sub": user_id,
         "iat": datetime.utcnow(),
-        "exp": datetime.utcnow() + timedelta(hours=24),
-        "role": "user",
+        "exp": datetime.utcnow() + timedelta(minutes=15),
+        "iss": "eventlink",
+        "aud": "eventlink-api",
     }
     return jwt.encode(payload, secret, algorithm="HS256")
 
@@ -633,6 +637,8 @@ $$ LANGUAGE plpgsql STRICT;
 
 ### 3.4 加密密钥管理（分层密钥体系）
 
+> **PoC简化实现**：使用单层PBKDF2密钥派生，Phase1将实现完整的三层密钥体系(Master Key → Data Key → Field Key)。
+
 ```mermaid
 flowchart TD
     A[主密钥 Master Key<br/>KMS/环境变量] -->|解密| B[数据密钥 Data Key<br/>加密存储于配置]
@@ -695,6 +701,8 @@ phone_key = km.derive_field_key(data_key, "phone")
 ```
 
 ### 3.5 敏感字段清单
+
+> **PoC简化说明**：PoC阶段仅加密phone和email两个字段，wechat和id_card加密将在Phase1实现。代码中 `PII_FIELDS = {"phone", "email"}`。
 
 | 字段名 | 所属模型 | 敏感级别 | 加密策略 | 脱敏规则 |
 |--------|----------|----------|----------|----------|
@@ -1770,18 +1778,22 @@ class PriorityScorerSecurity:
 
 ```sql
 CREATE TABLE score_audit_logs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id UUID NOT NULL,
     todo_id UUID NOT NULL,
     old_score FLOAT,
     new_score FLOAT NOT NULL,
-    urgency FLOAT,
-    importance FLOAT,
-    calculation_params JSONB,    -- 评分参数快照
+    score_version VARCHAR(20) NOT NULL,  -- poc_v1 / phase1_v1
+    calculation_factors JSONB NOT NULL,  -- 评分参数快照
+    calculated_by VARCHAR(50) NOT NULL,  -- PriorityScorer / PriorityScorerV2
+    triggered_by VARCHAR(50) NOT NULL,   -- implicit_feedback / manual_recalc / scheduled_job / scorer_update
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    INDEX idx_score_audit_user_time (user_id, created_at)
+    INDEX idx_score_audit_user_time (user_id, created_at DESC),
+    INDEX idx_score_audit_todo (todo_id, created_at DESC)
 );
 ```
+
+> **与Database_Design v2.9对齐**: score_audit_logs表新增score_version和calculated_by字段，主键改为INTEGER AUTOINCREMENT（SQLite兼容），triggered_by枚举新增scorer_update值。
 
 #### 6.7.2 隐式反馈完整性
 

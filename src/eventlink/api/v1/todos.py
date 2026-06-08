@@ -5,7 +5,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from eventlink.api.dependencies import rate_limit_dependency
@@ -31,6 +31,8 @@ class TodoResponse(BaseModel):
     description: str | None = None
     related_entity_id: uuid.UUID | str | None = None
     priority: int
+    priority_override: str | None = None
+    priority_source: str = "ai"
     status: str
     due_date: datetime | None = None
     source_event_id: uuid.UUID | str | None = None
@@ -49,6 +51,7 @@ class TodoUpdateRequest(BaseModel):
     status: str | None = None
     snoozed_until: datetime | None = None
     feedback: str | None = None
+    priority_override: str | None = None
 
 
 # ── Endpoints ──
@@ -95,12 +98,21 @@ async def list_todos(
     total = (await session.execute(count_query)).scalar() or 0
 
     # Apply sort
+    # For priority-based sorts, user-set priorities sort above AI-calculated at same level
+    # priority_source: "user" → 0 (first), "ai" → 1 (second)
+    _source_order = case(
+        (Todo.priority_source == "user", 0),
+        (Todo.priority_source == "ai", 1),
+        else_=1,
+    )
     if sort_by == "urgency":
-        query = query.order_by(Todo.priority.asc(), Todo.due_date.asc().nulls_last())
+        query = query.order_by(
+            Todo.priority.asc(), _source_order, Todo.due_date.asc().nulls_last()
+        )
     elif sort_by == "due_date":
         query = query.order_by(Todo.due_date.asc().nulls_last())
     elif sort_by == "priority":
-        query = query.order_by(Todo.priority.asc())
+        query = query.order_by(Todo.priority.asc(), _source_order)
     else:  # created
         query = query.order_by(Todo.created_at.desc())
 
@@ -170,6 +182,15 @@ async def update_todo(
         if request.feedback:
             todo.properties = todo.properties or {}
             todo.properties["feedback"] = request.feedback
+
+    # Handle priority_override (F-59)
+    if "priority_override" in request.model_fields_set:
+        if request.priority_override is not None:
+            todo.priority_override = request.priority_override
+            todo.priority_source = "user"
+        else:
+            todo.priority_override = None
+            todo.priority_source = "ai"
 
     await session.commit()
     await session.refresh(todo)

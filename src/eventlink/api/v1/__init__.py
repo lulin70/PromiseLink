@@ -1,5 +1,41 @@
 """API v1 routes."""
 
-from eventlink.api.v1 import associations, auth, dashboard, demand_input, entities, events, export, health, import_csv, relationship_briefs, todos, voice, wechat_forward
+from eventlink.api.v1 import (
+    associations,
+    auth,
+    dashboard,
+    demand_input,
+    email_sync,
+    entities,
+    events,
+    export,
+    health,
+    import_csv,
+    media,
+    privacy,
+    relationship_briefs,
+    todos,
+    voice,
+    voice_query,
+    wechat_forward,
+)
 
-__all__ = ["associations", "auth", "dashboard", "demand_input", "entities", "events", "export", "health", "import_csv", "relationship_briefs", "todos", "voice", "wechat_forward"]
+__all__ = [
+    "associations",
+    "auth",
+    "dashboard",
+    "demand_input",
+    "email_sync",
+    "entities",
+    "events",
+    "export",
+    "health",
+    "import_csv",
+    "media",
+    "privacy",
+    "relationship_briefs",
+    "todos",
+    "voice",
+    "voice_query",
+    "wechat_forward",
+]
