@@ -3,26 +3,25 @@
 Core loop: 互动记录 → InputScope分类 → 实体抽取 → Todo生成 → Promise双向分析 → 通知 → 原始数据存储 → 关联发现 → RelationshipBrief更新 → 状态机
 Implements the full processing pipeline from event ingestion to todo generation.
 
-Pipeline stages (14 steps):
-  Step 1  — Quick check: verify event exists and is pending
-  Step 2  — Status update: mark event as processing
-  Step 3  — Input Scope Classification (InputScopeClassifier) — F-44
-  Step 4  — Auto-generate Event title if empty/placeholder
-  Step 5  — Entity extraction (EntityExtractor) + Entity resolution — F-53 concern/capability
-  Step 6  — Entity resolution (5-step algorithm) — runs inside Step 5
-  Step 7  — Todo generation (TodoGenerator) — F-46 dedup integrated
-  Step 8  — Promise Bidirectional Analysis (PromiseBidirectionalHandler) — F-45
-  Step 9  — Notification — send notifications for new todos
-  Step 10 — Raw data storage (MemoryProvider) — store original text
-  Step 11 — Association discovery (AssociationDiscoveryEngine) — incremental
-  Step 12 — Association → Todo generation — Link → Action
-  Step 13 — Relationship Brief Update (RelationshipBriefService) — F-47+F-48
-  Step 14 — Status update: mark event as completed
+Pipeline stages (13 steps, sequentially numbered):
+  Step01 — Verify event + mark processing + input scope + title
+  Step02 — Entity extraction + resolution
+  Step03 — Entity embedding for semantic search
+  Step04 — Todo generation
+  Step05 — Promise bidirectional analysis
+  Step06 — Resource overuse detection
+  Step07 — Priority scoring
+  Step08 — Notification
+  Step09 — Memory storage
+  Step10 — Association discovery
+  Step11 — Association → Todo generation
+  Step12 — Relationship brief update
+  Step13 — Mark event as completed
 
 Uses short transactions to avoid holding SQLite write locks during slow LLM calls.
 Each step opens its own session/transaction, commits, and releases the lock.
 
-The actual step logic lives in ``pipeline_steps.py``; this module provides
+The actual step logic lives in ``steps/`` subdirectory; this module provides
 the public API (``PipelineResult``, ``process_event_with_short_transactions``)
 and re-exports the service classes so that existing test patches continue to work.
 """
@@ -39,6 +38,7 @@ from eventlink.services.entity_extractor import EntityExtractor, ExtractionResul
 from eventlink.services.entity_resolution import EntityResolutionEngine
 from eventlink.services.llm_client import LLMClient
 from eventlink.services.memory_provider import create_memory_provider
+from eventlink.services.steps.context import PipelineContext
 from eventlink.services.todo_generator import TodoGenerator
 
 logger = get_logger("eventlink.pipeline")
@@ -93,25 +93,24 @@ async def _generate_event_title(llm_client: LLMClient, raw_text: str) -> str | N
 
 
 # ── Pipeline step order ──
-# Imported lazily inside process_event_with_short_transactions to avoid
-# circular-import issues (pipeline_steps imports names from this module
-# at function level for test-patch compatibility).
+# Steps are imported from the steps/ subdirectory.
+# Some steps import names from this module at function level
+# for test-patch compatibility.
 
 _PIPELINE_STEPS = [
-    "Step1_RawEventToEvent",
-    "Step2_EntityExtraction",
-    "Step3_EntityResolution",
-    "Step5_5_DependencyAnalysis",
-    "Step5_TodoGeneration",
-    "Step7_ConcernCapabilityExtraction",
-    "Step8_3_ContextMatching",
-    "Step6_PriorityScoring",
-    "Step9_Notification",
-    "Step10_MemoryStorage",
-    "Step4_AssociationDiscovery",
-    "Step8_5_SemanticAssociation",
-    "Step13_RelationshipBriefUpdate",
-    "Step8_EventStatusUpdate",
+    "Step01_VerifyEvent",
+    "Step02_ExtractEntities",
+    "Step03_SemanticEmbedding",
+    "Step04_TodoGeneration",
+    "Step05_PromiseAnalysis",
+    "Step06_ResourceOveruse",
+    "Step07_PriorityScoring",
+    "Step08_Notification",
+    "Step09_MemoryStorage",
+    "Step10_AssociationDiscovery",
+    "Step11_AssociationTodos",
+    "Step12_RelationshipBriefUpdate",
+    "Step13_CompleteEvent",
 ]
 
 
@@ -130,7 +129,6 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
         PipelineResult with entities, todos, and status.
     """
     from eventlink.config import get_settings
-    from eventlink.services.pipeline_steps import PipelineContext
 
     settings = get_settings()
     llm_client = LLMClient(config=settings)
@@ -156,39 +154,37 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
     )
 
     try:
-        # Instantiate step objects (lazy import to avoid circular deps)
-        from eventlink.services.pipeline_steps import (
-            Step1_RawEventToEvent,
-            Step2_EntityExtraction,
-            Step3_EntityResolution,
-            Step4_AssociationDiscovery,
-            Step5_5_DependencyAnalysis,
-            Step5_TodoGeneration,
-            Step6_PriorityScoring,
-            Step7_ConcernCapabilityExtraction,
-            Step8_3_ContextMatching,
-            Step8_5_SemanticAssociation,
-            Step8_EventStatusUpdate,
-            Step9_Notification,
-            Step10_MemoryStorage,
-            Step13_RelationshipBriefUpdate,
+        # Instantiate step objects
+        from eventlink.services.steps import (
+            Step01_VerifyEvent,
+            Step02_ExtractEntities,
+            Step03_SemanticEmbedding,
+            Step04_TodoGeneration,
+            Step05_PromiseAnalysis,
+            Step06_ResourceOveruse,
+            Step07_PriorityScoring,
+            Step08_Notification,
+            Step09_MemoryStorage,
+            Step10_AssociationDiscovery,
+            Step11_AssociationTodos,
+            Step12_RelationshipBriefUpdate,
+            Step13_CompleteEvent,
         )
 
         steps = [
-            Step1_RawEventToEvent(),
-            Step2_EntityExtraction(),
-            Step3_EntityResolution(),
-            Step5_5_DependencyAnalysis(),
-            Step5_TodoGeneration(),
-            Step7_ConcernCapabilityExtraction(),
-            Step8_3_ContextMatching(),
-            Step6_PriorityScoring(),
-            Step9_Notification(),
-            Step10_MemoryStorage(),
-            Step4_AssociationDiscovery(),
-            Step8_5_SemanticAssociation(),
-            Step13_RelationshipBriefUpdate(),
-            Step8_EventStatusUpdate(),
+            Step01_VerifyEvent(),
+            Step02_ExtractEntities(),
+            Step03_SemanticEmbedding(),
+            Step04_TodoGeneration(),
+            Step05_PromiseAnalysis(),
+            Step06_ResourceOveruse(),
+            Step07_PriorityScoring(),
+            Step08_Notification(),
+            Step09_MemoryStorage(),
+            Step10_AssociationDiscovery(),
+            Step11_AssociationTodos(),
+            Step12_RelationshipBriefUpdate(),
+            Step13_CompleteEvent(),
         ]
 
         for step in steps:
