@@ -358,7 +358,7 @@ class AssociationDiscoveryEngine:
         """
         results = []
         for assoc_type, discoverer in self.cold_discoverers.items():
-            confidence, evidence = discoverer(entity_a, entity_b)
+            confidence, evidence = await discoverer(entity_a, entity_b)
             if confidence > PROVISIONAL_THRESHOLD:
                 status = "confirmed" if confidence >= self.confirm_threshold else "provisional"
                 results.append({
@@ -741,7 +741,7 @@ class AssociationDiscoveryEngine:
 
     # ── Cold Type Discovery (computed on read) ──
 
-    def _discover_alumni(self, a: Entity, b: Entity) -> tuple[float, dict]:
+    async def _discover_alumni(self, a: Entity, b: Entity) -> tuple[float, dict]:
         """Alumni: same school."""
         schools_a = set((a.properties or {}).get("basic", {}).get("schools", []))
         schools_b = set((b.properties or {}).get("basic", {}).get("schools", []))
@@ -753,7 +753,7 @@ class AssociationDiscoveryEngine:
         confidence = 0.95 if (majors_a & majors_b) else 0.75
         return confidence, {"common_schools": list(common)}
 
-    def _discover_tech_overlap(self, a: Entity, b: Entity) -> tuple[float, dict]:
+    async def _discover_tech_overlap(self, a: Entity, b: Entity) -> tuple[float, dict]:
         """Tech overlap: shared technology stack."""
         techs_a = set((a.properties or {}).get("tech_stack", []))
         techs_b = set((b.properties or {}).get("tech_stack", []))
@@ -766,7 +766,7 @@ class AssociationDiscoveryEngine:
         confidence = 0.5 + ratio * 0.4
         return confidence, {"common_techs": list(overlap), "overlap_ratio": round(ratio, 2)}
 
-    def _discover_deal_link(self, a: Entity, b: Entity) -> tuple[float, dict]:
+    async def _discover_deal_link(self, a: Entity, b: Entity) -> tuple[float, dict]:
         """Deal link: shared projects/deals."""
         deals_a = set((a.properties or {}).get("deals", []))
         deals_b = set((b.properties or {}).get("deals", []))
@@ -775,7 +775,7 @@ class AssociationDiscoveryEngine:
             return 1.0, {"common_deals": list(common)}
         return 0.0, {}
 
-    def _discover_risk_link(self, a: Entity, b: Entity) -> tuple[float, dict]:
+    async def _discover_risk_link(self, a: Entity, b: Entity) -> tuple[float, dict]:
         """Risk link: co-occurrence in negative events."""
         risk_events_a = (a.properties or {}).get("risk_events", [])
         risk_events_b = (b.properties or {}).get("risk_events", [])
@@ -784,7 +784,7 @@ class AssociationDiscoveryEngine:
             return 0.8, {"common_risk_events": len(common)}
         return 0.0, {}
 
-    def _discover_supply_chain(self, a: Entity, b: Entity) -> tuple[float, dict]:
+    async def _discover_supply_chain(self, a: Entity, b: Entity) -> tuple[float, dict]:
         """Supply chain: upstream/downstream relationship."""
         company_a = (a.properties or {}).get("basic", {}).get("company", "") or ""
         company_b = (b.properties or {}).get("basic", {}).get("company", "") or ""
@@ -884,7 +884,7 @@ class AssociationDiscoveryEngine:
 
         return confidence, evidence
 
-    def _discover_supply_demand(self, a: Entity, b: Entity) -> tuple[float, dict]:
+    async def _discover_supply_demand(self, a: Entity, b: Entity) -> tuple[float, dict]:
         """Supply-demand match: A's resources can satisfy B's demands.
 
         This is EventLink's core value proposition — discovering that
@@ -945,7 +945,7 @@ class AssociationDiscoveryEngine:
 
         if not matches:
             # F-58: Semantic similarity fallback when structured matching finds nothing
-            semantic_score = self._semantic_similarity_fallback(a, b)
+            semantic_score = await self._semantic_similarity_fallback(a, b)
             if semantic_score > 0:
                 return semantic_score * 0.3, {"semantic_match": True, "similarity": round(semantic_score, 4)}
             return 0.0, {}
@@ -963,7 +963,7 @@ class AssociationDiscoveryEngine:
         }
 
         # F-58: Blend with semantic similarity if available
-        semantic_score = self._semantic_similarity_fallback(a, b)
+        semantic_score = await self._semantic_similarity_fallback(a, b)
         if semantic_score > 0:
             # Hybrid: 70% structured + 30% semantic
             confidence = 0.7 * confidence + 0.3 * semantic_score
@@ -971,7 +971,7 @@ class AssociationDiscoveryEngine:
 
         return confidence, evidence
 
-    def _semantic_similarity_fallback(self, a: Entity, b: Entity) -> float:
+    async def _semantic_similarity_fallback(self, a: Entity, b: Entity) -> float:
         """F-58: Compute semantic similarity between two entities using embeddings.
 
         Uses pre-computed embeddings stored in vector_embeddings table.
@@ -987,52 +987,61 @@ class AssociationDiscoveryEngine:
             Semantic similarity score (0.0 ~ 1.0), or 0.0 if not available
         """
         try:
+            import asyncio
             from eventlink.services.semantic_search import SemanticSearchEngine
 
             # Derive db_path from Settings (same as SemanticSearchEngine._default_db_path)
             db_path = SemanticSearchEngine._default_db_path()
 
-            # Get embeddings from vector_embeddings table
-            import sqlite3
-            conn = sqlite3.connect(db_path)
-            try:
-                rows = conn.execute(
-                    "SELECT embedding FROM vector_embeddings WHERE target_id = ? AND target_type = 'entity'",
-                    (str(a.id),)
-                ).fetchone()
-                if not rows:
-                    return 0.0
+            # Run synchronous sqlite3 in thread pool to avoid blocking event loop
+            def _read_embeddings():
+                import sqlite3
+                conn = sqlite3.connect(db_path)
+                try:
+                    rows = conn.execute(
+                        "SELECT embedding FROM vector_embeddings WHERE target_id = ? AND target_type = 'entity'",
+                        (str(a.id),)
+                    ).fetchone()
+                    if not rows:
+                        return None, None
 
-                import struct
-                blob_a = rows[0]
-                count = len(blob_a) // 4
-                emb_a = list(struct.unpack(f"{count}f", blob_a))
+                    import struct
+                    blob_a = rows[0]
+                    count = len(blob_a) // 4
+                    emb_a = list(struct.unpack(f"{count}f", blob_a))
 
-                rows = conn.execute(
-                    "SELECT embedding FROM vector_embeddings WHERE target_id = ? AND target_type = 'entity'",
-                    (str(b.id),)
-                ).fetchone()
-                if not rows:
-                    return 0.0
+                    rows = conn.execute(
+                        "SELECT embedding FROM vector_embeddings WHERE target_id = ? AND target_type = 'entity'",
+                        (str(b.id),)
+                    ).fetchone()
+                    if not rows:
+                        return emb_a, None
 
-                blob_b = rows[0]
-                count = len(blob_b) // 4
-                emb_b = list(struct.unpack(f"{count}f", blob_b))
+                    blob_b = rows[0]
+                    count = len(blob_b) // 4
+                    emb_b = list(struct.unpack(f"{count}f", blob_b))
 
-                # Cosine similarity
-                similarity = SemanticSearchEngine._cosine_similarity(emb_a, emb_b)
+                    return emb_a, emb_b
+                finally:
+                    conn.close()
 
-                # Only return if above threshold
-                if similarity > 0.7:
-                    return round(similarity, 4)
+            emb_a, emb_b = await asyncio.to_thread(_read_embeddings)
+
+            if emb_a is None or emb_b is None:
                 return 0.0
-            finally:
-                conn.close()
+
+            # Cosine similarity
+            similarity = SemanticSearchEngine._cosine_similarity(emb_a, emb_b)
+
+            # Only return if above threshold
+            if similarity > 0.7:
+                return round(similarity, 4)
+            return 0.0
         except Exception:
             # Embeddings not available, return 0.0 gracefully
             return 0.0
 
-    def _discover_industry_chain(self, a: Entity, b: Entity) -> tuple[float, dict]:
+    async def _discover_industry_chain(self, a: Entity, b: Entity) -> tuple[float, dict]:
         """Industry chain: upstream/downstream industry relationship.
 
         Uses configurable industry chain mapping to detect relationships like:
@@ -1120,13 +1129,42 @@ class AssociationDiscoveryEngine:
         return list(result.scalars().all())
 
     async def _fetch_all_person_entities(self, user_id: str) -> list[Entity]:
-        """Fetch all person entities for a user (for cold discovery sweep)."""
-        stmt = select(Entity).where(
-            Entity.user_id == user_id,
-            Entity.entity_type == "person",
-        )
-        result = await self.session.execute(stmt)
-        return list(result.scalars().all())
+        """Fetch all person entities for a user (for cold discovery sweep).
+
+        Uses pagination to avoid loading all entities into memory at once.
+        MAX_ENTITY_LIMIT caps total entities to prevent OOM on large datasets.
+        """
+        MAX_ENTITY_LIMIT = 5000
+        BATCH_SIZE = 500
+
+        all_entities = []
+        offset = 0
+        while offset < MAX_ENTITY_LIMIT:
+            stmt = (
+                select(Entity)
+                .where(Entity.user_id == user_id, Entity.entity_type == "person")
+                .order_by(Entity.updated_at.desc())
+                .limit(BATCH_SIZE)
+                .offset(offset)
+            )
+            result = await self.session.execute(stmt)
+            batch = list(result.scalars().all())
+            all_entities.extend(batch)
+            if len(batch) < BATCH_SIZE:
+                break
+            offset += BATCH_SIZE
+
+        if len(all_entities) >= MAX_ENTITY_LIMIT:
+            import structlog
+            logger = structlog.get_logger()
+            logger.warning(
+                "entity_limit_reached",
+                user_id=user_id,
+                limit=MAX_ENTITY_LIMIT,
+                _message=f"Entity count capped at {MAX_ENTITY_LIMIT}. Consider increasing for this user.",
+            )
+
+        return all_entities
 
     async def _get_existing_pair_set(self, user_id: str) -> set[tuple]:
         """Get set of existing association pairs for dedup.
