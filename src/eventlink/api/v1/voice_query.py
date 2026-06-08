@@ -75,7 +75,9 @@ async def voice_query(
     )
 
     # Step 1: NLU intent classification
-    llm_client = LLMClient()
+    from eventlink.config import get_settings
+    settings = get_settings()
+    llm_client = LLMClient(config=settings)
     classifier = NLUIntentClassifier(llm_client=llm_client)
     nlu_result = await classifier.classify(body.text)
 
