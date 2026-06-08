@@ -15,6 +15,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from eventlink.api.dependencies import rate_limit_llm_dependency
+from eventlink.config import get_settings
 from eventlink.core.auth import get_current_user_id
 from eventlink.core.logging import get_logger, new_request_id
 from eventlink.database import get_async_session
@@ -98,7 +99,7 @@ async def create_voice_session(
     )
 
     # Run NLU classification
-    llm_client = LLMClient()
+    llm_client = LLMClient(config=get_settings())
     classifier = NLUIntentClassifier(llm_client=llm_client)
     nlu_result = await classifier.classify(body.query_text)
 

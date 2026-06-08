@@ -1173,16 +1173,19 @@ class AssociationDiscoveryEngine:
         with normalized direction (smaller ID first) to prevent
         bidirectional duplicates.
         """
-        stmt = select(Association).where(Association.user_id == user_id)
+        stmt = select(
+            Association.source_entity_id,
+            Association.target_entity_id,
+            Association.association_type,
+        ).where(Association.user_id == user_id)
         result = await self.session.execute(stmt)
-        associations = result.scalars().all()
         normalized = set()
-        for a in associations:
-            src, tgt = str(a.source_entity_id), str(a.target_entity_id)
+        for src, tgt, assoc_type in result.fetchall():
+            src, tgt = str(src), str(tgt)
             # Normalize direction: smaller ID first
             if src > tgt:
                 src, tgt = tgt, src
-            normalized.add((src, tgt, a.association_type))
+            normalized.add((src, tgt, assoc_type))
         return normalized
 
     async def _maybe_update_association(
