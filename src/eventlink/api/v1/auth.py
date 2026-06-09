@@ -7,10 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from eventlink.api.dependencies import rate_limit_dependency
 from eventlink.core.auth import create_access_token
 from eventlink.database import get_async_session
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(rate_limit_dependency)])
 
 
 class LoginRequest(BaseModel):
