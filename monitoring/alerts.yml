@@ -1,0 +1,26 @@
+groups:
+  - name: eventlink-alerts
+    rules:
+      - alert: EventLinkDown
+        expr: up{job="eventlink-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "EventLink API is down"
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Error rate > 5%"
+
+      - alert: SlowResponse
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P95 latency > 1s"

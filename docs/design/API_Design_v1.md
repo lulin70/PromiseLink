@@ -1,7 +1,7 @@
 # EventLink API设计文档
 
-> **版本**: v2.10 (POC阶段)
-> **日期**: 2026-06-08
+> **版本**: v2.11 (POC阶段)
+> **日期**: 2026-06-09
 > **阶段**: POC (v2.x series)
 > **设计师**: 架构师 + 开发团队
 > **参考**: PRD v4.3, 技术设计 v2.7 §7
@@ -64,6 +64,7 @@
 **说明**:
 - PoC阶段简化认证，使用共享密钥验证
 - 生产环境将替换为完整认证流程
+- **托管PoC模式备注**: 托管PoC模式下poc_secret由服务方管理，用户通过微信小程序登录
 
 #### 2.0.2 微信小程序登录 ✅ **已实现**
 
@@ -2994,6 +2995,8 @@ class ReindexResponse(BaseModel):
 
 **限流**: LLM端点限流(20次/分钟)
 
+> **数字名片API对接备注**: 数字名片API对接预留端点在PoC阶段不启用，Phase1再评估
+
 #### 3.22.4 POST /api/v1/media/ocr-event ✅ **已实现**
 
 OCR + 自动创建Event：上传图片，OCR识别后自动创建互动记录并触发Pipeline。
@@ -4644,7 +4647,8 @@ X-Cache-Hit: true
 | **v2.8** | **2026-06-07** | **F-08/F-21/F-36/F-39/EmailAdapter/WeChatForwardAdapter/F-50 API (v2.8)：**<br/>**① 新增§3.16 CSV Import API(F-08)**: POST /api/v1/import/csv — CSV文件上传导入，EntityResolution去重归一，返回统计<br/>**② 新增§3.17 Data Export API(F-21)**: GET /api/v1/export/json — JSON全量导出，ORM mapper column_attrs序列化，PII脱敏<br/>**③ 新增§3.18 Demand Input API(F-36)**: POST /api/v1/demands — 一句话需求录入，LLM提取+关键词fallback，concern追加到Entity.properties<br/>**④ 新增§3.19 Email Sync API(EmailAdapter)**: POST /api/v1/email/sync — IMAP邮件同步，一封邮件一个Event<br/>**⑤ 新增§3.20 WeChat Forward API(WeChatForwardAdapter)**: POST /api/v1/wechat/forward — 微信聊天记录转发解析，群聊/单聊支持<br/>**⑥ 新增§3.21 Voice Query API(F-50)**: POST /api/v1/voice/query — 语音查询三阶段Pipeline(NLU→DB→NLG)** |
 | **v2.9** | **2026-06-08** | **Media API + Privacy API (v2.9)：**<br/>**① 新增§3.22 Media API(PRD v4.8)**: POST /api/v1/media/asr(语音识别) + POST /api/v1/media/tts(文字转语音) + POST /api/v1/media/ocr(图片文字识别) + POST /api/v1/media/ocr-event(OCR+自动创建Event) + 安全约束(仅内存处理/不持久化/JWT认证/文件大小限制)<br/>**② 新增§3.23 Privacy API(GDPR合规)**: GET /api/v1/privacy/data-summary(数据统计摘要) + DELETE /api/v1/privacy/user-data(被遗忘权删除) + POST /api/v1/privacy/export(全量数据导出) |
 | **v2.10** | **2026-06-08** | **文档一致性修复与实现状态标注 (v2.10)：**<br/>**① D4 版本号格式统一**: 头部版本从"0.2.9"修正为"v2.10"，阶段标识从"0.2.x series"修正为"v2.x series"<br/>**② D1 API端点实现状态标注**: 为所有端点添加实现状态标签(✅已实现/📋Phase 2/⚠️路径差异)，每个API章节添加实现状态统计摘要<br/>**③ D5 认证部分更新**: 新增§2.0当前实现(PoC登录+微信登录)，原§2.1临时授权码模式标记为📋Phase 2规划，JWT Payload新增aud:"eventlink-api"声明<br/>**④ D6 Privacy API响应格式更新**: data-summary删除user_id字段、user-data响应改为deleted+各类型计数、export响应新增message字段 |
+| **v2.11** | **2026-06-09** | **托管PoC模式备注 (v2.11)：**<br/>**① §2.0.1 PoC登录新增备注**: 托管PoC模式下poc_secret由服务方管理，用户通过微信小程序登录<br/>**② §3.22.3 OCR端点新增备注**: 数字名片API对接预留端点在PoC阶段不启用，Phase1再评估 |
 
 ---
 
-*最后更新: 2026-06-08*
+*最后更新: 2026-06-09*

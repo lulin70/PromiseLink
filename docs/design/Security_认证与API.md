@@ -1,6 +1,6 @@
 # EventLink 安全设计文档 — 认证与API
 
-> **版本**: v2.9 (POC阶段)
+> **版本**: v3.0 (托管PoC模式更新)
 > **拆分日期**: 2026-06-08
 > **来源**: Security_Design_v1.md 按攻击面拆分
 > **设计师**: 架构师 + 安全工程师
@@ -349,6 +349,11 @@ sequenceDiagram
 
 **影响文件**: `api/v1/auth.py`
 
+> **托管PoC模式说明**：
+> - 托管PoC模式下，`EVENTLINK_POC_SECRET`由服务方(我方)统一管理，而非用户自行配置
+> - 用户通过微信小程序登录，无需输入`poc_secret`
+> - 服务方通过环境变量注入`poc_secret`到Docker容器，用户侧完全无感知
+
 #### 2.6.2 强制JWT认证 (CRITICAL修复)
 
 **问题**: `get_optional_user_id` 在无token时返回固定测试用户ID `"00000000-0000-0000-0000-000000000001"`，导致所有未认证请求共享同一身份。
@@ -474,6 +479,7 @@ result = await db.execute(
 | 阶段 | 允许的Origin | 方法 | 说明 |
 |------|-------------|------|------|
 | PoC | `http://localhost:*` | GET, POST, PATCH, DELETE | 本地开发 |
+| 托管PoC | `[微信小程序域名, 托管域名(如 eventlink.example.com)]` | GET, POST, PATCH, DELETE | 托管模式不允许localhost，必须白名单指定域名 |
 | Phase1 | `https://eventlink.com` + 小程序域名 | GET, POST, PATCH, DELETE | 生产环境 |
 | Phase2 | Phase1 + 自定义域名 | GET, POST, PATCH, DELETE | 多域名 |
 
@@ -599,3 +605,12 @@ def resolve_input_scope(client_scope: str | None, raw_text: str, event_type: str
 **安全验证要点**：
 - 单元测试必须覆盖：非法值→400、auto→服务端分类、合法hint→仍以服务端为准
 - 集成测试：构造包含恶意 `input_scope` 的请求，确认不影响管线路由安全
+
+---
+
+## 版本历史
+
+| 版本 | 日期 | 变更内容 |
+|------|------|----------|
+| v2.9 | 2026-06-08 | 初始拆分版，安全修复记录（PoC登录密钥验证、强制JWT认证、PBKDF2动态盐值、API速率限制） |
+| v3.0 | 2026-06-09 | 托管PoC模式更新：§5.3 CORS策略新增托管PoC行；§2.6.1 新增托管PoC模式下poc_secret管理说明 |
