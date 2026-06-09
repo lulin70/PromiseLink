@@ -1,7 +1,7 @@
-# EventLink集成设计文档 v2.8
+# EventLink集成设计文档 v2.9
 
-> **版本**: v2.8（POC阶段 — Insight Engine + DataSourceAdapter + 依赖性/场景匹配 + 语义搜索 + CSV/Email/WeChat/VoiceQuery 集成规格）
-> **日期**: 2026-06-07
+> **版本**: v2.9（POC阶段 — 托管PoC部署模式+数字名片对接决策+Insight Engine + DataSourceAdapter + 依赖性/场景匹配 + 语义搜索 + CSV/Email/WeChat/VoiceQuery 集成规格）
+> **日期**: 2026-06-09
 > **设计师**: 架构师团队
 > **参考**: PRD v4.3, 技术设计 v2.5, API设计 v1.0, 数据库设计 v2.0, LLM_Prompt_Templates v2.0
 > **状态**: POC阶段 — 共识清单D7-1~D7-11融合修订 + DevSquad Review更新
@@ -35,7 +35,7 @@
 | 3 | TTS/ASR集成设计 | P0 | ✅ 0.2.1详细化（ASR:微信同声传译+Whisper+Protocol抽象层 / TTS:Edge-TTS+缓存策略+Protocol抽象层+PII脱敏 / Voice Orchestrator+NLG） |
 | 4 | 微信服务号推送 | P1 | ✅ 设计完成（[D7-7] 模板消息/订阅消息框架不变） |
 | 5 | CarryMem集成设计 | P1 | ✅ 0.2.0更新（三阶段路径：PoC→Phase1→Phase2） |
-| 6 | 数字名片API对接 | P1 | 🔶 接口预留中（[D7-6] 陈宇欣团队+自建备选） |
+| 6 | 数字名片API对接 | P1 | 🔶 PoC阶段暂停，Phase1再评估（[D7-6] PRD v4.9确认PoC不对接外部数字名片平台） |
 | 7 | 数据导出集成 | P1 | ✅ 0.2.0新增（[D7-9] GET /data/export + PII脱敏） |
 | 8 | Redis缓存服务 | P1 | ✅ 设计完成（[D7-8] CacheService不变） |
 | 9 | 集成测试策略 | P0 | ✅ 设计完成 |
@@ -4134,22 +4134,26 @@ memory_provider = create_memory_provider({
 
 > 陈宇欣团队负责数字名片服务，EventLink需要与其API对接以获取/同步名片数据。
 > 当前为**接口预留**阶段，待对方接口就绪后实施对接。
+>
+> ⚠️ **PRD v4.9确认：PoC阶段不对接外部数字名片平台（如陈宇鑫公司），Phase1再评估对接方案**
 
 ### 6.5.2 接口预留设计
 
 | 项目 | 说明 |
 |------|------|
 | **对接方** | 陈宇欣团队 — 数字名片服务 |
-| **当前状态** | 接口定义中，等待对方提供OpenAPI/Swagger文档 |
-| **预计时间线** | 对方承诺2-3周内提供接口文档 |
-| **备选方案** | 如对接超3周未完成，启动自建小程序名片扫描模块 |
+| **当前状态** | PoC阶段暂停对接，Phase1再评估 |
+| **预计时间线** | Phase1阶段重新评估对接方案 |
+| **备选方案** | Phase1评估结论为不对接时，名片扫描保持当前OCR+LLM自建链路 |
 | **PoC策略** | 使用Mock数据模拟名片API响应，验证数据处理链路 |
 
 ### 6.5.3 Mock名片API（PoC验证用）
 
+> ⚠️ MockDigitalCardClient保留为Phase1对接验证用，PoC阶段不激活
+
 ```python
 class MockDigitalCardClient:
-    """陈宇欣团队数字名片API的Mock实现"""
+    """陈宇欣团队数字名片API的Mock实现（Phase1对接验证用，PoC阶段不激活）"""
 
     async def get_card(self, card_id: str) -> dict:
         """获取数字名片详情"""
@@ -4181,7 +4185,7 @@ class MockDigitalCardClient:
 
 ### 6.5.4 自建小程序备选方案
 
-> **触发条件**: 陈宇欣团队接口对接超3周未完成时自动激活
+> **触发条件**: Phase1评估结论为不对接时，名片扫描保持当前OCR+LLM自建链路
 
 | 备选方案 | 实现方式 | 开发周期 | 优缺点 |
 |---------|---------|---------|--------|
@@ -5442,7 +5446,8 @@ NLGService.generate_nlu_response() — 自然语言回答生成
 | **v2.6** | **2026-06-06** | **F-55/F-56 依赖性与场景匹配集成：①§11 DependencyAnalyzer集成设计[v2.6新增] — 11.1 与Pipeline Step 8.5集成点(Step8 Promise分析后触发→Step9 Todo持久化前) 11.2 与AssociationDiscoveryEngine数据依赖(Entity关联关系→Todo→Entity→Todo依赖链构建) 11.3 依赖图构建算法(BFS遍历+O(N×E)复杂度+N=Todo数/E=Entity关联数+dependency_score公式+性能考量PoC全量/Phase1增量/Phase2 Neo4j) ②§12 ContextMatcher集成设计[v2.6新增] — 12.1 与Pipeline Step 8.5集成点(与DependencyAnalyzer并行执行) 12.2 Event表查询优化(idx_events_context复合索引user_id+event_type+created_at+查询性能预估) 12.3 与PriorityScorerV2调用链(四维评分公式0.25×urgency+0.35×importance+0.20×dependency+0.20×context+降级策略)** |
 | **v2.7** | **2026-06-06** | **F-57/F-58 语义搜索与关联发现增强集成：①§13 EmbeddingProvider集成设计[v2.7新增] — 13.1 与Pipeline Step 5.5集成点(Entity提取后触发嵌入生成) 13.2 Moka AI API调用链(text-embedding-3-small+SHA256缓存+性能预估单条~100ms/批量~2s) 13.3 与AssociationDiscoveryEngine数据依赖(Entity→embed→vector_embeddings→SemanticAssociationEnhancer) ②§14 SemanticSearchEngine集成设计[v2.7新增] — 14.1 双集成点(Step5.5嵌入生成+Step11语义增强) 14.2 sqlite-vec vs Python余弦降级(5ms vs 50ms/1000条) 14.3 Phase2 pgvector迁移路径(6步骤+风险评估)** |
 | **v2.8** | **2026-06-07** | **F-08/F-21/F-36/F-39/EmailAdapter/WeChatForwardAdapter/F-50 集成规格：①§15 CSV导入集成设计[v2.8新增] — 15.1 集成架构(UploadFile→csv.DictReader→EntityResolution→统计) 15.2 与Pipeline关系(不触发完整Pipeline,仅EntityResolution) 15.3 与EntityResolution数据依赖 ②§16 邮件同步集成设计[v2.8新增] — 16.1 集成架构(IMAP→EmailAdapter→Event→Pipeline) 16.2 与DataSourceAdapter关系(继承抽象基类) 16.3 与Pipeline关系(触发完整Pipeline) 16.4 邮件解析细节(编码/正文/附件/日期) ③§17 微信转发集成设计[v2.8新增] — 17.1 集成架构(正则解析→Event→Pipeline) 17.2 与Pipeline关系(触发完整Pipeline) 17.3 格式识别策略(群聊/单聊/降级) 17.4 与DataSourceAdapter关系(API调用非定时同步) ④§18 语音查询集成设计[v2.8新增] — 18.1 集成架构(NLU→DB查询→NLG) 18.2 与现有Voice API关系(session vs query) 18.3 与Pipeline关系(只读不触发Pipeline) 18.4 与NLU引擎数据依赖** |
+| **v2.9** | **2026-06-09** | **托管PoC部署模式+数字名片对接决策：①§1集成总览表更新 — 数字名片API对接状态从"接口预留中"改为"PoC阶段暂停，Phase1再评估" ②§6.5数字名片API对接更新 — 新增PRD v4.9确认PoC不对接外部数字名片平台说明+MockDigitalCardClient标注为Phase1对接验证用PoC阶段不激活 ③§6.5.4自建小程序备选方案触发条件更新 — 从"对接超3周"改为"Phase1评估结论为不对接时保持OCR+LLM自建链路"** |
 
 ---
 
-*v2.8 完成于2026-06-07 — Insight Engine + DataSourceAdapter + 依赖性/场景匹配 + 语义搜索 + CSV/Email/WeChat/VoiceQuery 集成规格*
+*v2.9 完成于2026-06-09 — 托管PoC部署模式+数字名片对接决策+Insight Engine + DataSourceAdapter + 依赖性/场景匹配 + 语义搜索 + CSV/Email/WeChat/VoiceQuery 集成规格*

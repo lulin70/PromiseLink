@@ -325,8 +325,10 @@ class TestCrossDayUsage:
 
         scorer = PriorityScorer()
 
+        # Use a fixed "now" to make the test deterministic
+        now = datetime(2026, 6, 1, 12, 0, tzinfo=timezone.utc)
+
         # Day 1: Create a promise todo due in 7 days
-        day1 = date(2026, 6, 1)
         due_date_far = datetime(2026, 6, 8, 18, 0, tzinfo=timezone.utc)
 
         event = await insert_event(db_session, title="承诺事项")
@@ -346,14 +348,16 @@ class TestCrossDayUsage:
             todo_type="promise",
             due_date=due_date_far,
             priority=2,
+            now=now,
         )
 
-        # Score on Day 6 (1 day away) — higher urgency
+        # Score when 1 day away — higher urgency
         due_date_near = datetime(2026, 6, 2, 18, 0, tzinfo=timezone.utc)
         score_near = scorer.calculate(
             todo_type="promise",
             due_date=due_date_near,
             priority=2,
+            now=now,
         )
 
         # Near-due should score higher than far-due

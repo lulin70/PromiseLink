@@ -46,7 +46,7 @@ WORKDIR /app
 COPY src/ ./src/
 
 # Create data directory for SQLite (owned by non-root user)
-RUN mkdir -p /data && chown eventlink:eventlink /data
+RUN mkdir -p /app/data && chown eventlink:eventlink /app/data
 
 # Switch to non-root user
 USER eventlink

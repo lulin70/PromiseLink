@@ -113,7 +113,20 @@ jobs:
     if: github.ref == 'refs/heads/main'
     environment: staging
     steps:
-      - name: Deploy to staging
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH key
         run: |
-          echo "Staging deployment triggered for version ${{ needs.build-and-push.outputs.version }}"
-          echo "TODO: Add actual deployment commands (e.g., ssh/docker-compose pull && docker-compose up -d)"
+          mkdir -p ~/.ssh
+          echo "${{ secrets.STAGING_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan ${{ secrets.STAGING_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to staging
+        env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+        run: |
+          eval $(ssh-agent -a $SSH_AUTH_SOCK)
+          ssh-add ~/.ssh/deploy_key
+          chmod +x scripts/deploy-staging.sh
+          ./scripts/deploy-staging.sh ${{ secrets.STAGING_HOST }} ${{ secrets.STAGING_USER || 'ubuntu' }}

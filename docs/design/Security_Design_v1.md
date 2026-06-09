@@ -1,7 +1,7 @@
 # EventLink 安全设计文档
 
-> **版本**: v2.9 (POC阶段)
-> **日期**: 2026-06-08
+> **版本**: v3.0 (POC阶段)
+> **日期**: 2026-06-09
 > **阶段**: POC (0.2.x series)
 > **设计师**: 架构师 + 安全工程师
 > **参考**: PRD v4.3, 技术设计 v2.5 §8 (§3.1a + §8.0.3), API设计 v1.0, 数据库设计 v1.0
@@ -104,11 +104,20 @@ graph TB
 | 攻击面 | 入口点 | 暴露数据 | 防御优先级 |
 |--------|--------|----------|------------|
 | REST API | `/api/v1/*` | 全部业务数据 | P0 |
+| 公网API端点(托管PoC) | HTTPS端点暴露于公网 | 全部业务数据 | P0 |
 | LLM Prompt | 事件文本输入 | 用户PII | P0 |
 | 小程序WebView | H5页面URL | 认证凭据 | P0 |
 | 数据库 | SQLite/PG文件 | 加密后PII | P1 |
 | Redis | 6379端口 | Ticket/会话 | P1 |
 | Docker | 容器端口映射 | 服务配置 | P2 |
+
+**托管PoC攻击面详细分析**：
+
+| 威胁 | 攻击向量 | 缓解措施 | 优先级 |
+|------|----------|----------|--------|
+| DDoS | HTTPS端点暴露于公网，可被大规模请求淹没 | 限流（InMemorySlidingWindow）、IP白名单（可选） | P0 |
+| 暴力破解 | 对poc_secret认证端点进行字典/暴力攻击 | 限流 + poc_secret强密码要求 | P0 |
+| 未授权访问 | 无有效凭据直接访问API端点 | poc_secret认证 + JWT HS256强制校验 | P0 |
 
 ---
 
@@ -573,7 +582,8 @@ properties = {
 
 | 阶段 | 方案 | 配置 |
 |------|------|------|
-| PoC | HTTP（本地Docker内网） | 无TLS，仅本地访问 |
+| PoC（自托管） | HTTP（本地Docker内网） | 无TLS，仅本地访问 |
+| PoC（托管） | HTTPS（Let's Encrypt TLS 1.2+） | 所有端点强制HTTPS，公网暴露必须加密 |
 | Phase1 | TLS 1.3（Nginx终止） | 证书: Let's Encrypt，HSTS启用 |
 | Phase2 | TLS 1.3（Nginx终止） | 证书: 商业证书，OCSP Stapling |
 
@@ -2600,24 +2610,24 @@ flowchart TD
 
 ### 9.1 各阶段安全措施对比表
 
-| 安全措施 | PoC（本地Docker+SQLite） | Phase1（云端Docker Compose+PG+Redis） | Phase2（生产增强） |
-|----------|--------------------------|---------------------------------------|-------------------|
-| **传输加密** | HTTP（本地内网） | TLS 1.3（Let's Encrypt） | TLS 1.3（商业证书+OCSP） |
-| **认证算法** | HS256（简化） | RS256（非对称） | RS256 + 设备绑定 |
-| **Token传递** | URL参数（开发便利） | Ticket模式（安全） | Ticket + Cookie HttpOnly |
-| **PII加密** | 不加密（开发便利） | AES-256-GCM字段级加密 | AES-256-GCM + TDE |
-| **数据库加密** | SQLite明文 | pgcrypto字段加密 | TDE透明加密 |
-| **密钥管理** | 环境变量 | Docker Secret | KMS托管 |
-| **限流** | 内存（100次/分） | Redis（100次/分/user） | Redis令牌桶（100+突发200） |
-| **请求签名** | 无 | HMAC-SHA256 | HMAC-SHA256 |
-| **CORS** | localhost | 生产域名白名单 | 多域名白名单 |
-| **LLM脱敏** | 不脱敏（开发调试） | PII脱敏后发送 | PII脱敏 + 本地模型备选 |
-| **审计日志** | 文件日志 | 数据库审计表 | 数据库 + ELK |
-| **异常检测** | 无 | 基础规则 | 机器学习模型 |
-| **数据导出** | 无 | JSON/CSV | JSON/CSV/PDF |
-| **数据删除** | 软删除 | 硬删除+关联清理 | 硬删除+备份清理 |
-| **Token撤销** | 无（重启服务） | Redis黑名单 | Redis黑名单+设备管理 |
-| **备份加密** | 无 | 加密备份 | 加密备份+异地容灾 |
+| 安全措施 | PoC（本地Docker+SQLite） | 托管PoC（公网Docker+SQLite） | Phase1（云端Docker Compose+PG+Redis） | Phase2（生产增强） |
+|----------|--------------------------|----------------------------|---------------------------------------|-------------------|
+| **传输加密** | HTTP（本地内网） | HTTPS（Let's Encrypt TLS 1.2+） | TLS 1.3（Let's Encrypt） | TLS 1.3（商业证书+OCSP） |
+| **认证算法** | HS256（简化） | HS256 + poc_secret | RS256（非对称） | RS256 + 设备绑定 |
+| **Token传递** | URL参数（开发便利） | URL参数 + poc_secret认证 | Ticket模式（安全） | Ticket + Cookie HttpOnly |
+| **PII加密** | 不加密（开发便利） | AES-256-GCM字段级加密 | AES-256-GCM字段级加密 | AES-256-GCM + TDE |
+| **数据库加密** | SQLite明文 | SQLite + AES-256-GCM字段加密 | pgcrypto字段加密 | TDE透明加密 |
+| **密钥管理** | 环境变量 | 环境变量 | Docker Secret | KMS托管 |
+| **限流** | 内存（100次/分） | InMemorySlidingWindow（60/10/20三级） | Redis（100次/分/user） | Redis令牌桶（100+突发200） |
+| **请求签名** | 无 | 无 | HMAC-SHA256 | HMAC-SHA256 |
+| **CORS** | localhost | 微信小程序域名 + 托管域名 | 生产域名白名单 | 多域名白名单 |
+| **LLM脱敏** | 不脱敏（开发调试） | PII脱敏后发送 | PII脱敏后发送 | PII脱敏 + 本地模型备选 |
+| **审计日志** | 文件日志 | 文件日志 | 数据库审计表 | 数据库 + ELK |
+| **异常检测** | 无 | 无 | 基础规则 | 机器学习模型 |
+| **数据导出** | 无 | 无 | JSON/CSV | JSON/CSV/PDF |
+| **数据删除** | 软删除 | 软删除 | 硬删除+关联清理 | 硬删除+备份清理 |
+| **Token撤销** | 无（重启服务） | 无（重启服务） | Redis黑名单 | Redis黑名单+设备管理 |
+| **备份加密** | 无 | 无 | 加密备份 | 加密备份+异地容灾 |
 
 ### 9.2 PoC简化策略
 
@@ -2634,6 +2644,17 @@ PoC阶段为本地单用户开发环境，安全策略适度简化：
 - ✅ 输入验证（SQL注入/XSS防护）
 - ✅ LLM Prompt注入检测
 - ✅ 错误信息安全
+
+**托管PoC安全底线**（不可简化）：
+- ✅ HTTPS传输加密不可简化（公网暴露必须加密）
+- ✅ poc_secret认证不可简化（防止未授权访问）
+- ✅ 限流不可简化（防止DDoS和暴力破解）
+- ✅ 数据加密存储不可简化（AES-256-GCM字段级加密）
+
+**托管PoC可简化项**：
+- ⬇️ 无Redis（使用InMemorySlidingWindow内存限流）
+- ⬇️ 无PG（使用SQLite，与自托管PoC一致）
+- ⬇️ 无专业日志系统（使用文件日志，与自托管PoC一致）
 
 ### 9.3 Phase1增强项
 
@@ -2794,10 +2815,11 @@ trivy image --severity HIGH,CRITICAL eventlink:latest  # 仅报告高危
 | v2.7 | 2026-06-06 | **F-57/F-58安全专项**：①§6.12新增EmbeddingProvider安全专项(API Key复用LLM密钥+.env存储+缓存内存存储重启清空+user_id数据隔离) ②§6.13新增SemanticSearch安全专项(搜索数据隔离user_id强制过滤+JWT提取+sqlite-vec文件权限0o600+向量注入防护系统生成only) |
 | v2.8 | 2026-06-07 | **F-08/EmailAdapter/WeChatForwardAdapter安全专项**：①§6.14新增CSV导入安全专项(CSV注入防护+大文件DoS+编码攻击+恶意文件名+数据注入5项威胁缓解) ②§6.15新增EmailAdapter安全专项(IMAP凭证泄露+邮件PII+恶意附件+连接劫持+邮件洪水5项威胁缓解+SSL强制+附件仅记录不存储) ③§6.16新增WeChatForwardAdapter安全专项(文本长度DoS+正则ReDoS+聊天PII+XSS注入4项威胁缓解+512KB限制+简单正则) | 架构师 + 安全工程师 |
 | v2.9 | 2026-06-08 | **安全修复记录**：①§2.6新增安全修复记录章节 ②2.6.1 PoC登录密钥验证CRITICAL修复(EVENTLINK_POC_SECRET环境变量) ③2.6.2 强制JWT认证CRITICAL修复(get_current_user_id+13端点迁移+poc_anonymous_access) ④2.6.3 PBKDF2动态盐值派生CRITICAL修复(SHA256哈希派生替代硬编码盐值) ⑤2.6.4 API速率限制HIGH修复(滑动窗口限流器+Redis后端+三级限流60/10/20) | 架构师 + 安全工程师 |
+| v3.0 | 2026-06-09 | **托管PoC部署模式安全设计**：①§1.3攻击面分析新增公网API端点(托管PoC)攻击面+详细威胁分析表(DDoS/暴力破解/未授权访问) ②§3.2传输加密表新增托管PoC行(HTTPS Let's Encrypt TLS 1.2+，所有端点强制HTTPS) ③§9.1安全措施对比表新增托管PoC列(HTTPS+poc_secret+InMemorySlidingWindow+AES-256-GCM+文件日志+微信小程序域名+托管域名CORS) ④§9.2新增托管PoC安全底线(4项不可简化+3项可简化) | 架构师 + 安全工程师 |
 
 ---
 
-> **文档状态**: ✅ v2.9 更新完成（安全修复记录：PoC登录密钥验证 + 强制JWT认证 + PBKDF2动态盐值派生 + API速率限制）
+> **文档状态**: ✅ v3.0 更新完成（托管PoC部署模式安全设计：攻击面分析 + 传输加密 + 安全措施对比 + 安全底线）
 > **下次审查**: Phase1开发启动前
 > **安全负责人**: 架构师
 > **对齐文档**: 技术设计 v2.5 §3.1a + §8.0.3

@@ -1,10 +1,10 @@
 # EventLink 技术设计文档
 
-> **版本**: v2.8
-> **日期**: 2026-06-06
+> **版本**: v2.9
+> **日期**: 2026-06-09
 > **对应PRD**: v4.7
 > **架构师**: CarryMem团队
-> **变更说明**: v2.8: 向量化语义能力设计（EmbeddingProvider+SemanticSearchEngine+sqlite-vec+关联发现增强）
+> **变更说明**: v2.9: 托管PoC部署模式设计（云服务器+Nginx+HTTPS+小程序接入+托管PoC迁移路径）
 
 ---
 
@@ -3364,20 +3364,22 @@ LLM推理必须走云端，手机只是展示层。微信小程序已覆盖Event
 ### 8.6.2 阶段递进式部署架构
 
 ```
-PoC（用户电脑）              Phase 1（云服务器）           Phase 2（云集群）
-┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
-│ Docker单机       │         │ Docker Compose   │         │ K8s集群          │
-│ ├─ FastAPI       │  迁移   │ ├─ FastAPI       │  扩展   │ ├─ FastAPI×N     │
-│ ├─ SQLite        │ ──────→ │ ├─ PostgreSQL    │ ──────→ │ ├─ PG+Redis+ES  │
-│ └─ NullMemory    │         │ ├─ Redis         │         │ └─ pgvector     │
-│                  │         │ └─ CarryMem(opt) │         │                  │
-└─────────────────┘         └─────────────────┘         └─────────────────┘
-     ↕ API                       ↕ API                       ↕ API
-┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
-│ Swagger UI      │         │ 名片小程序        │         │ 独立小程序+Web   │
-│ (开发测试用)     │         │ ├─ 原生(语音/TTS) │         │ ├─ 原生+Web     │
-│                 │         │ └─ H5(查询/管理)  │         │ └─ 全功能       │
-└─────────────────┘         └─────────────────┘         └─────────────────┘
+自助PoC（用户电脑）          托管PoC（云服务器2C4G）        Phase 1（云服务器）           Phase 2（云集群）
+┌─────────────────┐         ┌─────────────────────┐     ┌─────────────────┐         ┌─────────────────┐
+│ Docker单机       │         │ Docker Compose       │     │ Docker Compose   │         │ K8s集群          │
+│ ├─ FastAPI       │         │ ├─ FastAPI           │     │ ├─ FastAPI       │  扩展   │ ├─ FastAPI×N     │
+│ ├─ SQLite        │         │ ├─ SQLite            │     │ ├─ PostgreSQL    │ ──────→ │ ├─ PG+Redis+ES  │
+│ └─ NullMemory    │         │ ├─ Nginx(反代+TLS)   │     │ ├─ Redis         │         │ └─ pgvector     │
+│                  │         │ └─ NullMemory        │     │ └─ CarryMem(opt) │         │                  │
+└─────────────────┘         └─────────────────────┘     └─────────────────┘         └─────────────────┘
+     ↕ localhost:8000             ↕ 域名+HTTPS                ↕ API                       ↕ API
+┌─────────────────┐         ┌─────────────────────┐     ┌─────────────────┐         ┌─────────────────┐
+│ Swagger UI      │         │ 名片小程序            │     │ 名片小程序        │         │ 独立小程序+Web   │
+│ (开发测试用)     │         │ ├─ 原生(语音/TTS)    │     │ ├─ 原生(语音/TTS) │         │ ├─ 原生+Web     │
+│                 │         │ └─ H5(查询/管理)     │     │ └─ H5(查询/管理)  │         │ └─ 全功能       │
+└─────────────────┘         └─────────────────────┘     └─────────────────┘         └─────────────────┘
+     迁移                        迁移                       扩展
+  (自助→托管可选)            (托管PoC→Phase1)           (Phase1→Phase2)
 ```
 
 ### 8.6.3 PoC部署方案（Docker单机）
@@ -3408,6 +3410,114 @@ docker compose -f docker-compose.poc.yml up -d
 ```
 
 **PoC数据位置**：`./data/eventlink_poc.db`（SQLite文件，用户完全控制）
+
+### 8.6.3a 托管PoC部署模式（v2.9新增）
+
+> **适用场景**：用户无本地Docker环境，或需要微信小程序直接访问，或希望零运维上手体验。
+
+**架构描述**：云服务器(2C4G) + Docker Compose + Nginx反向代理 + HTTPS(Let's Encrypt) + SQLite + 微信小程序接入。
+
+```yaml
+# docker-compose.hosted-poc.yml
+version: "3.8"
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    depends_on:
+      - eventlink-api
+    restart: always
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+  eventlink-api:
+    build: .
+    expose:
+      - "8000"
+    environment:
+      - EVENTLINK_STAGE=poc
+      - EVENTLINK_DB_PATH=/data/eventlink_poc.db
+      - LLM_API_KEY=${LLM_API_KEY}     # 由我们托管管理
+      - LLM_BASE_URL=${LLM_BASE_URL}
+    volumes:
+      - ./data:/data
+    restart: always
+```
+
+**Nginx反向代理配置**：
+```nginx
+# nginx/conf.d/eventlink.conf
+server {
+    listen 80;
+    server_name eventlink.example.com;
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    server_name eventlink.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/eventlink.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/eventlink.example.com/privkey.pem;
+
+    # 微信小程序安全域名要求
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    location / {
+        proxy_pass http://eventlink-api:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+**托管PoC启动命令**：
+```bash
+# 首次部署：申请证书
+docker compose -f docker-compose.hosted-poc.yml up -d nginx certbot
+# 证书签发后重启Nginx启用HTTPS
+docker compose -f docker-compose.hosted-poc.yml restart nginx
+```
+
+**自助PoC vs 托管PoC对比**：
+
+| 维度 | 自助PoC | 托管PoC |
+|------|---------|---------|
+| 部署位置 | 用户本地电脑 | 云服务器(2C4G) |
+| 访问方式 | localhost:8000（HTTP） | 域名+HTTPS（如 eventlink.example.com） |
+| 运维责任 | 用户自行维护 | 我们负责服务器运维+数据备份 |
+| 成本 | 零（用户自有设备） | 云服务器费用（~100元/月） |
+| 数据存储 | 本地SQLite，用户完全控制 | 云端SQLite，我们负责备份 |
+| TLS/HTTPS | 不需要（本地访问） | 必须（微信小程序要求+安全传输） |
+| 域名 | 不需要 | 需要公网域名+ICP备案 |
+| LLM Key | 用户自行配置 | 我们托管管理 |
+| 小程序接入 | ❌ 不支持（localhost不可达） | ✅ 支持（域名+HTTPS满足微信要求） |
+| 数据备份 | 用户自行负责 | 我们每日自动备份SQLite文件 |
+
+**与自助PoC的关键差异**：
+1. **公网IP+域名**：必须拥有公网IP和已备案域名，微信小程序要求HTTPS安全域名
+2. **HTTPS强制**：Let's Encrypt自动证书签发+自动续期，Nginx终止TLS
+3. **Nginx反向代理**：负责TLS终止、请求转发、安全头注入
+4. **LLM Key托管**：由我们统一管理API Key，用户无需自行配置
+5. **数据备份**：我们每日自动备份SQLite文件至对象存储，用户可随时下载
 
 ### 8.6.4 Phase 1部署方案（Docker Compose）
 
@@ -3496,6 +3606,64 @@ volumes:
 | CarryMem | NullMemory | 可选接入 | 配置切换 |
 | 前端 | Swagger UI | 小程序 | 新增，API不变 |
 | 数据 | SQLite→PG | 一次性迁移脚本 | ~100行 |
+
+#### 8.6.6a 托管PoC→Phase 1迁移路径（v2.9新增）
+
+> **场景**：用户从托管PoC升级到Phase 1，需要将云端SQLite数据迁移到PostgreSQL，同时切换Docker Compose配置。
+
+**迁移步骤**（5步，预计停机时间<10分钟）：
+
+```bash
+# Step 1: SQLite数据导出
+sqlite3 /data/eventlink_poc.db .dump > /tmp/eventlink_dump.sql
+
+# Step 2: 转换SQL方言（SQLite→PostgreSQL兼容性）
+python3 scripts/migrate_sqlite_to_pg.py /tmp/eventlink_dump.sql > /tmp/eventlink_pg.sql
+# 主要转换：
+#   - AUTOINCREMENT → SERIAL
+#   - TEXT → TEXT (保持不变，PG兼容)
+#   - BOOLEAN代用(INTEGER 0/1) → BOOLEAN
+#   - datetime('now') → NOW()
+#   - REMOVE PRAGMA/INDEX IF NOT EXISTS等SQLite特有语法
+
+# Step 3: 导入PostgreSQL
+docker compose -f docker-compose.phase1.yml up -d postgres redis
+sleep 5  # 等待PG就绪
+# 先执行Alembic初始迁移创建表结构
+alembic upgrade head
+# 再导入数据（跳过已由Alembic创建的表结构，仅导入数据行）
+psql $DATABASE_URL < /tmp/eventlink_pg.sql
+
+# Step 4: 切换Docker Compose文件
+docker compose -f docker-compose.hosted-poc.yml down
+docker compose -f docker-compose.phase1.yml up -d
+
+# Step 5: DNS切换（零停机）
+# 在Phase 1服务健康检查通过后，切换DNS A记录指向新服务
+# TTL设为60秒，等待旧DNS缓存过期（最多5分钟）
+curl -f https://eventlink.example.com/health || echo "HEALTH CHECK FAILED"
+```
+
+**零停机策略**：
+- Step 4~5之间，Nginx保留并指向新FastAPI实例
+- DNS切换前，新服务已通过健康检查
+- 切换期间旧连接自然过期，新请求路由到Phase 1
+
+**回滚方案**：
+1. DNS回退：将A记录指回原IP（TTL 60s，1分钟内生效）
+2. SQLite恢复：从备份恢复 `eventlink_poc.db`
+3. 重启托管PoC：`docker compose -f docker-compose.hosted-poc.yml up -d`
+4. 验证回滚：`curl -f https://eventlink.example.com/health`
+
+**迁移检查清单**：
+
+| 检查项 | 验证方法 | 通过标准 |
+|--------|----------|----------|
+| 数据完整性 | 对比源SQLite与目标PG记录数 | 各表行数一致 |
+| API可用性 | `curl /health` + 核心API调用 | 200 OK |
+| 小程序连通 | 微信开发者工具请求域名 | HTTPS正常响应 |
+| 认证切换 | API Key→JWT | 旧Key失效，新Token正常 |
+| 数据备份 | pg_dump验证 | 备份文件可恢复 |
 
 ---
 
@@ -3883,6 +4051,7 @@ class SemanticSearchEngine:
 |------|------|----------|------|
 | v2.6 | 2026-06-06 | 新增洞察引擎层+数据接入层架构：①§2.1架构图新增Insight Engine服务②§2.2服务拆分表新增Insight Engine行③§3.1 todos表DDL新增completed_rank/dynamic_score/score_calculated_at字段+索引④§4.10新增洞察引擎设计（动态评分器PriorityScorer+隐式反馈收集器ImplicitFeedbackCollector+Todo模型扩展+API变更）⑤§4.11新增数据接入层设计（DataSourceAdapter接口+邮件场景数据流+微信生态约束） | CarryMem团队 |
 | v2.7 | 2026-06-06 | Phase 1动态优先级四维演进：①§4.10.1a新增Phase 1四维评分器详细设计（依赖性全图谱路径分析+场景匹配Event表驱动）②依赖性算法：有向依赖图+阻塞链检测+3跳间接依赖+dependency_score=Σ(1/depth)×blocked_weight③场景匹配算法：未来24h meeting/call扫描+Entity匹配+context_score=max(0,1-hours/24)④权重配置Phase1(0.3/0.35/0.2/0.15) | CarryMem团队 |
+| v2.9 | 2026-06-09 | 托管PoC部署模式设计：①§8.6.2部署架构图更新为双路径（自助PoC+托管PoC）②§8.6.3a新增托管PoC部署模式（云服务器2C4G+Docker Compose+Nginx反向代理+Let's Encrypt HTTPS+SQLite+微信小程序接入）③新增自助PoC vs 托管PoC对比表（部署位置/访问方式/运维责任/成本/数据存储/TLS/域名）④§8.6.6新增托管PoC→Phase1迁移路径（SQLite导出→SQL方言转换→PG导入→docker-compose切换→DNS切换+零停机+回滚方案） | CarryMem团队 |
 | v2.8 | 2026-06-06 | 向量化语义能力设计（对应PRD v4.7）：①§4.12新增向量化语义引擎设计（5子节）②§4.12.1 EmbeddingProvider（Moka AI API+text-embedding-3-small+API模式768维/本地降级384维+缓存策略+批量接口）③§4.12.2 SemanticSearchEngine（语义搜索接口+SearchResult+余弦相似度）④§4.12.3 sqlite-vec存储设计（vector_embeddings表+vec_entities虚拟表+Phase2迁移pgvector路径）⑤§4.12.4 关联发现增强F-58（混合得分0.7×structured+0.3×semantic+阈值0.7）⑥§4.12.5 Pipeline集成点（Step5.5 Entity embedding+Step11.5语义相似度增强） | CarryMem团队 |
 | v1.0 | 2026-06-02 | 初始版本：4表数据模型+5步引擎+CarryMem解耦+YAML配置化+API设计 | CarryMem团队 |
 | v1.1 | 2026-06-02 | 小程序整合：§2.1架构图+§2.2 Mini/Notify服务+§2.3前端架构+H5通信协议+TTS服务 | CarryMem团队 |
