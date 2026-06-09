@@ -67,6 +67,21 @@ VALID_TODO_TYPES = [
     "risk",
 ]
 
+# Rule-based fallback: promise keywords that indicate a commitment
+_PROMISE_KEYWORDS = re.compile(
+    r"承诺|答应|保证|一定|包在我身上|放心吧|没问题|交给我|我会|我将|我一定|尽快|马上给|回头我|之后我|下周我|明天我"
+)
+
+# Rule-based fallback: care/followup keywords that indicate something to track
+_CARE_KEYWORDS = re.compile(
+    r"担心|焦虑|急需|正在找|希望|考虑|纠结|犹豫|头疼|困扰|着急|迫切|关注|在意"
+)
+
+# Rule-based fallback: followup keywords
+_FOLLOWUP_KEYWORDS = re.compile(
+    r"待确认|待定|再说|后续|跟进|回头|之后联系|到时候|看情况"
+)
+
 
 @dataclass
 class GeneratedTodo:
@@ -220,6 +235,21 @@ class TodoGenerator:
                     todo_type=gen.todo_type,
                     title=gen.title[:50],
                 )
+
+        # Rule-based fallback: if LLM generated nothing but text contains
+        # promise/care/followup keywords, create basic todos
+        if not all_generated:
+            fallback_todos = self._rule_based_fallback(
+                conversation=conversation,
+                persons=persons,
+            )
+            if fallback_todos:
+                logger.info(
+                    "todo_rule_based_fallback",
+                    event_id=str(event.id),
+                    fallback_count=len(fallback_todos),
+                )
+                unique_generated.extend(fallback_todos)
 
         # Persist all unique generated todos
         persisted_todos: list[Todo] = []
@@ -544,6 +574,119 @@ class TodoGenerator:
                 f"- {e.name}: {basic.get('title', '')} @ {basic.get('company', '')}"
             )
         return "\n".join(parts) if parts else "无"
+
+    def _rule_based_fallback(
+        self, conversation: str, persons: str
+    ) -> list[GeneratedTodo]:
+        """Generate basic todos using keyword matching when LLM produces nothing.
+
+        This is a safety net: if the LLM fails to extract any promise/care/followup
+        todos but the text clearly contains commitment or concern keywords, we
+        generate basic placeholder todos so the user doesn't miss important items.
+
+        Args:
+            conversation: Sanitized conversation text.
+            persons: Formatted person list for context.
+
+        Returns:
+            List of GeneratedTodo objects from rule-based extraction.
+        """
+        fallback: list[GeneratedTodo] = []
+
+        # Extract first person name from persons string for context
+        person_name = ""
+        if persons and persons != "无":
+            for line in persons.strip().split("\n"):
+                if line.startswith("- "):
+                    person_name = line[2:].split(":")[0].strip()
+                    break
+
+        # Check for promise keywords
+        promise_matches = _PROMISE_KEYWORDS.findall(conversation)
+        if promise_matches:
+            # Find the sentence containing the keyword
+            keyword = promise_matches[0]
+            sentences = re.split(r"[。！？；\n]", conversation)
+            relevant_sentence = ""
+            for s in sentences:
+                if keyword in s:
+                    relevant_sentence = s.strip()[:80]
+                    break
+
+            title = f"[承诺] {person_name} — 待确认承诺事项" if person_name else "[承诺] 待确认承诺事项"
+            fallback.append(GeneratedTodo(
+                todo_type="promise",
+                title=title[:60],
+                description=relevant_sentence or f"文本中包含承诺关键词「{keyword}」，请确认具体承诺内容",
+                priority=1,
+                due_date=datetime.now(timezone.utc) + timedelta(days=3),
+                properties={
+                    "source_text": relevant_sentence[:200] if relevant_sentence else None,
+                    "rule_based_fallback": True,
+                    "matched_keyword": keyword,
+                },
+                is_ai_inference=False,
+                confidence_level="inferred",
+                requires_confirmation=True,
+            ))
+
+        # Check for care keywords
+        care_matches = _CARE_KEYWORDS.findall(conversation)
+        if care_matches:
+            keyword = care_matches[0]
+            sentences = re.split(r"[。！？；\n]", conversation)
+            relevant_sentence = ""
+            for s in sentences:
+                if keyword in s:
+                    relevant_sentence = s.strip()[:80]
+                    break
+
+            title = f"[关注] {person_name} — 待确认关注点" if person_name else "[关注] 待确认关注点"
+            fallback.append(GeneratedTodo(
+                todo_type="care",
+                title=title[:60],
+                description=relevant_sentence or f"文本中包含关注关键词「{keyword}」，请确认对方关注点",
+                priority=3,
+                due_date=datetime.now(timezone.utc) + timedelta(days=7),
+                properties={
+                    "source_text": relevant_sentence[:200] if relevant_sentence else None,
+                    "rule_based_fallback": True,
+                    "matched_keyword": keyword,
+                },
+                is_ai_inference=False,
+                confidence_level="inferred",
+                requires_confirmation=True,
+            ))
+
+        # Check for followup keywords
+        followup_matches = _FOLLOWUP_KEYWORDS.findall(conversation)
+        if followup_matches:
+            keyword = followup_matches[0]
+            sentences = re.split(r"[。！？；\n]", conversation)
+            relevant_sentence = ""
+            for s in sentences:
+                if keyword in s:
+                    relevant_sentence = s.strip()[:80]
+                    break
+
+            title = f"[跟进] {person_name} — 待跟进事项" if person_name else "[跟进] 待跟进事项"
+            fallback.append(GeneratedTodo(
+                todo_type="followup",
+                title=title[:60],
+                description=relevant_sentence or f"文本中包含跟进关键词「{keyword}」，请确认跟进事项",
+                priority=3,
+                due_date=datetime.now(timezone.utc) + timedelta(days=7),
+                properties={
+                    "source_text": relevant_sentence[:200] if relevant_sentence else None,
+                    "rule_based_fallback": True,
+                    "matched_keyword": keyword,
+                },
+                is_ai_inference=False,
+                confidence_level="inferred",
+                requires_confirmation=True,
+            ))
+
+        return fallback
 
     async def _is_duplicate_todo(
         self,

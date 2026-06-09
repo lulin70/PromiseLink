@@ -28,7 +28,12 @@ async def rate_limit_dependency(
         limit = settings.rate_limit_authenticated
     else:
         # Use client IP for unauthenticated requests
-        client_ip = request.client.host if request.client else "unknown"
+        # Support X-Forwarded-For for reverse proxy scenarios
+        forwarded = request.headers.get("x-forwarded-for", "")
+        if forwarded:
+            client_ip = forwarded.split(",")[0].strip()
+        else:
+            client_ip = request.client.host if request.client else "unknown"
         key = f"ip:{client_ip}"
         limit = settings.rate_limit_unauthenticated
 
@@ -57,7 +62,11 @@ async def rate_limit_llm_dependency(
     if user_id:
         key = f"llm:user:{user_id}"
     else:
-        client_ip = request.client.host if request.client else "unknown"
+        forwarded = request.headers.get("x-forwarded-for", "")
+        if forwarded:
+            client_ip = forwarded.split(",")[0].strip()
+        else:
+            client_ip = request.client.host if request.client else "unknown"
         key = f"llm:ip:{client_ip}"
 
     limit = settings.rate_limit_llm
