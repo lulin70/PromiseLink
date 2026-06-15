@@ -74,7 +74,7 @@
 |---|--------|------|------|------|
 | **1.1** | IAMHERE 数字名片小程序功能增强 | ⭐⭐ | 2-4周 | 在现有小程序基础上增加"智能关联"模块 |
 | **1.2** | 名片扫描/查看事件采集 | ⭐ | 3-5天 | 用户查看名片时自动上报数据到 API |
-| **1.3** | 小程序内嵌提醒展示页面 | ⭐⭐ | 1-2周 | H5 页面或小程序原生页面，展示 EventLink 返回的提醒 |
+| **1.3** | 小程序内嵌提醒展示页面 | ⭐⭐ | 1-2周 | H5 页面或小程序原生页面，展示 PromiseLink 返回的提醒 |
 | **1.4** | 用户引导流程 (Onboarding) | ⭐⭐ | 1周 | 引导用户开启"智能关联"功能 |
 | **1.5** | 录音卡配套 App 开发（Phase 2） | ⭐⭐⭐ | 4-6周 | 对接恒智易R1 SDK，上传录音文件 |
 | **1.6** | 视频会议插件开发（Phase 2） | ⭐⭐⭐ | 3-4周 | 腾讯会议/飞书浏览器插件 |
@@ -102,7 +102,7 @@
 
 // 1️⃣ 上报一个名片查看事件
 wx.request({
-  url: 'https://api.eventlink.carrymem.com/v1/events',
+  url: 'https://api.promiselink.carrymem.com/v1/events',
   method: 'POST',
   header: { 'Authorization': 'Bearer USER_TOKEN' },
   data: {
@@ -123,7 +123,7 @@ wx.request({
 
 // 2️⃣ 获取用户的今日提醒列表
 wx.request({
-  url: 'https://api.eventlink.carrymem.com/v1/alerts/today',
+  url: 'https://api.promiselink.carrymem.com/v1/alerts/today',
   method: 'GET',
   header: { 'Authorization': 'Bearer USER_TOKEN' },
   success(res) {
@@ -143,7 +143,7 @@ wx.request({
 
 // 3️⃣ 用户对提醒的反馈（有用/无用）
 wx.request({
-  url: 'https://api.eventlink.carrymem.com/v1/alerts/{alert_id}/feedback',
+  url: 'https://api.promiselink.carrymem.com/v1/alerts/{alert_id}/feedback',
   method: 'POST',
   data: { feedback: 'useful' },  // or 'not_useful' / 'dismiss'
   success(res) {
@@ -227,9 +227,9 @@ wx.request({
 #### 分账细节（如果通过许总销售）
 
 ```
-场景：许总向他的客户销售"数字名片 + EventLink"套餐
+场景：许总向他的客户销售"数字名片 + PromiseLink"套餐
 
-客户付款: ¥999/年（数字名片免费 + EventLink 专业版一年）
+客户付款: ¥999/年（数字名片免费 + PromiseLink 专业版一年）
 
 资金流向:
   • 平台手续费（微信/支付宝）: -¥30 (3%)
@@ -243,7 +243,7 @@ wx.request({
       理由: CarryMem 提供 API 服务、算力、运维
       
   注意:
-  - 如果客户直接在 EventLink 官网购买，100% 归 CarryMem
+  - 如果客户直接在 PromiseLink 官网购买，100% 归 CarryMem
   - 如果通过许总的小程序引流购买，按上述比例分账
   - 月度结算，T+15 到账
 ```
@@ -269,7 +269,7 @@ wx.request({
 **适合有数据安全强要求的大企业客户**
 
 #### 模式描述
-> 将 EventLink 后端整体部署到客户自己的服务器上，数据完全私有。
+> 将 PromiseLink 后端整体部署到客户自己的服务器上，数据完全私有。
 
 #### 定价
 
@@ -297,7 +297,7 @@ wx.request({
 ```
 ┌─────────────────────────────────────────────────────┐
 │                                                     │
-│   EventLink 合作分工说明（2026-05-31 更新版）         │
+│   PromiseLink 合作分工说明（2026-05-31 更新版）         │
 │                                                     │
 └─────────────────────────────────────────────────────┘
 

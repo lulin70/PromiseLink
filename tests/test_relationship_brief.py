@@ -24,11 +24,11 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from eventlink.models.entity import Entity
-from eventlink.models.event import Event
-from eventlink.models.relationship_brief import RelationshipBrief
-from eventlink.models.todo import Todo
-from eventlink.services.relationship_brief_service import (
+from promiselink.models.entity import Entity
+from promiselink.models.event import Event
+from promiselink.models.relationship_brief import RelationshipBrief
+from promiselink.models.todo import Todo
+from promiselink.services.relationship_brief_service import (
     BriefGenerationResult,
     RelationshipBriefService,
 )
@@ -382,9 +382,9 @@ TEST_USER_ID = "00000000-0000-0000-0000-000000000001"
 def api_client(db_session: AsyncSession):
     """Create an httpx AsyncClient with DB dependency overridden."""
     from httpx import ASGITransport, AsyncClient
-    from eventlink.database import get_async_session
-    from eventlink.core.auth import get_current_user_id
-    from eventlink.main import app
+    from promiselink.database import get_async_session
+    from promiselink.core.auth import get_current_user_id
+    from promiselink.main import app
 
     app.dependency_overrides[get_async_session] = lambda: db_session  # type: ignore[return-value]
     app.dependency_overrides[get_current_user_id] = lambda: TEST_USER_ID
@@ -520,7 +520,10 @@ class TestAPIPatchRelationshipBrief:
         )
 
         assert response.status_code == 409
-        assert "Optimistic lock" in response.json()["detail"]
+        body = response.json()
+        # Unified error format: {"error": {"code": "...", "message": "..."}}
+        msg = body.get("error", {}).get("message", "") or body.get("detail", "")
+        assert "Optimistic lock" in msg
 
 
 class TestAPIRBAC:
@@ -545,8 +548,8 @@ class TestAPIRBAC:
         await db_session.commit()
 
         # Switch auth to a different user
-        from eventlink.main import app as main_app
-        from eventlink.core.auth import get_current_user_id
+        from promiselink.main import app as main_app
+        from promiselink.core.auth import get_current_user_id
 
         other_user_id = "99999999-9999-9999-9999-999999999999"
         main_app.dependency_overrides[get_current_user_id] = lambda: other_user_id
@@ -1017,7 +1020,7 @@ class TestGetAssociationsForEntity:
         db_session.add_all([entity_a, entity_b])
         await db_session.flush()
 
-        from eventlink.models.association import Association
+        from promiselink.models.association import Association
 
         assoc = Association(
             id=str(uuid.uuid4()),

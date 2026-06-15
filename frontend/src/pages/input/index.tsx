@@ -1,0 +1,592 @@
+import { useState, useEffect, useCallback } from 'react'
+import { View, Text, Textarea, Button, Picker, Input } from '@tarojs/components'
+import { createEvent, uploadEventFile, getEventDetail, getPendingConfirmations, confirmTodo, retryEvent, acceptDegradedEvent, recordScheduledEvent, getScheduledEventDetail, EventCreateResponse, ConfirmationItem } from '../../services/api'
+import { isLoggedIn } from '../../services/auth'
+import Taro, { useRouter } from '@tarojs/taro'
+import './index.scss'
+
+const EVENT_TYPES = [
+  { value: 'manual', label: '手动录入' },
+  { value: 'meeting', label: '会议' },
+  { value: 'call', label: '电话' },
+  { value: 'wechat_forward', label: '微信转发' },
+]
+
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  manual: '手动录入',
+  meeting: '会议',
+  call: '电话',
+  wechat_forward: '微信转发',
+}
+
+interface EventDetail {
+  id: string
+  status: string
+  pipeline?: string | null
+  processed_at?: string | null
+}
+
+export default function InputPage() {
+  const router = useRouter()
+  const scheduledEventId = router.params.scheduled_event_id || ''
+
+  const [rawText, setRawText] = useState('')
+  const [eventType, setEventType] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [result, setResult] = useState<EventCreateResponse | null>(null)
+  const [polling, setPolling] = useState(false)
+  const [eventDetail, setEventDetail] = useState<EventDetail | null>(null)
+  // F-E1: Confirmation state
+  const [pendingConfirmations, setPendingConfirmations] = useState<ConfirmationItem[]>([])
+  const [confirmLoading, setConfirmLoading] = useState<string | null>(null) // todo_id being confirmed
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editDesc, setEditDesc] = useState('')
+  // File upload state
+  const [inputMode, setInputMode] = useState<'text' | 'file'>('text')
+  const [selectedFile, setSelectedFile] = useState<string | null>(null)
+
+  // Scheduled event record mode state
+  const [isRecordMode, setIsRecordMode] = useState(false)
+  const [scheduledTopic, setScheduledTopic] = useState('')
+
+  // Load scheduled event info if in record mode
+  useEffect(() => {
+    if (!scheduledEventId) return
+    async function loadScheduledEvent() {
+      try {
+        const se = await getScheduledEventDetail(scheduledEventId)
+        if (se.status !== 'pending' && se.status !== 'overdue') {
+          setError('该预定日程已录入或已取消')
+          return
+        }
+        setIsRecordMode(true)
+        setScheduledTopic(se.topic)
+        // Set event type from scheduled event
+        const typeIdx = EVENT_TYPES.findIndex(t => t.value === se.event_type)
+        if (typeIdx >= 0) setEventType(typeIdx)
+        // Pre-fill raw_text with template
+        const participantNames = (se.participants || [])
+          .map(p => p.name)
+          .filter(Boolean)
+          .join('、')
+        const typeLabel = EVENT_TYPE_LABELS[se.event_type] || se.event_type
+        const prefix = participantNames
+          ? `与${participantNames}的${typeLabel}：${se.topic}\n`
+          : `${typeLabel}：${se.topic}\n`
+        setRawText(prefix)
+      } catch (err) {
+        setError('加载预定日程失败')
+      }
+    }
+    loadScheduledEvent()
+  }, [scheduledEventId])
+
+  if (!isLoggedIn()) {
+    Taro.redirectTo({ url: '/pages/index/login' })
+    return null
+  }
+
+  // Poll for pipeline completion
+  const pollEventDetail = useCallback(async (eventId: string) => {
+    try {
+      const detail = await getEventDetail(eventId)
+      setEventDetail({
+        id: detail.id,
+        status: detail.status,
+        pipeline: (detail as Record<string, unknown>).pipeline as string | null ?? null,
+        processed_at: (detail as Record<string, unknown>).processed_at as string | null ?? null,
+      })
+
+      // Stop polling when pipeline is done or failed
+      if (detail.status === 'completed' || detail.status === 'failed' || detail.status === 'awaiting_retry') {
+        setPolling(false)
+        // F-E1: Load pending confirmations when pipeline completes
+        if (detail.status === 'completed') {
+          try {
+            const confirmations = await getPendingConfirmations(eventId)
+            if (confirmations.length > 0) {
+              setPendingConfirmations(confirmations)
+            }
+          } catch {
+            // Silently fail - confirmations are optional
+          }
+        }
+        return true
+      }
+      return false
+    } catch {
+      return false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!polling || !result) return
+
+    const timer = setInterval(async () => {
+      const done = await pollEventDetail(result.id)
+      if (done) {
+        clearInterval(timer)
+      }
+    }, 2000)
+
+    return () => clearInterval(timer)
+  }, [polling, result, pollEventDetail])
+
+  async function handleSubmit() {
+    if (!rawText.trim()) {
+      setError('请输入内容')
+      return
+    }
+    try {
+      setLoading(true)
+      setError('')
+      setResult(null)
+      setEventDetail(null)
+
+      if (isRecordMode && scheduledEventId) {
+        // Record mode: call scheduled event record API
+        const res = await recordScheduledEvent(scheduledEventId, {
+          raw_text: rawText.trim(),
+          event_type: EVENT_TYPES[eventType].value,
+        })
+        // Poll the linked event for pipeline status
+        setResult({
+          id: res.event_id,
+          user_id: '',
+          event_type: EVENT_TYPES[eventType].value,
+          source: 'scheduled_record',
+          title: scheduledTopic,
+          timestamp: new Date().toISOString(),
+          status: 'pending',
+          created_at: new Date().toISOString(),
+          pipeline_status: res.pipeline_status,
+          entity_count: 0,
+          todo_count: 0,
+        })
+        setPolling(true)
+        setTimeout(() => pollEventDetail(res.event_id), 1500)
+      } else {
+        // Normal mode: call event create API
+        const res = await createEvent(rawText.trim(), EVENT_TYPES[eventType].value)
+        setResult(res)
+        if (res.pipeline_status === 'pending' || res.status === 'pending') {
+          setPolling(true)
+          setTimeout(() => pollEventDetail(res.id), 1500)
+        }
+      }
+      setRawText('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '提交失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleFileUpload() {
+    try {
+      const chooseRes = await Taro.chooseMessageFile({
+        count: 1,
+        type: 'file',
+        extension: ['.txt', '.md'],
+      })
+      const file = chooseRes.tempFiles[0]
+      setSelectedFile(file.name)
+
+      setLoading(true)
+      setError('')
+      setResult(null)
+      setEventDetail(null)
+
+      const res = await uploadEventFile(file as unknown as File, EVENT_TYPES[eventType].value)
+      setResult(res)
+      setSelectedFile(null)
+
+      // Start polling if pipeline is pending
+      if (res.pipeline_status === 'pending' || res.status === 'pending') {
+        setPolling(true)
+        setTimeout(() => pollEventDetail(res.id), 1500)
+      }
+    } catch (err) {
+      setSelectedFile(null)
+      if (err instanceof Error && err.message.includes('cancel')) return
+      setError(err instanceof Error ? err.message : '文件上传失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function handleReset() {
+    setResult(null)
+    setEventDetail(null)
+    setPolling(false)
+    setError('')
+    setPendingConfirmations([])
+    setEditingId(null)
+    setSelectedFile(null)
+  }
+
+  // F-E1: Confirm a pending promise
+  async function handleConfirm(todoId: string) {
+    try {
+      setConfirmLoading(todoId)
+      const desc = editingId === todoId ? editDesc : undefined
+      await confirmTodo(todoId, { confirmation_status: 'confirmed', description: desc })
+      setPendingConfirmations(prev => prev.filter(c => c.todo_id !== todoId))
+      setEditingId(null)
+    } catch (err) {
+      console.error('确认失败:', err)
+    } finally {
+      setConfirmLoading(null)
+    }
+  }
+
+  // F-E1: Reject a pending promise
+  async function handleReject(todoId: string) {
+    try {
+      setConfirmLoading(todoId)
+      await confirmTodo(todoId, { confirmation_status: 'rejected' })
+      setPendingConfirmations(prev => prev.filter(c => c.todo_id !== todoId))
+      setEditingId(null)
+    } catch (err) {
+      console.error('拒绝失败:', err)
+    } finally {
+      setConfirmLoading(null)
+    }
+  }
+
+  // F-E1: Start editing a confirmation item
+  function startEdit(item: ConfirmationItem) {
+    setEditingId(item.todo_id)
+    setEditDesc(item.description || '')
+  }
+
+  function getPipelineStatusText(): string {
+    if (!eventDetail) return '已提交，等待处理...'
+    switch (eventDetail.status) {
+      case 'completed': return '处理完成'
+      case 'failed': return '处理失败'
+      case 'processing': return '正在分析中...'
+      case 'pending': return '排队处理中...'
+      case 'awaiting_retry': return 'AI 处理受限，请选择操作'
+      case 'degraded_completed': return '已简化处理完成'
+      default: return `状态: ${eventDetail.status}`
+    }
+  }
+
+  function getPipelineStatusIcon(): string {
+    if (!eventDetail) return '⏳'
+    switch (eventDetail.status) {
+      case 'completed': return '✅'
+      case 'failed': return '❌'
+      case 'processing': return '🔄'
+      case 'awaiting_retry': return '🔔'
+      case 'degraded_completed': return '⚠️'
+      default: return '⏳'
+    }
+  }
+
+  return (
+    <View className='page-input'>
+      <View className='header'>
+        <View className='header-back' onClick={() => Taro.navigateBack({ delta: 1 })}>
+          <Text className='back-arrow'>&lt;</Text>
+        </View>
+        <Text className='header-title'>{isRecordMode ? `录入: ${scheduledTopic}` : '事件录入'}</Text>
+      </View>
+
+      {!result ? (
+        <View className='content'>
+          {/* Event Type Selector */}
+          <View className='form-section'>
+            <Text className='section-label'>事件类型</Text>
+            <Picker
+              mode='selector'
+              range={EVENT_TYPES.map(t => t.label)}
+              value={eventType}
+              onChange={e => setEventType(Number(e.detail.value))}
+            >
+              <View className='picker-value'>
+                <Text>{EVENT_TYPES[eventType].label}</Text>
+                <Text className='picker-arrow'>▼</Text>
+              </View>
+            </Picker>
+          </View>
+
+          {/* Input Mode Toggle */}
+          <View className='mode-toggle'>
+            <View
+              className={`mode-btn ${inputMode === 'text' ? 'active' : ''}`}
+              onClick={() => setInputMode('text')}
+            >
+              <Text>文本输入</Text>
+            </View>
+            <View
+              className={`mode-btn ${inputMode === 'file' ? 'active' : ''}`}
+              onClick={() => setInputMode('file')}
+            >
+              <Text>文件上传</Text>
+            </View>
+          </View>
+
+          {/* Text Input Mode */}
+          {inputMode === 'text' && (
+            <View className='form-section'>
+              <Text className='section-label'>内容</Text>
+              <Textarea
+                className='text-input'
+                value={rawText}
+                onInput={e => setRawText(e.detail.value)}
+                placeholder='输入事件内容，如：今天和张总开会讨论了新项目合作，约定下周三前提交方案...'
+                maxlength={5000}
+                autoFocus
+              />
+              <Text className='char-count'>{rawText.length}/5000</Text>
+            </View>
+          )}
+
+          {/* File Upload Mode */}
+          {inputMode === 'file' && (
+            <View className='form-section'>
+              <Text className='section-label'>上传文件</Text>
+              <View className='file-upload-area' onClick={handleFileUpload}>
+                {selectedFile ? (
+                  <View className='file-selected'>
+                    <Text className='file-icon'>📄</Text>
+                    <Text className='file-name'>{selectedFile}</Text>
+                  </View>
+                ) : (
+                  <View className='file-hint'>
+                    <Text className='file-hint-icon'>📁</Text>
+                    <Text className='file-hint-text'>点击选择文件或拖拽到此处</Text>
+                    <Text className='file-hint-ext'>支持 .txt、.md 格式</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+
+          {/* Error */}
+          {error && (
+            <View className='error-msg'>
+              <Text>✗ {error}</Text>
+            </View>
+          )}
+
+          {/* Submit Button (text mode only) */}
+          {inputMode === 'text' && (
+            <Button
+              className='submit-btn'
+              onClick={handleSubmit}
+              loading={loading}
+              disabled={loading || !rawText.trim()}
+            >
+              {loading ? '提交中...' : '提交'}
+            </Button>
+          )}
+
+          {/* Upload progress indicator (file mode) */}
+          {inputMode === 'file' && loading && (
+            <View className='upload-loading'>
+              <Text className='upload-loading-text'>📤 文件上传中...</Text>
+            </View>
+          )}
+
+          {/* Tips */}
+          <View className='tips'>
+            <Text className='tips-title'>录入提示</Text>
+            <Text className='tips-item'>· 支持自然语言输入，系统会自动提取人名、待办、承诺</Text>
+            <Text className='tips-item'>· 提及时间会自动识别，如"明天"、"下周五"</Text>
+            <Text className='tips-item'>· 承诺类内容会自动标记，如"我答应..."、"他说会..."</Text>
+            <Text className='tips-item'>· 文件上传支持 .txt 和 .md 格式</Text>
+          </View>
+        </View>
+      ) : (
+        /* Result View */
+        <View className='content'>
+          <View className='result-card'>
+            <View className='result-header'>
+              <Text className='result-icon'>{getPipelineStatusIcon()}</Text>
+              <View className='result-info'>
+                <Text className='result-title'>{getPipelineStatusText()}</Text>
+                <Text className='result-event-type'>
+                  {EVENT_TYPES.find(t => t.value === result.event_type)?.label}
+                </Text>
+              </View>
+            </View>
+
+            {/* Extraction Results */}
+            {(eventDetail?.status === 'completed') && (
+              <View className='extraction-results'>
+                <View className='result-row'>
+                  <Text className='result-label'>提取实体</Text>
+                  <Text className='result-value'>{result.entity_count} 个</Text>
+                </View>
+                <View className='result-row'>
+                  <Text className='result-label'>生成待办</Text>
+                  <Text className='result-value'>{result.todo_count} 条</Text>
+                </View>
+                {eventDetail.processed_at && (
+                  <View className='result-row'>
+                    <Text className='result-label'>处理时间</Text>
+                    <Text className='result-value'>
+                      {new Date(eventDetail.processed_at).toLocaleString('zh-CN')}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Polling indicator */}
+            {polling && (
+              <View className='polling-indicator'>
+                <Text className='polling-text'>🔄 正在处理，请稍候...</Text>
+              </View>
+            )}
+
+            {/* LLM degradation confirmation — user chooses retry or accept */}
+            {eventDetail?.status === 'awaiting_retry' && (
+              <View className='degradation-card'>
+                <Text className='degradation-title'>AI 处理受限</Text>
+                <Text className='degradation-desc'>
+                  AI 服务暂时不可用，事件未能完整处理。您可以选择：
+                </Text>
+                <View className='degradation-actions'>
+                  <Button
+                    className='degradation-btn retry-btn'
+                    onClick={async () => {
+                      if (!result) return
+                      try {
+                        await retryEvent(result.id)
+                        setEventDetail(null)
+                        setPolling(true)
+                      } catch (e) {
+                        Taro.showToast({ title: '重试失败', icon: 'error' })
+                      }
+                    }}
+                  >重新处理</Button>
+                  <Button
+                    className='degradation-btn accept-btn'
+                    onClick={async () => {
+                      if (!result) return
+                      try {
+                        const res = await acceptDegradedEvent(result.id)
+                        setEventDetail({ ...eventDetail, status: 'degraded_completed' })
+                      } catch (e) {
+                        Taro.showToast({ title: '操作失败', icon: 'error' })
+                      }
+                    }}
+                  >接受简化结果</Button>
+                </View>
+              </View>
+            )}
+
+            {/* Initial submitted state (before first poll returns) */}
+            {!eventDetail && !polling && (
+              <View className='extraction-results'>
+                <View className='result-row'>
+                  <Text className='result-label'>事件标题</Text>
+                  <Text className='result-value'>{result.title}</Text>
+                </View>
+                <View className='result-row'>
+                  <Text className='result-label'>状态</Text>
+                  <Text className='result-value'>{result.pipeline_status}</Text>
+                </View>
+              </View>
+            )}
+
+            {/* F-E1: Pending Confirmation Cards */}
+            {pendingConfirmations.length > 0 && (
+              <View className='confirmation-section'>
+                <Text className='confirmation-title'>
+                  AI识别到 {pendingConfirmations.length} 条承诺待确认
+                </Text>
+                {pendingConfirmations.map(item => (
+                  <View key={item.todo_id} className='confirmation-card'>
+                    <View className='conf-card-header'>
+                      <View className={`conf-action-badge ${item.action_type === 'their_promise' ? 'their' : ''}`}>
+                        <Text>{item.action_type === 'their_promise' ? '对方承诺' : '我的承诺'}</Text>
+                      </View>
+                      {item.confirmation_status === 'auto_set' && (
+                        <Text className='conf-auto-tag'>系统识别</Text>
+                      )}
+                    </View>
+                    <Text className='conf-desc'>{item.title}{item.description ? ': ' + item.description : ''}</Text>
+                    {item.evidence_quote && (
+                      <Text className='conf-evidence'>"{item.evidence_quote}"</Text>
+                    )}
+                    {item.due_date && (
+                      <Text className='conf-due'>截止: {new Date(item.due_date).toLocaleDateString('zh-CN')}</Text>
+                    )}
+                    {/* Edit mode */}
+                    {editingId === item.todo_id ? (
+                      <View className='conf-edit-area'>
+                        <Input
+                          className='conf-edit-input'
+                          value={editDesc}
+                          onInput={e => setEditDesc(e.detail.value)}
+                          placeholder='修改描述内容'
+                        />
+                      </View>
+                    ) : null}
+                    <View className='conf-actions'>
+                      <Button
+                        className='conf-btn conf-btn-confirm'
+                        size='mini'
+                        loading={confirmLoading === item.todo_id}
+                        onClick={() => handleConfirm(item.todo_id)}
+                      >
+                        确认
+                      </Button>
+                      <Button
+                        className='conf-btn conf-btn-edit'
+                        size='mini'
+                        onClick={() => startEdit(item)}
+                      >
+                        修改
+                      </Button>
+                      <Button
+                        className='conf-btn conf-btn-reject'
+                        size='mini'
+                        loading={confirmLoading === item.todo_id}
+                        onClick={() => handleReject(item.todo_id)}
+                      >
+                        拒绝
+                      </Button>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+
+          {/* Action Buttons */}
+          <View className='result-actions'>
+            <Button
+              className='reset-btn'
+              onClick={handleReset}
+            >
+              继续录入
+            </Button>
+            {eventDetail?.status === 'completed' && (
+              <Button
+                className='view-todos-btn'
+                onClick={() => Taro.switchTab({ url: '/pages/todos/index' })}
+              >
+                查看待办
+              </Button>
+            )}
+            {eventDetail?.status === 'completed' && (
+              <Button
+                className='view-events-btn'
+                onClick={() => Taro.switchTab({ url: '/pages/events/index' })}
+              >
+                查看事件
+              </Button>
+            )}
+          </View>
+        </View>
+      )}
+    </View>
+  )
+}

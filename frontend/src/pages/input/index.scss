@@ -1,0 +1,507 @@
+.page-input {
+  min-height: 100vh;
+  background-color: #f5f5f5;
+  padding-bottom: 120px;
+
+  .header {
+    background: #1890ff;
+    padding: 40px 30px 30px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+
+    .header-back {
+      width: 60px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 16px;
+
+      .back-arrow {
+        font-size: 36px;
+        color: #fff;
+        font-weight: 300;
+      }
+    }
+
+    .header-title {
+      font-size: 36px;
+      font-weight: bold;
+    }
+  }
+
+  .content {
+    padding: 24px;
+  }
+
+  .form-section {
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 20px;
+
+    .section-label {
+      font-size: 28px;
+      color: #333;
+      font-weight: 500;
+      margin-bottom: 16px;
+      display: block;
+    }
+  }
+
+  .mode-toggle {
+    display: flex;
+    gap: 0;
+    margin-bottom: 20px;
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+
+    .mode-btn {
+      flex: 1;
+      text-align: center;
+      padding: 20px 0;
+      font-size: 28px;
+      color: #666;
+      background: #f5f5f5;
+      transition: all 0.2s;
+
+      &.active {
+        background: #1890ff;
+        color: #fff;
+        font-weight: 500;
+      }
+    }
+  }
+
+  .file-upload-area {
+    min-height: 240px;
+    border: 2px dashed #d9d9d9;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: border-color 0.2s;
+
+    &:active {
+      border-color: #1890ff;
+    }
+
+    .file-hint {
+      text-align: center;
+
+      .file-hint-icon {
+        font-size: 56px;
+        display: block;
+        margin-bottom: 16px;
+      }
+
+      .file-hint-text {
+        font-size: 28px;
+        color: #666;
+        display: block;
+        margin-bottom: 8px;
+      }
+
+      .file-hint-ext {
+        font-size: 22px;
+        color: #999;
+        display: block;
+      }
+    }
+
+    .file-selected {
+      text-align: center;
+
+      .file-icon {
+        font-size: 48px;
+        display: block;
+        margin-bottom: 12px;
+      }
+
+      .file-name {
+        font-size: 26px;
+        color: #333;
+        display: block;
+      }
+    }
+  }
+
+  .upload-loading {
+    text-align: center;
+    padding: 24px 0;
+    margin-bottom: 20px;
+
+    .upload-loading-text {
+      font-size: 28px;
+      color: #1890ff;
+    }
+  }
+
+  .picker-value {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 0;
+    font-size: 28px;
+    color: #333;
+
+    .picker-arrow {
+      font-size: 22px;
+      color: #999;
+    }
+  }
+
+  .text-input {
+    width: 100%;
+    min-height: 300px;
+    font-size: 28px;
+    line-height: 1.6;
+    border: 2px solid #e8e8e8;
+    border-radius: 12px;
+    padding: 20px;
+    box-sizing: border-box;
+  }
+
+  .char-count {
+    font-size: 22px;
+    color: #999;
+    text-align: right;
+    margin-top: 8px;
+    display: block;
+  }
+
+  .success-msg {
+    background: #f6ffed;
+    border: 2px solid #b7eb8f;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+
+    Text {
+      color: #52c41a;
+      font-size: 26px;
+    }
+  }
+
+  .error-msg {
+    background: #fff2f0;
+    border: 2px solid #ffccc7;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+
+    Text {
+      color: #ff4d4f;
+      font-size: 26px;
+    }
+  }
+
+  .submit-btn {
+    width: 100%;
+    height: 88px;
+    background: #1890ff;
+    color: #fff;
+    font-size: 32px;
+    border-radius: 12px;
+    border: none;
+    margin-top: 12px;
+  }
+
+  .tips {
+    margin-top: 32px;
+    padding: 24px;
+    background: #fff;
+    border-radius: 16px;
+
+    .tips-title {
+      font-size: 26px;
+      color: #666;
+      font-weight: 500;
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    .tips-item {
+      font-size: 24px;
+      color: #999;
+      line-height: 1.8;
+      display: block;
+    }
+  }
+
+  // Result View
+  .result-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 20px;
+
+    .result-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 28px;
+
+      .result-icon {
+        font-size: 48px;
+        margin-right: 20px;
+      }
+
+      .result-info {
+        flex: 1;
+
+        .result-title {
+          font-size: 32px;
+          font-weight: bold;
+          color: #333;
+          display: block;
+        }
+
+        .result-event-type {
+          font-size: 24px;
+          color: #999;
+          margin-top: 4px;
+        }
+      }
+    }
+
+    .extraction-results {
+      background: #fafafa;
+      border-radius: 12px;
+      padding: 24px;
+
+      .result-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid #f0f0f0;
+
+        &:last-child {
+          border-bottom: none;
+        }
+
+        .result-label {
+          font-size: 26px;
+          color: #666;
+        }
+
+        .result-value {
+          font-size: 26px;
+          color: #333;
+          font-weight: 500;
+        }
+      }
+    }
+
+    .polling-indicator {
+      text-align: center;
+      padding: 24px 0;
+
+      .polling-text {
+        font-size: 28px;
+        color: #1890ff;
+      }
+    }
+
+    .degradation-card {
+      background: #fffbe6;
+      border: 2px solid #ffe58f;
+      border-radius: 16px;
+      padding: 24px;
+      margin: 20px 0;
+
+      .degradation-title {
+        font-size: 30px;
+        font-weight: bold;
+        color: #d48806;
+        margin-bottom: 12px;
+      }
+
+      .degradation-desc {
+        font-size: 26px;
+        color: #8c8c8c;
+        margin-bottom: 20px;
+      }
+
+      .degradation-actions {
+        display: flex;
+        gap: 20px;
+
+        .degradation-btn {
+          flex: 1;
+          height: 72px;
+          font-size: 26px;
+          border-radius: 12px;
+        }
+
+        .retry-btn {
+          background: #1890ff;
+          color: #fff;
+          border: none;
+        }
+
+        .accept-btn {
+          background: #fff;
+          color: #8c8c8c;
+          border: 2px solid #d9d9d9;
+        }
+      }
+    }
+  }
+
+  .result-actions {
+    display: flex;
+    gap: 20px;
+
+    .reset-btn {
+      flex: 1;
+      height: 88px;
+      background: #fff;
+      color: #1890ff;
+      font-size: 30px;
+      border: 2px solid #1890ff;
+      border-radius: 12px;
+    }
+
+    .view-todos-btn {
+      flex: 1;
+      height: 88px;
+      background: #1890ff;
+      color: #fff;
+      font-size: 30px;
+      border-radius: 12px;
+      border: none;
+    }
+
+    .view-events-btn {
+      flex: 1;
+      height: 88px;
+      background: #fff;
+      color: #52c41a;
+      font-size: 30px;
+      border: 2px solid #52c41a;
+      border-radius: 12px;
+    }
+  }
+
+  // F-E1: Confirmation Cards
+  .confirmation-section {
+    margin-top: 24px;
+
+    .confirmation-title {
+      font-size: 28px;
+      font-weight: bold;
+      color: #1890ff;
+      display: block;
+      margin-bottom: 16px;
+    }
+  }
+
+  .confirmation-card {
+    background: #fffbeb;
+    border: 2px solid #ffd666;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+
+    .conf-card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .conf-action-badge {
+      background: #1890ff;
+      color: #fff;
+      padding: 4px 16px;
+      border-radius: 6px;
+      font-size: 20px;
+
+      &.their {
+        background: #722ed1;
+      }
+    }
+
+    .conf-auto-tag {
+      font-size: 20px;
+      color: #faad14;
+      background: #fffbe6;
+      padding: 2px 10px;
+      border-radius: 4px;
+    }
+
+    .conf-desc {
+      font-size: 28px;
+      color: #333;
+      line-height: 1.5;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .conf-evidence {
+      font-size: 22px;
+      color: #8c8c8c;
+      font-style: italic;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .conf-due {
+      font-size: 22px;
+      color: #fa8c16;
+      display: block;
+      margin-bottom: 12px;
+    }
+
+    .conf-edit-area {
+      margin-bottom: 12px;
+
+      .conf-edit-input {
+        width: 100%;
+        height: 64px;
+        font-size: 26px;
+        border: 2px solid #d9d9d9;
+        border-radius: 8px;
+        padding: 8px 12px;
+        box-sizing: border-box;
+      }
+    }
+
+    .conf-actions {
+      display: flex;
+      gap: 12px;
+
+      .conf-btn {
+        flex: 1;
+        height: 64px;
+        font-size: 24px;
+        border-radius: 8px;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .conf-btn-confirm {
+        background: #52c41a;
+        color: #fff;
+      }
+
+      .conf-btn-edit {
+        background: #e6f7ff;
+        color: #1890ff;
+        border: 1px solid #91d5ff;
+      }
+
+      .conf-btn-reject {
+        background: #fff1f0;
+        color: #ff4d4f;
+        border: 1px solid #ffa39e;
+      }
+    }
+  }
+}

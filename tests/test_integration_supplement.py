@@ -1,4 +1,4 @@
-"""Supplementary Integration Tests for EventLink.
+"""Supplementary Integration Tests for PromiseLink.
 
 Implements test cases from the Test Plan:
   17.1 Pipeline全链路集成测试 (TC-INT-001 ~ TC-INT-004)
@@ -22,22 +22,22 @@ import pytest_asyncio
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from eventlink.models.association import Association
-from eventlink.models.entity import Entity
-from eventlink.models.event import Event
-from eventlink.models.todo import Todo
-from eventlink.services.data_source_adapter import RawEvent
-from eventlink.services.email_adapter import EmailAdapter, EmailMessage, parse_email_message
-from eventlink.services.embedding_provider import EmbeddingProvider
-from eventlink.services.memory_provider import (
+from promiselink.models.association import Association
+from promiselink.models.entity import Entity
+from promiselink.models.event import Event
+from promiselink.models.todo import Todo
+from promiselink.services.data_source_adapter import RawEvent
+from promiselink.services.email_adapter import EmailAdapter, EmailMessage, parse_email_message
+from promiselink.services.embedding_provider import EmbeddingProvider
+from promiselink.services.memory_provider import (
     CarryMemProvider,
     FileStoreProvider,
     MemoryEntry,
     NullMemoryProvider,
     create_memory_provider,
 )
-from eventlink.services.semantic_search import SemanticSearchEngine
-from eventlink.services.wechat_forward_adapter import WeChatForwardAdapter
+from promiselink.services.semantic_search import SemanticSearchEngine
+from promiselink.services.wechat_forward_adapter import WeChatForwardAdapter
 from tests.conftest import create_test_event, make_entity_data, make_user_id
 
 
@@ -614,6 +614,8 @@ class TestCacheAndStorage:
         mock_settings = MagicMock()
         mock_settings.llm_base_url = "https://api.example.com/v1"
         mock_settings.llm_api_key = "test-key"
+        mock_settings.embedding_provider = "api"
+        mock_settings.embedding_model = "text-embedding-3-small"
 
         provider = EmbeddingProvider(settings=mock_settings)
 

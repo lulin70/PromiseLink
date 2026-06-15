@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""EventLink Basic Security Check.
+"""PromiseLink Basic Security Check.
 
 Verifies key security controls are in place.
 """
 import asyncio
 import uuid
 import httpx
+import os
 
 BASE_URL = "http://localhost:8001/api/v1"
-POC_SECRET = "eventlink2024"
+POC_SECRET = os.environ.get("POC_SECRET", "promiselink2024")
 
 async def main():
     async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=5.0)) as client:

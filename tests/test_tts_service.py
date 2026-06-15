@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from eventlink.config import Settings
-from eventlink.services.tts_service import MAX_TEXT_LENGTH, TTSResult, TTSService
+from promiselink.config import Settings
+from promiselink.services.tts_service import MAX_TEXT_LENGTH, TTSResult, TTSService
 
 
 def _make_config() -> Settings:
@@ -140,7 +140,7 @@ class TestSynthesize:
         mock_client.is_closed = False
 
         with patch.object(service, "_get_client", return_value=mock_client):
-            with patch("eventlink.services.tts_service.asyncio.sleep", new_callable=AsyncMock):
+            with patch("promiselink.services.tts_service.asyncio.sleep", new_callable=AsyncMock):
                 result = await service.synthesize("Hello world")
 
         assert result.audio_bytes == b"audio_after_retry"
@@ -171,7 +171,7 @@ class TestSynthesize:
         mock_client.is_closed = False
 
         with patch.object(service, "_get_client", return_value=mock_client):
-            with patch("eventlink.services.tts_service.asyncio.sleep", new_callable=AsyncMock):
+            with patch("promiselink.services.tts_service.asyncio.sleep", new_callable=AsyncMock):
                 result = await service.synthesize("Hello world")
 
         assert result.audio_bytes == b"audio_after_429"
@@ -212,7 +212,7 @@ class TestSynthesize:
         mock_client.is_closed = False
 
         with patch.object(service, "_get_client", return_value=mock_client):
-            with patch("eventlink.services.tts_service.asyncio.sleep", new_callable=AsyncMock):
+            with patch("promiselink.services.tts_service.asyncio.sleep", new_callable=AsyncMock):
                 result = await service.synthesize("Hello world")
 
         # All retries exhausted → exception caught by synthesize() → fallback

@@ -1,4 +1,4 @@
-# EventLink 安全设计文档 — 认证与API
+# PromiseLink 安全设计文档 — 认证与API
 
 > **版本**: v3.0 (托管PoC模式更新)
 > **拆分日期**: 2026-06-08
@@ -8,7 +8,7 @@
 
 ---
 
-## 导航：EventLink 安全设计文档（v2.9 拆分版）
+## 导航：PromiseLink 安全设计文档（v2.9 拆分版）
 
 | 文档 | 攻击面 | 主要内容 |
 |------|--------|----------|
@@ -25,7 +25,7 @@
 
 ### 2.1 JWT RS256认证方案
 
-EventLink采用RS256（非对称签名）算法，公钥验证、私钥签名，便于未来多服务验证。
+PromiseLink采用RS256（非对称签名）算法，公钥验证、私钥签名，便于未来多服务验证。
 
 ```mermaid
 flowchart TD
@@ -91,7 +91,7 @@ with open("keys/public.pem", "wb") as f:
 
 ### 2.1b JWT HS256认证规范（v2.0新增，对应技术设计§8.0.3）
 
-> **说明**：技术设计 v2.5 §8.0.3 确认 EventLink 采用 **HS256**（对称签名）算法作为JWT认证方案。HS256 适用于单服务部署场景，密钥管理更简单。RS256（§2.1）保留作为 Phase2 多服务验证的备选方案。
+> **说明**：技术设计 v2.5 §8.0.3 确认 PromiseLink 采用 **HS256**（对称签名）算法作为JWT认证方案。HS256 适用于单服务部署场景，密钥管理更简单。RS256（§2.1）保留作为 Phase2 多服务验证的备选方案。
 
 **Token格式**：`Bearer <JWT>`
 
@@ -164,7 +164,7 @@ def verify_token(token: str, secret: str) -> dict:
 ```mermaid
 sequenceDiagram
     participant MP as 小程序
-    participant API as EventLink API
+    participant API as PromiseLink API
     participant Redis as Redis
     participant H5 as H5页面
 
@@ -174,7 +174,7 @@ sequenceDiagram
     API-->>MP: {code: "T_xxx", expires_in: 60}
 
     Note over MP,H5: 阶段2：WebView加载H5
-    MP->>H5: 打开WebView<br/>https://eventlink.com/h5?ticket=T_xxx
+    MP->>H5: 打开WebView<br/>https://promiselink.com/h5?ticket=T_xxx
     H5->>H5: 从URL提取ticket
 
     Note over MP,H5: 阶段3：Ticket交换Token
@@ -227,7 +227,7 @@ async def exchange_ticket(redis, code: str) -> dict | None:
 
 ### 2.3 单用户数据隔离
 
-EventLink是私密助手，**无RBAC、无多租户、无团队协作**。数据隔离通过`user_id`应用层过滤实现。
+PromiseLink是私密助手，**无RBAC、无多租户、无团队协作**。数据隔离通过`user_id`应用层过滤实现。
 
 ```mermaid
 flowchart LR
@@ -304,7 +304,7 @@ sequenceDiagram
     participant User as 用户
     participant MP as 微信小程序
     participant WX as 微信服务器
-    participant API as EventLink API
+    participant API as PromiseLink API
     participant Redis as Redis
     participant H5 as H5页面
 
@@ -345,12 +345,12 @@ sequenceDiagram
 
 **问题**: `/auth/login` 端点允许任意 `user_id` 获取JWT token，无任何验证。
 
-**修复**: 新增 `EVENTLINK_POC_SECRET` 环境变量验证。未设置此变量时，PoC登录端点完全禁用，返回403。设置后，请求需携带正确的 `poc_secret` 才能获取token。
+**修复**: 新增 `PROMISELINK_POC_SECRET` 环境变量验证。未设置此变量时，PoC登录端点完全禁用，返回403。设置后，请求需携带正确的 `poc_secret` 才能获取token。
 
 **影响文件**: `api/v1/auth.py`
 
 > **托管PoC模式说明**：
-> - 托管PoC模式下，`EVENTLINK_POC_SECRET`由服务方(我方)统一管理，而非用户自行配置
+> - 托管PoC模式下，`PROMISELINK_POC_SECRET`由服务方(我方)统一管理，而非用户自行配置
 > - 用户通过微信小程序登录，无需输入`poc_secret`
 > - 服务方通过环境变量注入`poc_secret`到Docker容器，用户侧完全无感知
 
@@ -368,7 +368,7 @@ sequenceDiagram
 
 #### 2.6.3 PBKDF2动态盐值派生 (CRITICAL修复)
 
-**问题**: `crypto.py` 使用硬编码固定盐值 `b"eventlink-pii-salt"`，所有部署实例共享同一盐。
+**问题**: `crypto.py` 使用硬编码固定盐值 `b"promiselink-pii-salt"`，所有部署实例共享同一盐。
 
 **修复**: 盐值从 `secret_key` 的SHA256哈希派生，每个部署实例（不同secret_key）产生不同的派生盐。
 
@@ -392,7 +392,7 @@ sequenceDiagram
 
 ### 5.1 限流策略
 
-EventLink为单用户私密助手，采用统一限流策略，**无RBAC分级**。
+PromiseLink为单用户私密助手，采用统一限流策略，**无RBAC分级**。
 
 | 阶段 | 限流规则 | 存储后端 | 说明 |
 |------|----------|----------|------|
@@ -479,8 +479,8 @@ result = await db.execute(
 | 阶段 | 允许的Origin | 方法 | 说明 |
 |------|-------------|------|------|
 | PoC | `http://localhost:*` | GET, POST, PATCH, DELETE | 本地开发 |
-| 托管PoC | `[微信小程序域名, 托管域名(如 eventlink.example.com)]` | GET, POST, PATCH, DELETE | 托管模式不允许localhost，必须白名单指定域名 |
-| Phase1 | `https://eventlink.com` + 小程序域名 | GET, POST, PATCH, DELETE | 生产环境 |
+| 托管PoC | `[微信小程序域名, 托管域名(如 promiselink.example.com)]` | GET, POST, PATCH, DELETE | 托管模式不允许localhost，必须白名单指定域名 |
+| Phase1 | `https://promiselink.com` + 小程序域名 | GET, POST, PATCH, DELETE | 生产环境 |
 | Phase2 | Phase1 + 自定义域名 | GET, POST, PATCH, DELETE | 多域名 |
 
 ```python

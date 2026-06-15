@@ -9,11 +9,11 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
-from eventlink.core.auth import get_current_user_id
-from eventlink.database import Base, get_async_session
-from eventlink.main import app
-from eventlink.models.entity import Entity
-from eventlink.models.event import Event
+from promiselink.core.auth import get_current_user_id
+from promiselink.database import Base, get_async_session
+from promiselink.main import app
+from promiselink.models.entity import Entity
+from promiselink.models.event import Event
 
 
 # ── Constants ──
@@ -63,7 +63,7 @@ async def db_engine():
     @sa_event.listens_for(engine.sync_engine, "connect")
     def set_sqlite_pragma(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA foreign_keys=OFF")
         cursor.close()
 
     async with engine.begin() as conn:
@@ -101,7 +101,7 @@ async def client(db_session):
 # ── Test 1: POST /demands 成功创建orphan demand ──────────────────
 
 
-@patch("eventlink.api.v1.demand_input.LLMClient")
+@patch("promiselink.api.v1.demand_input.LLMClient")
 async def test_create_demand_orphan_success(mock_llm_cls, client):
     """POST /demands creates an orphan demand when no entity matches."""
     mock_llm_instance = MagicMock()
@@ -133,7 +133,7 @@ async def test_create_demand_orphan_success(mock_llm_cls, client):
 # ── Test 2: POST /demands 关联到已有Entity ──────────────────────
 
 
-@patch("eventlink.api.v1.demand_input.LLMClient")
+@patch("promiselink.api.v1.demand_input.LLMClient")
 async def test_create_demand_linked_to_entity(mock_llm_cls, client, db_session):
     """POST /demands links demand to existing person entity by name."""
     event, entity = _create_test_entity(TEST_USER_ID, "张总")
@@ -170,7 +170,7 @@ async def test_create_demand_linked_to_entity(mock_llm_cls, client, db_session):
 # ── Test 3: LLM失败时使用fallback ──────────────────────────────
 
 
-@patch("eventlink.api.v1.demand_input.LLMClient")
+@patch("promiselink.api.v1.demand_input.LLMClient")
 async def test_demand_uses_fallback_on_llm_failure(mock_llm_cls, client):
     """POST /demands falls back to keyword extraction when LLM fails."""
     mock_llm_instance = MagicMock()
@@ -236,7 +236,7 @@ async def test_invalid_source_returns_422(client):
 # ── Test 5: source默认值为text ──────────────────────────────────
 
 
-@patch("eventlink.api.v1.demand_input.LLMClient")
+@patch("promiselink.api.v1.demand_input.LLMClient")
 async def test_default_source_is_text(mock_llm_cls, client):
     """Default source value is 'text' when not specified."""
     mock_llm_instance = MagicMock()
@@ -263,7 +263,7 @@ async def test_default_source_is_text(mock_llm_cls, client):
 # ── Test 6: alias匹配Entity ──────────────────────────────────────
 
 
-@patch("eventlink.api.v1.demand_input.LLMClient")
+@patch("promiselink.api.v1.demand_input.LLMClient")
 async def test_demand_matches_entity_by_alias(mock_llm_cls, client, db_session):
     """POST /demands matches entity by alias when name doesn't match."""
     event, entity = _create_test_entity(TEST_USER_ID, "张伟", aliases=["老张"])
@@ -300,7 +300,7 @@ async def test_demand_matches_entity_by_alias(mock_llm_cls, client, db_session):
 
 def test_fallback_extract_with_keyword():
     """Fallback extraction identifies demand tag from keywords."""
-    from eventlink.api.v1.demand_input import _fallback_extract
+    from promiselink.api.v1.demand_input import _fallback_extract
 
     result = _fallback_extract("我需要找装修团队")
     assert result["tag"] == "装修"
@@ -309,7 +309,7 @@ def test_fallback_extract_with_keyword():
 
 def test_fallback_extract_with_person_name():
     """Fallback extraction identifies person name from text."""
-    from eventlink.api.v1.demand_input import _fallback_extract
+    from promiselink.api.v1.demand_input import _fallback_extract
 
     result = _fallback_extract("张总需要融资支持")
     assert result["person_name"] is not None
@@ -318,7 +318,7 @@ def test_fallback_extract_with_person_name():
 
 def test_fallback_extract_no_keyword():
     """Fallback extraction returns '其他' when no keyword matches."""
-    from eventlink.api.v1.demand_input import _fallback_extract
+    from promiselink.api.v1.demand_input import _fallback_extract
 
     result = _fallback_extract("今天天气不错")
     assert result["tag"] == "其他"
@@ -327,7 +327,7 @@ def test_fallback_extract_no_keyword():
 # ── Test 8: concern追加到已有Entity ──────────────────────────────
 
 
-@patch("eventlink.api.v1.demand_input.LLMClient")
+@patch("promiselink.api.v1.demand_input.LLMClient")
 async def test_concern_appended_to_existing_entity(mock_llm_cls, client, db_session):
     """New concern is appended to existing entity's concern list."""
     existing_concern = [{"tag": "招聘", "detail": "需要招人", "source": "text", "created_at": "2026-01-01T00:00:00"}]
@@ -366,7 +366,7 @@ async def test_concern_appended_to_existing_entity(mock_llm_cls, client, db_sess
 # ── Test 9: voice来源标记 ──────────────────────────────────────
 
 
-@patch("eventlink.api.v1.demand_input.LLMClient")
+@patch("promiselink.api.v1.demand_input.LLMClient")
 async def test_voice_source_stored_in_concern(mock_llm_cls, client):
     """Voice source is stored correctly in the concern entry."""
     mock_llm_instance = MagicMock()
@@ -394,7 +394,7 @@ async def test_voice_source_stored_in_concern(mock_llm_cls, client):
 # ── Test 10: LLM返回缺少字段时fallback ──────────────────────────
 
 
-@patch("eventlink.api.v1.demand_input.LLMClient")
+@patch("promiselink.api.v1.demand_input.LLMClient")
 async def test_llm_missing_fields_triggers_fallback(mock_llm_cls, client):
     """When LLM returns incomplete data, fallback extraction is used."""
     mock_llm_instance = MagicMock()

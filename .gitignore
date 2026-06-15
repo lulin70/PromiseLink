@@ -1,9 +1,11 @@
-# EventLink .gitignore
+# PromiseLink .gitignore
 
 # === Secrets & Credentials ===
 .env
 .env.*
 !.env.poc.example
+!.env.basic.example
+!.env.poc.hosted.example
 *.key
 *.pem
 *.p12
@@ -64,7 +66,25 @@ logs/
 *_old.*
 *_tmp.*
 
+# === Node.js ===
+node_modules/
+
+# === Compressed archives ===
+*.tar.gz
+*.zip
+
+# === External docs binary assets ===
+docs/external/**/*.png
+docs/external/**/*.xlsx
+docs/external/**/*.pptx
+
+# === Frontend build cache ===
+frontend/.swc/
+frontend/dist/
+
 # === Test coverage ===
 .coverage
 htmlcov/
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/

@@ -1,4 +1,4 @@
-name: EventLink CI/CD
+name: PromiseLink CI/CD
 
 on:
   push:
@@ -17,9 +17,9 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: eventlink
-          POSTGRES_PASSWORD: eventlink_test
-          POSTGRES_DB: eventlink_test
+          POSTGRES_USER: promiselink
+          POSTGRES_PASSWORD: promiselink_test
+          POSTGRES_DB: promiselink_test
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -45,25 +45,42 @@ jobs:
         run: ruff check src/ tests/
 
       - name: Run type checking
-        run: mypy src/eventlink --ignore-missing-imports || true
+        run: mypy src/promiselink
 
       - name: Run tests
         env:
-          DATABASE_URL: postgresql+asyncpg://eventlink:eventlink_test@localhost:5432/eventlink_test
+          DATABASE_URL: postgresql+asyncpg://promiselink:promiselink_test@localhost:5432/promiselink_test
           TEST_MODE: "true"
           LLM_API_KEY: "test-key-for-ci"
           SECRET_KEY: "ci-test-secret-key-min-32-chars-long"
           REDIS_ENABLED: "false"
         run: |
-          pytest tests/ -v --cov=src/eventlink --cov-report=xml --cov-report=term-missing
+          pytest tests/ -v --cov=src/promiselink --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         with:
           fail_ci_if_error: false
 
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Lint
+        working-directory: frontend
+        run: npx eslint src/ --ext .ts,.tsx
+      - name: Build
+        working-directory: frontend
+        run: npm run build:h5
+
   build-and-push:
-    needs: test
+    needs: [test, frontend]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
@@ -105,7 +122,7 @@ jobs:
         run: |
           docker pull ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
           docker run --rm ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }} \
-            python -c "import eventlink; print(f'EventLink v{eventlink.__version__} OK')"
+            python -c "import promiselink; print(f'PromiseLink v{promiselink.__version__} OK')"
 
   deploy-staging:
     needs: build-and-push
@@ -128,5 +145,5 @@ jobs:
         run: |
           eval $(ssh-agent -a $SSH_AUTH_SOCK)
           ssh-add ~/.ssh/deploy_key
-          chmod +x scripts/deploy-staging.sh
-          ./scripts/deploy-staging.sh ${{ secrets.STAGING_HOST }} ${{ secrets.STAGING_USER || 'ubuntu' }}
+          chmod +x scripts/ops/deploy-staging.sh
+          ./scripts/ops/deploy-staging.sh ${{ secrets.STAGING_HOST }} ${{ secrets.STAGING_USER || 'ubuntu' }}

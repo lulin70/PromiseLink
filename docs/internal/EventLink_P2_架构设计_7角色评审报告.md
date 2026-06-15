@@ -1,6 +1,6 @@
 # 🤖 Multi-Agent 协作结果
 
-**任务**: 基于已通过评审的EventLink PRD v1.5,请架构师设计系统架构,其他角色评审。
+**任务**: 基于已通过评审的PromiseLink PRD v1.5,请架构师设计系统架构,其他角色评审。
 
 PRD核心需求摘要:
 - 三层架构:L1应用层(许总) + L2引擎层(事件标准化+语义路由) + L3引擎层(关联发现+Todo生成)
@@ -34,7 +34,7 @@ P1评审共识摘要:
 **参与角色**: product-manager, architect, ui-designer, devops, security, tester, solo-coder
 
 ## 📋 执行摘要
-任务「基于已通过评审的EventLink PRD v1.5,请架构师设计系统架构,其他角色评审。
+任务「基于已通过评审的PromiseLink PRD v1.5,请架构师设计系统架构,其他角色评审。
 
 PRD核心需求摘要:
 - 三层架构:L1应用层(许总) + L2引」已完成多Agent协作。
@@ -45,7 +45,7 @@ Scratchpad关键发现: # Scratchpad Summary (scratchpad-20260601-174115)
 **Total entries**: 7 | **Active findings**: 7 | **Conflicts**: 0
 
 ## 🔍 Key Findings (7)
-- [solo-coder-123cec/solo-coder] # EventLink 架构设计文档 v1.0
+- [solo-coder-123cec/solo-coder] # PromiseLink 架构设计文档 v1.0
 
 ## 作
 
@@ -53,7 +53,7 @@ Scratchpad关键发现: # Scratchpad Summary (scratchpad-20260601-174115)
 
 ### 🤖 product [✅]
 ---
-# EventLink 系统架构设计文档 v1.0
+# PromiseLink 系统架构设计文档 v1.0
 
 ## 1. 架构概览
 
@@ -449,7 +449,7 @@ class L2Message:
 class MessageBus:
     def __init__(self, redis_client: Redis):
         self.redis = redis_client
-        self.stream_name = 'eventlink:l2_to_l3'
+        self.stream_name = 'promiselink:l2_to_l3'
     
     async def publish(self, event: StandardEvent):
         """发布标准化事件到L3"""
@@ -847,7 +847,7 @@ def _find_alumni(self, graph: nx.Graph) -> List[PotentialAssociation]:
 
 ### 🏗️ 架构师 [✅]
 ---
-# EventLink 系统架构设计文档 v1.0
+# PromiseLink 系统架构设计文档 v1.0
 
 ## 1. 架构概览
 
@@ -1641,7 +1641,7 @@ CREATE INDEX idx_matches_opportunity ON opportunity
 
 ### 🤖 ui [✅]
 ---
-# EventLink 系统架构设计文档 v1.0
+# PromiseLink 系统架构设计文档 v1.0
 
 ## 1. 架构概览
 
@@ -2346,7 +2346,7 @@ POST   /api/v1/todos/{todo_id}/reopen    # 重新打开
 
 ### 🔒 安全专家 [✅]
 ---
-# EventLink 系统架构设计文档 v1.0
+# PromiseLink 系统架构设计文档 v1.0
 
 ## 1. 架构概览
 
@@ -3156,7 +3156,7 @@ STREAM_KEYS = {
 
 ### ⚙️ DevOps工程师 [✅]
 ---
-# EventLink 系统架构设计文档 v1.0
+# PromiseLink 系统架构设计文档 v1.0
 
 ## 1. 架构概览
 
@@ -3284,7 +3284,7 @@ def route_event(raw_event: dict) -> str:
 
 ```json
 {
-  "stream_key": "eventlink:pipeline:meeting",
+  "stream_key": "promiselink:pipeline:meeting",
   "message": {
     "event_id": "evt_20250101_abc123",
     "pipeline": "meeting",
@@ -3617,7 +3617,7 @@ GET    /api/v1/metrics                   # Prometheus指标
 
 ```bash
 # 提交会议事件
-curl -X POST https://api.eventlink.com/api/v1/events \
+curl -X POST https://api.promiselink.com/api/v1/events \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -3655,7 +3655,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://user:pass@postgres:5432/eventlink
+      - DATABASE_URL=postgresql://user:pass@postgres:5432/promiselink
       - REDIS_URL=redis://redis:6379/0
     depends_on:
       - postgres
@@ -3679,7 +3679,7 @@ services:
   entity-unification:
     build: ./services/entity-unification
     environment:
-      - DATABASE_URL=postgresql://user:pass@postgres:5432/eventlink
+      - DATABASE_URL=postgresql://user:pass@postgres:5432/promiselink
       - REDIS_URL=redis://redis:6379/0
     deploy:
       replicas: 2
@@ -3687,13 +3687,13 @@ services:
   association-discovery:
     build: ./services/association-discovery
     environment:
-      - DATABASE_URL=postgresql://user:pass@postgres:5432/eventlink
+      - DATABASE_URL=postgresql://user:pass@postgres:5432/promiselink
       - MOKA_AI_API_KEY=${MOKA_AI_API_KEY}
 
   todo-engine:
     build: ./services/todo-engine
     environment:
-      - DATABASE_URL=postgresql://user:pass@postgres:5432/eventlink
+      - DATABASE_URL=postgresql://user:pass@postgres:5432/promiselink
       - REDIS_URL=redis://redis:6379/0
 
   # 数据层
@@ -3702,7 +3702,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     environment:
-      - POSTGRES_DB=eventlink
+      - POSTGRES_DB=promiselink
       - POSTGRES_USER=user
       - POSTGRES_PASSWORD=pass
 
@@ -3739,7 +3739,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: api-gateway
-  namespace: eventlink-prod
+  namespace: promiselink-prod
 spec:
   replicas: 3
   selector:
@@ -3752,19 +3752,19 @@ spec:
     spec:
       containers:
       - name: api-gateway
-        image: eventlink/api-gateway:v1.0.0
+        image: promiselink/api-gateway:v1.0.0
         ports:
         - containerPort: 8000
         env:
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
-              name: eventlink-secrets
+              name: promiselink-secrets
               key: database-url
         - name: REDIS_URL
           valueFrom:
             configMapKeyRef:
-              name: eventlink-config
+              name: promiselink-config
               key: redis-url
         resources:
           requests:
@@ -3790,7 +3790,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: api-gateway
-  namespace: eventlink-prod
+  namespace: promiselink-prod
 spec:
   type: LoadBalancer
   selector:
@@ -3819,20 +3819,20 @@ spec:
 # Prometheus 指标定义
 metrics:
   # 业务指标
-  - eventlink_events_total{pipeline, status}  # 事件处理总数
-  - eventlink_event_processing_duration_seconds{pipeline}  # 处理耗时
-  - eventlink_entity_merge_proposals_total  # 合并建议数
-  - eventlink_todos_created_total{type}  # Todo创建数
+  - promiselink_events_total{pipeline, status}  # 事件处理总数
+  - promiselink_event_processing_duration_seconds{pipeline}  # 处理耗时
+  - promiselink_entity_merge_proposals_total  # 合并建议数
+  - promiselink_todos_created_total{type}  # Todo创建数
   
   # 系统指标
-  - eventlink_api_requests_total{method, endpoint, status}
-  - eventlink_api_request_duration_seconds{method, endpoint}
-  - eventlink_redis_stream_lag{stream}  # 消息积压
-  - eventlink_db_connection_pool_size
+  - promiselink_api_requests_total{method, endpoint, status}
+  - promiselink_api_request_duration_seconds{method, endpoint}
+  - promiselink_redis_stream_lag{stream}  # 消息积压
+  - promiselink_db_connection_pool_size
   
   # 错误指标
-  - eventlink_errors_total{service, error_type}
-  - eventlink_llm_api_failures_total
+  - promiselink_errors_total{service, error_type}
+  - promiselink_llm_api_failures_total
 ```
 
 ### 6.2 告警规则
@@ -3840,12 +3840,12 @@ metrics:
 ```yaml
 # alerting/rules.yml
 groups:
-- name: eventlink_alerts
+- name: promiselink_alerts
   interval: 30s
   rules:
   # 管线积压告警
   - alert: PipelineBacklog
-    expr: eventlink_redis_stream_lag{stream=~"pipeline:.*"} > 1000
+    expr: promiselink_redis_stream_lag{stream=~"pipeline:.*"} > 1000
     for: 5m
     labels:
       severity: warning
@@ -3854,7 +3854,7 @@ groups:
   
   # API错误率告警
   - alert: HighErrorRate
-    expr: rate(eventlink_api_requests_total{status=~"5.."}[5m]) > 0.05
+    expr: rate(promiselink_api_requests_total{status=~"5.."}[5m]) > 0.05
     for: 2m
     labels:
       severity: critical
@@ -3863,7 +3863,7 @@ groups:
   
   # 数据库连接池耗尽
   - alert: DBConnectionPoolExhausted
-    expr: eventlink_db_connection_pool_size / eventlink_db_connection_pool_max > 0.9
+    expr: promiselink_db_connection_pool_size / promiselink_db_connection_pool_max > 0.9
     for: 1m
     labels:
       severity: critical
@@ -3911,7 +3911,7 @@ logger.error(
 
 ### 🧪 测试专家 [✅]
 ---
-# EventLink 测试策略与质量保障方案
+# PromiseLink 测试策略与质量保障方案
 
 ## 一、测试策略概览
 
@@ -4664,7 +4664,7 @@ class TestEntityMergeConsistency:
 
 ### 🤖 solo [✅]
 ---
-# EventLink 架构设计文档 v1.0
+# PromiseLink 架构设计文档 v1.0
 
 ## 作者角色：全栈开发者
 **审查重点**：代码可实现性、性能优化点、技术债务风险
@@ -5470,7 +5470,7 @@ class TodoEngine:
 **Total entries**: 7 | **Active findings**: 7 | **Conflicts**: 0
 
 ## 🔍 Key Findings (7)
-- [solo-coder-123cec/solo-coder] # EventLink 架构设计文档 v1.0
+- [solo-coder-123cec/solo-coder] # PromiseLink 架构设计文档 v1.0
 
 ## 作者角色：全栈开发者
 **审查重点**：代码可实现性、性能优化点、技术债务风险
@@ -5483,7 +5483,7 @@ class TodoEngine:
 
 ```
 ┌───────────── (confidence: 70%)
-- [tester-409136/tester] # EventLink 测试策略与质量保障方案
+- [tester-409136/tester] # PromiseLink 测试策略与质量保障方案
 
 ## 一、测试策略概览
 
@@ -5493,7 +5493,7 @@ class TodoEngine:
            E2E Tests (5%)
          ┌─────────────────┐
        (confidence: 70%)
-- [devops-d68388/devops] # EventLink 系统架构设计文档 v1.0
+- [devops-d68388/devops] # PromiseLink 系统架构设计文档 v1.0
 
 ## 1. 架构概览
 
@@ -5501,7 +5501,7 @@ class TodoEngine:
 
 ```
 ┌───────────────────────────────────────────────────────────── (confidence: 70%)
-- [security-4678aa/security] # EventLink 系统架构设计文档 v1.0
+- [security-4678aa/security] # PromiseLink 系统架构设计文档 v1.0
 
 ## 1. 架构概览
 
@@ -5509,7 +5509,7 @@ class TodoEngine:
 
 ```
 ┌──────────────────────────────────────────────────────────── (confidence: 70%)
-- [ui-designer-be2059/ui-designer] # EventLink 系统架构设计文档 v1.0
+- [ui-designer-be2059/ui-designer] # PromiseLink 系统架构设计文档 v1.0
 
 ## 1. 架构概览
 
@@ -5517,7 +5517,7 @@ class TodoEngine:
 
 ```
 ┌───────────────────────────────────────────────────────────── (confidence: 70%)
-- [architect-034235/architect] # EventLink 系统架构设计文档 v1.0
+- [architect-034235/architect] # PromiseLink 系统架构设计文档 v1.0
 
 ## 1. 架构概览
 
@@ -5525,7 +5525,7 @@ class TodoEngine:
 
 ```
 ┌────────────────────────────────────────────────────────────── (confidence: 70%)
-- [product-manager-20e1d4/product-manager] # EventLink 系统架构设计文档 v1.0
+- [product-manager-20e1d4/product-manager] # PromiseLink 系统架构设计文档 v1.0
 
 ## 1. 架构概览
 

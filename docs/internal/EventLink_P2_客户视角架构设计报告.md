@@ -1,6 +1,6 @@
 # 🤖 Multi-Agent 协作结果
 
-**任务**: EventLink 架构重新设计(客户视角驱动)
+**任务**: PromiseLink 架构重新设计(客户视角驱动)
 
 ⚠️ 核心原则:架构从用户场景倒推,不是从技术正推!
 先定义用户看到的页面和操作,再设计支撑这些页面的架构。
@@ -57,7 +57,7 @@ UI:页面间导航是否流畅?信息架构是否合理?
 
 
 P1评审共识摘要:
-任务「EventLink PRD v1.6 客户视角评审 ⚠️ 核心要求:每个角色问自己:如果我是用户,我拿到这个产品,我能做什么?我缺什么?哪里不顺? 产品定位:E」已完成多Agent协作。
+任务「PromiseLink PRD v1.6 客户视角评审 ⚠️ 核心要求:每个角色问自己:如果我是用户,我拿到这个产品,我能做什么?我缺什么?哪里不顺? 产品定位:E」已完成多Agent协作。
 参与角色: 产品经理, UI设计师, 测试专家, 架构师, 开发者, 运维工程师, 安全专家 (7个)
 执行结果: 7/7 个Worker成功
 协作耗时: 119.65s
@@ -65,13 +65,13 @@ Scratchpad关键发现: # Scratchpad Summary (scratchpad-20260601-180503)
 **Total entries**: 7 | **Active findings**: 7 | **Conflicts**: 0
 
 ## 🔍 Key Findings (7)
-- [architect-e3622a/architect] # EventLink PRD v1.6 客户视角评审 - 系
+- [architect-e3622a/architect] # PromiseLink PRD v1.6 客户视角评审 - 系
 **状态**: ✅ 成功
 **耗时**: 142.88s
 **参与角色**: product-manager, devops, ui-designer, architect, solo-coder, tester, security
 
 ## 📋 执行摘要
-任务「EventLink 架构重新设计(客户视角驱动)
+任务「PromiseLink 架构重新设计(客户视角驱动)
 
 ⚠️ 核心原则:架构从用户场景倒推,不是从技术正推!
 先定义用户看到的页面和操作,再设计支撑这些页面的架构。」已完成多Agent协作。
@@ -82,13 +82,13 @@ Scratchpad关键发现: # Scratchpad Summary (scratchpad-20260601-180503)
 **Total entries**: 15 | **Active findings**: 14 | **Conflicts**: 0
 
 ## 🔍 Key Findings (14)
-- [ui-designer-30adfb/ui-designer] # EventLink 架构重新设计(客户视角驱
+- [ui-designer-30adfb/ui-designer] # PromiseLink 架构重新设计(客户视角驱
 
 ## 👥 各角色产出
 
 ### 🏗️ 架构师 [✅]
 ---
-# EventLink 架构重新设计(客户视角驱动)
+# PromiseLink 架构重新设计(客户视角驱动)
 
 ## 第一步:用户页面与操作流程定义
 
@@ -940,7 +940,7 @@ GET /api/v1/entities/{entity_id}/associations
 
 ### 🤖 solo [✅]
 ---
-# EventLink 架构重新设计(客户视角驱动)
+# PromiseLink 架构重新设计(客户视角驱动)
 
 ## 一、用户视角出发点
 
@@ -1569,7 +1569,7 @@ class AssociationDiscoveryService:
 
 ### 🔒 安全专家 [✅]
 ---
-# EventLink 架构重新设计(客户视角驱动)
+# PromiseLink 架构重新设计(客户视角驱动)
 
 ## 设计原则确认
 
@@ -2083,7 +2083,7 @@ PATCH /api/v1/todos/{id}/complete (标记完成)
 
 ### 🤖 product [✅]
 ---
-# EventLink 架构重新设计(客户视角驱动)
+# PromiseLink 架构重新设计(客户视角驱动)
 
 ## 设计原则确认
 
@@ -2099,7 +2099,7 @@ PATCH /api/v1/todos/{id}/complete (标记完成)
 
 ```
 ┌─────────────────────────────────────────────────┐
-│ EventLink Dashboard                    [搜索🔍] │
+│ PromiseLink Dashboard                    [搜索🔍] │
 ├─────────────────────────────────────────────────┤
 │                                                 │
 │ 📋 今日待办 (3)                    [查看全部→] │
@@ -2715,7 +2715,7 @@ PATCH /api/v1/todos/{id}/complete (标记完成)
 
 ### 🧪 测试专家 [✅]
 ---
-# EventLink 架构重新设计(客户视角驱动)
+# PromiseLink 架构重新设计(客户视角驱动)
 
 ## 一、用户视角:页面与操作流程优先
 
@@ -3406,7 +3406,7 @@ GET /api/v1/search/suggestions?q={partial_query}
 
 ### ⚙️ DevOps工程师 [✅]
 ---
-# EventLink 架构重新设计(客户视角驱动)
+# PromiseLink 架构重新设计(客户视角驱动)
 
 ## 🎯 设计原则确认
 
@@ -3421,7 +3421,7 @@ GET /api/v1/search/suggestions?q={partial_query}
 **用户第一眼看到:**
 ```
 ┌─────────────────────────────────────────┐
-│ 📊 EventLink Dashboard                  │
+│ 📊 PromiseLink Dashboard                  │
 ├─────────────────────────────────────────┤
 │ 🔥 今日待办 (3)                         │
 │  ☐ 回复张三邮件 (来自:名片扫描)         │
@@ -4096,7 +4096,7 @@ GET /api/v1/search/suggest
 
 ### 🤖 ui [✅]
 ---
-# EventLink 架构重新设计(客户视角驱动)
+# PromiseLink 架构重新设计(客户视角驱动)
 
 ## 设计原则确认
 ✅ 从用户场景倒推,不是从技术正推
@@ -4111,7 +4111,7 @@ GET /api/v1/search/suggest
 **用户第一眼看到:**
 ```
 ┌─────────────────────────────────────────┐
-│ EventLink - 今日概览                     │
+│ PromiseLink - 今日概览                     │
 ├─────────────────────────────────────────┤
 │ 🔴 紧急待办 (3)                          │
 │ ├─ 回复张总邮件 (今天 14:00前)          │
@@ -4199,7 +4199,7 @@ GET /api/v1/search/suggest
 │ ┌─────────────────────────────────────┐ │
 │ │ 2025-06-01 产品评审会议              │ │
 │ │ 参会人:张总(CEO)、李工(CTO)...       │ │
-│ │ 决策:Q3上线EventLink MVP...          │ │
+│ │ 决策:Q3上线PromiseLink MVP...          │ │
 │ └─────────────────────────────────────┘ │
 │                                          │
 │ 🤖 AI提取结果                            │
@@ -4209,12 +4209,12 @@ GET /api/v1/search/suggest
 │                                          │
 │ 👥 提取实体 (3个)                        │
 │ ├─ 张总 [Person] → 已归一到"张伟(CEO)" │
-│ ├─ EventLink [Product] → 新建实体       │
+│ ├─ PromiseLink [Product] → 新建实体       │
 │ └─ Q3 [Timeline] → 关联到"2025Q3"       │
 │                                          │
 │ 🔗 发现关联 (2条)                        │
-│ ├─ 张总 --决策--> EventLink MVP         │
-│ └─ EventLink --计划上线--> 2025Q3       │
+│ ├─ 张总 --决策--> PromiseLink MVP         │
+│ └─ PromiseLink --计划上线--> 2025Q3       │
 │                                          │
 │ ✅ 生成Todo (3个)                        │
 │ ├─ [行动] 准备MVP演示材料 (本周五)      │
@@ -4260,7 +4260,7 @@ GET /api/v1/search/suggest
 │                                          │
 │ 🔗 关联实体 (5条)                        │
 │ ├─ 张伟 --任职--> XX科技 [Company]      │
-│ ├─ 张伟 --决策--> EventLink [Product]   │
+│ ├─ 张伟 --决策--> PromiseLink [Product]   │
 │ ├─ 张伟 --合作--> 李工 [Person]         │
 │ └─ ...                                   │
 │                                          │
@@ -4386,7 +4386,7 @@ GET /api/v1/search/suggest
 │ 会议纪要分析: 产品评审会议(决策型)      │
 ├─────────────────────────────────────────┤
 │ 🎯 关键决策 (3条)                        │
-│ ├─ Q3上线EventLink MVP                  │
+│ ├─ Q3上线PromiseLink MVP                  │
 │ ├─ 优先开发名片扫描功能                 │
 │ └─ 预算批准50万                         │
 │                                          │
@@ -4400,7 +4400,7 @@ GET /api/v1/search/suggest
 │ └─ ...                                   │
 │                                          │
 │ 📊 影响分析                              │
-│ ├─ 影响产品: EventLink                  │
+│ ├─ 影响产品: PromiseLink                  │
 │ ├─ 影响时间线: 2025Q3                   │
 │ └─ 涉及预算: 50万                       │
 └─────────────────────────────────────────┘
@@ -4454,7 +4454,7 @@ GET /api/v1/search/suggest
 │                                          │
 │ 👥 实体 (3个)                            │
 │ ├─ 张伟(CEO) - 匹配"张总"               │
-│ ├─ EventLink [Product] - 匹配"产品"     │
+│ ├─ PromiseLink [Product] - 匹配"产品"     │
 │ └─ 产品路线图 [Document]                │
 │                                          │
 │ 📄 事件 (5个)                            │
@@ -4469,7 +4469,7 @@ GET /api/v1/search/suggest
 │ └─ ...                                   │
 │                                          │
 │ 🔗 关联 (2条)                            │
-│ ├─ 张伟 --决策--> EventLink             │
+│ ├─ 张伟 --决策--> PromiseLink             │
 │ └─ 张伟 --关注--> 产品路线图             │
 └─────────────────────────────────────────┘
 ```
@@ -4696,7 +4696,7 @@ Response:
 **Total entries**: 15 | **Active findings**: 14 | **Conflicts**: 0
 
 ## 🔍 Key Findings (14)
-- [ui-designer-30adfb/ui-designer] # EventLink 架构重新设计(客户视角驱动)
+- [ui-designer-30adfb/ui-designer] # PromiseLink 架构重新设计(客户视角驱动)
 
 ## 设计原则确认
 ✅ 从用户场景倒推,不是从技术正推
@@ -4706,7 +4706,7 @@ Response:
 ---
 
 ## 第一部分: (confidence: 70%)
-- [devops-f914e9/devops] # EventLink 架构重新设计(客户视角驱动)
+- [devops-f914e9/devops] # PromiseLink 架构重新设计(客户视角驱动)
 
 ## 🎯 设计原则确认
 
@@ -4717,7 +4717,7 @@ Response:
 ## 1️⃣ 页面架构设计(用户第一视角)
 
 ### 1.1 首页/仪表盘 (confidence: 70%)
-- [tester-330991/tester] # EventLink 架构重新设计(客户视角驱动)
+- [tester-330991/tester] # PromiseLink 架构重新设计(客户视角驱动)
 
 ## 一、用户视角:页面与操作流程优先
 
@@ -4727,7 +4727,7 @@ Response:
 **用户第一眼看到:**
 ```
 ┌──── (confidence: 70%)
-- [product-manager-4056da/product-manager] # EventLink 架构重新设计(客户视角驱动)
+- [product-manager-4056da/product-manager] # PromiseLink 架构重新设计(客户视角驱动)
 
 ## 设计原则确认
 
@@ -4738,7 +4738,7 @@ Response:
 ## 第一部分:页面架构设计
 
 ### 1.1 首页/仪表盘 (Dash (confidence: 70%)
-- [security-6220a1/security] # EventLink 架构重新设计(客户视角驱动)
+- [security-6220a1/security] # PromiseLink 架构重新设计(客户视角驱动)
 
 ## 设计原则确认
 
@@ -4747,7 +4747,7 @@ Response:
 ✅ **每个设计决策必须回答:这能让用户顺畅完成操作吗?**
 
 -- (confidence: 70%)
-- [solo-coder-7a74c7/solo-coder] # EventLink 架构重新设计(客户视角驱动)
+- [solo-coder-7a74c7/solo-coder] # PromiseLink 架构重新设计(客户视角驱动)
 
 ## 一、用户视角出发点
 
@@ -4755,7 +4755,7 @@ Response:
 
 ### 核心用户旅程
 1. **扫描名片** → 立即看到联系人信息 → 看到"需要跟进 (confidence: 70%)
-- [architect-3ad16b/architect] # EventLink 架构重新设计(客户视角驱动)
+- [architect-3ad16b/architect] # PromiseLink 架构重新设计(客户视角驱动)
 
 ## 第一步:用户页面与操作流程定义
 
@@ -4764,7 +4764,7 @@ Response:
 #### 1.1 首页/仪表盘
 **用户第一眼看到:**
 - 今日待办(Today's Todos):信息 (confidence: 70%)
-- [architect-e3622a/architect] # EventLink PRD v1.6 客户视角评审 - 系统架构师视角
+- [architect-e3622a/architect] # PromiseLink PRD v1.6 客户视角评审 - 系统架构师视角
 
 ## 一、客户视角发现的问题
 
@@ -4773,7 +4773,7 @@ Response:
 **P0-1: 缺少前端架构定义，用户界面结构完全未定义**
 - **用户痛点**：用 (confidence: 70%)
 - [ui-designer-70f63b/ui-designer] # UI/UX设计师评审报告
-## EventLink PRD v1.6 客户视角分析
+## PromiseLink PRD v1.6 客户视角分析
 
 ---
 
@@ -4783,7 +4783,7 @@ Response:
 
 **P0-1: 缺失完整的信息架构和页面结构定义**
 - **用户痛点* (confidence: 70%)
-- [tester-64a379/tester] # 测试专家评审报告 - EventLink PRD v1.6
+- [tester-64a379/tester] # 测试专家评审报告 - PromiseLink PRD v1.6
 
 ## 一、客户视角问题分析
 
@@ -4791,7 +4791,7 @@ Response:
 
 **P0-1: 缺少端到端用户旅程的验收标准**
 - **问题**: PRD定义了20个功能点,但没有定义完 (confidence: 70%)
-- [solo-coder-e31fe7/solo-coder] # EventLink PRD v1.6 客户视角评审 - 全栈开发者视角
+- [solo-coder-e31fe7/solo-coder] # PromiseLink PRD v1.6 客户视角评审 - 全栈开发者视角
 
 ## 一、客户视角问题分析
 
@@ -4799,7 +4799,7 @@ Response:
 
 **P0-1: 前端页面结构完全缺失**
 - **问题**: PRD定义了20个功能,但没有定义 (confidence: 70%)
-- [devops-0d7475/devops] # DevOps工程师 - EventLink PRD v1.6 客户视角评审
+- [devops-0d7475/devops] # DevOps工程师 - PromiseLink PRD v1.6 客户视角评审
 
 ## 1. 客户视角发现的问题
 
@@ -4816,7 +4816,7 @@ Response:
 **P0-1: 缺失首页/主界面定义**
 - **问题**: PRD未定义用户打开App第一眼看到什么
 - **用户影响**: 用户不知 (confidence: 70%)
-- [security-afe1a3/security] # 安全专家评审报告 - EventLink PRD v1.6
+- [security-afe1a3/security] # 安全专家评审报告 - PromiseLink PRD v1.6
 
 ## 一、客户视角安全问题分析
 

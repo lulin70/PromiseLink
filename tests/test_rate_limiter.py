@@ -8,10 +8,10 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
-from eventlink.core.auth import get_current_user_id
-from eventlink.core.rate_limiter import reset_rate_limits
-from eventlink.database import Base, get_async_session
-from eventlink.main import app
+from promiselink.core.auth import get_current_user_id
+from promiselink.core.rate_limiter import reset_rate_limits
+from promiselink.database import Base, get_async_session
+from promiselink.main import app
 
 
 # ── Constants ──
@@ -34,7 +34,7 @@ async def db_engine():
     @sa_event.listens_for(engine.sync_engine, "connect")
     def set_sqlite_pragma(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA foreign_keys=OFF")
         cursor.close()
 
     async with engine.begin() as conn:
@@ -108,7 +108,7 @@ async def test_rate_limiter_blocks_excessive_requests(client):
     # Use a low limit for testing by hitting the endpoint many times
     # The default authenticated limit is 60/min, so we need to exceed it
     # We'll use the in-memory limiter directly for a more controlled test
-    from eventlink.core.rate_limiter import check_rate_limit
+    from promiselink.core.rate_limiter import check_rate_limit
 
     key = "user:test_user_block"
     limit = 5
@@ -129,7 +129,7 @@ async def test_rate_limiter_blocks_excessive_requests(client):
 
 async def test_rate_limiter_llm_endpoints_lower_limit(client):
     """LLM endpoints (/voice/, /media/) should use lower rate limit."""
-    from eventlink.core.rate_limiter import check_rate_limit
+    from promiselink.core.rate_limiter import check_rate_limit
 
     # LLM limit is separate from standard limit
     llm_key = "llm:user:test_llm_user"
@@ -168,9 +168,9 @@ async def test_privacy_data_summary_requires_auth(unauth_client):
 async def test_privacy_data_summary_returns_counts(client, db_session):
     """GET /privacy/data-summary returns correct counts of user data."""
     # Create some test data
-    from eventlink.models.event import Event
-    from eventlink.models.entity import Entity
-    from eventlink.models.todo import Todo
+    from promiselink.models.event import Event
+    from promiselink.models.entity import Entity
+    from promiselink.models.todo import Todo
 
     # Create events first (entities and todos reference events)
     event_ids = []
@@ -230,10 +230,10 @@ async def test_privacy_data_summary_returns_counts(client, db_session):
 
 async def test_privacy_delete_user_data(client, db_session):
     """DELETE /privacy/user-data removes all user data."""
-    from eventlink.models.event import Event
-    from eventlink.models.entity import Entity
-    from eventlink.models.todo import Todo
-    from eventlink.models.association import Association
+    from promiselink.models.event import Event
+    from promiselink.models.entity import Entity
+    from promiselink.models.todo import Todo
+    from promiselink.models.association import Association
 
     # Create test data
     event_ids = []

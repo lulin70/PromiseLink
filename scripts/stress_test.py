@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""EventLink Stress Test - Real HTTP load testing
+"""PromiseLink Stress Test - Real HTTP load testing
 
 Adapted for SQLite backend: each event creation triggers a background pipeline
 (13 steps, each opening its own DB session + LLM calls). Pipeline tasks are
@@ -16,9 +16,10 @@ import time
 import uuid
 import statistics
 import httpx
+import os
 
 BASE = "http://localhost:8001/api/v1"
-SECRET = "eventlink2024"
+SECRET = os.environ.get("POC_SECRET", "promiselink2024")
 READ_CONCURRENCY = 50
 WRITE_DELAY = 3.0  # seconds between sequential writes
 COOLDOWN = 10  # seconds between test groups
@@ -33,7 +34,7 @@ async def get_token(client):
 async def stress_test():
     async with httpx.AsyncClient(timeout=60) as client:
         print("=" * 60)
-        print("EventLink Stress Test (SQLite backend)")
+        print("PromiseLink Stress Test (SQLite backend)")
         print("=" * 60)
 
         # Test 1: Sequential event creation (15 events with delay)

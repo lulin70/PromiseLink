@@ -1,7 +1,7 @@
 [project]
-name = "eventlink"
+name = "promiselink"
 version = "0.4.8"
-description = "AI-driven personal business relationship management assistant (EventLink)"
+description = "AI-driven personal business relationship management assistant (PromiseLink)"
 authors = [{name = "CarryMem Team", email = "team@carrymem.com"}]
 readme = "README.md"
 requires-python = ">=3.11"
@@ -44,7 +44,7 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["eventlink"]
+packages = ["promiselink"]
 package-dir = {"" = "src"}
 
 [tool.black]
@@ -58,16 +58,18 @@ select = ["E", "F", "I", "N", "W", "UP"]
 
 [tool.mypy]
 python_version = "3.11"
-strict = true
 warn_return_any = true
 warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+exclude = ["tests/", "alembic/"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "--cov=eventlink --cov-report=term-missing --cov-report=html"
+addopts = "--cov=promiselink --cov-report=term-missing --cov-report=html"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]

@@ -1,14 +1,16 @@
-# EventLink API设计文档
+# PromiseLink API设计文档
 
-> **版本**: v2.11 (POC阶段)
-> **日期**: 2026-06-09
-> **阶段**: POC (v2.x series)
+> **版本**: v3.1 (POC阶段)
+> **日期**: 2026-06-11
+> **阶段**: POC (v3.x series)
 > **设计师**: 架构师 + 开发团队
 > **参考**: PRD v4.3, 技术设计 v2.7 §7
 > **v2.6变更**: Insight Engine API新增priority-breakdown/upcoming-context端点(§3.13)、Todo schema新增dependency_raw/context_raw字段
 > **v2.7变更**: 新增§3.15 Semantic Search API（3个端点+SearchResult schema, F-57/F-58）
 > **v2.8变更**: 新增§3.16 CSV Import API(F-08)、§3.17 Data Export API(F-21)、§3.18 Demand Input API(F-36)、§3.19 Email Sync API(EmailAdapter)、§3.20 WeChat Forward API(WeChatForwardAdapter)、§3.21 Voice Query API(F-50)
 > **v2.9变更**: 新增§3.22 Media API(ASR/TTS/OCR/ocr-event, PRD v4.8)、§3.23 Privacy API(GDPR合规, 数据查看/导出/删除)
+> **v3.0变更**: 新增§3.24 Promise兑现状态追踪 API(F-68)、§3.25 智能跟进提醒 API(F-69)、F-67关系推进卡前端修复说明
+> **v3.1变更**: 术语替换Phase 1→专业版/Phase 2→定制版（对齐三层产品模型）、新增§3.27 Relay Gateway API中继网关（5个端点+产品层级标注）
 
 ---
 
@@ -34,7 +36,7 @@
 
 ## 2. 认证与授权
 
-> **实现状态**: ✅已实现 2 个 | 📋Phase 2 3 个 | ⚠️路径差异 0 个
+> **实现状态**: ✅已实现 2 个 | 📋定制版 3 个 | ⚠️路径差异 0 个
 
 ### 2.0 当前实现（PoC阶段）
 
@@ -99,8 +101,8 @@
   "sub": "user_id (UUID)",
   "iat": 1622619900,
   "exp": 1622706300,
-  "iss": "eventlink",
-  "aud": "eventlink-api"
+  "iss": "promiselink",
+  "aud": "promiselink-api"
 }
 ```
 
@@ -109,17 +111,17 @@
 | `sub` | string (UUID) | 用户唯一标识，对应 user_id |
 | `iat` | integer | 签发时间（Unix时间戳） |
 | `exp` | integer | 过期时间（Unix时间戳，默认24小时） |
-| `iss` | string | 签发者，固定为 `"eventlink"` |
-| `aud` | string | 受众，固定为 `"eventlink-api"` |
+| `iss` | string | 签发者，固定为 `"promiselink"` |
+| `aud` | string | 受众，固定为 `"promiselink-api"` |
 
-### 2.1 临时授权码模式（小程序→H5）📋 **Phase 2 规划**
+### 2.1 临时授权码模式（小程序→H5）📋 **定制版 规划**
 
-> **定位**: Phase 2 完整认证方案，支持小程序→H5跨端授权。当前PoC阶段使用 §2.0 简化方案。
+> **定位**: 定制版 完整认证方案，支持小程序→H5跨端授权。当前PoC阶段使用 §2.0 简化方案。
 
 ```mermaid
 sequenceDiagram
     participant MP as 小程序
-    participant API as EventLink API
+    participant API as PromiseLink API
     participant H5 as H5页面
     
     MP->>API: POST /api/v1/auth/ticket<br/>{action, person_id}
@@ -130,7 +132,7 @@ sequenceDiagram
     H5->>H5: 保存token到sessionStorage
 ```
 
-#### 2.1.1 生成授权码 📋 **Phase 2**
+#### 2.1.1 生成授权码 📋 **定制版**
 
 **端点**: `POST /api/v1/auth/ticket`
 
@@ -156,7 +158,7 @@ sequenceDiagram
 - Ticket存储在Redis，60秒有效
 - 单次使用（exchange后自动删除）
 
-#### 2.1.2 交换Token 📋 **Phase 2**
+#### 2.1.2 交换Token 📋 **定制版**
 
 **端点**: `POST /api/v1/auth/exchange`
 
@@ -184,8 +186,8 @@ sequenceDiagram
   "user_id": "uuid",
   "exp": 1622620800,
   "iat": 1622619900,
-  "iss": "eventlink",
-  "aud": "eventlink-api"
+  "iss": "promiselink",
+  "aud": "promiselink-api"
 }
 ```
 
@@ -225,7 +227,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 | SC-JWT-3 | Refresh Token旋转 | 每次刷新生成新token对，旧token立即失效 | 防止token重放攻击 |
 | SC-JWT-4 | CORS白名单 | 跨域请求仅允许配置的Origin列表 | **禁止使用 `*` 通配符** |
 
-**Token刷新**: `POST /api/v1/auth/refresh` 📋 **Phase 2**
+**Token刷新**: `POST /api/v1/auth/refresh` 📋 **定制版**
 
 ---
 
@@ -233,7 +235,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ### 3.1 Events API
 
-> **实现状态**: ✅已实现 2 个 | 📋Phase 2 0 个 | ⚠️路径差异 0 个
+> **实现状态**: ✅已实现 2 个 | 📋定制版 0 个 | ⚠️路径差异 0 个
 
 #### 3.1.1 创建事件 ✅ **已实现**
 
@@ -319,7 +321,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ### 3.2 Entities API
 
-> **实现状态**: ✅已实现 3 个 | 📋Phase 2 4 个 | ⚠️路径差异 0 个
+> **实现状态**: ✅已实现 3 个 | 📋定制版 4 个 | ⚠️路径差异 0 个
 
 #### 3.2.1 搜索实体 ✅ **已实现**
 
@@ -450,7 +452,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 
 **响应**: `200 OK`（返回更新后的实体）
 
-#### 3.2.4 修改资源敏感度 📋 **Phase 2**
+#### 3.2.4 修改资源敏感度 📋 **定制版**
 
 **端点**: `PATCH /api/v1/entities/{id}/sensitivity`
 
@@ -485,7 +487,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-#### 3.2.5 添加/确认关注点 📋 **Phase 2**
+#### 3.2.5 添加/确认关注点 📋 **定制版**
 
 **端点**: `PATCH /api/v1/entities/{id}/concern`
 
@@ -517,7 +519,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-#### 3.2.6 添加/更新承诺 📋 **Phase 2**
+#### 3.2.6 添加/更新承诺 📋 **定制版**
 
 **端点**: `PATCH /api/v1/entities/{id}/promise`
 
@@ -550,7 +552,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-#### 3.2.7 记录帮助 📋 **Phase 2**
+#### 3.2.7 记录帮助 📋 **定制版**
 
 **端点**: `PATCH /api/v1/entities/{id}/contribution`
 
@@ -583,7 +585,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ### 3.3 Associations API
 
-> **实现状态**: ✅已实现 1 个 | 📋Phase 2 1 个 | ⚠️路径差异 0 个
+> **实现状态**: ✅已实现 1 个 | 📋定制版 1 个 | ⚠️路径差异 0 个
 
 #### 3.3.1 查询关联 ✅ **已实现**
 
@@ -623,7 +625,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-#### 3.3.2 实体关系图谱 📋 **Phase 2**
+#### 3.3.2 实体关系图谱 📋 **定制版**
 
 **端点**: `GET /api/v1/entities/{id}/graph`
 
@@ -661,7 +663,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ### 3.4 Todos API
 
-> **实现状态**: ✅已实现 2 个 | 📋Phase 2 2 个 | ⚠️路径差异 0 个
+> **实现状态**: ✅已实现 2 个 | 📋定制版 2 个 | ⚠️路径差异 0 个
 
 #### 3.4.1 待办列表 ✅ **已实现**
 
@@ -858,7 +860,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 
 **响应**: `200 OK`（返回更新后的Todo）
 
-#### 3.4.3 Todo反馈闭环 📋 **Phase 2**
+#### 3.4.3 Todo反馈闭环 📋 **定制版**
 
 **端点**: `POST /api/v1/todos/{id}/feedback`
 
@@ -878,7 +880,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-#### 3.4.4 Snooze延迟 📋 **Phase 2**
+#### 3.4.4 Snooze延迟 📋 **定制版**
 
 **端点**: `POST /api/v1/todos/{id}/snooze`
 
@@ -1030,9 +1032,9 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ### 3.5 Digest API（摘要）
 
-> **📋 未实现，Phase1规划**：Digest API 尚未实现独立端点，相关功能将在 Phase1 中开发。
+> **📋 未实现，专业版规划**：Digest API 尚未实现独立端点，相关功能将在专业版中开发。
 
-> **实现状态**: ✅已实现 0 个 | 📋Phase 2 1 个 | ⚠️路径差异 1 个
+> **实现状态**: ✅已实现 0 个 | 📋定制版 1 个 | ⚠️路径差异 1 个
 
 #### 3.5.1 早晨简报 ⚠️ **路径差异**
 
@@ -1069,7 +1071,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-#### 3.5.2 晚间总结 📋 **Phase 2**
+#### 3.5.2 晚间总结 📋 **定制版**
 
 **端点**: `GET /api/v1/digest/evening`
 
@@ -1097,9 +1099,9 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ### 3.6 Mini Program API（小程序专用）
 
-> **实现状态**: ✅已实现 0 个 | 📋Phase 2 4 个 | ⚠️路径差异 0 个
+> **实现状态**: ✅已实现 0 个 | 📋定制版 4 个 | ⚠️路径差异 0 个
 
-#### 3.6.1 今日会议 📋 **Phase 2**
+#### 3.6.1 今日会议 📋 **定制版**
 
 **端点**: `GET /api/v1/mini/today`
 
@@ -1123,7 +1125,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-#### 3.6.2 人物速览 📋 **Phase 2**
+#### 3.6.2 人物速览 📋 **定制版**
 
 **端点**: `GET /api/v1/mini/person/{id}`
 
@@ -1144,7 +1146,7 @@ Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-#### 3.6.3 TTS语音播报 📋 **Phase 2**
+#### 3.6.3 TTS语音播报 📋 **定制版**
 
 **端点**: `GET /api/v1/mini/person/{id}/tts`
 
@@ -1157,7 +1159,7 @@ Content-Type: audio/mpeg
 Content-Length: 45678
 ```
 
-#### 3.6.4 语音录入 📋 **Phase 2**
+#### 3.6.4 语音录入 📋 **定制版**
 
 **端点**: `POST /api/v1/mini/voice-input`
 
@@ -1180,20 +1182,20 @@ language: zh-CN
 
 ### 3.7 Resources API（资源管理）
 
-> **📋 未实现，Phase2规划**：Resources API 尚未实现，商机匹配功能(F-05)已暂停，将在 Phase2 条件性重启。
+> **📋 未实现，定制版规划**：Resources API 尚未实现，商机匹配功能(F-05)已暂停，将在定制版条件性重启。
 
-> **实现状态**: ✅已实现 0 个 | 📋Phase 2 4 个 | ⚠️路径差异 0 个
+> **实现状态**: ✅已实现 0 个 | 📋定制版 4 个 | ⚠️路径差异 0 个
 
-> **⚠️ F-05 暂停声明（Phase 2）**: 商机匹配相关API在 Phase 1 暂不实现。以下端点标记为 **Phase 2**：
+> **⚠️ F-05 暂停声明（定制版）**: 商机匹配相关API在专业版暂不实现。以下端点标记为 **定制版**：
 > - `GET /api/v1/resources/match` — 资源匹配查询（单边匹配+六维加权评分算法）
 > - 商机匹配度五维算法（keyword/industry/topic/llm/history/callability）
 >
-> **原因**: Phase 1 聚焦"关系经营闭环"核心能力（关系推进卡、Dashboard、日视图），资源匹配作为 Phase 2 深度整合能力延后。
-> **替代方案**: Phase 1 使用简化的 PromiseFulfillmentEngine（承诺兑现闭环）替代完整八维匹配。
+> **原因**: 专业版聚焦"关系经营闭环"核心能力（关系推进卡、Dashboard、日视图），资源匹配作为定制版深度整合能力延后。
+> **替代方案**: 专业版使用简化的 PromiseFulfillmentEngine（承诺兑现闭环）替代完整八维匹配。
 
 > **定位**: 资源管理是AI驱动的个人商务关系经营助手的核心能力，支持单边匹配——"我的需求匹配我人脉的供给"。
 
-#### 3.7.1 查看实体资源列表 📋 **Phase 2**
+#### 3.7.1 查看实体资源列表 📋 **定制版**
 
 **端点**: `GET /api/v1/entities/{id}/resources`
 
@@ -1234,7 +1236,7 @@ language: zh-CN
 }
 ```
 
-#### 3.7.2 添加资源标签 📋 **Phase 2**
+#### 3.7.2 添加资源标签 📋 **定制版**
 
 **端点**: `POST /api/v1/entities/{id}/resources`
 
@@ -1269,7 +1271,7 @@ language: zh-CN
 }
 ```
 
-#### 3.7.3 删除资源标签 📋 **Phase 2**
+#### 3.7.3 删除资源标签 📋 **定制版**
 
 **端点**: `DELETE /api/v1/entities/{id}/resources/{resource_id}`
 
@@ -1290,7 +1292,7 @@ language: zh-CN
 }
 ```
 
-#### 3.7.4 资源匹配查询 📋 **Phase 2**
+#### 3.7.4 资源匹配查询 📋 **定制版**
 
 **端点**: `GET /api/v1/resources/match`
 
@@ -1472,7 +1474,7 @@ language: zh-CN
 ### 3.9 Dashboard & 关系推进卡 API（v2.0新增，P0端点）
 
 > **定位**: v2.3/v2.4 新增的P0核心端点，支撑关系经营闭环。
-> **实现状态**: ✅已实现 1 个 | 📋Phase 2 1 个 | ⚠️路径差异 1 个
+> **实现状态**: ✅已实现 1 个 | 📋定制版 1 个 | ⚠️路径差异 1 个
 
 #### 3.9.1 获取关系推进卡 ✅ **已实现**
 
@@ -1631,7 +1633,7 @@ language: zh-CN
 }
 ```
 
-#### 3.9.3 今日Dashboard 📋 **Phase 2**
+#### 3.9.3 今日Dashboard 📋 **定制版**
 
 **端点**: `GET /api/v1/dashboard/today`
 
@@ -1699,11 +1701,11 @@ language: zh-CN
 
 ### 3.10 记录贡献与反馈 API（v2.0新增）
 
-> **📋 未实现，Phase1规划**：贡献与反馈 API 尚未实现独立端点，相关功能将在 Phase1 中开发。
+> **📋 未实现，专业版规划**：贡献与反馈 API 尚未实现独立端点，相关功能将在专业版中开发。
 
-> **实现状态**: ✅已实现 0 个 | 📋Phase 2 2 个 | ⚠️路径差异 0 个
+> **实现状态**: ✅已实现 0 个 | 📋定制版 2 个 | ⚠️路径差异 0 个
 
-#### 3.10.1 记录已提供的帮助/回应 📋 **Phase 2**
+#### 3.10.1 记录已提供的帮助/回应 📋 **定制版**
 
 **端点**: `POST /api/v1/contributions`
 
@@ -1742,7 +1744,7 @@ language: zh-CN
 }
 ```
 
-#### 3.10.2 记录反馈与下一步 📋 **Phase 2**
+#### 3.10.2 记录反馈与下一步 📋 **定制版**
 
 **端点**: `POST /api/v1/feedbacks`
 
@@ -1806,9 +1808,9 @@ language: zh-CN
 
 ---
 
-### 3.11 日视图API（F-49, Phase 1, v2.0新增）
+### 3.11 日视图API（F-49, 专业版, v2.0新增）
 
-> **实现状态**: ✅已实现 1 个 | 📋Phase 2 0 个 | ⚠️路径差异 0 个
+> **实现状态**: ✅已实现 1 个 | 📋定制版 0 个 | ⚠️路径差异 0 个
 
 **端点**: `GET /api/v1/dashboard/day-view?date=YYYY-MM-DD` ✅ **已实现**
 
@@ -1866,11 +1868,11 @@ language: zh-CN
 
 ---
 
-### 3.12 Voice Assistant API（F-50, Phase 1.1, v2.1新增）
+### 3.12 Voice Assistant API（F-50, 专业版v1, v2.1新增）
 
-> **[F-50新增] 定位**: 语音问答交互层，接收ASR识别后的文本，经NLU意图识别后调用对应业务API，返回自然语言答案+预生成TTS音频URL。Phase 1.1为一次性会话模式（无多轮对话）。
+> **[F-50新增] 定位**: 语音问答交互层，接收ASR识别后的文本，经NLU意图识别后调用对应业务API，返回自然语言答案+预生成TTS音频URL。专业版v1为一次性会话模式（无多轮对话）。
 > **关键约束**: 不存储原始音频；TTS输出需PII脱敏（复用 `redact_pii_from_text()`）；所有端点需JWT认证。
-> **实现状态**: ✅已实现 1 个 | 📋Phase 2 2 个 | ⚠️路径差异 0 个
+> **实现状态**: ✅已实现 1 个 | 📋定制版 2 个 | ⚠️路径差异 0 个
 
 #### 3.12.1 NLU意图枚举定义
 
@@ -1878,16 +1880,16 @@ language: zh-CN
 
 ```python
 class VoiceIntent(str, Enum):
-    # Phase 1.1 核心 (P0)
+    # 专业版v1 核心 (P0)
     SCHEDULE_QUERY = "schedule_query"          # 日程查询("今天有什么会")
     PROMISE_TRACKER = "promise_tracker"        # 承诺追踪("我答应谁什么还没做")
     RELATIONSHIP_STATUS = "relationship_status" # 关系推进("张总到哪步了")
 
-    # Phase 1.2 扩展 (P1)
+    # 专业版v2 扩展 (P1)
     SCHEDULE_RANGE = "schedule_range"          # 范围日程("明后天有什么安排")
     ACTION_SUGGESTION = "action_suggestion"    # 行动建议("该联系谁")
 
-    # Phase 2 (P2)
+    # 定制版 (P2)
     CONVERSATION_REVIEW = "conversation_review" # 交流回顾("聊了什么主题")
     KNOWLEDGE_RETRIEVAL = "knowledge_retrieval" # 知识检索("物流方面的新知识")
 
@@ -2007,7 +2009,7 @@ class VoiceSessionResponse(BaseModel):
 6. 返回 session_id + answer_text + tts_url + source_data
 ```
 
-#### 3.12.4 获取TTS音频 📋 **Phase 2**
+#### 3.12.4 获取TTS音频 📋 **定制版**
 
 **[F-50新增] 端点**: `GET /api/v1/voice/tts/{session_id}`
 
@@ -2037,7 +2039,7 @@ Cache-Control: private, max-age=300
 - Cache-Control设为private（不经过共享缓存）
 - 音频文件不持久化存储，TTL过期后自动删除
 
-#### 3.12.5 语音回答质量反馈 📋 **Phase 2**
+#### 3.12.5 语音回答质量反馈 📋 **定制版**
 
 **[F-50新增] 端点**: `POST /api/v1/voice/feedback`
 
@@ -2084,7 +2086,7 @@ Cache-Control: private, max-age=300
 > **定位**: Insight Engine 将 Todo 从"被动记录"升级为"主动服务"，基于动态优先级评分和隐式反馈驱动用户注意力。
 > **📋 部分实现（集成在dashboard.py）**：Insight Engine 的核心功能（动态优先级评分、隐式反馈）已在 `services/priority_scorer.py` 和 `services/implicit_feedback.py` 中实现，API 端点集成在 `api/v1/dashboard.py` 中，未创建独立 `/insights` 端点。
 
-> **实现状态**: ✅已实现 2 个 | 📋Phase 2 4 个 | ⚠️路径差异 0 个
+> **实现状态**: ✅已实现 2 个 | 📋定制版 4 个 | ⚠️路径差异 0 个
 
 #### 3.13.1 按动态评分排序的 Todo 列表 ✅ **已实现**
 
@@ -2118,7 +2120,7 @@ Cache-Control: private, max-age=300
 
 **示例**: `GET /api/v1/todos?sort=due_date&status=pending`
 
-#### 3.13.3 触发优先级重新计算 📋 **Phase 2**
+#### 3.13.3 触发优先级重新计算 📋 **定制版**
 
 **端点**: `POST /api/v1/insights/calculate`
 
@@ -2174,7 +2176,7 @@ Cache-Control: private, max-age=300
 | 422 | E1003 | scope=entity 但未提供 entity_id |
 | 429 | E3000 | 超过限流（10次/分钟） |
 
-#### 3.13.4 获取隐式反馈统计 📋 **Phase 2**
+#### 3.13.4 获取隐式反馈统计 📋 **定制版**
 
 **端点**: `GET /api/v1/insights/feedback-stats`
 
@@ -2229,7 +2231,7 @@ Cache-Control: private, max-age=300
 | 401 | E2000 | 未认证 |
 | 404 | E1001 | entity_id 不存在 |
 
-#### 3.13.5 获取Todo优先级评分详情（v2.6 新增, F-55/F-56） 📋 **Phase 2**
+#### 3.13.5 获取Todo优先级评分详情（v2.6 新增, F-55/F-56） 📋 **定制版**
 
 **端点**: `GET /api/v1/todos/{todo_id}/priority-breakdown`
 
@@ -2307,7 +2309,7 @@ Cache-Control: private, max-age=300
 | 401 | E2000 | 未认证 |
 | 404 | E1001 | todo_id 不存在 |
 
-#### 3.13.6 获取即将见面的Entity及关联Todo（v2.6 新增, F-56） 📋 **Phase 2**
+#### 3.13.6 获取即将见面的Entity及关联Todo（v2.6 新增, F-56） 📋 **定制版**
 
 **端点**: `GET /api/v1/users/{user_id}/upcoming-context`
 
@@ -2390,9 +2392,9 @@ Cache-Control: private, max-age=300
 > **定位**: 多数据源适配器管理接口，支持用户配置和同步不同来源的数据（微信转发、邮件、日历等）。
 > **📋 部分实现（集成在对应Adapter端点）**：DataSourceAdapter 接口已在 `services/data_source_adapter.py` 中定义，具体 Adapter（EmailAdapter、WeChatForwardAdapter）已实现，但独立的 `/adapters` 管理端点未创建，功能集成在 `api/v1/email_sync.py` 和 `api/v1/wechat_forward.py` 中。
 
-> **实现状态**: ✅已实现 0 个 | 📋Phase 2 4 个 | ⚠️路径差异 0 个
+> **实现状态**: ✅已实现 0 个 | 📋定制版 4 个 | ⚠️路径差异 0 个
 
-#### 3.14.1 列出已配置的数据源 📋 **Phase 2**
+#### 3.14.1 列出已配置的数据源 📋 **定制版**
 
 **端点**: `GET /api/v1/adapters`
 
@@ -2434,7 +2436,7 @@ Cache-Control: private, max-age=300
 
 > **安全约束**: 响应中不返回 `config_encrypted` 字段内容，防止密钥泄露。
 
-#### 3.14.2 添加新数据源配置 📋 **Phase 2**
+#### 3.14.2 添加新数据源配置 📋 **定制版**
 
 **端点**: `POST /api/v1/adapters`
 
@@ -2479,7 +2481,7 @@ Cache-Control: private, max-age=300
 | 409 | E1002 | 该用户已配置同名适配器（UNIQUE约束冲突） |
 | 422 | E1003 | adapter_name 不在合法枚举值内 |
 
-#### 3.14.3 手动触发同步 📋 **Phase 2**
+#### 3.14.3 手动触发同步 📋 **定制版**
 
 **端点**: `POST /api/v1/adapters/{name}/sync`
 
@@ -2522,7 +2524,7 @@ Cache-Control: private, max-age=300
 | 409 | E1002 | 已有同步任务在执行中 |
 | 429 | E3000 | 超过限流（5次/分钟/适配器） |
 
-#### 3.14.4 删除数据源配置 📋 **Phase 2**
+#### 3.14.4 删除数据源配置 📋 **定制版**
 
 **端点**: `DELETE /api/v1/adapters/{name}`
 
@@ -2550,9 +2552,9 @@ Cache-Control: private, max-age=300
 > **定位**: 提供基于向量嵌入的语义搜索能力，支持Entity/Event的自然语言查询，同时为关联发现提供语义增强（F-58）。
 > **📋 未实现独立端点，功能集成在entities.py**：语义搜索的核心功能（EmbeddingProvider + SemanticSearch）已在 `services/embedding_provider.py` 和 `services/semantic_search.py` 中实现，但独立的 `/search/semantic` 端点未创建，搜索功能集成在 `api/v1/entities.py` 的列表查询中。
 
-> **实现状态**: ✅已实现 0 个 | 📋Phase 2 3 个 | ⚠️路径差异 0 个
+> **实现状态**: ✅已实现 0 个 | 📋定制版 3 个 | ⚠️路径差异 0 个
 
-#### 3.15.1 语义搜索 📋 **Phase 2**
+#### 3.15.1 语义搜索 📋 **定制版**
 
 **端点**: `POST /api/v1/search/semantic`
 
@@ -2612,7 +2614,7 @@ Cache-Control: private, max-age=300
 | 401 | E2000 | 未认证 |
 | 503 | E4000 | 语义搜索服务不可用（embedding API故障） |
 
-#### 3.15.2 向量索引统计 📋 **Phase 2**
+#### 3.15.2 向量索引统计 📋 **定制版**
 
 **端点**: `GET /api/v1/search/stats`
 
@@ -2640,7 +2642,7 @@ Cache-Control: private, max-age=300
 }
 ```
 
-#### 3.15.3 重建索引 📋 **Phase 2**
+#### 3.15.3 重建索引 📋 **定制版**
 
 **端点**: `POST /api/v1/search/reindex`
 
@@ -2731,7 +2733,7 @@ class ReindexResponse(BaseModel):
 ### 3.16 CSV Import API（v2.8 新增, F-08）
 
 > **[F-08新增] 定位**: 冷启动数据导入，接受CSV文件上传，解析行数据为Entity对象，经EntityResolution去重归一。
-> **实现状态**: ✅已实现 1 个 | 📋Phase 2 0 个 | ⚠️路径差异 0 个
+> **实现状态**: ✅已实现 1 个 | 📋定制版 0 个 | ⚠️路径差异 0 个
 
 #### 3.16.1 导入CSV ✅ **已实现**
 
@@ -2766,7 +2768,7 @@ class ReindexResponse(BaseModel):
 ### 3.17 Data Export API（v2.8 新增, F-21）
 
 > **[F-21新增] 定位**: 用户数据可携带权保障，JSON全量导出用户所有数据。
-> **实现状态**: ✅已实现 1 个 | 📋Phase 2 0 个 | ⚠️路径差异 0 个
+> **实现状态**: ✅已实现 1 个 | 📋定制版 0 个 | ⚠️路径差异 0 个
 
 #### 3.17.1 导出全部数据 ✅ **已实现**
 
@@ -2796,7 +2798,7 @@ class ReindexResponse(BaseModel):
 ### 3.18 Demand Input API（v2.8 新增, F-36）
 
 > **[F-36新增] 定位**: 一句话需求录入，LLM提取需求标签+详情，关联已有Entity或创建orphan_demand。
-> **实现状态**: ✅已实现 1 个 | 📋Phase 2 0 个 | ⚠️路径差异 0 个
+> **实现状态**: ✅已实现 1 个 | 📋定制版 0 个 | ⚠️路径差异 0 个
 
 #### 3.18.1 创建需求 ✅ **已实现**
 
@@ -2832,7 +2834,7 @@ class ReindexResponse(BaseModel):
 ### 3.19 Email Sync API（v2.8 新增, EmailAdapter）
 
 > **[EmailAdapter新增] 定位**: IMAP邮件同步，一封邮件一个Event，进入Pipeline处理。
-> **实现状态**: ✅已实现 1 个 | 📋Phase 2 0 个 | ⚠️路径差异 0 个
+> **实现状态**: ✅已实现 1 个 | 📋定制版 0 个 | ⚠️路径差异 0 个
 
 #### 3.19.1 同步邮件 ✅ **已实现**
 
@@ -2868,7 +2870,7 @@ class ReindexResponse(BaseModel):
 ### 3.20 WeChat Forward API（v2.8 新增, WeChatForwardAdapter）
 
 > **[WeChatForwardAdapter新增] 定位**: 微信聊天记录转发解析，纯规则解析（无LLM），支持群聊/单聊。
-> **实现状态**: ✅已实现 1 个 | 📋Phase 2 0 个 | ⚠️路径差异 0 个
+> **实现状态**: ✅已实现 1 个 | 📋定制版 0 个 | ⚠️路径差异 0 个
 
 #### 3.20.1 转发微信消息 ✅ **已实现**
 
@@ -2904,7 +2906,7 @@ class ReindexResponse(BaseModel):
 ### 3.21 Voice Query API（v2.8 新增, F-50）
 
 > **[F-50新增] 定位**: 语音查询专用端点，三阶段Pipeline: NLU意图识别→DB查询→NLG回答生成。
-> **实现状态**: ✅已实现 1 个 | 📋Phase 2 0 个 | ⚠️路径差异 0 个
+> **实现状态**: ✅已实现 1 个 | 📋定制版 0 个 | ⚠️路径差异 0 个
 
 #### 3.21.1 语音查询 ✅ **已实现**
 
@@ -2938,8 +2940,8 @@ class ReindexResponse(BaseModel):
 
 ### §3.22 Media API (v2.9新增)
 
-> **架构决策修订** (PRD v4.8): EventLink提供媒体处理服务(ASR/TTS/OCR)，但严格解耦。媒体文件仅内存处理，不持久化存储。
-> **实现状态**: ✅已实现 4 个 | 📋Phase 2 0 个 | ⚠️路径差异 0 个
+> **架构决策修订** (PRD v4.8): PromiseLink提供媒体处理服务(ASR/TTS/OCR)，但严格解耦。媒体文件仅内存处理，不持久化存储。
+> **实现状态**: ✅已实现 4 个 | 📋定制版 0 个 | ⚠️路径差异 0 个
 
 #### 3.22.1 POST /api/v1/media/asr ✅ **已实现**
 
@@ -2995,7 +2997,7 @@ class ReindexResponse(BaseModel):
 
 **限流**: LLM端点限流(20次/分钟)
 
-> **数字名片API对接备注**: 数字名片API对接预留端点在PoC阶段不启用，Phase1再评估
+> **数字名片API对接备注**: 数字名片API对接预留端点在PoC阶段不启用，专业版再评估
 
 #### 3.22.4 POST /api/v1/media/ocr-event ✅ **已实现**
 
@@ -3028,7 +3030,7 @@ OCR + 自动创建Event：上传图片，OCR识别后自动创建互动记录并
 
 GDPR合规端点，支持数据查看、导出、删除。
 
-> **实现状态**: ✅已实现 3 个 | 📋Phase 2 0 个 | ⚠️路径差异 0 个
+> **实现状态**: ✅已实现 3 个 | 📋定制版 0 个 | ⚠️路径差异 0 个
 
 #### 3.23.1 GET /api/v1/privacy/data-summary ✅ **已实现**
 
@@ -3075,6 +3077,345 @@ GDPR合规端点，支持数据查看、导出、删除。
 
 ---
 
+### §3.24 Promise兑现状态追踪 API (v3.0新增, F-68)
+
+承诺兑现状态追踪，支持"我的承诺"与"他人的承诺"分类查看、状态标记与统计。
+
+> **实现状态**: 📋定制版 3 个
+
+#### 3.24.1 GET /api/v1/promises 📋 **定制版**
+
+获取承诺列表，支持按视角和状态筛选。
+
+**Query参数**:
+- `view`: 视角筛选（可选）。枚举值：
+  - `my-promises` — 我对他人做出的承诺
+  - `their-promises` — 他人对我做出的承诺
+- `status`: 兑现状态筛选（可选）。枚举值：
+  - `pending` — 待兑现
+  - `fulfilled` — 已兑现
+  - `overdue` — 已逾期
+  - `broken` — 已违约
+- `page`: 页码（默认1）
+- `page_size`: 每页数量（默认20）
+
+**Response 200**:
+```json
+{
+  "items": [
+    {
+      "todo_id": "todo-uuid",
+      "entity_id": "entity-uuid",
+      "entity_name": "张三",
+      "action_type": "promise",
+      "description": "下周介绍赵六给张三认识",
+      "due_date": "2026-06-15",
+      "fulfillment_status": "pending",
+      "created_at": "2026-06-08T10:00:00Z"
+    }
+  ],
+  "total": 15,
+  "page": 1,
+  "page_size": 20
+}
+```
+
+**安全约束**:
+- `user_id` 从JWT提取，结果按 `user_id` 过滤
+- `their-promises` 视角下的 `overdue`/`broken` 状态仅允许用户手动标记，AI不可自动标记
+
+#### 3.24.2 PATCH /api/v1/todos/{todo_id}/fulfillment 📋 **定制版**
+
+更新承诺的兑现状态。
+
+**路径参数**:
+- `todo_id`: Todo ID（UUID）
+
+**请求Body**:
+```json
+{
+  "fulfillment_status": "fulfilled"
+}
+```
+
+**fulfillment_status枚举值**:
+- `fulfilled` — 已兑现
+- `overdue` — 已逾期
+- `broken` — 已违约
+
+**Response 200**:
+```json
+{
+  "todo_id": "todo-uuid",
+  "fulfillment_status": "fulfilled",
+  "updated_at": "2026-06-11T10:00:00Z"
+}
+```
+
+**安全约束**:
+- `user_id` 从JWT提取，仅允许操作自己的Todo
+- `their_promise` 类型只允许 `pending` → `fulfilled` 的转换（用户确认对方已兑现），不允许AI自动标记 `overdue`/`broken`
+
+#### 3.24.3 GET /api/v1/promises/stats 📋 **定制版**
+
+获取承诺兑现统计。
+
+**Response 200**:
+```json
+{
+  "total": 25,
+  "my_promises": {
+    "pending": 5,
+    "fulfilled": 8,
+    "overdue": 2,
+    "broken": 0
+  },
+  "their_promises": {
+    "pending": 4,
+    "fulfilled": 3,
+    "overdue": 2,
+    "broken": 1
+  },
+  "fulfillment_rate": 0.68
+}
+```
+
+---
+
+### §3.25 智能跟进提醒 API (v3.0新增, F-69)
+
+每日智能提醒，支持疲劳度控制与用户偏好设置。
+
+> **实现状态**: 📋定制版 4 个
+
+#### 3.25.1 GET /api/v1/reminders/daily 📋 **定制版**
+
+获取每日提醒列表。
+
+**Query参数**:
+- `date`: 日期（可选，格式 `YYYY-MM-DD`，默认今天）
+
+**Response 200**:
+```json
+{
+  "date": "2026-06-11",
+  "items": [
+    {
+      "todo_id": "todo-uuid",
+      "entity_id": "entity-uuid",
+      "entity_name": "张三",
+      "reminder_type": "promise_due",
+      "priority_score": 85,
+      "description": "承诺"下周介绍赵六"即将到期",
+      "due_date": "2026-06-15",
+      "suggested_action": "联系张三确认介绍安排"
+    }
+  ],
+  "total_count": 5,
+  "fatigue_remaining": 3
+}
+```
+
+**ReminderItem字段说明**:
+- `reminder_type`: 提醒类型枚举（`promise_due`/`follow_up`/`relationship_stale`/`overdue_alert`）
+- `priority_score`: 优先级评分（0-100，越高越紧急）
+- `suggested_action`: AI建议的跟进动作
+
+#### 3.25.2 POST /api/v1/reminders/{todo_id}/action 📋 **定制版**
+
+对提醒执行操作。
+
+**路径参数**:
+- `todo_id`: Todo ID（UUID）
+
+**请求Body**:
+```json
+{
+  "action": "snoozed",
+  "snooze_days": 3
+}
+```
+
+**action枚举值**:
+- `completed` — 已完成
+- `snoozed` — 延后提醒（需提供 `snooze_days`）
+- `dismissed` — 忽略此提醒
+
+**Response 200**:
+```json
+{
+  "todo_id": "todo-uuid",
+  "action": "snoozed",
+  "next_reminder_date": "2026-06-14"
+}
+```
+
+**安全约束**:
+- `user_id` 从JWT提取，仅允许操作自己的提醒
+
+#### 3.25.3 GET /api/v1/reminders/preferences 📋 **定制版**
+
+获取提醒偏好设置。
+
+**Response 200**:
+```json
+{
+  "preferred_times": ["08:00", "20:00"],
+  "fatigue_threshold": 7,
+  "quiet_hours_start": "22:00",
+  "quiet_hours_end": "07:00"
+}
+```
+
+#### 3.25.4 PATCH /api/v1/reminders/preferences 📋 **定制版**
+
+更新提醒偏好设置。
+
+**请求Body**:
+```json
+{
+  "preferred_times": ["09:00", "21:00"],
+  "fatigue_threshold": 5,
+  "quiet_hours_start": "23:00",
+  "quiet_hours_end": "08:00"
+}
+```
+
+所有字段均为可选，仅更新传入的字段。
+
+**Response 200**:
+```json
+{
+  "preferred_times": ["09:00", "21:00"],
+  "fatigue_threshold": 5,
+  "quiet_hours_start": "23:00",
+  "quiet_hours_end": "08:00"
+}
+```
+
+---
+
+### §3.26 F-67 关系推进卡前端修复 (v3.0备注)
+
+**说明**: 关系推进卡前端修复，不涉及API端点变更。
+
+**已有端点（无需变更）**:
+- `GET /api/v1/persons/{entity_id}/relationship-brief` — 获取关系推进卡（§3.9.1）
+- `GET /api/v1/persons/{entity_id}/relationship-brief/aggregated` — 获取聚合关系简报
+
+**修复事项**:
+- 小程序需修正API路径，确保与后端实际路径一致
+
+---
+
+### §3.27 Relay Gateway API (v3.1新增) 📋 **专业版（尚未实现）**
+
+> **产品层级说明**: Relay Gateway API 仅在 **专业版** 中使用。基础版为本地运行，无需中继网关；定制版为自部署服务，不使用共享网关。
+
+**说明**: 专业版通过云中继网关（Relay Gateway）实现微信小程序访问和AI调用代理。以下5个端点定义了本地服务与中继网关之间的通信协议。
+
+#### 3.27.1 WebSocket 中继连接 📋 **专业版（尚未实现）**
+
+**端点**: `WSS /relay`
+
+**说明**: 本地 relay_client 通过 WebSocket 连接到云中继网关，建立双向通信通道。小程序请求通过网关中继转发到本地服务。
+
+**协议**: WebSocket over TLS (WSS)
+
+**认证**: 连接时携带 `RELAY_TOKEN` 进行身份验证
+
+**消息类型**:
+- `ping` / `pong` — 心跳保活（默认30秒间隔）
+- `request` — 小程序→本地服务的API请求转发
+- `response` — 本地服务→小程序的API响应转发
+- `ai_proxy_request` — 本地服务→网关的AI调用请求
+- `ai_proxy_response` — 网关→本地服务的AI调用响应
+
+#### 3.27.2 AI调用代理 📋 **专业版（尚未实现）**
+
+**端点**: 通过WebSocket中继通道发送 `ai_proxy_request` 消息
+
+**说明**: 本地服务将LLM API调用请求发送到中继网关，网关代理调用LLM API后返回结果。专业版用户无需自行配置LLM API Key。
+
+**请求消息格式**:
+```json
+{
+  "type": "ai_proxy_request",
+  "request_id": "uuid",
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-20250514",
+  "messages": [...],
+  "max_tokens": 2000,
+  "temperature": 0.3
+}
+```
+
+**响应消息格式**:
+```json
+{
+  "type": "ai_proxy_response",
+  "request_id": "uuid",
+  "status": "success",
+  "content": "...",
+  "tokens_used": 500,
+  "cost": 0.05
+}
+```
+
+#### 3.27.3 中继连接状态查询 📋 **专业版（尚未实现）**
+
+**端点**: `GET /api/v1/relay/status`
+
+**说明**: 查询本地relay_client与中继网关的连接状态。
+
+**响应**:
+```json
+{
+  "connected": true,
+  "gateway_url": "wss://api.promiselink.com/relay",
+  "connected_at": "2026-06-11T10:00:00Z",
+  "last_heartbeat": "2026-06-11T10:05:00Z",
+  "reconnect_count": 0
+}
+```
+
+#### 3.27.4 AI用量查询 📋 **专业版（尚未实现）**
+
+**端点**: `GET /api/v1/relay/usage`
+
+**说明**: 查询当前计费周期内的AI调用量和费用统计。
+
+**响应**:
+```json
+{
+  "period": "2026-06",
+  "total_tokens": 150000,
+  "total_cost": 15.0,
+  "breakdown": {
+    "entity_extraction": {"tokens": 50000, "cost": 5.0},
+    "todo_generation": {"tokens": 30000, "cost": 3.0},
+    "semantic_search": {"tokens": 20000, "cost": 2.0}
+  }
+}
+```
+
+#### 3.27.5 中继连接重连 📋 **专业版（尚未实现）**
+
+**端点**: `POST /api/v1/relay/reconnect`
+
+**说明**: 手动触发relay_client重新连接中继网关。通常在连接异常时使用，正常情况下relay_client自动重连（指数退避）。
+
+**响应**:
+```json
+{
+  "status": "reconnecting",
+  "gateway_url": "wss://api.promiselink.com/relay",
+  "attempt": 1
+}
+```
+
+---
+
 ## 4. 安全策略（v2.0新增）
 
 ### 4.1 PII脱敏API行为
@@ -3112,7 +3453,7 @@ GDPR合规端点，支持数据查看、导出、删除。
 
 **实现要点**:
 - 脱敏仅在 **API返回层** 执行，**存储层保留原文**（已加密）
-- 工具函数位置：`src/eventlink/core/text_utils.py → redact_pii_from_text()`
+- 工具函数位置：`src/promiselink/core/text_utils.py → redact_pii_from_text()`
 - 单元测试必须覆盖每种PII类型
 - 导出功能(CSV/JSON)同样执行脱敏
 
@@ -3167,11 +3508,11 @@ def resolve_input_scope(client_scope: str | None, raw_text: str, event_type: str
     return result  # {scope, confidence, reason}
 ```
 
-### 4.3 数据导出API（GDPR数据携带权, Phase 2） 📋 **Phase 2**
+### 4.3 数据导出API（GDPR数据携带权, 定制版） 📋 **定制版**
 
-**端点**: `GET /api/v1/data/export?format=json|csv` 📋 **Phase 2**
+**端点**: `GET /api/v1/data/export?format=json|csv` 📋 **定制版**
 
-**说明**: 支持用户导出其全量个人数据，满足 GDPR 式"数据携带权"(Right to Data Portability)。原计划 Phase 2 实现，提前至 Phase 1。
+**说明**: 支持用户导出其全量个人数据，满足 GDPR 式"数据携带权"(Right to Data Portability)。原计划定制版实现，提前至专业版。
 
 **查询参数**:
 - `format`: 导出格式（必填）。`json` — JSON格式；`csv` — CSV格式
@@ -3382,7 +3723,7 @@ def resolve_input_scope(client_scope: str | None, raw_text: str, event_type: str
 
 ### 7.1 限流规则
 
-> **设计原则**: EventLink定位为AI驱动的个人商务关系经营助手，采用单用户模式，无RBAC/多租户/团队协作，因此限流策略为统一单用户限流。
+> **设计原则**: PromiseLink定位为AI驱动的个人商务关系经营助手，采用单用户模式，无RBAC/多租户/团队协作，因此限流策略为统一单用户限流。
 
 | 限流对象 | 限制 | 时间窗口 | 说明 |
 |---------|------|---------|------|
@@ -3417,17 +3758,17 @@ X-RateLimit-Reset: 1622620800
 ```yaml
 openapi: 3.0.3
 info:
-  title: EventLink API
+  title: PromiseLink API
   version: 2.0.0
   description: |
-    EventLink AI驱动的个人商务关系经营助手API
+    PromiseLink AI驱动的个人商务关系经营助手API
     v2.0新增：关系推进卡API、Dashboard API、日视图API、贡献与反馈API、数据导出API、安全策略（PII脱敏/SC-01/JWT加固）
   contact:
     name: CarryMem团队
     email: support@carrymem.com
 
 servers:
-  - url: https://api.eventlink.example.com/api/v1
+  - url: https://api.promiselink.example.com/api/v1
     description: 生产环境
   - url: http://localhost:8000/api/v1
     description: 开发环境
@@ -3726,7 +4067,7 @@ paths:
       summary: 创建语音问答会话（F-50）
       description: |
         接收ASR识别后的文本，经NLU意图识别后调用对应业务API，返回自然语言答案+预生成TTS音频URL。
-        Phase 1.1为一次性会话模式（无多轮对话）。
+        专业版v1为一次性会话模式（无多轮对话）。
       requestBody:
         required: true
         content:
@@ -4411,7 +4752,7 @@ components:
 
 ### 9.1 版本体系（三层版本号）
 
-EventLink采用**语义化版本号（SemVer）**管理API演进：
+PromiseLink采用**语义化版本号（SemVer）**管理API演进：
 
 | 层级 | 格式 | 含义 | 示例 | 变更触发 |
 |------|------|------|------|---------|
@@ -4558,7 +4899,7 @@ alembic current
 - 每次API次版本变更必须对应一个Alembic迁移脚本
 - 迁移脚本必须包含 `upgrade()` 和 `downgrade()`
 - 破坏性Schema变更（删列/改类型）只能在新的API主版本中执行
-- PoC→Phase1迁移是一次性全量迁移，不走Alembic增量
+- PoC→专业版迁移是一次性全量迁移，不走Alembic增量
 
 ### 9.7 客户端SDK版本策略
 
@@ -4581,7 +4922,7 @@ async function checkApiCompatibility() {
     // 主版本不匹配，提示用户更新小程序
     wx.showModal({
       title: '需要更新',
-      content: 'EventLink已升级，请更新小程序以继续使用',
+      content: 'PromiseLink已升级，请更新小程序以继续使用',
       showCancel: false
     })
   }
@@ -4639,16 +4980,17 @@ X-Cache-Hit: true
 | v1.1 | 2026-06-03 | Todos类型扩展为6种（opportunity/risk/context/action/pending_confirm/resource_maint）；添加莫兰迪色系morandi_color字段；Entities API添加resource_sensitivity字段及sensitivity端点；新增Resources API（资源管理+六维匹配算法）；限流策略改为单用户统一限流（移除RBAC三级）；OpenAPI规范同步更新 |
 | v1.2 | 2026-06-03 | Todo类型重命名（opportunity→cooperation_signal, context→care, action→promise, pending_confirm→followup, resource_maint→help）；Entities API新增concern/promise/contribution字段及三个PATCH端点（concern/promise/contribution）；Todos API新增promise/care/cooperation_signal类型详细示例；新增§3.8 AI输出语言规则（confidence_level/is_ai_inference/requires_confirmation）；OpenAPI规范同步更新（TodoType枚举、新增Concern/Promise/Contribution/AIInferenceMarker schema） |
 | v1.3 | 2026-06-03 | §8 API版本管理策略全面补齐：三层版本号（SemVer）+ 版本协商机制 + 兼容性规则 + 废弃流程（12个月过渡期）+ 多版本共存（FastAPI路由层）+ Alembic数据库迁移策略 + 客户端SDK版本策略 + 版本变更日志规范 |
-| **v2.0** | **2026-06-04** | **v2.0大版本升级（参考 PRD v4.3 + 技术设计 v2.5 §7）：**<br/>**① D2-1** 版本头更新<br/>**② D2-2 新增6个P0 API端点**: GET relationship-brief / PATCH stage(乐观锁) / GET dashboard/today / GET todos?view=my-responses / POST contributions / POST feedbacks<br/>**③ D2-3 日视图API (F-49)**: GET /api/v1/dashboard/day-view<br/>**④ D2-4 现有端点变更**: POST /events增加input_scope字段 / PATCH /todos增加action_type+promisor_id+beneficiary_id / GET /entities返回值增加relationship_stage<br/>**⑤ D2-5 JWT认证加固**: Payload结构(sub/iat/exp/role) + 4项安全约束(Secret≥256/黑名单/Refresh旋转/CORS白名单)<br/>**⑥ D2-6 PII脱敏行为**: 标注7类端点执行redact_pii_from_text() + 5种PII掩码规则<br/>**⑦ D2-7 SC-01安全约束**: input_scope服务端强制校验，永远不以客户端值为准<br/>**⑧ D2-8 错误码扩展**: E1004 INVALID_INPUT_SCOPE(400) + E1005 OPTIMISTIC_LOCK_CONFLICT(409)<br/>**⑨ D2-9 数据导出API**: GET /api/v1/data/export?format=json\|csv（GDPR数据携带权，Phase 1提前）<br/>**⑩ D2-10 F-05暂停声明**: 商机匹配相关API标记Phase 2 |
+| **v2.0** | **2026-06-04** | **v2.0大版本升级（参考 PRD v4.3 + 技术设计 v2.5 §7）：**<br/>**① D2-1** 版本头更新<br/>**② D2-2 新增6个P0 API端点**: GET relationship-brief / PATCH stage(乐观锁) / GET dashboard/today / GET todos?view=my-responses / POST contributions / POST feedbacks<br/>**③ D2-3 日视图API (F-49)**: GET /api/v1/dashboard/day-view<br/>**④ D2-4 现有端点变更**: POST /events增加input_scope字段 / PATCH /todos增加action_type+promisor_id+beneficiary_id / GET /entities返回值增加relationship_stage<br/>**⑤ D2-5 JWT认证加固**: Payload结构(sub/iat/exp/role) + 4项安全约束(Secret≥256/黑名单/Refresh旋转/CORS白名单)<br/>**⑥ D2-6 PII脱敏行为**: 标注7类端点执行redact_pii_from_text() + 5种PII掩码规则<br/>**⑦ D2-7 SC-01安全约束**: input_scope服务端强制校验，永远不以客户端值为准<br/>**⑧ D2-8 错误码扩展**: E1004 INVALID_INPUT_SCOPE(400) + E1005 OPTIMISTIC_LOCK_CONFLICT(409)<br/>**⑨ D2-9 数据导出API**: GET /api/v1/data/export?format=json\|csv（GDPR数据携带权，专业版提前）<br/>**⑩ D2-10 F-05暂停声明**: 商机匹配相关API标记定制版 |
 | **v2.1** | **2026-06-05** | **[F-50新增] 语音助手API (Voice Assistant, Phase 1.1)：**<br/>**① F50-1 新增§3.12 Voice Assistant API章节**:<br/>　- POST /api/v1/voice/session — 创建语音问答会话(NLU意图识别→业务API调用→自然语言回答→TTS预生成)<br/>　- GET /api/v1/voice/tts/{session_id} — 获取预生成TTS音频(MP3流, Cache-Control private max-age=300)<br/>　- POST /api/v1/voice/feedback — 语音回答质量反馈(NLU模型优化用)<br/>**② F50-2 NLU意图枚举 VoiceIntent**: schedule_query/promise_tracker/relationship_status(P0) + schedule_range/action_suggestion(P1) + conversation_review/knowledge_retrieval(P2) + unclear<br/>**③ F50-3 VoiceSessionCreate/VoiceSessionResponse 数据模型定义**<br/>**④ F50-4 现有端点变更** — summary_level参数(三档: brief/detail/voice):<br/>　- GET /api/v1/dashboard/day-view(F-49) + natural_date参数("今天"|"明天"|"后天"|"本周"|"下游") → answer_paragraph字段<br/>　- GET /api/v1/persons/{id}/relationship-brief(F-47) → voice_summary字段<br/>　- GET /api/v1/todos → voice_summary字段<br/>**⑤ F50-5 PII脱敏清单扩展**: POST /voice/session(answer_text) + GET /voice/tts(音频内容)<br/>**关键约束**: 不存储原始音频; TTS输出PII脱敏; 所有端点JWT认证; TTL=5分钟音频缓存 |
 | **v2.5** | **2026-06-06** | **Insight Engine + DataSourceAdapter API (v2.5)：**<br/>**① 新增§3.13 Insight Engine API**:<br/>　- GET /api/v1/todos?sort=smart — 按动态评分排序(默认)<br/>　- GET /api/v1/todos?sort=due_date — 按截止时间排序<br/>　- POST /api/v1/insights/calculate — 触发优先级重新计算(scope: all/entity/overdue, 限流10次/分)<br/>　- GET /api/v1/insights/feedback-stats — 获取隐式反馈统计(period: 1d/7d/30d)<br/>**② 新增§3.14 DataSourceAdapter API**:<br/>　- GET /api/v1/adapters — 列出已配置数据源(不返回config_encrypted)<br/>　- POST /api/v1/adapters — 添加新数据源配置(adapter_name枚举5值, config加密存储)<br/>　- POST /api/v1/adapters/{name}/sync — 手动触发同步(异步, 限流5次/分/适配器)<br/>　- DELETE /api/v1/adapters/{name} — 删除数据源配置(manual/voice不可删)<br/>**③ Todo响应schema新增字段**: completed_rank(完成序号) + dynamic_score(动态优先级分, 0-100)<br/>**④ OpenAPI YAML Todo schema更新**: 新增completed_rank(integer, nullable) + dynamic_score(number, 0-100, nullable) |
 | **v2.6** | **2026-06-06** | **F-55/F-56 Insight Engine API扩展 (v2.6)：**<br/>**① §3.13 Insight Engine API新增2个端点**:<br/>　- GET /api/v1/todos/{todo_id}/priority-breakdown — 返回四维评分详情(urgency/importance/dependency/context)，含每个维度的原始得分和计算因子，支持可解释性面板<br/>　- GET /api/v1/users/{user_id}/upcoming-context — 返回未来24h即将见面的Entity及关联Todo，支持会前准备场景<br/>**② Todo schema breakdown字段扩展**: 新增dependency_raw(依赖分析原始因子, F-55) + context_raw(场景匹配原始因子, F-56)<br/>**③ OpenAPI YAML Todo schema更新**: 新增breakdown对象(含urgency/importance/dependency/context四维得分 + dependency_raw/context_raw原始因子) |
 | **v2.7** | **2026-06-06** | **F-57/F-58 语义搜索与关联发现增强 API (v2.7)：**<br/>**① 新增§3.15 Semantic Search API**:<br/>　- POST /api/v1/search/semantic — 语义搜索(query+top_k+target_types+min_similarity，返回SearchResultItem列表含similarity/highlights)<br/>　- GET /api/v1/search/stats — 向量索引统计(total_embeddings/by_type/index_method/cache_size)<br/>　- POST /api/v1/search/reindex — 重建索引(full/incremental，异步202返回task_id，限流2次/小时)<br/>**② 新增SearchResult Schema**: SearchResultItem + SemanticSearchResponse + SearchStatsResponse + ReindexRequest + ReindexResponse<br/>**③ 数据隔离**: user_id从JWT提取，搜索结果按user_id过滤，忽略客户端传入的user_id** |
 | **v2.8** | **2026-06-07** | **F-08/F-21/F-36/F-39/EmailAdapter/WeChatForwardAdapter/F-50 API (v2.8)：**<br/>**① 新增§3.16 CSV Import API(F-08)**: POST /api/v1/import/csv — CSV文件上传导入，EntityResolution去重归一，返回统计<br/>**② 新增§3.17 Data Export API(F-21)**: GET /api/v1/export/json — JSON全量导出，ORM mapper column_attrs序列化，PII脱敏<br/>**③ 新增§3.18 Demand Input API(F-36)**: POST /api/v1/demands — 一句话需求录入，LLM提取+关键词fallback，concern追加到Entity.properties<br/>**④ 新增§3.19 Email Sync API(EmailAdapter)**: POST /api/v1/email/sync — IMAP邮件同步，一封邮件一个Event<br/>**⑤ 新增§3.20 WeChat Forward API(WeChatForwardAdapter)**: POST /api/v1/wechat/forward — 微信聊天记录转发解析，群聊/单聊支持<br/>**⑥ 新增§3.21 Voice Query API(F-50)**: POST /api/v1/voice/query — 语音查询三阶段Pipeline(NLU→DB→NLG)** |
 | **v2.9** | **2026-06-08** | **Media API + Privacy API (v2.9)：**<br/>**① 新增§3.22 Media API(PRD v4.8)**: POST /api/v1/media/asr(语音识别) + POST /api/v1/media/tts(文字转语音) + POST /api/v1/media/ocr(图片文字识别) + POST /api/v1/media/ocr-event(OCR+自动创建Event) + 安全约束(仅内存处理/不持久化/JWT认证/文件大小限制)<br/>**② 新增§3.23 Privacy API(GDPR合规)**: GET /api/v1/privacy/data-summary(数据统计摘要) + DELETE /api/v1/privacy/user-data(被遗忘权删除) + POST /api/v1/privacy/export(全量数据导出) |
-| **v2.10** | **2026-06-08** | **文档一致性修复与实现状态标注 (v2.10)：**<br/>**① D4 版本号格式统一**: 头部版本从"0.2.9"修正为"v2.10"，阶段标识从"0.2.x series"修正为"v2.x series"<br/>**② D1 API端点实现状态标注**: 为所有端点添加实现状态标签(✅已实现/📋Phase 2/⚠️路径差异)，每个API章节添加实现状态统计摘要<br/>**③ D5 认证部分更新**: 新增§2.0当前实现(PoC登录+微信登录)，原§2.1临时授权码模式标记为📋Phase 2规划，JWT Payload新增aud:"eventlink-api"声明<br/>**④ D6 Privacy API响应格式更新**: data-summary删除user_id字段、user-data响应改为deleted+各类型计数、export响应新增message字段 |
-| **v2.11** | **2026-06-09** | **托管PoC模式备注 (v2.11)：**<br/>**① §2.0.1 PoC登录新增备注**: 托管PoC模式下poc_secret由服务方管理，用户通过微信小程序登录<br/>**② §3.22.3 OCR端点新增备注**: 数字名片API对接预留端点在PoC阶段不启用，Phase1再评估 |
+| **v2.10** | **2026-06-08** | **文档一致性修复与实现状态标注 (v2.10)：**<br/>**① D4 版本号格式统一**: 头部版本从"0.2.9"修正为"v2.10"，阶段标识从"0.2.x series"修正为"v2.x series"<br/>**② D1 API端点实现状态标注**: 为所有端点添加实现状态标签(✅已实现/📋定制版/⚠️路径差异)，每个API章节添加实现状态统计摘要<br/>**③ D5 认证部分更新**: 新增§2.0当前实现(PoC登录+微信登录)，原§2.1临时授权码模式标记为📋定制版规划，JWT Payload新增aud:"promiselink-api"声明<br/>**④ D6 Privacy API响应格式更新**: data-summary删除user_id字段、user-data响应改为deleted+各类型计数、export响应新增message字段 |
+| **v2.11** | **2026-06-09** | **托管PoC模式备注 (v2.11)：**<br/>**① §2.0.1 PoC登录新增备注**: 托管PoC模式下poc_secret由服务方管理，用户通过微信小程序登录<br/>**② §3.22.3 OCR端点新增备注**: 数字名片API对接预留端点在PoC阶段不启用，专业版再评估 |
+| **v3.0** | **2026-06-11** | **v3.0大版本升级 — Promise追踪 + 智能提醒 + 前端修复 (v3.0)：**<br/>**① 新增§3.24 Promise兑现状态追踪 API(F-68)**:<br/>　- GET /api/v1/promises — 承诺列表(view=my-promises\|their-promises, status=pending\|fulfilled\|overdue\|broken)<br/>　- PATCH /api/v1/todos/{todo_id}/fulfillment — 更新兑现状态(their_promise仅允许pending→fulfilled)<br/>　- GET /api/v1/promises/stats — 兑现统计(my_promises/their_promises分项+fulfillment_rate)<br/>**② 新增§3.25 智能跟进提醒 API(F-69)**:<br/>　- GET /api/v1/reminders/daily — 每日提醒(date, fatigue_remaining)<br/>　- POST /api/v1/reminders/{todo_id}/action — 提醒操作(completed/snoozed/dismissed)<br/>　- GET /api/v1/reminders/preferences — 提醒偏好查询<br/>　- PATCH /api/v1/reminders/preferences — 提醒偏好更新<br/>**③ 新增§3.26 F-67关系推进卡前端修复备注**: 已有端点无需变更，小程序需修正API路径 |
 
 ---
 
-*最后更新: 2026-06-09*
+*最后更新: 2026-06-11*

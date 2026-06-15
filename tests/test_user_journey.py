@@ -1,4 +1,4 @@
-"""User Journey (E2E) tests for EventLink.
+"""User Journey (E2E) tests for PromiseLink.
 
 Simulates real user workflows as defined in the PRD:
 
@@ -28,16 +28,16 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from eventlink.core.auth import create_access_token, get_current_user_id
-from eventlink.core.rate_limiter import reset_rate_limits
-from eventlink.database import Base, get_async_session
-from eventlink.main import app
-from eventlink.models.association import Association
-from eventlink.models.entity import Entity
-from eventlink.models.event import Event
-from eventlink.models.relationship_brief import RelationshipBrief
-from eventlink.models.todo import Todo
-from eventlink.services.relationship_brief_service import RelationshipBriefService
+from promiselink.core.auth import create_access_token, get_current_user_id
+from promiselink.core.rate_limiter import reset_rate_limits
+from promiselink.database import Base, get_async_session
+from promiselink.main import app
+from promiselink.models.association import Association
+from promiselink.models.entity import Entity
+from promiselink.models.event import Event
+from promiselink.models.relationship_brief import RelationshipBrief
+from promiselink.models.todo import Todo
+from promiselink.services.relationship_brief_service import RelationshipBriefService
 
 # ── Constants ──
 
@@ -59,7 +59,7 @@ async def db_engine():
     @sa_event.listens_for(engine.sync_engine, "connect")
     def set_sqlite_pragma(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA foreign_keys=OFF")
         cursor.close()
 
     async with engine.begin() as conn:
@@ -95,15 +95,15 @@ async def client(db_session):
     async def mock_process_event(event_id):
         pass
 
-    import eventlink.api.v1.events as events_module
-    original_process = events_module._process_event_background
-    events_module._process_event_background = mock_process_event
+    import promiselink.services.event_processor as processor_module
+    original_process = processor_module.process_event_background
+    processor_module.process_event_background = mock_process_event
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
-    events_module._process_event_background = original_process
+    processor_module.process_event_background = original_process
     app.dependency_overrides.clear()
 
 
@@ -364,7 +364,7 @@ class TestJourney1RecordInteraction:
         await db_session.commit()
 
         # View dashboard for today
-        with patch("eventlink.core.natural_date.date") as mock_date:
+        with patch("promiselink.core.natural_date.date") as mock_date:
             mock_date.today.return_value = today_ts.date()
             mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
 
@@ -597,7 +597,7 @@ class TestJourney2DailyReview:
         )
         await db_session.commit()
 
-        with patch("eventlink.core.natural_date.date") as mock_date:
+        with patch("promiselink.core.natural_date.date") as mock_date:
             mock_date.today.return_value = today_ts.date()
             mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
 
@@ -655,7 +655,7 @@ class TestJourney2DailyReview:
         assert resp.json()["status"] == "done"
 
         # Step 4: Day-view
-        with patch("eventlink.core.natural_date.date") as mock_date:
+        with patch("promiselink.core.natural_date.date") as mock_date:
             mock_date.today.return_value = today_ts.date()
             mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
 

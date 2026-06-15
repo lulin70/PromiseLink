@@ -6,9 +6,9 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from eventlink.models.association import Association
-from eventlink.models.entity import Entity
-from eventlink.services.association_discovery import (
+from promiselink.models.association import Association
+from promiselink.models.entity import Entity
+from promiselink.services.association_discovery import (
     CONFIRM_THRESHOLD,
     VALID_ASSOCIATION_TYPES,
     AssociationDiscoveryEngine,

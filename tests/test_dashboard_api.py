@@ -10,12 +10,12 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from eventlink.core.auth import get_current_user_id
-from eventlink.database import Base, get_async_session
-from eventlink.main import app
-from eventlink.models.entity import Entity
-from eventlink.models.event import Event
-from eventlink.models.todo import Todo
+from promiselink.core.auth import get_current_user_id
+from promiselink.database import Base, get_async_session
+from promiselink.main import app
+from promiselink.models.entity import Entity
+from promiselink.models.event import Event
+from promiselink.models.todo import Todo
 
 
 # ── Constants ──
@@ -39,7 +39,7 @@ async def db_engine():
     @sa_event.listens_for(engine.sync_engine, "connect")
     def set_sqlite_pragma(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA foreign_keys=OFF")
         cursor.close()
 
     async with engine.begin() as conn:
@@ -172,7 +172,7 @@ class TestDayViewNoParams:
         fixed_today = date(2026, 6, 4)
         evt = await _seed_event(db_session, "今天的会议", days_offset=0)
 
-        with patch("eventlink.core.natural_date.date") as mock_date:
+        with patch("promiselink.core.natural_date.date") as mock_date:
             mock_date.today.return_value = fixed_today
             mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
 
@@ -194,7 +194,7 @@ class TestDayViewTomorrow:
         await _seed_event(db_session, "今天的事", days_offset=0)
         await _seed_event(db_session, "明天的事", days_offset=1)
 
-        with patch("eventlink.core.natural_date.date") as mock_date:
+        with patch("promiselink.core.natural_date.date") as mock_date:
             mock_date.today.return_value = ref
             mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
 
@@ -236,7 +236,7 @@ class TestDayViewTodosOverdueFlag:
         # Seed a todo due on TARGET_DATE but mark it as overdue by patching today forward
         await _seed_todo(db_session, "过期待办", days_offset=0, status="pending")
 
-        with patch("eventlink.api.v1.dashboard.date") as mock_date:
+        with patch("promiselink.api.v1.dashboard.date") as mock_date:
             mock_date.today.return_value = date(2026, 6, 10)  # Well past due
             mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
 
@@ -253,7 +253,7 @@ class TestDayViewTodosOverdueFlag:
     async def test_done_todo_not_overdue(self, client: AsyncClient, db_session: AsyncSession):
         await _seed_todo(db_session, "已完成", days_offset=-5, status="done")
 
-        with patch("eventlink.api.v1.dashboard.date") as mock_date:
+        with patch("promiselink.api.v1.dashboard.date") as mock_date:
             mock_date.today.return_value = date(2026, 6, 10)
             mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
 
@@ -382,7 +382,7 @@ class TestRangeViewThisWeek:
         await _seed_event(db_session, "周四事件", days_offset=0)   # Thursday
         await _seed_event(db_session, "周五事件", days_offset=1)   # Friday
 
-        with patch("eventlink.core.natural_date.date") as mock_date:
+        with patch("promiselink.core.natural_date.date") as mock_date:
             mock_date.today.return_value = date(2026, 6, 4)
             mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
 

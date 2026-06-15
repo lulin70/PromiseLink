@@ -1,4 +1,4 @@
-# EventLink 文档一致性检查清单
+# PromiseLink 文档一致性检查清单
 
 > **更新时间**: 2026-06-09
 > **阶段**: Phase 1 前后端集成完成 (0.3.x) — 托管PoC部署就绪 + PoC准备度82/100
@@ -10,36 +10,36 @@
 
 | # | 文档 | 路径 | 当前版本 | 更新日期 | 状态 |
 |---|------|------|----------|----------|------|
-| 1 | **PRD** | `spec/PRD_v1.md` | **v4.9** | 2026-06-09 | ✅ 生效 |
-| 2 | **技术设计** | `architecture/EventLink_技术设计_v1.md` | **v2.9** | 2026-06-09 | ✅ 生效 |
-| 3 | **数据库设计** | `design/Database_Design_v1.md` | **v2.8** | 2026-06-08 | ✅ 生效 |
-| 4 | **API设计** | `design/API_Design_v1.md` | **v2.11** | 2026-06-09 | ✅ 生效 |
-| 5 | **安全设计** | `design/Security_Design_v1.md` | **v3.0** | 2026-06-09 | ✅ 生效 |
+| 1 | **PRD** | `spec/PRD_v1.md` | **v5.2** | 2026-06-14 | ✅ 生效 |
+| 2 | **技术设计** | `architecture/PromiseLink_技术设计_v1.md` | **v3.2** | 2026-06-14 | ✅ 生效 |
+| 3 | **数据库设计** | `design/Database_Design_v1.md` | **v3.0** | 2026-06-14 | ✅ 生效 |
+| 4 | **API设计** | `design/API_Design_v1.md` | **v3.1** | 2026-06-14 | ✅ 生效 |
+| 5 | **安全设计** | `design/Security_Design_v1.md` | **v3.1** | 2026-06-14 | ✅ 生效 |
 | 6 | **安全威胁模型** | `design/Security_威胁模型.md` | **v3.0** | 2026-06-09 | ✅ 生效 |
 | 7 | **安全认证与API** | `design/Security_认证与API.md` | **v3.0** | 2026-06-09 | ✅ 生效 |
 | 8 | **安全数据保护与主权** | `design/Security_数据保护与主权.md` | **v3.0** | 2026-06-09 | ✅ 生效 |
 | 9 | **算法设计** | `design/Algorithm_Design_v1.md` | **v2.8** | 2026-06-08 | ✅ 生效 |
-| 10 | **测试计划** | `design/Test_Plan_v1.md` | **v4.9** | 2026-06-09 | ✅ 生效 |
+| 10 | **测试计划** | `design/Test_Plan_v1.md` | **v5.1** | 2026-06-14 | ✅ 生效 |
 | 11 | **LLM Prompt模板** | `design/LLM_Prompt_Templates.md` | **0.4.1** | 2026-06-08 | ✅ 生效 |
 | 12 | **集成设计** | `design/Integration_Design_v1.md` | **v2.9** | 2026-06-09 | ✅ 生效 |
-| 13 | **部署指南** | `design/Deployment_Guide.md` | **v0.4.8** | 2026-06-09 | ✅ 生效 |
-| 14 | **UI/UX设计** | `design/UI_UX_Design_v1.md` | **v2.5** | 2026-06-09 | ✅ 生效 |
-| 15 | **规格说明README** | `spec/README.md` | **v4.9** | 2026-06-09 | ✅ 同步 |
-| 16 | **项目状态** | `PROJECT_STATUS.md` | **已同步** | 2026-06-09 | ✅ 最新 |
+| 13 | **部署指南** | `design/Deployment_Guide.md` | **v0.5.0** | 2026-06-14 | ✅ 生效 |
+| 14 | **UI/UX设计** | `design/UI_UX_Design_v1.md` | **v3.1** | 2026-06-14 | ✅ 生效 |
+| 15 | **规格说明README** | `spec/README.md` | **v5.2** | 2026-06-14 | ✅ 同步 |
+| 16 | **项目状态** | `PROJECT_STATUS.md` | **已同步** | 2026-06-14 | ✅ 最新 |
 | 17 | **托管PoC Docker Compose** | `docker-compose.hosted-poc.yml` | **v1.0** | 2026-06-09 | ✅ 已验证 |
 | 18 | **nginx配置** | `nginx/` | **v1.0** | 2026-06-09 | ✅ 已验证 |
 | 19 | **PoC环境变量** | `.env.poc.hosted` | **v1.0** | 2026-06-09 | ✅ 已验证 |
-| 20 | **部署脚本** | `scripts/deploy.sh` | **v1.0** | 2026-06-09 | ✅ 已验证 |
+| 20 | **部署脚本** | `scripts/ops/deploy-staging.sh` | **v1.0** | 2026-06-09 | ✅ 已验证 |
 | 21 | **备份脚本** | `scripts/backup.sh` | **v1.0** | 2026-06-09 | ✅ 已验证 |
 | 22 | **Prometheus配置** | `prometheus.yml` | **v1.0** | 2026-06-09 | ✅ 已验证 |
 
 ### 版本对照总结
 
-- **需求层 (P1)**: PRD v4.9 ←→ 技术设计 v2.9（双主文档对齐）
-- **设计层 (P3-P7)**: 安全设计系列 v3.0 / 集成设计 v2.9 / API设计 v2.11 / 测试计划 v4.9 / 算法设计 v2.8
-- **部署层**: 部署指南 v0.4.8 / docker-compose.hosted-poc.yml v1.0 / nginx v1.0 / deploy.sh v1.0 / backup.sh v1.0
+- **需求层 (P1)**: PRD v5.2 ←→ 技术设计 v3.2（双主文档对齐）
+- **设计层 (P3-P7)**: 安全设计系列 v3.1 / 集成设计 v2.9 / API设计 v3.1 / 测试计划 v5.1 / 算法设计 v2.8
+- **部署层**: 部署指南 v0.5.0 / docker-compose.hosted-poc.yml v1.0 / nginx v1.0 / deploy-staging.sh v1.0 / backup.sh v1.0
 - **运维层**: Prometheus配置 v1.0 / 备份脚本 v1.0
-- **UI层**: UI/UX设计 v2.5（完整版，含小程序前端集成+托管PoC模式备注）
+- **UI层**: UI/UX设计 v3.1（完整版，含小程序前端集成+托管PoC模式备注）
 
 ---
 
@@ -58,8 +58,8 @@
 ```
 F-01 事件语义路由    F-02 管线化实体抽取   F-03 实体归一(5步)
 F-04 关联发现(8种)   F-05 商机匹配度(暂停) F-06 Todo生成追踪
-F-44 Input Scope分类  F-45 Action Type识别  F-46 RelationshipBrief
-F-47 RelationshipStage  F-48 实体属性增强
+F-44 Input Scope分类  F-45 Action Type识别  F-46 Todo降噪
+F-47 RelationshipBrief  F-48 RelationshipStage
 F-50 智能语音助手(NLU+语音会话+多轮对话) [F-50新增]
 ```
 
@@ -123,9 +123,9 @@ ACTION_TYPES = ["follow_up", "introduce", "collaborate", "provide_help",
 | Dockerfile与部署指南步骤一致 | 项目根目录 `Dockerfile` ↔ Deployment Guide §3 | 基础镜像/依赖安装/启动命令匹配 | ⬜ 待确认 |
 | docker-compose.poc.yml服务定义完整 | `docker-compose.poc.yml` ↔ Deployment Guide §3.2 | web/db/redis三个服务配置齐全 | ⬜ 待确认 |
 | docker-compose.hosted-poc.yml服务定义完整 | `docker-compose.hosted-poc.yml` ↔ 技术设计 §8.6.3a | api/nginx/certbot三个服务配置齐全 | ✅ 已确认 |
-| 环境变量模板与代码config.py一致 | `.env.poc.hosted` ↔ `src/eventlink/config.py` | 必需环境变量全覆盖 | ✅ 已确认 |
+| 环境变量模板与代码config.py一致 | `.env.poc.hosted` ↔ `src/promiselink/config.py` | 必需环境变量全覆盖 | ✅ 已确认 |
 | nginx配置与部署指南一致 | `nginx/` ↔ Deployment Guide §3 | 反向代理+HTTPS+certbot配置匹配 | ✅ 已确认 |
-| 部署脚本可执行 | `scripts/deploy.sh` ↔ Deployment Guide | 一键部署流程完整 | ✅ 已确认 |
+| 部署脚本可执行 | `scripts/ops/deploy-staging.sh` ↔ Deployment Guide | 一键部署流程完整 | ✅ 已确认 |
 | 备份脚本可执行 | `scripts/backup.sh` ↔ Deployment Guide | PG dump+Redis AOF备份完整 | ✅ 已确认 |
 
 ---
@@ -224,21 +224,21 @@ ACTION_TYPES = ["follow_up", "introduce", "collaborate", "provide_help",
 
 | 文档 | 快速跳转 |
 |------|----------|
-| PRD v4.9 | [查看](./spec/PRD_v1.md) |
-| 技术设计 v2.9 | [查看](./architecture/EventLink_技术设计_v1.md) |
-| 数据库设计 0.2.0 | [查看](./design/Database_Design_v1.md) |
-| API设计 v2.11 | [查看](./design/API_Design_v1.md) |
-| 安全设计 v3.0 | [查看](./design/Security_Design_v1.md) |
-| 算法设计 0.2.0 | [查看](./design/Algorithm_Design_v1.md) |
-| 测试计划 v4.9 | [查看](./design/Test_Plan_v1.md) |
-| LLM Prompt模板 0.2.0 | [查看](./design/LLM_Prompt_Templates.md) |
+| PRD v5.2 | [查看](./spec/PRD_v1.md) |
+| 技术设计 v3.2 | [查看](./architecture/PromiseLink_技术设计_v1.md) |
+| 数据库设计 v3.0 | [查看](./design/Database_Design_v1.md) |
+| API设计 v3.1 | [查看](./design/API_Design_v1.md) |
+| 安全设计 v3.1 | [查看](./design/Security_Design_v1.md) |
+| 算法设计 v2.8 | [查看](./design/Algorithm_Design_v1.md) |
+| 测试计划 v5.1 | [查看](./design/Test_Plan_v1.md) |
+| LLM Prompt模板 0.4.1 | [查看](./design/LLM_Prompt_Templates.md) |
 | 集成设计 v2.9 | [查看](./design/Integration_Design_v1.md) |
-| 部署指南 v0.4.8 | [查看](./design/Deployment_Guide.md) |
-| UI/UX设计 v2.5 | [查看](./design/UI_UX_Design_v1.md) |
+| 部署指南 v0.5.0 | [查看](./design/Deployment_Guide.md) |
+| UI/UX设计 v3.1 | [查看](./design/UI_UX_Design_v1.md) |
 | 项目状态总览 | [查看](./PROJECT_STATUS.md) |
 
 ---
 
-> **维护说明**: 本文档是EventLink进入Sprint 0编码前的最终文档质量门禁。每次文档更新后应重新运行此检查清单。
+> **维护说明**: 本文档是PromiseLink进入Sprint 0编码前的最终文档质量门禁。每次文档更新后应重新运行此检查清单。
 >
-> **最后审核**: 2026-06-09 (前端集成+托管PoC部署就绪+PoC准备度82/100+文档版本同步)
+> **最后审核**: 2026-06-14 (文档版本同步至PRD v5.2/技术设计 v3.2/API设计 v3.1)

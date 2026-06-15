@@ -1,4 +1,4 @@
-# EventLink集成设计文档 v2.9
+# PromiseLink集成设计文档 v2.9
 
 > **版本**: v2.9（POC阶段 — 托管PoC部署模式+数字名片对接决策+Insight Engine + DataSourceAdapter + 依赖性/场景匹配 + 语义搜索 + CSV/Email/WeChat/VoiceQuery 集成规格）
 > **日期**: 2026-06-09
@@ -51,10 +51,10 @@ graph TB
         MP[IAMHERE小程序]
     end
     subgraph H5端
-        H5[EventLink H5]
+        H5[PromiseLink H5]
     end
     subgraph 后端服务
-        API[EventLink API]
+        API[PromiseLink API]
         LLM[LLM Client]
         TTS[TTS/ASR Client]
         WX[微信推送服务]
@@ -98,7 +98,7 @@ graph TB
 
 ### 2.1 WebView嵌入方案
 
-小程序通过WebView嵌入EventLink H5页面，实现完整功能交互。
+小程序通过WebView嵌入PromiseLink H5页面，实现完整功能交互。
 
 **嵌入规则**:
 - H5页面域名必须在小程序业务域名白名单中
@@ -136,7 +136,7 @@ graph TB
 ```mermaid
 sequenceDiagram
     participant MP as IAMHERE小程序
-    participant API as EventLink API
+    participant API as PromiseLink API
     participant Redis as Redis
     participant H5 as H5页面
 
@@ -148,7 +148,7 @@ sequenceDiagram
 
     Note over MP: 生成WebView URL
 
-    MP->>H5: 打开WebView<br/>https://eventlink.com/h5?ticket=T_xxx
+    MP->>H5: 打开WebView<br/>https://promiselink.com/h5?ticket=T_xxx
     H5->>H5: 从URL解析ticket参数
 
     H5->>API: POST /api/v1/auth/exchange<br/>{ticket: "T_xxx"}
@@ -233,7 +233,7 @@ SET ticket:T_AbCdEf12345 '{"user_id":"uuid","action":"view_person","person_id":"
   "user_id": "uuid",
   "exp": 1622620800,
   "iat": 1622619900,
-  "iss": "eventlink",
+  "iss": "promiselink",
   "scope": "view_person"
 }
 ```
@@ -272,7 +272,7 @@ wx.miniProgram.navigateBack()
 
 ```javascript
 // 小程序通过URL参数传递指令
-const h5Url = `https://eventlink.com/h5?ticket=${ticket}&action=view_person&id=${personId}`
+const h5Url = `https://promiselink.com/h5?ticket=${ticket}&action=view_person&id=${personId}`
 
 // 小程序接收H5消息
 <web-view src="{{h5Url}}" bindmessage="onMessage"></web-view>
@@ -305,7 +305,7 @@ Page({
 
     // 1. 获取临时授权码
     const ticketRes = await wx.request({
-      url: 'https://api.eventlink.com/api/v1/auth/ticket',
+      url: 'https://api.promiselink.com/api/v1/auth/ticket',
       method: 'POST',
       data: {
         action: 'view_person',
@@ -319,7 +319,7 @@ Page({
 
     // 2. 构造H5 URL（仅传递ticket，不传明文token）
     this.setData({
-      h5Url: `https://eventlink.com/h5?ticket=${ticketRes.data.code}`
+      h5Url: `https://promiselink.com/h5?ticket=${ticketRes.data.code}`
     })
   },
 
@@ -338,8 +338,8 @@ Page({
 // H5端 auth.js — Token管理模块
 class AuthManager {
   constructor() {
-    this.TOKEN_KEY = 'eventlink_auth'
-    this.REFRESH_KEY = 'eventlink_refresh'
+    this.TOKEN_KEY = 'promiselink_auth'
+    this.REFRESH_KEY = 'promiselink_refresh'
   }
 
   // 初始化：用ticket换取JWT
@@ -560,7 +560,7 @@ class LLMClient:
 
 **Prompt**:
 ```
-你是一个EventLink输入分类器。请判断以下用户输入属于哪种scope。
+你是一个PromiseLink输入分类器。请判断以下用户输入属于哪种scope。
 
 8种scope定义：
 1. card_scan（名片扫描）：名片扫描/OCR识别结果，包含姓名、公司、职位、联系方式等结构化或半结构化信息
@@ -1797,7 +1797,7 @@ class MockTTSClient(TTSClient):
 sequenceDiagram
     participant User as 用户
     participant H5 as H5页面
-    participant API as EventLink API
+    participant API as PromiseLink API
     participant ASR as 阿里云ASR
     participant LLM as LLM Client
 
@@ -2015,9 +2015,9 @@ function stopVoiceInput() {
   manager.stop()
 }
 
-// 提交转写文本到EventLink API
+// 提交转写文本到PromiseLink API
 async function submitToAPI(text) {
-  const token = wx.getStorageSync('eventlink_token')
+  const token = wx.getStorageSync('promiselink_token')
   wx.request({
     url: `${API_BASE}/api/v1/mini/voice-input`,
     method: 'POST',
@@ -2077,7 +2077,7 @@ function checkASRAvailability() {
 | 推理框架 | `faster-whisper`（CTranslate2后端） | 比原始whisper快4x+，内存占用更低 |
 | 运行时 | Python 3.10+ / torch + faster-whisper | 服务端部署 |
 | 延迟目标 | ~1-3s（取决于模型大小和硬件） | base≈1s, small≈2-3s |
-| 部署方式 | 与EventLink后端同容器 或 独立微服务 | PoC阶段同容器即可 |
+| 部署方式 | 与PromiseLink后端同容器 或 独立微服务 | PoC阶段同容器即可 |
 
 **服务端实现**:
 ```python
@@ -2437,7 +2437,7 @@ logger = logging.getLogger(__name__)
 # 默认TTS配置
 DEFAULT_VOICE = "zh-CN-XiaoxiaoNeural"
 DEFAULT_RATE = "-10%"       # 稍慢，适合信息播报
-TTS_CACHE_DIR = Path("/var/cache/eventlink/tts")
+TTS_CACHE_DIR = Path("/var/cache/promiselink/tts")
 
 
 @dataclass
@@ -2543,7 +2543,7 @@ graph LR
 |------|------|
 | 缓存Key | `MD5(answer_text + voice_name + rate)` |
 | 缓存TTL | 24小时（固定回答不会频繁变化） |
-| 存储位置 | `/var/cache/eventlink/tts/`（Docker Volume挂载） |
+| 存储位置 | `/var/cache/promiselink/tts/`（Docker Volume挂载） |
 | 文件命名 | `{md5_hash}.mp3` |
 | 缓存淘汰 | LRU + TTL过期自动清理 |
 | 访问方式 | 通过静态文件服务或CDN返回MP3 URL |
@@ -3549,7 +3549,7 @@ class NLGGenerator:
 
 ### 5.1 推送通道设计
 
-EventLink支持3种推送通道，按优先级选择：
+PromiseLink支持3种推送通道，按优先级选择：
 
 | 通道 | 适用场景 | 到达率 | 实时性 | 限制 |
 |------|---------|--------|--------|------|
@@ -3610,7 +3610,7 @@ class WeChatPushClient:
 {
   "touser": "{{openid}}",
   "template_id": "TPL_PROMISE",
-  "url": "https://eventlink.com/h5/todos/{{todo_id}}",
+  "url": "https://promiselink.com/h5/todos/{{todo_id}}",
   "data": {
     "first": {"value": "🟢 你答应过XX的事，明天到期", "color": "#A0C4A8"},
     "keyword1": {"value": "{{person_name}} - {{promise_content}}"},
@@ -3627,7 +3627,7 @@ class WeChatPushClient:
 {
   "touser": "{{openid}}",
   "template_id": "TPL_HELP",
-  "url": "https://eventlink.com/h5/todos/{{todo_id}}",
+  "url": "https://promiselink.com/h5/todos/{{todo_id}}",
   "data": {
     "first": {"value": "⚪ XX最近在关注YY，你可以帮到他", "color": "#B8C4C0"},
     "keyword1": {"value": "{{person_name}} - {{care_topic}}"},
@@ -3644,7 +3644,7 @@ class WeChatPushClient:
 {
   "touser": "{{openid}}",
   "template_id": "TPL_CARE",
-  "url": "https://eventlink.com/h5/todos/{{todo_id}}",
+  "url": "https://promiselink.com/h5/todos/{{todo_id}}",
   "data": {
     "first": {"value": "🔵 XX上次提到的YY，有新进展了吗", "color": "#A0B0C4"},
     "keyword1": {"value": "{{person_name}} - {{care_topic}}"},
@@ -3661,7 +3661,7 @@ class WeChatPushClient:
 {
   "touser": "{{openid}}",
   "template_id": "TPL_FOLLOWUP",
-  "url": "https://eventlink.com/h5/todos/{{todo_id}}",
+  "url": "https://promiselink.com/h5/todos/{{todo_id}}",
   "data": {
     "first": {"value": "🟣 有事项需要跟进", "color": "#B0A0C4"},
     "keyword1": {"value": "{{followup_description}}"},
@@ -3678,7 +3678,7 @@ class WeChatPushClient:
 {
   "touser": "{{openid}}",
   "template_id": "TPL_COOPERATION_SIGNAL",
-  "url": "https://eventlink.com/h5/todos/{{todo_id}}",
+  "url": "https://promiselink.com/h5/todos/{{todo_id}}",
   "data": {
     "first": {"value": "⚪ 你和XX在YY方面有合作可能", "color": "#C4C0A0"},
     "keyword1": {"value": "{{person_name}} - {{cooperation_topic}}"},
@@ -3695,7 +3695,7 @@ class WeChatPushClient:
 {
   "touser": "{{openid}}",
   "template_id": "TPL_RISK",
-  "url": "https://eventlink.com/h5/todos/{{todo_id}}",
+  "url": "https://promiselink.com/h5/todos/{{todo_id}}",
   "data": {
     "first": {"value": "🔴 风险预警", "color": "#C4A7A0"},
     "keyword1": {"value": "{{risk_description}}"},
@@ -3832,14 +3832,14 @@ async def send_push(user_id: str, todo_type: str, data: dict):
 
 ### 6.1 集成定位
 
-> EventLink是CarryMem生态的下游应用。CarryMem提供记忆检索和规则匹配能力，
-> EventLink**不把CarryMem当存储层**，仅作为智能增强的输入源。
+> PromiseLink是CarryMem生态的下游应用。CarryMem提供记忆检索和规则匹配能力，
+> PromiseLink**不把CarryMem当存储层**，仅作为智能增强的输入源。
 
 **集成原则**:
-- EventLink拥有自己的数据存储（SQLite/PG），不依赖CarryMem存储
+- PromiseLink拥有自己的数据存储（SQLite/PG），不依赖CarryMem存储
 - CarryMem提供recall_memories（记忆检索）和match_rules（规则匹配）能力
-- EventLink通过declare向CarryMem声明新知识，但不期望回读
-- CarryMem不可用时，EventLink通过NullMemoryProvider优雅降级
+- PromiseLink通过declare向CarryMem声明新知识，但不期望回读
+- CarryMem不可用时，PromiseLink通过NullMemoryProvider优雅降级
 - **[0.2.0新增] CarryMem必须通过Protocol接口解耦**，PoC阶段使用NullMemoryProvider
 
 ### 6.1.1 三阶段集成路径 [0.2.0更新]
@@ -3927,7 +3927,7 @@ class MemoryProvider(ABC):
     async def declare(
         self,
         content: str,
-        source: str = "eventlink",
+        source: str = "promiselink",
         metadata: Optional[dict] = None,
     ) -> bool:
         """声明新知识（单向，不期望回读）"""
@@ -3963,7 +3963,7 @@ class NullMemoryProvider(MemoryProvider):
     async def declare(
         self,
         content: str,
-        source: str = "eventlink",
+        source: str = "promiselink",
         metadata: Optional[dict] = None,
     ) -> bool:
         logger.debug(f"CarryMem不可用，declare丢弃: {content[:50]}...")
@@ -4054,7 +4054,7 @@ class CarryMemMemoryProvider(MemoryProvider):
     async def declare(
         self,
         content: str,
-        source: str = "eventlink",
+        source: str = "promiselink",
         metadata: Optional[dict] = None,
     ) -> bool:
         """向CarryMem声明新知识（单向）"""
@@ -4086,7 +4086,7 @@ class CarryMemMemoryProvider(MemoryProvider):
 | Todo生成增强 | recall_memories | 生成Todo时检索相关记忆，提供更精准的建议 | 不检索记忆，仅基于当前事件生成 |
 | 敏感度判断增强 | match_rules | 匹配CarryMem中的隐私规则，避免推荐敏感信息 | 仅依赖LLM模板9判断 |
 | 关系维护增强 | recall_memories | 检索历史交互记忆，生成更个性化的维护建议 | 仅基于本地交互历史 |
-| 新知识声明 | declare | 新实体/关联创建后，声明到CarryMem | 丢弃声明，不影响EventLink功能 |
+| 新知识声明 | declare | 新实体/关联创建后，声明到CarryMem | 丢弃声明，不影响PromiseLink功能 |
 | 商机匹配增强 | recall_memories | 匹配时检索用户历史偏好和成功案例 | 仅使用六维算法打分 |
 
 ### 6.6 Provider初始化
@@ -4121,10 +4121,10 @@ memory_provider = create_memory_provider({
 
 | 不做 | 原因 |
 |------|------|
-| EventLink不把CarryMem当存储层 | EventLink有独立的数据存储，CarryMem仅提供智能增强 |
-| EventLink不从CarryMem读取核心数据 | 核心数据（实体/关联/Todo）存储在本地SQLite/PG |
-| EventLink不依赖CarryMem可用性 | NullMemoryProvider保证CarryMem不可用时系统正常运行 |
-| EventLink不向CarryMem同步全量数据 | 仅声明关键新知识，不做双向同步 |
+| PromiseLink不把CarryMem当存储层 | PromiseLink有独立的数据存储，CarryMem仅提供智能增强 |
+| PromiseLink不从CarryMem读取核心数据 | 核心数据（实体/关联/Todo）存储在本地SQLite/PG |
+| PromiseLink不依赖CarryMem可用性 | NullMemoryProvider保证CarryMem不可用时系统正常运行 |
+| PromiseLink不向CarryMem同步全量数据 | 仅声明关键新知识，不做双向同步 |
 
 ---
 
@@ -4132,7 +4132,7 @@ memory_provider = create_memory_provider({
 
 ### 6.5.1 对接背景
 
-> 陈宇欣团队负责数字名片服务，EventLink需要与其API对接以获取/同步名片数据。
+> 陈宇欣团队负责数字名片服务，PromiseLink需要与其API对接以获取/同步名片数据。
 > 当前为**接口预留**阶段，待对方接口就绪后实施对接。
 >
 > ⚠️ **PRD v4.9确认：PoC阶段不对接外部数字名片平台（如陈宇鑫公司），Phase1再评估对接方案**
@@ -4177,9 +4177,9 @@ class MockDigitalCardClient:
             for i in range(min(limit, 3))
         ]
 
-    async def sync_to_eventlink(self, card_data: dict) -> dict:
-        """同步名片到EventLink实体系统"""
-        # 调用EventLink内部实体创建逻辑
+    async def sync_to_promiselink(self, card_data: dict) -> dict:
+        """同步名片到PromiseLink实体系统"""
+        # 调用PromiseLink内部实体创建逻辑
         return {"entity_id": "mock-entity-uuid", "status": "synced"}
 ```
 
@@ -4436,7 +4436,7 @@ def mock_memory_provider():
         Memory(
             id="mem_1",
             content="张三偏好通过微信沟通",
-            source="eventlink",
+            source="promiselink",
             relevance=0.85,
             metadata={"type": "preference"},
         )
@@ -4777,7 +4777,7 @@ groups:
 
 ## 10. DataSourceAdapter 集成 [v2.5新增]
 
-> EventLink从"被动记录"升级为"主动服务"，需要多源数据接入能力。DataSourceAdapter定义统一的数据源适配接口，使系统能从邮件、日历、微信等多种渠道获取Event数据。
+> PromiseLink从"被动记录"升级为"主动服务"，需要多源数据接入能力。DataSourceAdapter定义统一的数据源适配接口，使系统能从邮件、日历、微信等多种渠道获取Event数据。
 
 ### 10.1 Adapter接口定义 [v2.5新增]
 
@@ -4867,7 +4867,7 @@ Email → EmailAdapter.fetch_new_events()
 
 **PoC策略**：
 - **聚焦降低输入摩擦**：语音输入是最低摩擦方案（按住即说，无需打字）
-- **微信转发方案**：用户长按聊天记录 → 转发到EventLink小程序 → 小程序接收文本 → 生成Event
+- **微信转发方案**：用户长按聊天记录 → 转发到PromiseLink小程序 → 小程序接收文本 → 生成Event
 - **企业微信方案留Phase 2**：需要企业环境支持，PoC不实现
 
 **WeChatForwardAdapter实现（PoC）**：
@@ -4916,7 +4916,7 @@ pip install --require-hashes -r requirements.txt
   run: |
     pip install pip-audit bandit
     pip-audit -r requirements.txt
-    bandit -r src/eventlink/adapters/ -ll
+    bandit -r src/promiselink/adapters/ -ll
 ```
 
 **Adapter审查流程**：

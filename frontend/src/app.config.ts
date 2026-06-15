@@ -1,0 +1,55 @@
+export default defineAppConfig({
+  pages: [
+    'pages/index/index',
+    'pages/input/index',
+    'pages/events/index',
+    'pages/todos/index',
+    'pages/entities/index',
+    'pages/promises/index',
+    'pages/login/index',
+  ],
+  tabBar: {
+    color: '#999999',
+    selectedColor: '#1890ff',
+    backgroundColor: '#ffffff',
+    borderStyle: 'white',
+    list: [
+      {
+        pagePath: 'pages/index/index',
+        text: '首页',
+        iconPath: 'icons/home.png',
+        selectedIconPath: 'icons/home-active.png',
+      },
+      {
+        pagePath: 'pages/events/index',
+        text: '事件',
+        iconPath: 'icons/events.png',
+        selectedIconPath: 'icons/events-active.png',
+      },
+      {
+        pagePath: 'pages/entities/index',
+        text: '人脉',
+        iconPath: 'icons/people.png',
+        selectedIconPath: 'icons/people-active.png',
+      },
+      {
+        pagePath: 'pages/todos/index',
+        text: '待办',
+        iconPath: 'icons/todo.png',
+        selectedIconPath: 'icons/todo-active.png',
+      },
+      {
+        pagePath: 'pages/promises/index',
+        text: '承诺',
+        iconPath: 'icons/promise.png',
+        selectedIconPath: 'icons/promise-active.png',
+      },
+    ],
+  },
+  window: {
+    backgroundTextStyle: 'light',
+    navigationBarBackgroundColor: '#1890ff',
+    navigationBarTitleText: 'PromiseLink 基础版',
+    navigationBarTextStyle: 'white',
+  },
+})

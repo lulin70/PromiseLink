@@ -1,6 +1,144 @@
 # Changelog
 
-All notable changes to EventLink will be documented in this file.
+All notable changes to PromiseLink will be documented in this file.
+
+## [0.5.1] - 2026-06-14
+
+### Fixed — P1 技术债清零
+- **代码重复消除**: `_decode_content`→`core/file_utils.py`, `_process_event_background`→`services/event_processor.py`, JSON提取→统一使用`text_utils.extract_json_from_text`
+- **API层批量删除移入Service层**: 新增`services/entity_cleanup.py`，使用ORM delete替代`__table__.delete()`
+- **Pipeline全局锁→per-user锁**: `_pipeline_write_lock`改为`_pipeline_locks[user_id]`，多用户并发不再串行
+- **Pipeline步骤导入移至模块顶部**: 消除函数体内延迟导入
+- **4个API端点添加限流**: demand_input/export/voice_query/import_csv
+- **13处datetime.utcnow()→datetime.now(UTC)**: promises/reminders/reminder模型
+- **API响应统一Pydantic模型**: 新增`schemas/api_responses.py`，7个端点返回类型化响应
+- **分页参数统一**: promises的page/page_size→offset/limit
+- **todo_id参数类型统一**: str→uuid.UUID
+
+### Fixed — P2 技术债清零
+- **数据模型FK约束**: Association.source_event_id、Todo.evidence_event_id添加ForeignKey
+- **SnoozeSchedule SQLite兼容**: recover_at从None改为String(50)存储ISO格式
+- **ReminderLog复合索引**: 添加(user_id, todo_id)索引
+- **Association UniqueConstraint包含user_id**
+- **VoiceSession completed_at自动设置**: before_update事件监听器
+- **EntityProperties校验增强**: strict_properties_validation配置项+warning日志
+- **voice.py COUNT替代全量加载**
+- **Dashboard get_supply_demand添加分页**
+- **Dashboard get_care_reminders N+1→批量查询**
+- **entities_credit.py N+1→批量查询**
+- **LLMClient连接池复用**: 共享httpx.AsyncClient+shutdown清理
+- **CORS配置收紧**: 显式allow_methods+通配符警告
+- **Prompt注入检测增强**: 3→10个检测模式
+- **裸except添加日志**: 8处except Exception: pass→logger.debug
+- **email_sync.py密码字段安全文档**
+- **Settings()直接实例化→get_settings()**
+
+### Added — 测试增强
+- **3个新端点测试文件**: test_entities_credit_api.py(8), test_entities_stages_api.py(9), test_wechat_forward_api.py(8)
+- **conftest.py内存数据库**: sqlite:///test.db→sqlite://(内存)
+- **共享auth_headers fixture**
+- **perf测试重命名**: perf_entity_resolution.py→test_perf_entity_resolution.py
+- **relationship_brief_service.py语法修复**: _build_interaction_freq调用缺少await
+
+### Changed
+- 测试数量: 1224→1249 passed, 覆盖率73%
+- 新增模块: core/file_utils.py, services/event_processor.py, services/entity_cleanup.py, schemas/api_responses.py
+- 新增Alembic迁移: f1a2b3c4d5e6 (Association FK + ReminderLog索引 + UniqueConstraint)
+
+## [0.5.0] - 2026-06-14
+
+### Fixed
+- **P0: X-Forwarded-For欺骗漏洞** — `_get_client_ip()`不再无条件信任X-Forwarded-For，仅当trusted_proxies配置且直连IP属于可信代理时才读取
+- **P0: 文档一致性** — 统一测试数量(1224)、覆盖率(73%)、Pipeline步数(13步)、总体进度(85%)，修复7个文件的P0不一致
+- **P0: .env.poc.example变量名** — PROMISELINK_前缀变量改为config.py识别的标准名称
+- **P0: docker-compose.yml变量名** — PROMISELINK_POC_SECRET改为POC_SECRET
+- **P0: spec/README.md功能编号** — F-46/F-47/F-48名称与PRD对齐
+- **P1: 4个API端点缺少限流** — demand_input/export/voice_query/import_csv添加rate_limit_dependency
+- **P1: datetime.utcnow()时区不安全** — 13处替换为datetime.now(UTC)
+- **P1: health.py版本号硬编码** — 改为从config读取app_version
+- **P1: 死代码清理** — 删除_stream_export和_generate_response_text未使用函数
+
+### Changed
+- **CI/CD** — 移除前端lint `|| true`，build-and-push添加frontend依赖
+- **部署脚本** — deploy-staging.sh修复文件引用路径
+- **E2E脚本** — 从scripts/移至scripts/e2e/目录
+- **.gitignore** — 添加node_modules/、压缩包、二进制文件规则
+- **新增** .env.poc.hosted.example云端部署配置模板
+- **新增** config.py trusted_proxies字段
+
+## [0.4.9] - 2026-06-13
+
+### Added
+- **文件上传功能**: 事件录入支持 .txt/.md 格式会议纪要文件上传
+  - `POST /events/upload` 端点，1MB文件大小限制
+  - UTF-8/GBK编码自动检测，Markdown格式自动剥离
+  - 前端"文本输入"/"文件上传"模式切换
+- **Pipeline集成测试**: 3个端到端Pipeline测试（happy path/空文本/多实体）
+- **Todo忽略操作**: 前端"忽略"按钮 + `PATCH /todos/{id}` dismiss接口
+- **CreditScore批量计算**: `CreditScoreService.batch_calculate()` 替代N+1逐实体查询
+- **422错误格式统一**: 自定义 `RequestValidationError` handler，统一返回 `{error: {code, message, details}}`
+- **JSONB Schema验证**: `EntityProperties` Pydantic模型验证 + 优雅降级
+- **Alembic迁移同步**: event_type/event_status CHECK约束与代码枚举对齐
+- **默认密钥阻断**: 非测试环境使用默认secret_key时启动失败
+
+### Fixed
+- **P0: Alembic CHECK约束不同步** — event_type缺少email/wechat_forward，event_status缺少awaiting_retry等状态
+- **P0: 默认密钥无阻断** — 生产环境使用默认poc_secret无告警，现已阻断启动
+- **P1: CSV导入无大小限制** — 新增10MB限制
+- **P1: Credit Score N+1查询** — 批量查询替代逐实体查询
+- **沉睡联系人扫描去重** — scan_dormant_contacts调用从2次减为1次
+- **循环依赖消除** — `_generate_event_title` 提取到 `title_generator.py`
+- **Todo.source_event_id外键** — 添加 `ForeignKey("events.id", ondelete="SET NULL")`
+- **前端图标路径** — config/index.ts copy路径从 `src/assets/icons/` 修正为 `src/icons/`
+- **Export StreamingResponse** — 去掉"data"嵌套层，events/entities等直接在顶层
+
+### Changed
+- **entities.py拆分** — 拆分为 entities.py(核心CRUD) + entities_stages.py + entities_credit.py
+- **Export改为StreamingResponse** — 避免大数据量OOM，10000实体上限
+- **RateLimiter定期清理** — 300秒间隔自动清理过期令牌
+- **PII加密密钥独立** — 新增 `pii_encryption_key` 配置项，优先于 `secret_key`
+- **Docker Compose profiles** — postgres/redis标记为 `profiles: ["full"]`，基础版仅启动promiselink
+- **前端CI流水线** — 新增Node 18 + eslint + build:h5检查
+- **mypy配置** — 新增 `[tool.mypy]` 基础配置
+- **统一分页参数** — dormant/credit-scores端点添加offset参数
+- **测试FK隔离** — 19个测试文件 `PRAGMA foreign_keys=OFF` 确保测试隔离
+- 测试数量: 1036→1224 passed, 覆盖率73%
+
+## [0.4.8] - 2026-06-13
+
+### Added
+- **LLM Retry + User-Confirmed Degradation (A0-1)**:
+  - 新增 `awaiting_retry`/`degraded_completed` 事件状态
+  - 新增 `/events/{id}/retry` 和 `/events/{id}/accept-degraded` API端点
+  - 前端降级确认卡片（"重新处理"/"接受简化结果"按钮）
+- **Events Tab + FAB (A1-3)**:
+  - 删除"录入"Tab，新增"事件"Tab（日期筛选+事件列表）
+  - 首页FAB按钮跳转录入页
+- **Cross-Page Navigation (A1-4)**:
+  - Taro.eventCenter + switchTab 300ms延迟导航
+  - API返回entity_name支持跨页面点击跳转
+- **UUID Field Filtering (A1-5)**:
+  - 前端过滤source_event_id等6个内部字段
+- **Title Fallback (A1-2)**:
+  - Step13自动从raw_text截取前20字符作为fallback标题
+- **G1/G2/G3 Features**:
+  - G1: 关系健康诊断（5维度评分：阶段30%+互动25%+活跃20%+承诺15%+待办10%）
+  - G2: 关系阶段展示与推进建议
+  - G3: 个人关怀提醒（5类关怀点匹配）
+- **Performance Benchmark**:
+  - Entity Resolution O(n)→O(1) 内存索引优化
+  - Step11 改为只查关联实体
+  - 1000实体warm resolve 0.1ms/entity，5000实体0.1ms/entity
+
+### Fixed
+- **P0: Entity status "active" bug** — dashboard.py/health_diagnostic.py/entity_resolution.py使用不存在的"active"状态过滤，导致新实体不可见。改为["provisional", "confirmed"]
+- **P0: Step02 failed_steps遗漏** — LLM失败时_extract_conversation返回空结果，Step02条件判断遗漏。新增raw_text非空但0人提取的检测逻辑
+- **P1: Promise 422错误** — FastAPI动态路由/{todo_id}匹配了/pending-confirmations。调整路由注册顺序
+
+### Changed
+- Pipeline从14步重构为13步（Step01-Step13）
+- 前端从Vue3迁移到Taro+React+TypeScript
+- 测试数量从866→1036（+170新测试）
 
 ## [0.3.0] - 2026-06-08
 

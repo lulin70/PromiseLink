@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from eventlink.services.memory_provider import (
+from promiselink.services.memory_provider import (
     CarryMemProvider,
     FileStoreProvider,
     MemoryEntry,

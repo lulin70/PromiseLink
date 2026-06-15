@@ -9,9 +9,9 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from eventlink.core.exceptions import InvalidTransitionError
-from eventlink.models.relationship_brief import RelationshipBrief
-from eventlink.services.relationship_stage import (
+from promiselink.core.exceptions import InvalidTransitionError
+from promiselink.models.relationship_brief import RelationshipBrief
+from promiselink.services.relationship_stage import (
     STAGE_METADATA,
     STAGE_TRANSITIONS,
     RelationshipStage,

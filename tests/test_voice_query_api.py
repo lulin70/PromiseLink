@@ -19,16 +19,16 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
-from eventlink.core.auth import get_current_user_id
-from eventlink.database import Base, get_async_session
-from eventlink.main import app
-from eventlink.models.association import Association
-from eventlink.models.entity import Entity
-from eventlink.models.event import Event
-from eventlink.models.relationship_brief import RelationshipBrief
-from eventlink.models.todo import Todo
-from eventlink.services.nlu_intent_classifier import VoiceIntent
-from eventlink.services.voice_query_service import (
+from promiselink.core.auth import get_current_user_id
+from promiselink.database import Base, get_async_session
+from promiselink.main import app
+from promiselink.models.association import Association
+from promiselink.models.entity import Entity
+from promiselink.models.event import Event
+from promiselink.models.relationship_brief import RelationshipBrief
+from promiselink.models.todo import Todo
+from promiselink.services.nlu_intent_classifier import VoiceIntent
+from promiselink.services.voice_query_service import (
     execute_query,
     query_promises,
     query_relationship,
@@ -57,7 +57,7 @@ async def db_engine():
     @sa_event.listens_for(engine.sync_engine, "connect")
     def set_sqlite_pragma(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA foreign_keys=OFF")
         cursor.close()
 
     async with engine.begin() as conn:
@@ -123,8 +123,8 @@ def _make_mock_nlu_result(intent_value="schedule_query", confidence=0.92, slots=
 # ── Test 1: Schedule query (日程查询) ──────────────────────────────
 
 
-@patch("eventlink.api.v1.voice_query.LLMClient")
-@patch("eventlink.api.v1.voice_query.NLUIntentClassifier")
+@patch("promiselink.api.v1.voice_query.LLMClient")
+@patch("promiselink.api.v1.voice_query.NLUIntentClassifier")
 async def test_voice_query_schedule(mock_classifier_cls, mock_llm_cls, client):
     """POST /voice/query with schedule query returns events data."""
     mock_llm_cls.return_value = MagicMock()
@@ -158,8 +158,8 @@ async def test_voice_query_schedule(mock_classifier_cls, mock_llm_cls, client):
 # ── Test 2: Promise query (承诺追踪) ──────────────────────────────
 
 
-@patch("eventlink.api.v1.voice_query.LLMClient")
-@patch("eventlink.api.v1.voice_query.NLUIntentClassifier")
+@patch("promiselink.api.v1.voice_query.LLMClient")
+@patch("promiselink.api.v1.voice_query.NLUIntentClassifier")
 async def test_voice_query_promise(mock_classifier_cls, mock_llm_cls, client):
     """POST /voice/query with promise query returns todos data."""
     mock_llm_cls.return_value = MagicMock()
@@ -192,8 +192,8 @@ async def test_voice_query_promise(mock_classifier_cls, mock_llm_cls, client):
 # ── Test 3: Relationship query (关系推进查询) ──────────────────────
 
 
-@patch("eventlink.api.v1.voice_query.LLMClient")
-@patch("eventlink.api.v1.voice_query.NLUIntentClassifier")
+@patch("promiselink.api.v1.voice_query.LLMClient")
+@patch("promiselink.api.v1.voice_query.NLUIntentClassifier")
 async def test_voice_query_relationship(mock_classifier_cls, mock_llm_cls, client):
     """POST /voice/query with relationship query returns relationships data."""
     mock_llm_cls.return_value = MagicMock()
@@ -226,8 +226,8 @@ async def test_voice_query_relationship(mock_classifier_cls, mock_llm_cls, clien
 # ── Test 4: Non-query intent returns no data ──────────────────────
 
 
-@patch("eventlink.api.v1.voice_query.LLMClient")
-@patch("eventlink.api.v1.voice_query.NLUIntentClassifier")
+@patch("promiselink.api.v1.voice_query.LLMClient")
+@patch("promiselink.api.v1.voice_query.NLUIntentClassifier")
 async def test_voice_query_non_query_intent_no_data(mock_classifier_cls, mock_llm_cls, client):
     """POST /voice/query with non-query intent (e.g., exit) returns no data field."""
     mock_llm_cls.return_value = MagicMock()
@@ -253,8 +253,8 @@ async def test_voice_query_non_query_intent_no_data(mock_classifier_cls, mock_ll
     assert data["data"] is None
 
 
-@patch("eventlink.api.v1.voice_query.LLMClient")
-@patch("eventlink.api.v1.voice_query.NLUIntentClassifier")
+@patch("promiselink.api.v1.voice_query.LLMClient")
+@patch("promiselink.api.v1.voice_query.NLUIntentClassifier")
 async def test_voice_query_todo_create_no_data(mock_classifier_cls, mock_llm_cls, client):
     """POST /voice/query with todo_create intent returns no data field."""
     mock_llm_cls.return_value = MagicMock()
@@ -314,8 +314,8 @@ async def test_voice_query_text_too_long_returns_422(client):
 # ── Test 6: user_id from body overrides auth ──────────────────────
 
 
-@patch("eventlink.api.v1.voice_query.LLMClient")
-@patch("eventlink.api.v1.voice_query.NLUIntentClassifier")
+@patch("promiselink.api.v1.voice_query.LLMClient")
+@patch("promiselink.api.v1.voice_query.NLUIntentClassifier")
 async def test_voice_query_user_id_from_body(mock_classifier_cls, mock_llm_cls, client):
     """user_id in request body is used when provided."""
     mock_llm_cls.return_value = MagicMock()

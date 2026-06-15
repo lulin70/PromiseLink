@@ -10,9 +10,9 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
-from eventlink.core.auth import get_current_user_id
-from eventlink.database import Base, get_async_session
-from eventlink.main import app
+from promiselink.core.auth import get_current_user_id
+from promiselink.database import Base, get_async_session
+from promiselink.main import app
 
 
 # ── Constants ──
@@ -35,7 +35,7 @@ async def db_engine():
     @sa_event.listens_for(engine.sync_engine, "connect")
     def set_sqlite_pragma(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA foreign_keys=OFF")
         cursor.close()
 
     async with engine.begin() as conn:
@@ -106,10 +106,10 @@ async def test_asr_endpoint_requires_auth(unauth_client):
     assert response.status_code == 401
 
 
-@patch("eventlink.api.v1.media.ASRService")
+@patch("promiselink.api.v1.media.ASRService")
 async def test_asr_endpoint_with_mock(mock_asr_cls, client):
     """POST /media/asr with mock ASR service returns correct structure."""
-    from eventlink.services.asr_service import ASRResult
+    from promiselink.services.asr_service import ASRResult
 
     mock_service = MagicMock()
     mock_service.transcribe = AsyncMock(
@@ -143,10 +143,10 @@ async def test_tts_endpoint_requires_auth(unauth_client):
     assert response.status_code == 401
 
 
-@patch("eventlink.api.v1.media.TTSService")
+@patch("promiselink.api.v1.media.TTSService")
 async def test_tts_endpoint_with_mock(mock_tts_cls, client):
     """POST /media/tts with mock TTS service returns audio response."""
-    from eventlink.services.tts_service import TTSResult
+    from promiselink.services.tts_service import TTSResult
 
     mock_service = MagicMock()
     mock_service.synthesize = AsyncMock(
@@ -183,10 +183,10 @@ async def test_ocr_endpoint_requires_auth(unauth_client):
     assert response.status_code == 401
 
 
-@patch("eventlink.api.v1.media.OCRService")
+@patch("promiselink.api.v1.media.OCRService")
 async def test_ocr_endpoint_with_mock(mock_ocr_cls, client):
     """POST /media/ocr with mock OCR service returns correct structure."""
-    from eventlink.services.ocr_service import OCRResult
+    from promiselink.services.ocr_service import OCRResult
 
     structured_data = {
         "names": ["张三"],
@@ -225,10 +225,10 @@ async def test_ocr_endpoint_with_mock(mock_ocr_cls, client):
 # ── OCR-Event Tests ──
 
 
-@patch("eventlink.api.v1.media.OCRService")
+@patch("promiselink.api.v1.media.OCRService")
 async def test_ocr_event_endpoint_with_mock(mock_ocr_cls, client):
     """POST /media/ocr-event with mock OCR + pipeline creates event."""
-    from eventlink.services.ocr_service import OCRResult
+    from promiselink.services.ocr_service import OCRResult
 
     structured_data = {
         "names": ["李四"],

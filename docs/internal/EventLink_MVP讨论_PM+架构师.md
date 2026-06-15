@@ -1,10 +1,10 @@
-# EventLink MVP范围精简 — PM+架构师讨论
+# PromiseLink MVP范围精简 — PM+架构师讨论
 
 > 日期: 2026-06-01
 
 ---
 
-# EventLink MVP范围精简讨论
+# PromiseLink MVP范围精简讨论
 
 ## PM与架构师对话
 

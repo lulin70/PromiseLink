@@ -1,4 +1,4 @@
-# EventLink 名片数据接口规范 v1.2
+# PromiseLink 名片数据接口规范 v1.2
 
 **日期**：2026-06-03
 **状态**：草案（待无界团队确认字段映射）
@@ -8,20 +8,20 @@
 
 ## 1. 概述
 
-本文档定义了 EventLink 的 `card_save` 管线接收名片数据的 JSON Schema。
+本文档定义了 PromiseLink 的 `card_save` 管线接收名片数据的 JSON Schema。
 
 ### 数据流方向
 
 ```
-数据流入（名片→EventLink）：
-无界小程序（或其他名片源）──POST /api/v1/events──→ EventLink
+数据流入（名片→PromiseLink）：
+无界小程序（或其他名片源）──POST /api/v1/events──→ PromiseLink
                                                    │
                                                    └─ event_type: "card_save"
                                                       source: "iamhere" | "manual"
                                                       raw_text: JSON字符串（本Schema定义的格式）
 
-数据查询（小程序←EventLink）：
-无界小程序 ──GET /api/v1/mini/entity/{id}/events──→ EventLink
+数据查询（小程序←PromiseLink）：
+无界小程序 ──GET /api/v1/mini/entity/{id}/events──→ PromiseLink
                                                     │
                                                     └─ 返回该实体的交流记录概要（脱敏）
                                                        通过 person_id（wujie_person_id）关联查询
@@ -30,9 +30,9 @@
 **核心原则**：
 
 - 名片源只负责提供结构化数据，不负责AI推理
-- EventLink负责从数据中提取实体、推断关联、生成Todo
-- 名片数据单向流入：名片源 → EventLink
-- 交流历史概要按需查询：小程序 ← EventLink（通过person_id关联，仅脱敏概要，非原始数据）
+- PromiseLink负责从数据中提取实体、推断关联、生成Todo
+- 名片数据单向流入：名片源 → PromiseLink
+- 交流历史概要按需查询：小程序 ← PromiseLink（通过person_id关联，仅脱敏概要，非原始数据）
 
 ***
 
@@ -67,8 +67,8 @@
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "EventLink Business Card",
-  "description": "EventLink card_save 管线的名片数据输入格式",
+  "title": "PromiseLink Business Card",
+  "description": "PromiseLink card_save 管线的名片数据输入格式",
   "type": "object",
   "required": ["person"],
   "additionalProperties": true,
@@ -252,7 +252,7 @@
 
     "interaction_context": {
       "type": ["object", "null"],
-      "description": "首次交互场景（EventLink利他闭环核心字段）",
+      "description": "首次交互场景（PromiseLink利他闭环核心字段）",
       "additionalProperties": true,
       "properties": {
         "met_via": {
@@ -311,7 +311,7 @@
 
     "custom_fields": {
       "type": ["object", "null"],
-      "description": "自定义扩展字段（名片源可自由添加，EventLink透传到Entity.properties）",
+      "description": "自定义扩展字段（名片源可自由添加，PromiseLink透传到Entity.properties）",
       "additionalProperties": true
     },
 
@@ -379,7 +379,7 @@
 }
 ```
 
-> 只有名字也能进系统。EventLink会在后续交互中渐进填充其他字段。
+> 只有名字也能进系统。PromiseLink会在后续交互中渐进填充其他字段。
 
 ### 4.2 标准名片（会议场景交换）
 
@@ -493,11 +493,11 @@
 
 ***
 
-## 5. 与 EventLink 内部数据模型的映射
+## 5. 与 PromiseLink 内部数据模型的映射
 
-名片JSON解析后，字段映射到 EventLink 内部实体：
+名片JSON解析后，字段映射到 PromiseLink 内部实体：
 
-| 名片字段                                  | EventLink 实体 | 目标字段                         | 映射规则                              |
+| 名片字段                                  | PromiseLink 实体 | 目标字段                         | 映射规则                              |
 | ------------------------------------- | ------------ | ---------------------------- | --------------------------------- |
 | person.name                           | Entity       | name                         | 直接映射                              |
 | person.name\_en                       | Entity       | aliases\[]                   | 追加到别名数组                           |
@@ -551,9 +551,9 @@ Organization(
 
 | 阶段     | 方式          | 说明                           |
 | ------ | ----------- | ---------------------------- |
-| PoC    | 手动导出JSON    | 用户在无界导出名片JSON，在EventLink导入   |
-| Phase1 | API拉取       | EventLink通过API从无界拉取授权用户的名片数据 |
-| Phase2 | Webhook实时推送 | 名片创建/更新时，无界主动推送到EventLink    |
+| PoC    | 手动导出JSON    | 用户在无界导出名片JSON，在PromiseLink导入   |
+| Phase1 | API拉取       | PromiseLink通过API从无界拉取授权用户的名片数据 |
+| Phase2 | Webhook实时推送 | 名片创建/更新时，无界主动推送到PromiseLink    |
 
 ### 6.2 API接口规范（Phase1，待无界团队开发）
 
@@ -573,14 +573,14 @@ Response:
 }
 ```
 
-### 6.3 EventLink 反向查询接口（小程序展示交流记录）
+### 6.3 PromiseLink 反向查询接口（小程序展示交流记录）
 
 > **需求来源**：小程序在名片详情页需要展示"交流记录"，需按实体ID查询关联的Event概要。
 
 **数据流**：
 
 ```
-无界小程序 ──GET /api/v1/mini/entity/{id}/events──→ EventLink
+无界小程序 ──GET /api/v1/mini/entity/{id}/events──→ PromiseLink
                                                     │
                                                     └─ 返回脱敏后的Event概要清单
 ```
@@ -625,25 +625,25 @@ Response:
 | 字段        | 脱敏方式     | 说明                           |
 | --------- | -------- | ---------------------------- |
 | summary   | AI生成的摘要  | 不暴露原始对话内容，仅返回结构化摘要           |
-| raw\_text | **不返回**  | 原始文本可能含PII，仅EventLink内部使用    |
+| raw\_text | **不返回**  | 原始文本可能含PII，仅PromiseLink内部使用    |
 | metadata  | **不返回**  | 内部元数据不暴露给第三方                 |
-| todo详情    | 仅返回count | 不暴露具体Todo内容，用户需进入EventLink查看 |
+| todo详情    | 仅返回count | 不暴露具体Todo内容，用户需进入PromiseLink查看 |
 
 **边界约束**：
 
 - 此接口仅返回**当前用户**与该实体的交流记录（user\_id隔离）
 - 不返回其他用户与同一实体的交流记录
 - 不返回实体的完整properties（含concern/promise/contribution等敏感字段）
-- 小程序侧仅展示概要，详细内容需跳转EventLink H5页面
+- 小程序侧仅展示概要，详细内容需跳转PromiseLink H5页面
 
 ### 6.4 数据安全要求
 
 | 要求   | 说明                                                       |
 | ---- | -------------------------------------------------------- |
 | 传输加密 | HTTPS/TLS 1.2+                                           |
-| 数据方向 | 名片数据**单向流入**：无界 → EventLink；交流概要**按需查询**：小程序 ← EventLink |
-| 用户授权 | 用户在无界侧主动授权导入，EventLink不主动拉取                              |
-| 存储隔离 | 导入后数据存入EventLink本地数据库，与无界解耦                              |
+| 数据方向 | 名片数据**单向流入**：无界 → PromiseLink；交流概要**按需查询**：小程序 ← PromiseLink |
+| 用户授权 | 用户在无界侧主动授权导入，PromiseLink不主动拉取                              |
+| 存储隔离 | 导入后数据存入PromiseLink本地数据库，与无界解耦                              |
 | 字段过滤 | 仅导入名片基础字段，不导入无界的知识库/对话记录                                 |
 
 ***

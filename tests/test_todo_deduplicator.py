@@ -4,8 +4,8 @@ import uuid
 
 import pytest
 
-from eventlink.models.todo import Todo
-from eventlink.services.todo_deduplicator import (
+from promiselink.models.todo import Todo
+from promiselink.services.todo_deduplicator import (
     DeduplicationResult,
     TodoDeduplicator,
 )

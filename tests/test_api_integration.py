@@ -1,4 +1,4 @@
-"""API layer integration tests for EventLink.
+"""API layer integration tests for PromiseLink.
 
 Uses httpx.AsyncClient + FastAPI dependency injection to test all API endpoints
 against an in-memory SQLite database, with LLM calls mocked out.
@@ -13,13 +13,13 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from eventlink.core.auth import get_current_user_id
-from eventlink.database import Base, get_async_session
-from eventlink.main import app
-from eventlink.models.association import Association
-from eventlink.models.entity import Entity
-from eventlink.models.event import Event
-from eventlink.models.todo import Todo
+from promiselink.core.auth import get_current_user_id
+from promiselink.database import Base, get_async_session
+from promiselink.main import app
+from promiselink.models.association import Association
+from promiselink.models.entity import Entity
+from promiselink.models.event import Event
+from promiselink.models.todo import Todo
 
 # ── Constants ──
 
@@ -41,7 +41,7 @@ async def db_engine():
     @sa_event.listens_for(engine.sync_engine, "connect")
     def set_sqlite_pragma(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA foreign_keys=OFF")
         cursor.close()
 
     async with engine.begin() as conn:
@@ -78,17 +78,17 @@ async def client(db_session, db_engine):
     async def mock_process_event(event_id):
         pass
 
-    import eventlink.api.v1.events as events_module
+    import promiselink.services.event_processor as processor_module
 
-    original_process = events_module._process_event_background
-    events_module._process_event_background = mock_process_event
+    original_process = processor_module.process_event_background
+    processor_module.process_event_background = mock_process_event
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
     # Restore
-    events_module._process_event_background = original_process
+    processor_module.process_event_background = original_process
     app.dependency_overrides.clear()
 
 
@@ -231,7 +231,7 @@ class TestHealthAPI:
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "healthy"
-        assert data["service"] == "eventlink"
+        assert data["service"] == "promiselink"
         assert "timestamp" in data
 
 

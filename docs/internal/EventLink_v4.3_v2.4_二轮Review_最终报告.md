@@ -1,12 +1,12 @@
 # 🤖 Multi-Agent 协作结果
 
-**任务**: ## 任务:EventLink PRD v4.3 + 技术设计 v2.4 — 7角色全员二轮验证性Review ### 背景 EventLink项目已完成文档三轮迭代: 1. 第一轮:李总v1.2建议 → PM+Arch评审 → PRD v4.2 + 技术设计v2.2 2. 第二轮:7角色全员一轮Review → 发现2项P0阻塞(BLK-1/BLK-2) + 多项改进建议 3. 第三轮:PRD v4.2→v4.3 + 技术设计v2.3→v2.4(修复BLK问题+融入许总反馈+采纳7角色意见) ### 本轮性质 **验证性Review**(非发现性Review)。重点验证以下内容是否已在v4.3/v2.4中正确修复和实现: #### 一、验证P0阻塞问题是否已修复 **BLK-1: evidence_quote PII脱敏策略** - 一轮发现:evidence_quote字段存储原始对话片段,可能含PII,无脱敏策略 - 需验证:PRD和技术设计中是否已定义完整的PII脱敏流程? - 检查点:sanitize_llm_input()清洗、redact_pii_from_text()函数、不建全文索引、API返回前脱敏 **BLK-2: input_scope服务端强制校验** - 一轮发现:API允许客户端传入input_scope覆盖自动分类结果,存在越权风险 - 需验证:技术设计Step 0是否增加了SC-01安全约束? - 检查点:永远以服务端classify()为准、非法值返回400、客户端值仅作hint **BLK-3: action_type枚举统一** - 一轮发现:PRD中5种与技术设计中6种不一致 - 需验证:是否已统一为6种(my_promise/their_promise/my_followup/mutual_action/system_reminder/unclear)? #### 二、验证许总POC反馈是否已融入 **F-49 日视图功能** - 许总需求:"一天4波或6波会议的主题在同一天可以分别显示" - 需验证:F-49功能定义是否存在且完整?API端点是否已定义? **主题互通语言包装** - 许总需求:"主题间是可以互通且可以无限扩展" - 需验证:F-04关联发现引擎是否已增加"主题互通"用户视角语言? **终身智能体助手愿景** - 许总需求:"成为终身智能体助手" - 需验证:产品愿景章节是否已强化"终身"属性?CarryMem记忆层支撑是否已描述? **TTS/ASR语音交互** - 许总需求:"除了文字可以语音互动" - 需验证:技术设计中是否有ASR/TTS技术路径规划?PoC Mock方案? #### 三、验证7角色意见是否已采纳 | 意见来源 | 具体意见 | 验证要点 | |---------|---------|---------| | PM | 测试方法学文档计划 | PoC退出条件是否有测试方法学表? | | DevOps | 监控指标定义 | 是否新增P0业务指标? | | UI | 展示优先级 | F-47推进卡12模块是否有优先级分级? | | Arch | evidence_event_id字段 | todos表是否新增该外键字段? | | Arch | PATCH乐观锁 | RelationshipBrief阶段变更API是否有乐观锁? | #### 四、检查新引入的不一致 - PRD v4.3与技术设计v2.4之间的一致性 - 新增内容与现有内容的风格一致性 - 版本号/日期/变更记录的准确性 ### 输入材料位置 1. PRD v4.3: ./docs/spec/PRD_V1.md 2. 技术设计v2.4: ./docs/architecture/EventLink_技术设计_v1.md 3. 一轮Review报告: ./docs/internal/EventLink_v4.2_v2.3_7角色全员Review报告.md 4. 许总反馈: ./docs/external/for_许总/20260604_许总POC反馈_符合想象_四点确认.md ### 输出要求 每个角色1. **总体判定**:✅ 全部通过 / ⚠️ 有遗留项 / ❌ 有新问题 2. **逐项验证**:对上述每个BLK项/许总反馈/7角色意见给出:**已修复/已融入/已采纳** + 具体证据引用 3. **新问题**:如有新发现的不一致或遗漏,明确列出 4. **最终建议**:是否可以进入实施阶段
+**任务**: ## 任务:PromiseLink PRD v4.3 + 技术设计 v2.4 — 7角色全员二轮验证性Review ### 背景 PromiseLink项目已完成文档三轮迭代: 1. 第一轮:李总v1.2建议 → PM+Arch评审 → PRD v4.2 + 技术设计v2.2 2. 第二轮:7角色全员一轮Review → 发现2项P0阻塞(BLK-1/BLK-2) + 多项改进建议 3. 第三轮:PRD v4.2→v4.3 + 技术设计v2.3→v2.4(修复BLK问题+融入许总反馈+采纳7角色意见) ### 本轮性质 **验证性Review**(非发现性Review)。重点验证以下内容是否已在v4.3/v2.4中正确修复和实现: #### 一、验证P0阻塞问题是否已修复 **BLK-1: evidence_quote PII脱敏策略** - 一轮发现:evidence_quote字段存储原始对话片段,可能含PII,无脱敏策略 - 需验证:PRD和技术设计中是否已定义完整的PII脱敏流程? - 检查点:sanitize_llm_input()清洗、redact_pii_from_text()函数、不建全文索引、API返回前脱敏 **BLK-2: input_scope服务端强制校验** - 一轮发现:API允许客户端传入input_scope覆盖自动分类结果,存在越权风险 - 需验证:技术设计Step 0是否增加了SC-01安全约束? - 检查点:永远以服务端classify()为准、非法值返回400、客户端值仅作hint **BLK-3: action_type枚举统一** - 一轮发现:PRD中5种与技术设计中6种不一致 - 需验证:是否已统一为6种(my_promise/their_promise/my_followup/mutual_action/system_reminder/unclear)? #### 二、验证许总POC反馈是否已融入 **F-49 日视图功能** - 许总需求:"一天4波或6波会议的主题在同一天可以分别显示" - 需验证:F-49功能定义是否存在且完整?API端点是否已定义? **主题互通语言包装** - 许总需求:"主题间是可以互通且可以无限扩展" - 需验证:F-04关联发现引擎是否已增加"主题互通"用户视角语言? **终身智能体助手愿景** - 许总需求:"成为终身智能体助手" - 需验证:产品愿景章节是否已强化"终身"属性?CarryMem记忆层支撑是否已描述? **TTS/ASR语音交互** - 许总需求:"除了文字可以语音互动" - 需验证:技术设计中是否有ASR/TTS技术路径规划?PoC Mock方案? #### 三、验证7角色意见是否已采纳 | 意见来源 | 具体意见 | 验证要点 | |---------|---------|---------| | PM | 测试方法学文档计划 | PoC退出条件是否有测试方法学表? | | DevOps | 监控指标定义 | 是否新增P0业务指标? | | UI | 展示优先级 | F-47推进卡12模块是否有优先级分级? | | Arch | evidence_event_id字段 | todos表是否新增该外键字段? | | Arch | PATCH乐观锁 | RelationshipBrief阶段变更API是否有乐观锁? | #### 四、检查新引入的不一致 - PRD v4.3与技术设计v2.4之间的一致性 - 新增内容与现有内容的风格一致性 - 版本号/日期/变更记录的准确性 ### 输入材料位置 1. PRD v4.3: ./docs/spec/PRD_V1.md 2. 技术设计v2.4: ./docs/architecture/PromiseLink_技术设计_v1.md 3. 一轮Review报告: ./docs/internal/PromiseLink_v4.2_v2.3_7角色全员Review报告.md 4. 许总反馈: ./docs/external/for_许总/20260604_许总POC反馈_符合想象_四点确认.md ### 输出要求 每个角色1. **总体判定**:✅ 全部通过 / ⚠️ 有遗留项 / ❌ 有新问题 2. **逐项验证**:对上述每个BLK项/许总反馈/7角色意见给出:**已修复/已融入/已采纳** + 具体证据引用 3. **新问题**:如有新发现的不一致或遗漏,明确列出 4. **最终建议**:是否可以进入实施阶段
 **状态**: ✅ 成功
 **耗时**: 147.00s
 **参与角色**: architect, product-manager, ui-designer, solo-coder, devops, tester, security
 
 ## 📋 执行摘要
-任务「## 任务:EventLink PRD v4.3 + 技术设计 v2.4 — 7角色全员二轮验证性Review ### 背景 EventLink项目已完成文档三」已完成多Agent协作。
+任务「## 任务:PromiseLink PRD v4.3 + 技术设计 v2.4 — 7角色全员二轮验证性Review ### 背景 PromiseLink项目已完成文档三」已完成多Agent协作。
 参与角色: 架构师, 产品经理, UI设计师, 开发者, 运维工程师, 测试专家, 安全专家 (7个)
 执行结果: 7/7 个Worker成功
 协作耗时: 115.88s
@@ -14,13 +14,13 @@ Scratchpad关键发现: # Scratchpad Summary (scratchpad-20260604-234058)
 **Total entries**: 7 | **Active findings**: 7 | **Conflicts**: 0
 
 ## 🔍 Key Findings (7)
-- [devops-41a785/devops] # EventLink PRD v4.3 + 技术设计 v2.4 — De
+- [devops-41a785/devops] # PromiseLink PRD v4.3 + 技术设计 v2.4 — De
 
 ## 👥 各角色产出
 
 ### 🤖 ui [✅]
 ---
-# UI/UX设计师 — EventLink PRD v4.3 + 技术设计 v2.4 验证性Review
+# UI/UX设计师 — PromiseLink PRD v4.3 + 技术设计 v2.4 验证性Review
 
 ## 一、总体判定
 
@@ -400,7 +400,7 @@ F-47 priority_score视觉规范:
 
 ### 🤖 product [✅]
 ---
-# EventLink PRD v4.3 + 技术设计 v2.4 二轮验证性Review报告(产品经理视角)
+# PromiseLink PRD v4.3 + 技术设计 v2.4 二轮验证性Review报告(产品经理视角)
 
 ## 角色身份
 产品经理 - 负责需求完整性、用户故事完备性、PRD与技术设计一致性验证
@@ -543,7 +543,7 @@ F-47 priority_score视觉规范:
 
 1. **PRD v4.3 第1.2节 产品愿景**
    ```
-   EventLink致力于成为用户的**终身智能体助手**,通过:
+   PromiseLink致力于成为用户的**终身智能体助手**,通过:
    - 长期记忆积累(CarryMem技术)
    - 跨时空关系发现
    - 持续学习用户偏好
@@ -728,11 +728,11 @@ F-50: 语音交互(Voice Interaction)
 1.3 竞品分析
 | 产品 | 核心功能 | 差异化优势 |
 |------|---------|-----------|
-| Notion | 手动待办管理 | EventLink自动提取 |
-| Motion | AI日程安排 | EventLink关系发现 |
-| Mem | AI笔记助手 | EventLink行动导向 |
+| Notion | 手动待办管理 | PromiseLink自动提取 |
+| Motion | AI日程安排 | PromiseLink关系发现 |
+| Mem | AI笔记助手 | PromiseLink行动导向 |
 
-EventLink差异化:
+PromiseLink差异化:
 1. 自动从对话提取待办(vs 手动创建)
 2. 跨时空关系发现(vs 单一任务视图)
 3. 终身记忆积累(vs 短期项目管理)
@@ -1033,7 +1033,7 @@ EventLink差异化:
 
 1. **PRD v4.3 - 1.1 产品愿景**
    ```
-   EventLink致力于成为用户的**终身智能体助手**,
+   PromiseLink致力于成为用户的**终身智能体助手**,
    通过持续记忆积累和主动智能服务,
    陪伴用户职业生涯全周期。
    ```
@@ -1376,7 +1376,7 @@ class Todo:
 
 ### 🏗️ 架构师 [✅]
 ---
-# EventLink PRD v4.3 + 技术设计 v2.4 系统架构师验证性Review报告
+# PromiseLink PRD v4.3 + 技术设计 v2.4 系统架构师验证性Review报告
 
 ## 总体判定: ⚠️ **有遗留项**
 
@@ -1844,7 +1844,7 @@ return 201, response
 
 ### 🧪 测试专家 [✅]
 ---
-# EventLink v4.3/v2.4 验证性Review报告 — 测试专家视角
+# PromiseLink v4.3/v2.4 验证性Review报告 — 测试专家视角
 
 ## 执行摘要
 
@@ -2045,7 +2045,7 @@ return 201, response
 
 1. **PRD v4.3** (§1.1 产品愿景):
    ```
-   EventLink致力于成为用户的终身智能体助手,通过持久化记忆和智能关联,
+   PromiseLink致力于成为用户的终身智能体助手,通过持久化记忆和智能关联,
    陪伴用户的职业生涯和生活历程
    ```
 
@@ -2296,7 +2296,7 @@ Mock服务:
 ### 5.4 测试方法学文档大纲(建议立即补充)
 
 ```markdown
-# EventLink测试方法学 v1.0
+# PromiseLink测试方法学 v1.0
 
 ## 1. 测试分层策略
 - 1.1 单元测试(70%覆盖率目标)
@@ -2398,12 +2398,12 @@ Mock服务:
 
 **报告生成**: 2025-06-04  
 **测试专家**: Kiro AI  
-**文档版本**: EventLink v4.3/v2.4 验证性Review  
+**文档版本**: PromiseLink v4.3/v2.4 验证性Review  
 **下次Review触发条件**: 测试方法学文档v1.0发布 OR 首个Sprint结束
 
 ### 🔒 安全专家 [✅]
 ---
-# EventLink v4.3/v2.4 安全专家验证性Review报告
+# PromiseLink v4.3/v2.4 安全专家验证性Review报告
 
 ## 执行摘要
 
@@ -2429,8 +2429,8 @@ Mock服务:
 
 ```
 读取文件: ./docs/spec/PRD_V1.md
-读取文件: ./docs/architecture/EventLink_技术设计_v1.md
-读取文件: ./docs/internal/EventLink_v4.2_v2.3_7角色全员Review报告.md
+读取文件: ./docs/architecture/PromiseLink_技术设计_v1.md
+读取文件: ./docs/internal/PromiseLink_v4.2_v2.3_7角色全员Review报告.md
 ```
 
 让我搜索关键安全相关内容。
@@ -2439,7 +2439,7 @@ Mock服务:
 
 ---
 
-# EventLink v4.3/v2.4 安全专家验证性Review报告
+# PromiseLink v4.3/v2.4 安全专家验证性Review报告
 
 ## 执行摘要
 
@@ -2657,7 +2657,7 @@ def generate_relation_narrative(rel: Relationship) -> str:
 
 **PRD v4.3 § 1.2 产品愿景(更新)**:
 ```
-EventLink定位为用户的"终身智能体助手":
+PromiseLink定位为用户的"终身智能体助手":
 - 终身记忆:通过CarryMem持久化用户上下文
 - 长期陪伴:从单次对话扩展到多年关系追踪
 - 智能演进:随用户成长调整推荐策略
@@ -2857,8 +2857,8 @@ GDPR Art.33: 数据泄露通知(72h内报告)
 ### ⚠️ 版本号问题
 
 **发现**: 
-- 技术设计文件名为`EventLink_技术设计_v1.md`,但内容标记为v2.4
-- 建议统一文件名为`EventLink_技术设计_v2.4.md`
+- 技术设计文件名为`PromiseLink_技术设计_v1.md`,但内容标记为v2.4
+- 建议统一文件名为`PromiseLink_技术设计_v2.4.md`
 
 ---
 
@@ -2938,7 +2938,7 @@ GDPR Art.33: 数据泄露通知(72h内报告)
 
 ### ⚙️ DevOps工程师 [✅]
 ---
-# EventLink PRD v4.3 + 技术设计 v2.4 — DevOps工程师验证性Review
+# PromiseLink PRD v4.3 + 技术设计 v2.4 — DevOps工程师验证性Review
 
 ## 执行摘要
 
@@ -3176,7 +3176,7 @@ Phase 2扩展功能（PoC后）：
 • ASR集成：Whisper API或Azure Speech
 • TTS集成：ElevenLabs或Azure TTS
 • 语音输入流程：
-  audio_file → ASR → raw_input → EventLink Pipeline
+  audio_file → ASR → raw_input → PromiseLink Pipeline
 • 语音输出流程：
   todo_text → TTS → audio_response
   
@@ -3213,7 +3213,7 @@ Q3 2026目标：
 
 评估方法：
 • 100条真实对话样本测试
-• A/B测试对比（EventLink vs 手动记录）
+• A/B测试对比（PromiseLink vs 手动记录）
 ```
 
 **⚠️ 遗留问题**:
@@ -3264,7 +3264,7 @@ Q3 2026目标：
 ```yaml
 # 建议补充的监控配置（Prometheus格式）
 groups:
-  - name: eventlink_p0_alerts
+  - name: promiselink_p0_alerts
     interval: 30s
     rules:
       - alert: EventCreationFailureHigh
@@ -3432,7 +3432,7 @@ def update_relationship_stage(relationship_id, new_stage, if_match):
 
 ```yaml
 # .github/workflows/ci.yml
-name: EventLink CI/CD
+name: PromiseLink CI/CD
 
 on:
   push:
@@ -3456,8 +3456,8 @@ jobs:
     steps:
       - name: Build Docker Image
         run: |
-          docker build -t eventlink:${{ github.sha }} .
-          docker tag eventlink:${{ github.sha }} eventlink:latest
+          docker build -t promiselink:${{ github.sha }} .
+          docker tag promiselink:${{ github.sha }} promiselink:latest
           
   deploy-staging:
     needs: build
@@ -3466,10 +3466,10 @@ jobs:
     steps:
       - name: Deploy to Staging
         run: |
-          kubectl set image deployment/eventlink \
-            eventlink=eventlink:${{ github.sha }} \
+          kubectl set image deployment/promiselink \
+            promiselink=promiselink:${{ github.sha }} \
             -n staging
-          kubectl rollout status deployment/eventlink -n staging
+          kubectl rollout status deployment/promiselink -n staging
           
   deploy-prod:
     needs: build
@@ -3479,8 +3479,8 @@ jobs:
       - name: Deploy to Production (Canary)
         run: |
           # 金丝雀发布：10% → 50% → 100%
-          kubectl set image deployment/eventlink-canary \
-            eventlink=eventlink:${{ github.sha }} -n production
+          kubectl set image deployment/promiselink-canary \
+            promiselink=promiselink:${{ github.sha }} -n production
           # 监控5分钟，错误率<1%则继续
           ./scripts/canary-check.sh
 ```
@@ -3507,7 +3507,7 @@ environments:
   development:
     database:
       host: localhost
-      name: eventlink_dev
+      name: promiselink_dev
     llm:
       provider: openai
       model: gpt-4o-mini  # 使用便宜模型
@@ -3518,7 +3518,7 @@ environments:
   staging:
     database:
       host: staging-db.internal
-      name: eventlink_staging
+      name: promiselink_staging
     llm:
       provider: openai
       model: gpt-4o
@@ -3530,7 +3530,7 @@ environments:
   production:
     database:
       host: prod-db-cluster.internal
-      name: eventlink_prod
+      name: promiselink_prod
       read_replicas: 3
     llm:
       provider: openai
@@ -3602,12 +3602,12 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 version: '3.8'
 
 services:
-  eventlink-api:
+  promiselink-api:
     build: .
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://user:pass@db:5432/eventlink_dev
+      - DATABASE_URL=postgresql://user:pass@db:5432/promiselink_dev
       - CARRYMEM_URL=http://carrymem:8001
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
@@ -3617,7 +3617,7 @@ services:
   db:
     image: postgres:15
     environment:
-      POSTGRES_DB: eventlink_dev
+      POSTGRES_DB: promiselink_dev
       POSTGRES_USER: user
       POSTGRES_PASSWORD: pass
     volumes:
@@ -3668,9 +3668,9 @@ rule_files:
   - '/etc/prometheus/alerts/*.yml'
 
 scrape_configs:
-  - job_name: 'eventlink-api'
+  - job_name: 'promiselink-api'
     static_configs:
-      - targets: ['eventlink-api:8000']
+      - targets: ['promiselink-api:8000']
     metrics_path: '/metrics'
     
   - job_name: 'postgres'
@@ -3686,7 +3686,7 @@ scrape_configs:
 # grafana-dashboard.json (核心指标看板)
 {
   "dashboard": {
-    "title": "EventLink P0 Metrics",
+    "title": "PromiseLink P0 Metrics",
     "panels": [
       {
         "title": "Event Creation Success Rate",
@@ -3782,13 +3782,13 @@ backup_policy:
       retention: 7 days
     point_in_time_recovery:
       enabled: true
-      wal_archive: s3://eventlink-backups/wal/
+      wal_archive: s3://promiselink-backups/wal/
       
   qdrant:
     snapshot:
       schedule: "0 3 * * *"
       retention: 14 days
-      storage: s3://eventlink-backups/qdrant/
+      storage: s3://promiselink-backups/qdrant/
       
 recovery_sla:
   rpo: 6 hours  # 恢复点目标：最多丢失6小时数据
@@ -3830,7 +3830,7 @@ disaster_recovery_plan:
 **Total entries**: 7 | **Active findings**: 7 | **Conflicts**: 0
 
 ## 🔍 Key Findings (7)
-- [devops-41a785/devops] # EventLink PRD v4.3 + 技术设计 v2.4 — DevOps工程师验证性Review
+- [devops-41a785/devops] # PromiseLink PRD v4.3 + 技术设计 v2.4 — DevOps工程师验证性Review
 
 ## 执行摘要
 
@@ -3838,7 +3838,7 @@ disaster_recovery_plan:
 
 **核心发现**:
 - ✅ P0阻塞问题(BLK-1/2/3)已修 (confidence: 70%)
-- [security-c438d1/security] # EventLink v4.3/v2.4 安全专家验证性Review报告
+- [security-c438d1/security] # PromiseLink v4.3/v2.4 安全专家验证性Review报告
 
 ## 执行摘要
 
@@ -3846,7 +3846,7 @@ disaster_recovery_plan:
 
 **关键发现**:
 - ✅ P0阻塞问题(BLK-1/BLK-2/BLK-3)已修复,但实现细节需 (confidence: 70%)
-- [tester-16fee8/tester] # EventLink v4.3/v2.4 验证性Review报告 — 测试专家视角
+- [tester-16fee8/tester] # PromiseLink v4.3/v2.4 验证性Review报告 — 测试专家视角
 
 ## 执行摘要
 
@@ -3854,7 +3854,7 @@ disaster_recovery_plan:
 
 **核心发现**:
 - ✅ P0阻塞问题(BLK-1/2/3)已全部修复并有充分技术支撑 (confidence: 70%)
-- [architect-7056dc/architect] # EventLink PRD v4.3 + 技术设计 v2.4 系统架构师验证性Review报告
+- [architect-7056dc/architect] # PromiseLink PRD v4.3 + 技术设计 v2.4 系统架构师验证性Review报告
 
 ## 总体判定: ⚠️ **有遗留项**
 
@@ -3872,7 +3872,7 @@ disaster_recovery_plan:
 ## 2. 逐项验证
 
 # (confidence: 70%)
-- [product-manager-aeab03/product-manager] # EventLink PRD v4.3 + 技术设计 v2.4 二轮验证性Review报告(产品经理视角)
+- [product-manager-aeab03/product-manager] # PromiseLink PRD v4.3 + 技术设计 v2.4 二轮验证性Review报告(产品经理视角)
 
 ## 角色身份
 产品经理 - 负责需求完整性、用户故事完备性、PRD与技术设计一致性验证
@@ -3882,7 +3882,7 @@ disaster_recovery_plan:
 ## 一、总体判定
 
 ** (confidence: 70%)
-- [ui-designer-e14d06/ui-designer] # UI/UX设计师 — EventLink PRD v4.3 + 技术设计 v2.4 验证性Review
+- [ui-designer-e14d06/ui-designer] # UI/UX设计师 — PromiseLink PRD v4.3 + 技术设计 v2.4 验证性Review
 
 ## 一、总体判定
 

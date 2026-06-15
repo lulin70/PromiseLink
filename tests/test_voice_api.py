@@ -9,9 +9,9 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
-from eventlink.core.auth import get_current_user_id
-from eventlink.database import Base, get_async_session
-from eventlink.main import app
+from promiselink.core.auth import get_current_user_id
+from promiselink.database import Base, get_async_session
+from promiselink.main import app
 
 
 # ── Constants ──
@@ -35,7 +35,7 @@ async def db_engine():
     @sa_event.listens_for(engine.sync_engine, "connect")
     def set_sqlite_pragma(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA foreign_keys=OFF")
         cursor.close()
 
     async with engine.begin() as conn:
@@ -84,8 +84,8 @@ def _make_mock_nlu_result(intent_value="schedule_query", confidence=0.92, slots=
 # ── Test 1: POST /voice/session 成功创建 ──────────────────────────
 
 
-@patch("eventlink.api.v1.voice.LLMClient")
-@patch("eventlink.api.v1.voice.NLUIntentClassifier")
+@patch("promiselink.api.v1.voice.LLMClient")
+@patch("promiselink.api.v1.voice.NLUIntentClassifier")
 async def test_create_voice_session_success(mock_classifier_cls, mock_llm_cls, client):
     """POST /voice/session creates a session and returns intent + response_text."""
     mock_llm_instance = MagicMock()
@@ -121,8 +121,8 @@ async def test_create_voice_session_success(mock_classifier_cls, mock_llm_cls, c
 # ── Test 2: 返回 intent 和 response_text ──────────────────────────
 
 
-@patch("eventlink.api.v1.voice.LLMClient")
-@patch("eventlink.api.v1.voice.NLUIntentClassifier")
+@patch("promiselink.api.v1.voice.LLMClient")
+@patch("promiselink.api.v1.voice.NLUIntentClassifier")
 async def test_session_returns_intent_and_response(mock_classifier_cls, mock_llm_cls, client):
     """Response includes both intent field and generated response_text."""
     mock_llm_cls.return_value = MagicMock()
@@ -183,8 +183,8 @@ async def test_query_text_too_long_returns_422(client):
 # ── Test 4: GET /voice/sessions 返回列表 ───────────────────────────
 
 
-@patch("eventlink.api.v1.voice.LLMClient")
-@patch("eventlink.api.v1.voice.NLUIntentClassifier")
+@patch("promiselink.api.v1.voice.LLMClient")
+@patch("promiselink.api.v1.voice.NLUIntentClassifier")
 async def test_list_voice_sessions_returns_list(mock_classifier_cls, mock_llm_cls, client):
     """GET /voice/sessions returns a list structure with total and items."""
     # First create a session
@@ -226,8 +226,8 @@ async def test_delete_voice_sessions_success(client):
 # ── Test 6: 用户隔离 — 只能访问自己的 session ─────────────────────
 
 
-@patch("eventlink.api.v1.voice.LLMClient")
-@patch("eventlink.api.v1.voice.NLUIntentClassifier")
+@patch("promiselink.api.v1.voice.LLMClient")
+@patch("promiselink.api.v1.voice.NLUIntentClassifier")
 async def test_user_isolation_in_list(mock_classifier_cls, mock_llm_cls, client):
     """GET /voice/sessions only returns sessions for the authenticated user."""
     mock_llm_cls.return_value = MagicMock()
@@ -254,8 +254,8 @@ async def test_user_isolation_in_list(mock_classifier_cls, mock_llm_cls, client)
 # ── Test 7: asr_confidence 存储 ────────────────────────────────────
 
 
-@patch("eventlink.api.v1.voice.LLMClient")
-@patch("eventlink.api.v1.voice.NLUIntentClassifier")
+@patch("promiselink.api.v1.voice.LLMClient")
+@patch("promiselink.api.v1.voice.NLUIntentClassifier")
 async def test_asr_confidence_stored_in_session(mock_classifier_cls, mock_llm_cls, client):
     """asr_confidence value is passed through to the session record."""
     mock_llm_cls.return_value = MagicMock()
@@ -278,8 +278,8 @@ async def test_asr_confidence_stored_in_session(mock_classifier_cls, mock_llm_cl
     assert response.status_code == 200
 
 
-@patch("eventlink.api.v1.voice.LLMClient")
-@patch("eventlink.api.v1.voice.NLUIntentClassifier")
+@patch("promiselink.api.v1.voice.LLMClient")
+@patch("promiselink.api.v1.voice.NLUIntentClassifier")
 async def test_asr_confidence_out_of_range_rejected(mock_classifier_cls, mock_llm_cls, client):
     """asr_confidence outside [0, 1] range is rejected by Pydantic validation."""
     response = await client.post(
@@ -295,8 +295,8 @@ async def test_asr_confidence_out_of_range_rejected(mock_classifier_cls, mock_ll
 # ── Test 8: status 默认为 active ───────────────────────────────────
 
 
-@patch("eventlink.api.v1.voice.LLMClient")
-@patch("eventlink.api.v1.voice.NLUIntentClassifier")
+@patch("promiselink.api.v1.voice.LLMClient")
+@patch("promiselink.api.v1.voice.NLUIntentClassifier")
 async def test_default_status_active_for_non_exit_intents(mock_classifier_cls, mock_llm_cls, client):
     """Session status defaults to 'active' for non-exit/non-chitchat intents."""
     mock_llm_cls.return_value = MagicMock()
@@ -315,8 +315,8 @@ async def test_default_status_active_for_non_exit_intents(mock_classifier_cls, m
     assert response.status_code == 200
 
 
-@patch("eventlink.api.v1.voice.LLMClient")
-@patch("eventlink.api.v1.voice.NLUIntentClassifier")
+@patch("promiselink.api.v1.voice.LLMClient")
+@patch("promiselink.api.v1.voice.NLUIntentClassifier")
 async def test_status_completed_for_exit_intent(mock_classifier_cls, mock_llm_cls, client):
     """Session status is 'completed' for exit/chitchat intents."""
     mock_llm_cls.return_value = MagicMock()
@@ -364,8 +364,8 @@ async def test_list_sessions_limit_exceeds_max(client):
 # ── Test 10: 默认 asr_provider 值 ──────────────────────────────────
 
 
-@patch("eventlink.api.v1.voice.LLMClient")
-@patch("eventlink.api.v1.voice.NLUIntentClassifier")
+@patch("promiselink.api.v1.voice.LLMClient")
+@patch("promiselink.api.v1.voice.NLUIntentClassifier")
 async def test_default_asr_provider_is_wechat(mock_classifier_cls, mock_llm_cls, client):
     """Default asr_provider value is 'wechat' when not specified."""
     mock_llm_cls.return_value = MagicMock()

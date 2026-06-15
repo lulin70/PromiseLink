@@ -1,12 +1,12 @@
 # 🤖 Multi-Agent 协作结果
 
-**任务**: EventLink PRD v1.6 客户视角评审 ⚠️ 核心要求:每个角色问自己:如果我是用户,我拿到这个产品,我能做什么?我缺什么?哪里不顺? 产品定位:EventLink = 数字名片 + AI关联发现引擎 + Todo行动管理 目标用户:商务BD、创业者、投资人——每周参加多场商务活动的人 核心场景:扫描名片→发现隐藏关联→生成行动建议→追踪完成 当前PRD功能清单(20个): P0核心:F-01事件语义路由、F-02管线化实体抽取、F-03实体归一、F-04关联发现、F-05商机匹配度、F-06 Todo生成与追踪 P1增强:F-07反馈闭环、F-09人脉关系录入与提取、F-14会议行动项分解(4类)、F-15行动建议生成、F-16模糊查找与交叉检索、F-17安全校验与敏感词过滤、F-20数据管理中心(CRUD) P2:F-08竞对数据、F-10图谱可视化、F-11专业数据服务、F-18语音输出、F-19设备接入、F-12个性化 4条事件管线:card_save(轻量秒级) / meeting(深度分钟级) / call(要点) / manual(补全) 4种会议类型:A内部协同 / B对外商务 / C项目复盘 / D知识提取 Todo类型:⚪机会(信息型) / 🔵背景(信息型) / 🟢行动(行动型) / 🔴风险(P2) 8种关联:alumni/ex_colleague/same_city/competitor/tech_overlap/deal_link/risk_link/supply_chain 【各角色 产品经理: 1. 用户打开产品第一眼看到什么?首页是什么?当前PRD有定义吗? 2. 用户典型的一天使用流程是什么?从早到晚怎么用? 3. 哪些用户故事是"伪需求"(技术自嗨但用户不care)? 4. 缺少哪些用户故事?用户会做但PRD没覆盖的操作? 5. 20个功能的优先级真的对吗?用户最想要的是什么? 架构师: 1. 用户扫描名片后3秒内看到什么?5秒呢?10秒呢?当前架构能支撑吗? 2. 用户在地铁上弱网环境能用吗?离线场景呢? 3. 用户数据从0到1000条,体验会退化吗? 4. 前端需要几个页面/组件?当前PRD有定义前端结构吗? 安全专家: 1. 用户最担心的隐私问题是什么?当前PRD解决了几个? 2. 如果用户是高管,他们愿意把会议纪要上传吗?顾虑是什么? 3. 多租户场景下,A用户能看到B用户的关联吗? 测试专家: 1. 从用户视角,哪些验收标准是"技术指标"但不是"用户体验指标"? 2. 用户最不能容忍的3个bug是什么?当前验收标准覆盖了吗? 3. 端到端测试:用户从扫描名片到完成一个行动,完整路径覆盖了吗? 开发者: 1. 前端需要多少个页面?PRD定义了页面结构吗? 2. API设计从用户操作倒推,还是从数据模型正推?哪种更合理? 3. 用户最常用的3个操作,API调用链是什么?延迟多少? DevOps: 1. 用户在什么时候用?高峰期是什么?当前架构扛得住吗? 2. 如果服务挂了,用户最不能接受丢失什么数据? UI设计师: 1. 当前PRD定义了几个页面?页面之间的导航关系是什么? 2. Todo列表怎么展示?信息型和行动型怎么区分?用户一眼能分清吗? 3. 数据管理中心(F-20)的交互流程是什么?用户怎么从Todo跳转到实体详情? 4. 名片扫描后的结果页长什么样?用户看到什么信息?怎么操作? 【输出格式】 每个角色输出: 1. 客户视角发现的问题(P0/P1/P2分级,2. 评分(1-10,从用户满意度角度) 3. 缺失的用户故事或功能(具体描述) 4. 是否同意通过P1 Gate(及理由)
+**任务**: PromiseLink PRD v1.6 客户视角评审 ⚠️ 核心要求:每个角色问自己:如果我是用户,我拿到这个产品,我能做什么?我缺什么?哪里不顺? 产品定位:PromiseLink = 数字名片 + AI关联发现引擎 + Todo行动管理 目标用户:商务BD、创业者、投资人——每周参加多场商务活动的人 核心场景:扫描名片→发现隐藏关联→生成行动建议→追踪完成 当前PRD功能清单(20个): P0核心:F-01事件语义路由、F-02管线化实体抽取、F-03实体归一、F-04关联发现、F-05商机匹配度、F-06 Todo生成与追踪 P1增强:F-07反馈闭环、F-09人脉关系录入与提取、F-14会议行动项分解(4类)、F-15行动建议生成、F-16模糊查找与交叉检索、F-17安全校验与敏感词过滤、F-20数据管理中心(CRUD) P2:F-08竞对数据、F-10图谱可视化、F-11专业数据服务、F-18语音输出、F-19设备接入、F-12个性化 4条事件管线:card_save(轻量秒级) / meeting(深度分钟级) / call(要点) / manual(补全) 4种会议类型:A内部协同 / B对外商务 / C项目复盘 / D知识提取 Todo类型:⚪机会(信息型) / 🔵背景(信息型) / 🟢行动(行动型) / 🔴风险(P2) 8种关联:alumni/ex_colleague/same_city/competitor/tech_overlap/deal_link/risk_link/supply_chain 【各角色 产品经理: 1. 用户打开产品第一眼看到什么?首页是什么?当前PRD有定义吗? 2. 用户典型的一天使用流程是什么?从早到晚怎么用? 3. 哪些用户故事是"伪需求"(技术自嗨但用户不care)? 4. 缺少哪些用户故事?用户会做但PRD没覆盖的操作? 5. 20个功能的优先级真的对吗?用户最想要的是什么? 架构师: 1. 用户扫描名片后3秒内看到什么?5秒呢?10秒呢?当前架构能支撑吗? 2. 用户在地铁上弱网环境能用吗?离线场景呢? 3. 用户数据从0到1000条,体验会退化吗? 4. 前端需要几个页面/组件?当前PRD有定义前端结构吗? 安全专家: 1. 用户最担心的隐私问题是什么?当前PRD解决了几个? 2. 如果用户是高管,他们愿意把会议纪要上传吗?顾虑是什么? 3. 多租户场景下,A用户能看到B用户的关联吗? 测试专家: 1. 从用户视角,哪些验收标准是"技术指标"但不是"用户体验指标"? 2. 用户最不能容忍的3个bug是什么?当前验收标准覆盖了吗? 3. 端到端测试:用户从扫描名片到完成一个行动,完整路径覆盖了吗? 开发者: 1. 前端需要多少个页面?PRD定义了页面结构吗? 2. API设计从用户操作倒推,还是从数据模型正推?哪种更合理? 3. 用户最常用的3个操作,API调用链是什么?延迟多少? DevOps: 1. 用户在什么时候用?高峰期是什么?当前架构扛得住吗? 2. 如果服务挂了,用户最不能接受丢失什么数据? UI设计师: 1. 当前PRD定义了几个页面?页面之间的导航关系是什么? 2. Todo列表怎么展示?信息型和行动型怎么区分?用户一眼能分清吗? 3. 数据管理中心(F-20)的交互流程是什么?用户怎么从Todo跳转到实体详情? 4. 名片扫描后的结果页长什么样?用户看到什么信息?怎么操作? 【输出格式】 每个角色输出: 1. 客户视角发现的问题(P0/P1/P2分级,2. 评分(1-10,从用户满意度角度) 3. 缺失的用户故事或功能(具体描述) 4. 是否同意通过P1 Gate(及理由)
 **状态**: ✅ 成功
 **耗时**: 146.46s
 **参与角色**: product-manager, ui-designer, tester, architect, solo-coder, devops, security
 
 ## 📋 执行摘要
-任务「EventLink PRD v1.6 客户视角评审 ⚠️ 核心要求:每个角色问自己:如果我是用户,我拿到这个产品,我能做什么?我缺什么?哪里不顺? 产品定位:E」已完成多Agent协作。
+任务「PromiseLink PRD v1.6 客户视角评审 ⚠️ 核心要求:每个角色问自己:如果我是用户,我拿到这个产品,我能做什么?我缺什么?哪里不顺? 产品定位:E」已完成多Agent协作。
 参与角色: 产品经理, UI设计师, 测试专家, 架构师, 开发者, 运维工程师, 安全专家 (7个)
 执行结果: 7/7 个Worker成功
 协作耗时: 119.65s
@@ -14,13 +14,13 @@ Scratchpad关键发现: # Scratchpad Summary (scratchpad-20260601-180503)
 **Total entries**: 7 | **Active findings**: 7 | **Conflicts**: 0
 
 ## 🔍 Key Findings (7)
-- [architect-e3622a/architect] # EventLink PRD v1.6 客户视角评审 - 系
+- [architect-e3622a/architect] # PromiseLink PRD v1.6 客户视角评审 - 系
 
 ## 👥 各角色产出
 
 ### 🔒 安全专家 [✅]
 ---
-# 安全专家评审报告 - EventLink PRD v1.6
+# 安全专家评审报告 - PromiseLink PRD v1.6
 
 ## 一、客户视角安全问题分析
 
@@ -63,7 +63,7 @@ Scratchpad关键发现: # Scratchpad Summary (scratchpad-20260601-180503)
 
 ## 三、OWASP Top 10映射
 
-| OWASP风险 | EventLink场景 | 当前PRD状态 | 用户影响 |
+| OWASP风险 | PromiseLink场景 | 当前PRD状态 | 用户影响 |
 |-----------|---------------|-------------|----------|
 | **A01:Broken Access Control** | 用户A能否看到用户B的关联? | ❌ 未定义RBAC/多租户隔离 | 🔴 数据泄露 |
 | **A02:Cryptographic Failures** | 名片/会议纪要存储加密? | ❌ 未定义加密方案 | 🔴 合规风险 |
@@ -315,7 +315,7 @@ Scratchpad关键发现: # Scratchpad Summary (scratchpad-20260601-180503)
 
 ### 核心发现
 
-**产品视角**:EventLink功能创新,但**安全设计为0**,用户不敢用
+**产品视角**:PromiseLink功能创新,但**安全设计为0**,用户不敢用
 
 **用户视角**:
 - ❌ 我不信任这个产品(数据会被泄露吗?)
@@ -716,7 +716,7 @@ Scratchpad关键发现: # Scratchpad Summary (scratchpad-20260601-180503)
 
 ### ⚙️ DevOps工程师 [✅]
 ---
-# DevOps工程师 - EventLink PRD v1.6 客户视角评审
+# DevOps工程师 - PromiseLink PRD v1.6 客户视角评审
 
 ## 1. 客户视角发现的问题
 
@@ -1022,7 +1022,7 @@ Scratchpad关键发现: # Scratchpad Summary (scratchpad-20260601-180503)
 
 ### 🤖 solo [✅]
 ---
-# EventLink PRD v1.6 客户视角评审 - 全栈开发者视角
+# PromiseLink PRD v1.6 客户视角评审 - 全栈开发者视角
 
 ## 一、客户视角问题分析
 
@@ -1350,7 +1350,7 @@ useEffect(() => {
 
 // 离线缓存(IndexedDB)
 import { openDB } from 'idb';
-const db = await openDB('eventlink', 1, {
+const db = await openDB('promiselink', 1, {
   upgrade(db) {
     db.createObjectStore('cards');
     db.createObjectStore('todos');
@@ -1501,7 +1501,7 @@ def process_card_save(card_id):
 
 ### 🧪 测试专家 [✅]
 ---
-# 测试专家评审报告 - EventLink PRD v1.6
+# 测试专家评审报告 - PromiseLink PRD v1.6
 
 ## 一、客户视角问题分析
 
@@ -2042,7 +2042,7 @@ P3 Gate(用户验证):
 ### 🤖 ui [✅]
 ---
 # UI/UX设计师评审报告
-## EventLink PRD v1.6 客户视角分析
+## PromiseLink PRD v1.6 客户视角分析
 
 ---
 
@@ -2168,7 +2168,7 @@ P3 Gate(用户验证):
 ### 3.1 页面层级结构
 
 ```
-EventLink App
+PromiseLink App
 │
 ├─ 首页(Home) ⭐
 │  ├─ 今日待办(3个优先Todo)
@@ -2518,7 +2518,7 @@ Desktop: 1024px+        (三列布局,P2)
 
 ### 🏗️ 架构师 [✅]
 ---
-# EventLink PRD v1.6 客户视角评审 - 系统架构师视角
+# PromiseLink PRD v1.6 客户视角评审 - 系统架构师视角
 
 ## 一、客户视角发现的问题
 
@@ -3160,7 +3160,7 @@ Monolith
 **Total entries**: 7 | **Active findings**: 7 | **Conflicts**: 0
 
 ## 🔍 Key Findings (7)
-- [architect-e3622a/architect] # EventLink PRD v1.6 客户视角评审 - 系统架构师视角
+- [architect-e3622a/architect] # PromiseLink PRD v1.6 客户视角评审 - 系统架构师视角
 
 ## 一、客户视角发现的问题
 
@@ -3169,7 +3169,7 @@ Monolith
 **P0-1: 缺少前端架构定义，用户界面结构完全未定义**
 - **用户痛点**：用 (confidence: 70%)
 - [ui-designer-70f63b/ui-designer] # UI/UX设计师评审报告
-## EventLink PRD v1.6 客户视角分析
+## PromiseLink PRD v1.6 客户视角分析
 
 ---
 
@@ -3179,7 +3179,7 @@ Monolith
 
 **P0-1: 缺失完整的信息架构和页面结构定义**
 - **用户痛点* (confidence: 70%)
-- [tester-64a379/tester] # 测试专家评审报告 - EventLink PRD v1.6
+- [tester-64a379/tester] # 测试专家评审报告 - PromiseLink PRD v1.6
 
 ## 一、客户视角问题分析
 
@@ -3187,7 +3187,7 @@ Monolith
 
 **P0-1: 缺少端到端用户旅程的验收标准**
 - **问题**: PRD定义了20个功能点,但没有定义完 (confidence: 70%)
-- [solo-coder-e31fe7/solo-coder] # EventLink PRD v1.6 客户视角评审 - 全栈开发者视角
+- [solo-coder-e31fe7/solo-coder] # PromiseLink PRD v1.6 客户视角评审 - 全栈开发者视角
 
 ## 一、客户视角问题分析
 
@@ -3195,7 +3195,7 @@ Monolith
 
 **P0-1: 前端页面结构完全缺失**
 - **问题**: PRD定义了20个功能,但没有定义 (confidence: 70%)
-- [devops-0d7475/devops] # DevOps工程师 - EventLink PRD v1.6 客户视角评审
+- [devops-0d7475/devops] # DevOps工程师 - PromiseLink PRD v1.6 客户视角评审
 
 ## 1. 客户视角发现的问题
 
@@ -3212,7 +3212,7 @@ Monolith
 **P0-1: 缺失首页/主界面定义**
 - **问题**: PRD未定义用户打开App第一眼看到什么
 - **用户影响**: 用户不知 (confidence: 70%)
-- [security-afe1a3/security] # 安全专家评审报告 - EventLink PRD v1.6
+- [security-afe1a3/security] # 安全专家评审报告 - PromiseLink PRD v1.6
 
 ## 一、客户视角安全问题分析
 

@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 import pytest_asyncio
 
-from eventlink.services.priority_scorer import (
+from promiselink.services.priority_scorer import (
     DEFAULT_IMPORTANCE,
     IMPORTANCE_WEIGHTS,
     URGENCY_NO_DUE,
@@ -166,7 +166,7 @@ class TestScoreAndUpdateTodo:
     @pytest.mark.asyncio
     async def test_score_and_update_todo(self, db_session):
         """Verify score_and_update_todo sets dynamic_score and score_calculated_at."""
-        from eventlink.models.todo import Todo
+        from promiselink.models.todo import Todo
 
         user_id = make_user_id()
         event = await create_test_event(db_session, user_id=user_id)
@@ -193,7 +193,7 @@ class TestScoreAndUpdateTodo:
     @pytest.mark.asyncio
     async def test_batch_score_todos(self, db_session):
         """Verify batch_score_todos updates multiple todos."""
-        from eventlink.models.todo import Todo
+        from promiselink.models.todo import Todo
 
         user_id = make_user_id()
         event = await create_test_event(db_session, user_id=user_id)

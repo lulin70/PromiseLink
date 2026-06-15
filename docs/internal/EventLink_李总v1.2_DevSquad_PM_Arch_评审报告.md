@@ -1,15 +1,15 @@
-# EventLink 李总v1.2建议 — PM+Architect 联合深度评审报告
+# PromiseLink 李总v1.2建议 — PM+Architect 联合深度评审报告
 
 > **报告编号**: DS-REV-2026-012
 > **评审方法**: DevSquad MultiAgentDispatcher（Mock模式 + 人工深度分析）
 > **参与角色**: Product Manager + Architect（Consensus共识模式）
 > **评审日期**: 2026-06-04
 > **输入材料**:
-> - 李总v1.2原文：`docs/external/for_李总/EventLink_PoC技术整改与产品演进建议_v1.2_融合分形宇宙外部合作SOP .md`
-> - WORKBUDDY定稿：`docs/external/for_team/EventLink_李总v1.2审阅_产品定位定稿_2026-06-04.md`
+> - 李总v1.2原文：`docs/external/for_李总/PromiseLink_PoC技术整改与产品演进建议_v1.2_融合分形宇宙外部合作SOP .md`
+> - WORKBUDDY定稿：`docs/external/for_team/PromiseLink_李总v1.2审阅_产品定位定稿_2026-06-04.md`
 > - 当前PRD：`docs/spec/PRD_V1.md` (v4.0)
-> - 技术设计：`docs/architecture/EventLink_技术设计_v1.md` (v2.2)
-> - 源代码：`src/eventlink/` 全部模块
+> - 技术设计：`docs/architecture/PromiseLink_技术设计_v1.md` (v2.2)
+> - 源代码：`src/promiselink/` 全部模块
 
 ---
 
@@ -26,7 +26,7 @@
 
 ### 1.2 核心结论
 
-**李总v1.2是EventLink目前收到的最有价值的外部建议文档。** 其核心价值不在于引入SOP全流程，而在于：
+**李总v1.2是PromiseLink目前收到的最有价值的外部建议文档。** 其核心价值不在于引入SOP全流程，而在于：
 
 1. 用**真实PoC错误数据**（7事件→24条Todo、承诺错配、资料混流）验证了产品设计的薄弱环节
 2. 提出了**结构化的解决方案**（input_scope分类、Promise双向动作、Todo降噪），而非泛泛的建议
@@ -492,7 +492,7 @@ generated.append(GeneratedTodo(
 
 ### 5.1 战略共识
 
-1. **李总v1.2的方向完全正确**。其核心洞察——"一次连接需要被回应，一段关系需要被推进"——与 EventLink 的产品定位完美契合。
+1. **李总v1.2的方向完全正确**。其核心洞察——"一次连接需要被回应，一段关系需要被推进"——与 PromiseLink 的产品定位完美契合。
 2. **5项P0建议构成最小可行改进集**，恰好解决PoC暴露的全部严重问题（混流、噪音、错配、缺全貌）。
 3. **"暂停商机匹配"是正确的战略决策**，应作为PoC Gate的硬性前提条件。
 4. **SOP借鉴应有明确边界**：只引入"阶段思维"和"节点意识"，不搬入组织型流程（建群、结算、专委会）。
@@ -557,7 +557,7 @@ TTS语音播报对他来说是核心使用路径而非增强功能。
 
 预计2周后可以请您 reviewing 我们的改进效果。
 
-林总 & EventLink 团队
+林总 & PromiseLink 团队
 2026-06-04
 ```
 

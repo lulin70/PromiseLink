@@ -9,7 +9,7 @@ Covers:
 
 import pytest
 
-from eventlink.services.wechat_forward_adapter import (
+from promiselink.services.wechat_forward_adapter import (
     ChatMessage,
     WeChatForwardAdapter,
 )

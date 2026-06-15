@@ -1,4 +1,4 @@
-"""Comprehensive integration tests for EventLink.
+"""Comprehensive integration tests for PromiseLink.
 
 Validates that multiple components work together correctly:
   1. Full Pipeline Integration (Event → Entity → Todo → Association → Brief)
@@ -11,6 +11,7 @@ Uses httpx.AsyncClient + FastAPI dependency injection against in-memory SQLite,
 with LLM calls mocked out. No external services required.
 """
 
+import json
 import os
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -22,15 +23,15 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from eventlink.core.auth import create_access_token, get_current_user_id
-from eventlink.core.rate_limiter import reset_rate_limits
-from eventlink.database import Base, get_async_session
-from eventlink.main import app
-from eventlink.models.association import Association
-from eventlink.models.entity import Entity
-from eventlink.models.event import Event
-from eventlink.models.relationship_brief import RelationshipBrief
-from eventlink.models.todo import Todo
+from promiselink.core.auth import create_access_token, get_current_user_id
+from promiselink.core.rate_limiter import reset_rate_limits
+from promiselink.database import Base, get_async_session
+from promiselink.main import app
+from promiselink.models.association import Association
+from promiselink.models.entity import Entity
+from promiselink.models.event import Event
+from promiselink.models.relationship_brief import RelationshipBrief
+from promiselink.models.todo import Todo
 
 # ── Constants ──
 
@@ -53,7 +54,7 @@ async def db_engine():
     @sa_event.listens_for(engine.sync_engine, "connect")
     def set_sqlite_pragma(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA foreign_keys=OFF")
         cursor.close()
 
     async with engine.begin() as conn:
@@ -89,15 +90,15 @@ async def client(db_session):
     async def mock_process_event(event_id):
         pass
 
-    import eventlink.api.v1.events as events_module
-    original_process = events_module._process_event_background
-    events_module._process_event_background = mock_process_event
+    import promiselink.services.event_processor as processor_module
+    original_process = processor_module.process_event_background
+    processor_module.process_event_background = mock_process_event
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
-    events_module._process_event_background = original_process
+    processor_module.process_event_background = original_process
     app.dependency_overrides.clear()
 
 
@@ -378,7 +379,7 @@ class TestFullPipelineIntegration:
         await db_session.commit()
 
         # Use the service to update the brief (simulating pipeline step 12)
-        from eventlink.services.relationship_brief_service import RelationshipBriefService
+        from promiselink.services.relationship_brief_service import RelationshipBriefService
         service = RelationshipBriefService(db_session)
         result = await service.update_brief_from_event(
             user_id=TEST_USER_ID,
@@ -407,8 +408,11 @@ class TestAuthAPIIntegration:
     @pytest.mark.asyncio
     async def test_login_with_poc_secret(self, db_session: AsyncSession):
         """Login via /auth/login with valid poc_secret returns JWT."""
-        # Set the poc_secret env var
-        os.environ["EVENTLINK_POC_SECRET"] = "test-secret-123"
+        from promiselink.config import get_settings, Settings
+
+        # Clear cached settings so new instance picks up env var
+        get_settings.cache_clear()
+        os.environ["POC_SECRET"] = "test-secret-123"
 
         try:
             async def override_get_async_session():
@@ -428,13 +432,14 @@ class TestAuthAPIIntegration:
             assert data["token_type"] == "bearer"
             assert data["user_id"] == TEST_USER_ID
         finally:
-            os.environ.pop("EVENTLINK_POC_SECRET", None)
+            os.environ.pop("POC_SECRET", None)
+            get_settings.cache_clear()
             app.dependency_overrides.clear()
 
     @pytest.mark.asyncio
     async def test_login_with_wrong_secret_returns_401(self, db_session: AsyncSession):
         """Login with wrong poc_secret returns 401."""
-        os.environ["EVENTLINK_POC_SECRET"] = "correct-secret"
+        os.environ["PROMISELINK_POC_SECRET"] = "correct-secret"
 
         try:
             async def override_get_async_session():
@@ -450,7 +455,7 @@ class TestAuthAPIIntegration:
                 )
             assert resp.status_code == 401
         finally:
-            os.environ.pop("EVENTLINK_POC_SECRET", None)
+            os.environ.pop("PROMISELINK_POC_SECRET", None)
             app.dependency_overrides.clear()
 
     @pytest.mark.asyncio
@@ -689,7 +694,7 @@ class TestPrivacyAPIIntegration:
 
         resp = await client.get(f"{API_PREFIX}/export/{TEST_USER_ID}")
         assert resp.status_code == 200
-        data = resp.json()
+        data = json.loads(resp.text)
 
         assert data["export_version"] == "1.0"
         assert data["user_id"] == TEST_USER_ID
@@ -791,7 +796,7 @@ class TestRateLimitingIntegration:
         self, client: AsyncClient
     ):
         """Rapid requests to a rate-limited endpoint eventually return 429."""
-        from eventlink.core.rate_limiter import check_rate_limit
+        from promiselink.core.rate_limiter import check_rate_limit
 
         # Use the in-memory limiter directly for a controlled test
         key = "user:rate_test_user"
@@ -813,7 +818,7 @@ class TestRateLimitingIntegration:
     @pytest.mark.asyncio
     async def test_rate_limiter_separate_keys_are_independent(self):
         """Different rate limit keys have independent counters."""
-        from eventlink.core.rate_limiter import check_rate_limit
+        from promiselink.core.rate_limiter import check_rate_limit
 
         key_a = "user:independent_a"
         key_b = "user:independent_b"
@@ -838,7 +843,7 @@ class TestRateLimitingIntegration:
     @pytest.mark.asyncio
     async def test_rate_limiter_resets_between_tests(self):
         """Rate limit state is reset between tests (autouse fixture)."""
-        from eventlink.core.rate_limiter import check_rate_limit
+        from promiselink.core.rate_limiter import check_rate_limit
 
         key = "user:reset_test"
         limit = 2

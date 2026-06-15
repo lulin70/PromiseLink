@@ -1,4 +1,4 @@
-# EventLink 第一轮：PRD v3.2 + 技术设计 v1.1 审核 — 7角色审核报告
+# PromiseLink 第一轮：PRD v3.2 + 技术设计 v1.1 审核 — 7角色审核报告
 
 > **审核轮次**: 第一轮：PRD v3.2 + 技术设计 v1.1 审核
 > **审核日期**: 2026-06-02
@@ -11,7 +11,7 @@
 
 ## 架构师 (architect)
 
-# EventLink 架构师审核意见
+# PromiseLink 架构师审核意见
 
 ## 一、关键问题（P0/P1）
 
@@ -179,7 +179,7 @@ def match_rules(self, user_id: str, context: str) -> List[str]
 ```
 
 但缺少关键能力：
-1. **声明记忆**：EventLink生成的Todo需反哺CarryMem（如"用户确认了XX是竞对"）
+1. **声明记忆**：PromiseLink生成的Todo需反哺CarryMem（如"用户确认了XX是竞对"）
 2. **纠正反馈**：用户驳回AI推断时（如"这不是竞对"），需更新CarryMem规则
 3. **健康检查**：`is_available()`仅返回bool，无法区分"未启用"vs"连接超时"vs"版本不兼容"
 
@@ -585,9 +585,9 @@ class NotifyService:
 **问题位置**: §1.3 核心价值主张（三层架构图）
 
 **具体问题**:
-1. **入口混乱**: 用户在"名片小程序"扫描名片后，需要手动点击"关系助手"才能看到EventLink功能，增加了一次操作成本
-2. **数据孤岛风险**: 名片夹与EventLink的实体库如何同步？如果用户在名片夹修改了联系方式，EventLink能否感知？
-3. **心智模型冲突**: 名片小程序的心智是"静态通讯录"，EventLink的心智是"动态关系网"，两者合并后用户可能困惑"我到底是在管理名片还是在经营关系？"
+1. **入口混乱**: 用户在"名片小程序"扫描名片后，需要手动点击"关系助手"才能看到PromiseLink功能，增加了一次操作成本
+2. **数据孤岛风险**: 名片夹与PromiseLink的实体库如何同步？如果用户在名片夹修改了联系方式，PromiseLink能否感知？
+3. **心智模型冲突**: 名片小程序的心智是"静态通讯录"，PromiseLink的心智是"动态关系网"，两者合并后用户可能困惑"我到底是在管理名片还是在经营关系？"
 
 **改进建议**:
 ```
@@ -598,9 +598,9 @@ class NotifyService:
     └─ 🆕 建议行动（置顶显示）
   
   数据同步策略:
-    - 名片夹作为"展示层"，EventLink实体库作为"存储层"
-    - 用户修改名片信息 → 自动同步到EventLink
-    - EventLink发现新关联 → 实时推送到名片夹
+    - 名片夹作为"展示层"，PromiseLink实体库作为"存储层"
+    - 用户修改名片信息 → 自动同步到PromiseLink
+    - PromiseLink发现新关联 → 实时推送到名片夹
   
   统一心智模型:
     - 改名片夹为"人脉库"
@@ -1272,7 +1272,7 @@ CREATE INDEX idx_audit_user_time ON audit_logs(user_id, created_at DESC);
 Content-Security-Policy: 
   default-src 'self'; 
   script-src 'self' 'unsafe-inline'; 
-  connect-src 'self' https://api.eventlink.com;
+  connect-src 'self' https://api.promiselink.com;
   img-src 'self' data:;
 ```
 
@@ -1356,13 +1356,13 @@ Content-Security-Policy:
         - 转写延迟<会议时长*1.5
       
       Step3: 会后处理
-        - EventLink API接收会议文本<10秒
+        - PromiseLink API接收会议文本<10秒
         - 生成行动项<30秒
         - 微信服务号推送到达<60秒
       
       Step4: 语音补录
         - 小程序语音录入→转文本<5秒
-        - EventLink处理→推送结果<60秒
+        - PromiseLink处理→推送结果<60秒
     
     异常路径:
       - 录音卡离线: 小程序应提示手动录入
@@ -1584,12 +1584,12 @@ Content-Security-Policy:
           assert notification_engine.send(user, todo) == True
   ```
 
-**P1-3: 录音卡→ASR→EventLink端到端链路的容错测试缺失**
+**P1-3: 录音卡→ASR→PromiseLink端到端链路的容错测试缺失**
 - **问题位置**: PRD §1.5.2 环节B，技术设计未覆盖
 - **具体问题**:
   - 录音卡与手机蓝牙断连后重连，录音数据完整性如何保障？
   - ASR转写失败(如方言、噪音环境)时，用户如何感知和补救？
-  - EventLink API接收到空文本或乱码时的降级处理未定义
+  - PromiseLink API接收到空文本或乱码时的降级处理未定义
 - **改进建议**:
   ```python
   # 端到端容错测试套件
@@ -1606,8 +1606,8 @@ Content-Security-Policy:
           transcript = asr_service.transcribe(audio_file)
           assert len(transcript) > 100  # 至少有实质内容
           
-          # 3. EventLink处理
-          response = eventlink_api.post_event({
+          # 3. PromiseLink处理
+          response = promiselink_api.post_event({
               "event_type": "call",
               "raw_text": transcript,
               "source": "recording_r1"
@@ -1616,7 +1616,7 @@ Content-Security-Policy:
           
           # 4. 验证结果
           time.sleep(30)  # 等待后台处理
-          todos = eventlink_api.get_todos(status="pending")
+          todos = promiselink_api.get_todos(status="pending")
           assert len(todos) > 0
       
       def test_bluetooth_disconnect_recovery(self):
@@ -1646,20 +1646,20 @@ Content-Security-Policy:
           # ASR应返回置信度
           assert transcript.confidence < 0.5
           
-          # EventLink应标记为低质量
-          response = eventlink_api.post_event({
+          # PromiseLink应标记为低质量
+          response = promiselink_api.post_event({
               "event_type": "call",
               "raw_text": transcript.text,
               "metadata": {"asr_confidence": transcript.confidence}
           })
           
           # 验证生成的Todo带有质量警告
-          todos = eventlink_api.get_todos(source_event=response.json()["event_id"])
+          todos = promiselink_api.get_todos(source_event=response.json()["event_id"])
           assert any("转写质量较低" in t["description"] for t in todos)
       
-      def test_eventlink_empty_text_handling(self):
-          """EventLink空文本处理"""
-          response = eventlink_api.post_event({
+      def test_promiselink_empty_text_handling(self):
+          """PromiseLink空文本处理"""
+          response = promiselink_api.post_event({
               "event_type": "call",
               "raw_text": "",
               "source": "recording_r1"
@@ -1669,9 +1669,9 @@ Content-Security-Policy:
           assert response.status_code == 422
           assert "raw_text不能为空" in response.json()["detail"]
       
-      def test_eventlink_malformed_text_handling(self):
-          """EventLink乱码文本处理"""
-          response = eventlink_api.post_event({
+      def test_promiselink_malformed_text_handling(self):
+          """PromiseLink乱码文本处理"""
+          response = promiselink_api.post_event({
               "event_type": "call",
               "raw_text": "��无效字符��",
               "source": "recording_r1"
@@ -1695,7 +1695,7 @@ Content-Security-Policy:
   ])
   def test_feature_parity_with_without_carrymem(memory_provider):
       """验证核心功能在降级模式下依然可用"""
-      app = EventLinkApp(memory_provider=memory_provider)
+      app = PromiseLinkApp(memory_provider=memory_provider)
       
       event = create_test_event(event_type="meeting", raw_text="...")
       entities, todos = app.process_event(event)
@@ -1767,7 +1767,7 @@ Content-Security-Policy:
 **不足**:
 1. **端到端测试场景不够具体**(P0)：旅程二环节B+是核心场景，但测试设计不够细化，缺少异常路径和性能基准的可操作性定义
 2. **语音相关测试策略薄弱**(P0)：TTS播报和语音录入是差异化功能，但验证手段不足，尤其是内容准确性的自动化测试缺失
-3. **跨系统通信可靠性测试不足**(P1)：H5-小程序postMessage、录音卡-手机蓝牙、ASR-EventLink等多个集成点的容错测试未覆盖
+3. **跨系统通信可靠性测试不足**(P1)：H5-小程序postMessage、录音卡-手机蓝牙、ASR-PromiseLink等多个集成点的容错测试未覆盖
 4. **性能测试基准缺少并发和负载定义**(P2)：<3秒、<60秒等指标未说明是单用户还是并发场景
 
 **通过条件**:
@@ -2396,20 +2396,20 @@ async def create_event():
     - 部署在哪里？（Nginx静态服务？CDN？小程序云开发？）
     - 如何做版本管理？（前端代码更新后，老版本小程序WebView缓存怎么办？）
     - 如何做灰度发布？（20%用户先用新版，出问题快速回滚）
-  - 前后端联调：H5页面调用EventLink API，跨域如何处理？
+  - 前后端联调：H5页面调用PromiseLink API，跨域如何处理？
 - **改进建议**:
   ```yaml
   # H5部署方案
   h5_deployment:
     phase1_minimum:
-      - Nginx静态托管（与EventLink API同一台服务器）
-      - URL: https://eventlink.example.com/h5/
+      - Nginx静态托管（与PromiseLink API同一台服务器）
+      - URL: https://promiselink.example.com/h5/
       - CORS配置：允许小程序域名访问API
       
     phase2_cdn:
       - 静态资源上传到腾讯云COS/阿里云OSS
       - 配置CDN加速
-      - URL: https://cdn.eventlink.com/h5/v1.2.3/
+      - URL: https://cdn.promiselink.com/h5/v1.2.3/
       
     version_management:
       - 每次发布打tag: v1.2.3
@@ -2461,8 +2461,8 @@ async def create_event():
 
 **P3-2: Prometheus指标补充**
 - 建议增加业务指标：
-  - `eventlink_entity_merge_auto_count`（自动合并实体数，监控归一引擎效果）
-  - `eventlink_todo_completion_rate`（Todo完成率，监控产品价值）
+  - `promiselink_entity_merge_auto_count`（自动合并实体数，监控归一引擎效果）
+  - `promiselink_todo_completion_rate`（Todo完成率，监控产品价值）
 
 **P3-3: 开发环境Docker Compose配置**
 - 建议提供`docker-compose.dev.yml`，包含：

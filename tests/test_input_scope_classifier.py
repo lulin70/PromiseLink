@@ -6,13 +6,13 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import pytest_asyncio
 
-from eventlink.models.event import Event
-from eventlink.services.input_scope_classifier import (
+from promiselink.models.event import Event
+from promiselink.services.input_scope_classifier import (
     ClassificationResult,
     InputScope,
     InputScopeClassifier,
 )
-from eventlink.services.llm_client import LLMClient
+from promiselink.services.llm_client import LLMClient
 
 
 # ── Helpers ──

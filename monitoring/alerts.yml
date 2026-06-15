@@ -1,13 +1,13 @@
 groups:
-  - name: eventlink-alerts
+  - name: promiselink-alerts
     rules:
-      - alert: EventLinkDown
-        expr: up{job="eventlink-api"} == 0
+      - alert: PromiseLinkDown
+        expr: up{job="promiselink-api"} == 0
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "EventLink API is down"
+          summary: "PromiseLink API is down"
 
       - alert: HighErrorRate
         expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05

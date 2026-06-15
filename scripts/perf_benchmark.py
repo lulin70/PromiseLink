@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""EventLink API Performance Benchmark.
+"""PromiseLink API Performance Benchmark.
 
 Tests P95 latency < 500ms for all core endpoints.
 Rate limit: 60 req/min for authenticated users. We use 10 req/endpoint with delays.
@@ -9,9 +9,10 @@ import time
 import statistics
 import uuid
 import httpx
+import os
 
 BASE_URL = "http://localhost:8001/api/v1"
-POC_SECRET = "eventlink2024"
+POC_SECRET = os.environ.get("POC_SECRET", "promiselink2024")
 USER_ID = str(uuid.uuid4())
 
 async def get_token(client: httpx.AsyncClient) -> str:

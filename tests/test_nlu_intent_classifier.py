@@ -5,12 +5,12 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from eventlink.services.nlu_intent_classifier import (
+from promiselink.services.nlu_intent_classifier import (
     NLUIntentClassifier,
     NLUResult,
     VoiceIntent,
 )
-from eventlink.services.llm_client import LLMClient
+from promiselink.services.llm_client import LLMClient
 
 
 # ── Helpers ──
@@ -240,7 +240,7 @@ async def test_no_rule_match_falls_back_to_llm():
 
 def test_slot_extract_date_tomorrow():
     """'明天' slot extraction returns correct ISO date."""
-    from eventlink.services.nlu_intent_classifier import NLUIntentClassifier as C
+    from promiselink.services.nlu_intent_classifier import NLUIntentClassifier as C
     today = date.today()
     expected = (today + timedelta(days=1)).isoformat()
 
@@ -250,7 +250,7 @@ def test_slot_extract_date_tomorrow():
 
 def test_slot_extract_date_day_after_tomorrow():
     """'后天' slot extraction returns correct ISO date."""
-    from eventlink.services.nlu_intent_classifier import NLUIntentClassifier as C
+    from promiselink.services.nlu_intent_classifier import NLUIntentClassifier as C
     today = date.today()
     expected = (today + timedelta(days=2)).isoformat()
 
@@ -260,7 +260,7 @@ def test_slot_extract_date_day_after_tomorrow():
 
 def test_slot_extract_date_range_this_week():
     """'本周' slot extraction returns correct date range."""
-    from eventlink.services.nlu_intent_classifier import NLUIntentClassifier as C
+    from promiselink.services.nlu_intent_classifier import NLUIntentClassifier as C
     today = date.today()
 
     slots = C._extract_slots("本周的日程", VoiceIntent.SCHEDULE_QUERY)
@@ -270,7 +270,7 @@ def test_slot_extract_date_range_this_week():
 
 def test_slot_extract_date_iso_format():
     """ISO date pattern in text gets extracted as date slot."""
-    from eventlink.services.nlu_intent_classifier import NLUIntentClassifier as C
+    from promiselink.services.nlu_intent_classifier import NLUIntentClassifier as C
 
     slots = C._extract_slots("2026-06-10有什么安排", VoiceIntent.SCHEDULE_QUERY)
     assert slots["date"] == "2026-06-10"
@@ -281,7 +281,7 @@ def test_slot_extract_date_iso_format():
 
 def test_slot_extract_person_name():
     """Person name '张总' extracted for relationship_status intent."""
-    from eventlink.services.nlu_intent_classifier import NLUIntentClassifier as C
+    from promiselink.services.nlu_intent_classifier import NLUIntentClassifier as C
 
     slots = C._extract_slots("张总到哪步了", VoiceIntent.RELATIONSHIP_STATUS)
     assert slots["person"] == "张总"
@@ -289,7 +289,7 @@ def test_slot_extract_person_name():
 
 def test_slot_extract_person_name_for_promise():
     """Person name extracted for promise_tracker intent too."""
-    from eventlink.services.nlu_intent_classifier import NLUIntentClassifier as C
+    from promiselink.services.nlu_intent_classifier import NLUIntentClassifier as C
 
     slots = C._extract_slots("我答应王经理的事", VoiceIntent.PROMISE_TRACKER)
     assert slots["person"] == "王经理"

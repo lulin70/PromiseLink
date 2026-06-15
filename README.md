@@ -1,6 +1,6 @@
-# EventLink - AI驱动的个人商务关系经营助手
+# PromiseLink - AI驱动的个人商务关系经营助手
 
-> **项目状态**: PoC 验收通过 | Phase 1 开发中 | 654 测试全通过 | 72% 覆盖率
+> **项目状态**: PoC 验收通过 | 基础版打包中 | 1224+ 测试全通过 | 73% 覆盖率
 >
 > **定位**: 先成就关系，再促成合作 — 利他切入的个人商务关系经营系统
 
@@ -11,12 +11,12 @@
 pip install -r requirements.txt
 
 # 2. 配置环境变量
-cp .env.example .env
+cp .env.basic.example .env
 # 编辑 .env 填入 MOKA_AI_API_KEY (Moka AI) 或 OPENAI_API_KEY
 
 # 3. 启动应用
 export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
-python -m uvicorn eventlink.main:app --reload --port 8000
+python -m uvicorn promiselink.main:app --reload --port 8000
 
 # 4. 访问API文档
 open http://localhost:8000/docs
@@ -25,16 +25,16 @@ open http://localhost:8000/docs
 ## 项目结构
 
 ```
-EventLink/
-├── src/eventlink/              # 应用源码
-│   ├── models/                 # 数据模型（6张表）
+PromiseLink/
+├── src/promiselink/              # 应用源码
+│   ├── models/                 # 数据模型（8个模型文件，11个模型类）
 │   │   ├── entity.py           # 人物实体
 │   │   ├── event.py            # 互动事件
 │   │   ├── todo.py             # 行动提醒（6类）
 │   │   ├── association.py      # 关联发现
 │   │   ├── relationship_brief.py  # 关系简报
 │   │   └── voice_session.py    # 语音会话
-│   ├── api/v1/                 # REST API（17个端点）
+│   ├── api/v1/                 # REST API（19个路由）
 │   │   ├── health.py           # 健康检查
 │   │   ├── events.py           # 事件CRUD + Pipeline触发
 │   │   ├── entities.py         # 实体管理
@@ -47,9 +47,9 @@ EventLink/
 │   │   ├── export.py           # 数据导出
 │   │   ├── demand_input.py     # 需求输入
 │   │   ├── auth.py             # 认证
-│   │   └── wechat_forward.py / email_sync.py  # 数据接入（Phase 1）
-│   ├── services/               # 核心引擎（28个模块）
-│   │   ├── event_pipeline.py   # 14步事件处理管线
+│   │   ├── wechat_forward.py / email_sync.py  # 数据接入
+│   ├── services/               # 核心引擎（36个模块）
+│   │   ├── event_pipeline.py   # 13步事件处理管线
 │   │   ├── entity_extractor.py    # LLM实体提取
 │   │   ├── entity_resolution.py    # 实体归一（5步算法）
 │   │   ├── todo_generator.py       # Todo生成（6类型策略）
@@ -70,14 +70,14 @@ EventLink/
 │   ├── prompts/                # LLM Prompt模板
 │   └── main.py                 # FastAPI入口
 ├── docs/                       # 文档体系
-├── tests/                      # 测试（41个文件 / 654用例）
+├── tests/                      # 测试（41+个文件 / 1224+用例）
 ├── data/                       # SQLite数据存储
 └── docker-compose.yml          # Docker配置
 ```
 
 ## 核心能力
 
-### 事件处理管线（14步）
+### 事件处理管线（13步）
 
 ```
 原始输入 → 输入分类 → 实体提取 → 实体归一 → Todo生成(6类)
@@ -95,7 +95,7 @@ EventLink/
 | risk | 烟粉 | 风险预警 |
 
 ### 数据接入层（DataSourceAdapter）
-- 手动输入 / 语音输入 / 微信转发 / CSV导入 / **邮件同步（Phase 1）**
+- 手动输入 / 语音输入 / 微信转发 / CSV导入 / **邮件同步**
 
 ### Insight Engine（洞察引擎）
 - 动态优先级评分（4维：紧急度×0.4 + 重要度×0.6）
@@ -105,60 +105,58 @@ EventLink/
 ## 文档索引
 
 ### 核心文档
-- [PRD v4.7](docs/spec/PRD_v1.md) - 产品需求文档（向量化语义能力）
-- [技术设计 v2.8](docs/architecture/EventLink_技术设计_v1.md) - 完整技术方案
-- [项目状态](docs/PROJECT_STATUS.md) - 11阶段生命周期跟踪（75%完成）
+- [PRD v5.2](docs/spec/PRD_v1.md) - 产品需求文档
+- [技术设计 v3.2](docs/architecture/PromiseLink_技术设计_v1.md) - 完整技术方案
+- [项目状态](docs/PROJECT_STATUS.md) - 11阶段生命周期跟踪（55%完成）
 - [Setup指南](docs/deliverables/README_SETUP.md) - 详细安装和启动说明
 
-### 详细设计文档（v2.x 全部就绪）
-- [数据库设计 v2.7](docs/design/Database_Design_v1.md)
-- [API设计 v2.7](docs/design/API_Design_v1.md)
-- [算法设计 v2.7](docs/design/Algorithm_Design_v1.md)
-- [安全设计 v2.7](docs/design/Security_Design_v1.md)
-- [测试计划 v2.7](docs/design/Test_Plan_v1.md)
-- [集成设计 v2.7](docs/design/Integration_Design_v1.md)
-- [部署指南 0.4.0](docs/design/Deployment_Guide.md)
+### 详细设计文档
+- [数据库设计 v3.0](docs/design/Database_Design_v1.md)
+- [API设计 v3.1](docs/design/API_Design_v1.md)
+- [算法设计 v2.8](docs/design/Algorithm_Design_v1.md)
+- [安全设计 v3.1](docs/design/Security_Design_v1.md)
+- [测试计划 v5.1](docs/design/Test_Plan_v1.md)
+- [集成设计 v2.9](docs/design/Integration_Design_v1.md)
+- [部署指南 v0.5.0](docs/design/Deployment_Guide.md)
 
 ### 评估报告
-- [POC准备度评估](docs/reports/EventLink_POC准备度评估报告.md)
+- [POC准备度评估](docs/external/for_team/PromiseLink_POC准备度评估报告.md)
 
 ## 当前进度
 
 ### ✅ 已完成（P1-P9）
-- [x] PRD v4.7（关系经营核心闭环 + 向量化语义能力）
-- [x] 技术设计 v2.8（Insight Engine + DataSourceAdapter + 向量语义）
+- [x] PRD v5.2（关系经营核心闭环 + 向量化语义能力）
+- [x] 技术设计 v3.2（Insight Engine + DataSourceAdapter + 向量语义）
 - [x] P0核心算法全部实现（实体归一/承诺履行/状态机/关联发现/动态评分）
-- [x] FastAPI完整实现（17个API端点）
-- [x] 28个服务模块（Pipeline/NLG/SemanticSearch/MemoryProvider等）
-- [x] 6个数据模型（entity/event/todo/association/relationship_brief/voice_session）
+- [x] FastAPI完整实现（19个API路由）
+- [x] 28+个服务模块（Pipeline/NLG/SemanticSearch/MemoryProvider等）
+- [x] 8个模型文件，11个模型类（entity/event/todo/association/relationship_brief/voice_session等）
 - [x] DataSourceAdapter抽象层（手动/语音/微信/CSV/邮件）
 - [x] CarryMem协议解耦（NullMemoryProvider优雅降级）
 - [x] 加密体系（HMAC-SHA256 + 字段级加密 + 行级安全）
-- [x] 41个测试文件 / **654测试用例** / **72%覆盖率**
+- [x] 41+个测试文件 / **1224+测试用例** / **73%覆盖率**
 - [x] Docker + CI/CD + Alembic 就绪
 - [x] PoC Demo 4/4场景通过
 
-### ⏳ Phase 1 进行中
-- [ ] 邮件集成完整流程
-- [ ] 长按反馈交互机制
-- [ ] 4D优先级模型完善
-- [ ] 推送通知（微信模板消息/移动推送/小程序卡片）
+### ⏳ 基础版打包中
+- [ ] Docker打包 + 一键安装脚本
+- [ ] Taro H5前端打包发布
+- [ ] 本地E2E验证
 
 ### 🔴 未启动
-- [ ] Phase 2: 日历集成 + 上下文感知推送
-- [ ] 小程序前端开发
-- [ ] 生产环境K8s部署
+- [ ] 专业版: 网关中继开发（SQLite+relay gateway）
+- [ ] 定制版: 团队协作功能（PG+Redis+多租户）
 
 ## 技术栈
 
 | 层面 | 技术 |
 |------|------|
 | **框架** | FastAPI 0.109+ (Python 3.11+) |
-| **数据库** | SQLite (PoC) / PostgreSQL 15 (Phase 1) |
+| **数据库** | SQLite (基础版+专业版长期方案) / PostgreSQL 15 (定制版) |
 | **ORM** | SQLAlchemy 2.0+ (async) |
 | **LLM** | Moka AI (Claude Sonnet 4) / OpenAI兼容 |
-| **向量** | sqlite-vec (PoC) / pgvector (生产) |
-| **缓存** | Redis (Phase 1) |
+| **向量** | sqlite-vec (基础版+专业版) / pgvector (定制版) |
+| **缓存** | Redis (定制版) |
 | **算法** | NetworkX + RapidFuzz + numpy |
 | **部署** | Docker + Docker Compose |
 
@@ -191,12 +189,14 @@ curl "http://localhost:8000/api/v1/entities/search?q=技术合作"
 
 | 指标 | 数值 |
 |------|------|
-| 测试用例 | **654 passed, 0 failed** |
-| 代码覆盖率 | **72%** (5884 stmts / 1626 missed) |
-| API端点 | **17个** |
-| 服务模块 | **28个** |
-| 数据模型 | **6个** |
-| 文档版本 | PRD v4.7 / Tech v2.8 |
+| 测试用例 | **1224+ passed, 0 failed** |
+| 代码覆盖率 | **73%** |
+| API路由 | **19个** |
+| 服务模块 | **36个** |
+| 数据模型 | **8个文件，11个模型类** |
+| 文档版本 | PRD v5.2 / Tech v3.2 |
+| 产品层级 | 基础版(本地免费) / 专业版(网关中继) / 定制版(团队) |
+| 总体进度 | **85%** |
 
 ## 团队
 

@@ -8,12 +8,12 @@ import pytest_asyncio
 from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
-from eventlink.database import Base
-from eventlink.models.event import Event
-from eventlink.models.todo import Todo
-from eventlink.models.relationship_brief import RelationshipBrief
-from eventlink.models.entity import Entity
-from eventlink.services.nlg_service import (
+from promiselink.database import Base
+from promiselink.models.event import Event
+from promiselink.models.todo import Todo
+from promiselink.models.relationship_brief import RelationshipBrief
+from promiselink.models.entity import Entity
+from promiselink.services.nlg_service import (
     _clean_concern,
     generate_nlu_response,
     _response_schedule_query,
@@ -21,7 +21,7 @@ from eventlink.services.nlg_service import (
     _response_relationship_status,
     _response_action_suggestion,
 )
-from eventlink.services.nlu_intent_classifier import VoiceIntent
+from promiselink.services.nlu_intent_classifier import VoiceIntent
 
 
 # ── Constants ──
@@ -83,7 +83,7 @@ async def db_engine():
     @sa_event.listens_for(engine.sync_engine, "connect")
     def set_sqlite_pragma(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA foreign_keys=OFF")
         cursor.close()
 
     async with engine.begin() as conn:

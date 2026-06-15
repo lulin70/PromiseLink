@@ -2,7 +2,7 @@
 
 import pytest
 
-from eventlink.services.data_source_adapter import (
+from promiselink.services.data_source_adapter import (
     DataSourceAdapter,
     EmailAdapter,
     ManualAdapter,
@@ -184,7 +184,7 @@ class TestAdapterRegistry:
         assert adapter.source_type == "slack"
 
         # Cleanup: remove the registered adapter to avoid test pollution
-        from eventlink.services import data_source_adapter
+        from promiselink.services import data_source_adapter
         data_source_adapter._ADAPTERS.pop("slack", None)
 
 

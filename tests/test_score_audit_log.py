@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from eventlink.models.score_audit_log import ScoreAuditLog
-from eventlink.models.todo import Todo
-from eventlink.services.priority_scorer import (
+from promiselink.models.score_audit_log import ScoreAuditLog
+from promiselink.models.todo import Todo
+from promiselink.services.priority_scorer import (
     SCORE_VERSION_PHASE1,
     SCORE_VERSION_POC,
     PriorityScorer,
@@ -321,8 +321,8 @@ class TestPriorityScorerV2AuditLog:
         db_session.add(todo)
         await db_session.flush()
 
-        with patch("eventlink.services.dependency_analyzer.DependencyAnalyzer") as mock_da_cls, \
-             patch("eventlink.services.context_matcher.ContextMatcher") as mock_cm_cls:
+        with patch("promiselink.services.dependency_analyzer.DependencyAnalyzer") as mock_da_cls, \
+             patch("promiselink.services.context_matcher.ContextMatcher") as mock_cm_cls:
             mock_da_instance = AsyncMock()
             mock_da_instance.compute_dependency_score.return_value = 0.45
             mock_da_cls.return_value = mock_da_instance
@@ -331,7 +331,7 @@ class TestPriorityScorerV2AuditLog:
             mock_cm_instance.compute_context_score.return_value = 0.917
             mock_cm_cls.return_value = mock_cm_instance
 
-            from eventlink.services.priority_scorer import PriorityScorerV2
+            from promiselink.services.priority_scorer import PriorityScorerV2
             scorer_v2 = PriorityScorerV2()
             score = await scorer_v2.score_and_update_todo_v2(todo, db_session)
 
@@ -373,8 +373,8 @@ class TestPriorityScorerV2AuditLog:
 
         await db_session.flush()
 
-        with patch("eventlink.services.dependency_analyzer.DependencyAnalyzer") as mock_da_cls, \
-             patch("eventlink.services.context_matcher.ContextMatcher") as mock_cm_cls:
+        with patch("promiselink.services.dependency_analyzer.DependencyAnalyzer") as mock_da_cls, \
+             patch("promiselink.services.context_matcher.ContextMatcher") as mock_cm_cls:
             mock_da_instance = AsyncMock()
             mock_da_instance.compute_dependency_score.return_value = 0.3
             mock_da_cls.return_value = mock_da_instance
@@ -383,7 +383,7 @@ class TestPriorityScorerV2AuditLog:
             mock_cm_instance.compute_context_score.return_value = 0.5
             mock_cm_cls.return_value = mock_cm_instance
 
-            from eventlink.services.priority_scorer import PriorityScorerV2
+            from promiselink.services.priority_scorer import PriorityScorerV2
             scorer_v2 = PriorityScorerV2()
             await scorer_v2.batch_score_with_context(todos, db_session)
 
