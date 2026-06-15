@@ -2,13 +2,13 @@
 
 import pytest
 
-from eventlink.core.exceptions import (
+from promiselink.core.exceptions import (
     BusinessError,
     CarryMemUnavailableError,
     DatabaseError,
     DuplicateEntityError,
     EntityNotFoundError,
-    EventLinkError,
+    PromiseLinkError,
     InfrastructureError,
     InvalidTodoTypeError,
     InvalidTransitionError,
@@ -25,16 +25,16 @@ class TestExceptionHierarchy:
     """Verify exception class hierarchy is correct."""
 
     def test_base_error_is_exception(self):
-        assert issubclass(EventLinkError, Exception)
+        assert issubclass(PromiseLinkError, Exception)
 
     def test_business_error_inherits_base(self):
-        assert issubclass(BusinessError, EventLinkError)
+        assert issubclass(BusinessError, PromiseLinkError)
 
     def test_llm_error_inherits_base(self):
-        assert issubclass(LLMError, EventLinkError)
+        assert issubclass(LLMError, PromiseLinkError)
 
     def test_infrastructure_error_inherits_base(self):
-        assert issubclass(InfrastructureError, EventLinkError)
+        assert issubclass(InfrastructureError, PromiseLinkError)
 
     def test_entity_not_found_is_business(self):
         assert issubclass(EntityNotFoundError, BusinessError)
@@ -105,10 +105,10 @@ class TestExceptionDetails:
         assert "raw_response" not in exc.details
 
     def test_catch_by_base_class(self):
-        """All specific errors can be caught by EventLinkError."""
-        with pytest.raises(EventLinkError):
+        """All specific errors can be caught by PromiseLinkError."""
+        with pytest.raises(PromiseLinkError):
             raise EntityNotFoundError("x")
-        with pytest.raises(EventLinkError):
+        with pytest.raises(PromiseLinkError):
             raise LLMTimeoutError("p", 10)
-        with pytest.raises(EventLinkError):
+        with pytest.raises(PromiseLinkError):
             raise DatabaseError("select")

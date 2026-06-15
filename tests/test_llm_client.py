@@ -15,15 +15,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from eventlink.config import Settings
-from eventlink.core.exceptions import (
+from promiselink.config import Settings
+from promiselink.core.exceptions import (
     LLMError,
     LLMQuotaExceeded,
     LLMRateLimitError,
     LLMResponseParseError,
     LLMTimeoutError,
 )
-from eventlink.services.llm_client import LLMClient
+from promiselink.services.llm_client import LLMClient
 
 # ── Fixtures ──
 
@@ -43,7 +43,7 @@ def settings():
 
 @pytest.fixture
 def llm_client(settings):
-    from eventlink.core.redis import cache_service
+    from promiselink.core.redis import cache_service
     cache_service._memory_cache.clear()
     client = LLMClient(settings)
     yield client
@@ -193,7 +193,7 @@ class TestHttpExceptionMapping:
         mock_client = _make_mock_http_client(
             post_side_effect=httpx.TimeoutException("timeout")
         )
-        llm_client._get_client = MagicMock(return_value=mock_client)
+        llm_client._get_client = AsyncMock(return_value=mock_client)
 
         with pytest.raises(LLMTimeoutError) as exc_info:
             await llm_client._http_call(
@@ -209,7 +209,7 @@ class TestHttpExceptionMapping:
         mock_client = _make_mock_http_client(
             post_return=_make_httpx_response(429)
         )
-        llm_client._get_client = MagicMock(return_value=mock_client)
+        llm_client._get_client = AsyncMock(return_value=mock_client)
 
         with pytest.raises(LLMRateLimitError) as exc_info:
             await llm_client._http_call(
@@ -224,7 +224,7 @@ class TestHttpExceptionMapping:
         mock_client = _make_mock_http_client(
             post_return=_make_httpx_response(402)
         )
-        llm_client._get_client = MagicMock(return_value=mock_client)
+        llm_client._get_client = AsyncMock(return_value=mock_client)
 
         with pytest.raises(LLMQuotaExceeded) as exc_info:
             await llm_client._http_call(
@@ -239,7 +239,7 @@ class TestHttpExceptionMapping:
         mock_client = _make_mock_http_client(
             post_return=_make_httpx_response(403)
         )
-        llm_client._get_client = MagicMock(return_value=mock_client)
+        llm_client._get_client = AsyncMock(return_value=mock_client)
 
         with pytest.raises(LLMQuotaExceeded):
             await llm_client._http_call(
@@ -253,7 +253,7 @@ class TestHttpExceptionMapping:
         mock_client = _make_mock_http_client(
             post_return=_make_httpx_response(500)
         )
-        llm_client._get_client = MagicMock(return_value=mock_client)
+        llm_client._get_client = AsyncMock(return_value=mock_client)
 
         with pytest.raises(LLMError, match="HTTP 500"):
             await llm_client._http_call(
@@ -267,7 +267,7 @@ class TestHttpExceptionMapping:
         mock_client = _make_mock_http_client(
             post_side_effect=httpx.HTTPError("connection reset")
         )
-        llm_client._get_client = MagicMock(return_value=mock_client)
+        llm_client._get_client = AsyncMock(return_value=mock_client)
 
         with pytest.raises(LLMError, match="LLM HTTP error"):
             await llm_client._http_call(
@@ -289,7 +289,7 @@ class TestCallMethods:
         mock_client = _make_mock_http_client(
             post_return=_make_httpx_response(200, json_data=response_data)
         )
-        llm_client._get_client = MagicMock(return_value=mock_client)
+        llm_client._get_client = AsyncMock(return_value=mock_client)
 
         result = await llm_client.call("Say hello")
         assert result == "Hello from LLM"
@@ -301,7 +301,7 @@ class TestCallMethods:
         mock_client = _make_mock_http_client(
             post_return=_make_httpx_response(200, json_data=response_data)
         )
-        llm_client._get_client = MagicMock(return_value=mock_client)
+        llm_client._get_client = AsyncMock(return_value=mock_client)
 
         result = await llm_client.call_json("Extract person info")
         assert result == {"name": "Alice", "company": "Acme"}
@@ -312,7 +312,7 @@ class TestCallMethods:
         mock_client = _make_mock_http_client(
             post_return=_make_httpx_response(200, json_data=response_data)
         )
-        llm_client._get_client = MagicMock(return_value=mock_client)
+        llm_client._get_client = AsyncMock(return_value=mock_client)
 
         with pytest.raises(LLMResponseParseError):
             await llm_client.call_json("Extract person info")
@@ -323,7 +323,7 @@ class TestCallMethods:
         mock_client = _make_mock_http_client(
             post_return=_make_httpx_response(200, json_data=response_data)
         )
-        llm_client._get_client = MagicMock(return_value=mock_client)
+        llm_client._get_client = AsyncMock(return_value=mock_client)
 
         await llm_client.call("test")
 
@@ -339,7 +339,7 @@ class TestCallMethods:
         mock_client = _make_mock_http_client(
             post_return=_make_httpx_response(200, json_data=response_data)
         )
-        llm_client._get_client = MagicMock(return_value=mock_client)
+        llm_client._get_client = AsyncMock(return_value=mock_client)
 
         await llm_client.call("test", max_tokens=500, temperature=0.7)
 
@@ -360,9 +360,9 @@ class TestRetryLogic:
         mock_client = _make_mock_http_client(
             post_side_effect=httpx.TimeoutException("timeout")
         )
-        llm_client._get_client = MagicMock(return_value=mock_client)
+        llm_client._get_client = AsyncMock(return_value=mock_client)
 
-        with patch("eventlink.services.llm_client.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+        with patch("promiselink.services.llm_client.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
             with pytest.raises(LLMTimeoutError):
                 await llm_client._call_with_retry(
                     messages=[{"role": "user", "content": "hi"}],
@@ -382,9 +382,9 @@ class TestRetryLogic:
         mock_client = _make_mock_http_client(
             post_return=_make_httpx_response(429)
         )
-        llm_client._get_client = MagicMock(return_value=mock_client)
+        llm_client._get_client = AsyncMock(return_value=mock_client)
 
-        with patch("eventlink.services.llm_client.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+        with patch("promiselink.services.llm_client.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
             with pytest.raises(LLMRateLimitError):
                 await llm_client._call_with_retry(
                     messages=[{"role": "user", "content": "hi"}],
@@ -402,7 +402,7 @@ class TestRetryLogic:
         mock_client = _make_mock_http_client(
             post_return=_make_httpx_response(402)
         )
-        llm_client._get_client = MagicMock(return_value=mock_client)
+        llm_client._get_client = AsyncMock(return_value=mock_client)
 
         with pytest.raises(LLMQuotaExceeded):
             await llm_client._call_with_retry(
@@ -425,9 +425,9 @@ class TestRetryLogic:
                 _make_httpx_response(200, json_data=response_data),
             ]
         )
-        llm_client._get_client = MagicMock(return_value=mock_client)
+        llm_client._get_client = AsyncMock(return_value=mock_client)
 
-        with patch("eventlink.services.llm_client.asyncio.sleep", new_callable=AsyncMock):
+        with patch("promiselink.services.llm_client.asyncio.sleep", new_callable=AsyncMock):
             result = await llm_client._call_with_retry(
                 messages=[{"role": "user", "content": "hi"}],
                 max_tokens=100,
@@ -449,7 +449,7 @@ class TestGenerate:
         mock_client = _make_mock_http_client(
             post_return=_make_httpx_response(200, json_data=response_data)
         )
-        llm_client._get_client = MagicMock(return_value=mock_client)
+        llm_client._get_client = AsyncMock(return_value=mock_client)
 
         result = await llm_client.generate("Rate confidence", max_tokens=10)
         assert result == "0.95"
@@ -483,17 +483,18 @@ class TestClientLifecycle:
         client = LLMClient(settings)
         assert client.base_url == "https://api.example.com/v1"
 
-    async def test_close_closes_client(self, llm_client):
-        """close() closes the internal httpx client."""
+    async def test_close_is_noop(self, llm_client):
+        """close() is a no-op with shared client — does not close or clear _client."""
         mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.is_closed = False
         llm_client._client = mock_client
 
         await llm_client.close()
-        mock_client.aclose.assert_awaited_once()
-        assert llm_client._client is None
+        # close() is now a no-op: should NOT call aclose or clear _client
+        mock_client.aclose.assert_not_awaited()
+        assert llm_client._client is mock_client
 
     async def test_close_idempotent(self, llm_client):
-        """close() is safe to call when client is already None."""
-        llm_client._client = None
+        """close() is safe to call multiple times — it's a no-op."""
         await llm_client.close()  # Should not raise
+        await llm_client.close()  # Still should not raise

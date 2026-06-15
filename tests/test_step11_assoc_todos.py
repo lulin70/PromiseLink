@@ -9,13 +9,13 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from eventlink.models.association import Association
-from eventlink.models.entity import Entity
-from eventlink.models.event import Event
-from eventlink.models.todo import Todo
-from eventlink.services.event_pipeline import PipelineResult
-from eventlink.services.steps.context import PipelineContext
-from eventlink.services.steps.step_11_assoc_todos import Step11_AssociationTodos
+from promiselink.models.association import Association
+from promiselink.models.entity import Entity
+from promiselink.models.event import Event
+from promiselink.models.todo import Todo
+from promiselink.services.event_pipeline import PipelineResult
+from promiselink.services.steps.context import PipelineContext
+from promiselink.services.steps.step_11_assoc_todos import Step11_AssociationTodos
 
 
 def _uid() -> str:
@@ -99,7 +99,7 @@ async def _patch_session(session: AsyncSession):
         yield session
 
     with patch(
-        "eventlink.database.AsyncSessionLocal",
+        "promiselink.database.AsyncSessionLocal",
         new=_mock_session_local,
     ):
         yield
@@ -125,7 +125,7 @@ class TestNoNewAssociations:
         )
         todos = list(todo_result.scalars().all())
         assert len(todos) == 0
-        assert "step12_assoc_todos" in result_ctx.result.step_timings
+        assert "step11_assoc_todos" in result_ctx.result.step_timings
 
 
 class TestIndustryChainAssociations:
@@ -431,8 +431,8 @@ class TestStepTiming:
         async with _patch_session(db_session):
             result_ctx = await step.execute(ctx)
 
-        assert "step12_assoc_todos" in result_ctx.result.step_timings
-        assert result_ctx.result.step_timings["step12_assoc_todos"] >= 0
+        assert "step11_assoc_todos" in result_ctx.result.step_timings
+        assert result_ctx.result.step_timings["step11_assoc_todos"] >= 0
 
 
 class TestExceptionHandling:
@@ -456,11 +456,11 @@ class TestExceptionHandling:
             yield  # noqa: unreachable — makes this an async gen
 
         with patch(
-            "eventlink.database.AsyncSessionLocal",
+            "promiselink.database.AsyncSessionLocal",
             new=_failing_session,
         ):
             # Should NOT raise — step catches and logs
             result_ctx = await step.execute(ctx)
 
         # Pipeline continues — timing still recorded
-        assert "step12_assoc_todos" in result_ctx.result.step_timings
+        assert "step11_assoc_todos" in result_ctx.result.step_timings

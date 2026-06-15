@@ -5,8 +5,8 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from eventlink.models.entity import Entity
-from eventlink.services.entity_resolution import (
+from promiselink.models.entity import Entity
+from promiselink.services.entity_resolution import (
     EntityResolutionEngine,
     ResolutionAction,
     ResolutionResult,

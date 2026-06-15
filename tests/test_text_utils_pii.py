@@ -2,7 +2,7 @@
 
 import pytest
 
-from eventlink.core.text_utils import redact_pii_from_text
+from promiselink.core.text_utils import redact_pii_from_text
 
 
 class TestPhoneRedaction:

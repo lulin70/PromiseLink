@@ -1,4 +1,4 @@
-# EventLink 安全设计文档 — 小程序与WebView
+# PromiseLink 安全设计文档 — 小程序与WebView
 
 > **版本**: v2.9 (POC阶段)
 > **拆分日期**: 2026-06-08
@@ -8,7 +8,7 @@
 
 ---
 
-## 导航：EventLink 安全设计文档（v2.9 拆分版）
+## 导航：PromiseLink 安全设计文档（v2.9 拆分版）
 
 | 文档 | 攻击面 | 主要内容 |
 |------|--------|----------|
@@ -68,8 +68,8 @@ window.addEventListener('beforeunload', () => {
     "request": 10000
   },
   "domainWhitelist": [
-    "https://eventlink.com",
-    "https://api.eventlink.com"
+    "https://promiselink.com",
+    "https://api.promiselink.com"
   ]
 }
 ```
@@ -77,7 +77,7 @@ window.addEventListener('beforeunload', () => {
 | 阶段 | 域名白名单 | 说明 |
 |------|-----------|------|
 | PoC | `http://localhost:*` | 本地开发 |
-| Phase1 | `https://eventlink.com`, `https://api.eventlink.com` | 生产域名 |
+| Phase1 | `https://promiselink.com`, `https://api.promiselink.com` | 生产域名 |
 | Phase2 | Phase1 + CDN域名 | 静态资源CDN |
 
 ### 6.4 用户身份绑定（openid→user_id映射）
@@ -233,7 +233,7 @@ def sanitize_voice_input(text: str) -> str:
 
 **NLU安全Prompt模板**:
 ```
-你是EventLink意图识别引擎。你的唯一任务是将用户问询分类为预定义意图之一。
+你是PromiseLink意图识别引擎。你的唯一任务是将用户问询分类为预定义意图之一。
 严格规则:
 1. 只返回JSON: {"intent": "xxx", "confidence": 0.xx}
 2. intent必须是以下值之一: schedule_query, promise_tracker, relationship_status, unclear

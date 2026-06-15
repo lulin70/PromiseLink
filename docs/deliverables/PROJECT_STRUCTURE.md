@@ -1,6 +1,6 @@
 <!-- ⚠️ 本文档已过时，仅供参考。Todo类型名和部分文件名已更新（如card_scan→card_save，todo_type枚举值已变更），请参考最新版PRD v4.0。 -->
 
-# EventLink 项目结构说明
+# PromiseLink 项目结构说明
 
 > **版本**: v0.1.0  
 > **更新时间**: 2026-06-02  
@@ -11,7 +11,7 @@
 ## 目录结构（按DevSquad规范整理）
 
 ```
-EventLink/
+PromiseLink/
 ├── README.md                      # 项目概览
 ├── .gitignore                     # Git忽略规则
 ├── .env.example                   # 环境变量模板
@@ -22,7 +22,7 @@ EventLink/
 ├── docker-compose.yml             # Docker编排配置
 │
 ├── src/                           # 📦 源代码
-│   └── eventlink/                 # 主应用包
+│   └── promiselink/                 # 主应用包
 │       ├── __init__.py
 │       ├── main.py                # FastAPI应用入口
 │       ├── config.py              # 配置管理
@@ -69,7 +69,7 @@ EventLink/
 │   │   └── PRD_v1_review_report.md
 │   │
 │   ├── architecture/              # 架构设计
-│   │   └── EventLink_技术设计_v1.md  # 技术设计文档v1.7
+│   │   └── PromiseLink_技术设计_v1.md  # 技术设计文档v1.7
 │   │
 │   ├── planning/                  # 项目计划
 │   │   ├── 20260601_会议纪要.md
@@ -77,12 +77,12 @@ EventLink/
 │   │   └── 会议待确认事项清单.md
 │   │
 │   ├── reports/                   # 📊 评审报告（已整理）
-│   │   ├── EventLink_POC准备度评估报告.md
-│   │   ├── EventLink_DevSquad_真实AI评审报告.md
-│   │   ├── EventLink_产品设计评审报告.md
-│   │   ├── EventLink_产品设计讨论报告.md
-│   │   ├── EventLink_技术方案V3_技术版.md
-│   │   ├── EventLink_技术方案V3_网页版.html
+│   │   ├── PromiseLink_POC准备度评估报告.md
+│   │   ├── PromiseLink_DevSquad_真实AI评审报告.md
+│   │   ├── PromiseLink_产品设计评审报告.md
+│   │   ├── PromiseLink_产品设计讨论报告.md
+│   │   ├── PromiseLink_技术方案V3_技术版.md
+│   │   ├── PromiseLink_技术方案V3_网页版.html
 │   │   └── ...（其他报告）
 │   │
 │   ├── deliverables/              # 📤 交付物
@@ -90,35 +90,35 @@ EventLink/
 │   │   └── README_SETUP.md        # 快速启动指南
 │   │
 │   ├── internal/                  # 🔒 内部文档
-│   │   ├── EventLink_产品架构V2_数字名片整合方案.md
-│   │   ├── EventLink_PRD+技术设计_联合审阅报告_CarryMem.md
+│   │   ├── PromiseLink_产品架构V2_数字名片整合方案.md
+│   │   ├── PromiseLink_PRD+技术设计_联合审阅报告_CarryMem.md
 │   │   └── ...（AI评审报告、会议纪要等）
 │   │
 │   └── external/                  # 📋 对外文档
 │       ├── for_team/              # 团队共享
-│       │   ├── EventLink_最终总结报告.md
-│       │   ├── EventLink_分工模型V2.1_修正版.md
-│       │   └── EventLink_一页纸方案_V2_精简版.md
+│       │   ├── PromiseLink_最终总结报告.md
+│       │   ├── PromiseLink_分工模型V2.1_修正版.md
+│       │   └── PromiseLink_一页纸方案_V2_精简版.md
 │       │
 │       ├── for_许总/               # 许总（IAMHERE）
-│       │   └── EventLink_技术方案V3_网页版.html
+│       │   └── PromiseLink_技术方案V3_网页版.html
 │       │
 │       └── for_李总/               # 李总（反馈）
-│           └── EventLink_产品核心价值升级建议_资源匹配供给与维护版.md
+│           └── PromiseLink_产品核心价值升级建议_资源匹配供给与维护版.md
 │
 ├── data/                          # 💾 数据存储
-│   └── eventlink.db               # SQLite数据库（PoC）
+│   └── promiselink.db               # SQLite数据库（PoC）
 │
 └── archive/                       # 📦 归档
     └── drafts/                    # 早期草稿
-        └── EventLink_一页纸方案_给许总.md
+        └── PromiseLink_一页纸方案_给许总.md
 ```
 
 ---
 
 ## 核心模块说明
 
-### 1. 数据模型（`src/eventlink/models/`）
+### 1. 数据模型（`src/promiselink/models/`）
 
 所有模型100%对齐技术设计文档v1.7 §3.1规范：
 
@@ -142,7 +142,7 @@ EventLink/
 - 5种状态：`pending`, `in_progress`, `done`, `dismissed`, `snoozed`
 - SnoozeSchedule子表：支持Todo暂停/恢复
 
-### 2. API端点（`src/eventlink/api/v1/`）
+### 2. API端点（`src/promiselink/api/v1/`）
 
 #### Health API
 - `GET /api/v1/health` - 基础健康检查
@@ -180,7 +180,7 @@ EventLink/
 ### 方式1：本地开发
 
 ```bash
-cd EventLink
+cd PromiseLink
 
 # 设置PYTHONPATH（重要！）
 export PYTHONPATH=./src
@@ -192,7 +192,7 @@ pip install -r requirements.txt
 cp .env.example .env
 
 # 启动应用
-python -m uvicorn eventlink.main:app --reload
+python -m uvicorn promiselink.main:app --reload
 
 # 访问文档
 open http://localhost:8000/docs
@@ -201,7 +201,7 @@ open http://localhost:8000/docs
 ### 方式2：Docker
 
 ```bash
-cd EventLink
+cd PromiseLink
 
 # 构建并启动
 docker-compose up --build
@@ -264,7 +264,7 @@ curl http://localhost:8000/api/v1/health
 
 - **项目负责人**: 林总（CarryMem团队）
 - **合作方**: 许总（IAMHERE数字名片）
-- **技术文档**: `docs/architecture/EventLink_技术设计_v1.md`
+- **技术文档**: `docs/architecture/PromiseLink_技术设计_v1.md`
 - **产品需求**: `docs/spec/PRD_v1.md`
 - **项目状态**: `docs/PROJECT_STATUS.md`
 

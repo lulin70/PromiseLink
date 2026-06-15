@@ -1,4 +1,4 @@
-# EventLink v4.2 + 技术设计 v2.3 — 7角色全员Review报告
+# PromiseLink v4.2 + 技术设计 v2.3 — 7角色全员Review报告
 
 > **报告编号**: DS-REV-2026-013
 > **评审方法**: DevSquad MultiAgentDispatcher（Consensus共识模式，7角色全员）
@@ -6,10 +6,10 @@
 > **评审日期**: 2026-06-04
 > **输入材料**:
 > - PRD v4.2: `docs/spec/PRD_V1.md`
-> - 技术设计 v2.3: `docs/architecture/EventLink_技术设计_v1.md`
-> - Review会议材料: `docs/internal/EventLink_文档更新v4.2_v2.3_全员Review会议材料.md`
-> - 李总v1.2原文: `docs/external/for_李总/EventLink_PoC技术整改与产品演进建议_v1.2_融合分形宇宙外部合作SOP .md`
-> - PM+Arch评审报告: `docs/internal/EventLink_李总v1.2_DevSquad_PM_Arch_评审报告.md`
+> - 技术设计 v2.3: `docs/architecture/PromiseLink_技术设计_v1.md`
+> - Review会议材料: `docs/internal/PromiseLink_文档更新v4.2_v2.3_全员Review会议材料.md`
+> - 李总v1.2原文: `docs/external/for_李总/PromiseLink_PoC技术整改与产品演进建议_v1.2_融合分形宇宙外部合作SOP .md`
+> - PM+Arch评审报告: `docs/internal/PromiseLink_李总v1.2_DevSquad_PM_Arch_评审报告.md`
 
 ---
 
@@ -777,7 +777,7 @@ Sprint 2完成后:
 
 ```
 ┌─────────────────────────────────────────────┐
-│  EventLink                    🔍 [搜索]     │
+│  PromiseLink                    🔍 [搜索]     │
 ├─────────────────────────────────────────────┤
 │                                             │
 │  ┌─ 今天需要我回应的连接 ──────────────┐  │
@@ -955,11 +955,11 @@ new_connection ─── understanding_needs ─── value_response ─── 
 
 ### 4.2 最终共识结论
 
-# 🏆 EventLink v4.2 + 技术设计 v2.3 —— 7角色全员Review **通过** ✅
+# 🏆 PromiseLink v4.2 + 技术设计 v2.3 —— 7角色全员Review **通过** ✅
 
 **共识声明**：
 
-> 经过Product Manager、Architect、Security Expert、Tester、Coder、DevOps、UI Designer七角色全员Review，EventLink PRD v4.2与技术设计v2.3**达成完全共识（9/9决策点通过，7/7角色同意）**，可以立即启动Sprint 0实施。
+> 经过Product Manager、Architect、Security Expert、Tester、Coder、DevOps、UI Designer七角色全员Review，PromiseLink PRD v4.2与技术设计v2.3**达成完全共识（9/9决策点通过，7/7角色同意）**，可以立即启动Sprint 0实施。
 
 ### 4.3 各角色最终裁定
 

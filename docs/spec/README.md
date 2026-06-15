@@ -1,4 +1,4 @@
-# EventLink 需求规格文档
+# PromiseLink 需求规格文档
 
 > **目录**: `docs/spec/`  
 > **用途**: 存放产品需求文档（PRD）及相关评审报告
@@ -11,7 +11,7 @@
 
 | 文件名 | 版本 | 日期 | 状态 | 说明 |
 |--------|------|------|------|------|
-| **PRD_v1.md** | v4.4 | 2026-06-05 | ✅ 生效中 | 产品需求文档主文档<br/>152处量化指标，50项功能（F-01~F-50）[F-50新增] |
+| **PRD_v1.md** | v5.2 | 2026-06-14 | ✅ 生效中 | 产品需求文档主文档<br/>152处量化指标，69项功能（F-01~F-69） |
 | PRD_v1_review_report.md | - | 2026-06-01 | ✅ 完成 | 7角色评审报告 |
 
 ---
@@ -74,7 +74,7 @@
 - ⚪ **cooperation_signal**（信息型）：合作信号/商机线索
 - 🔴 **risk**（信息型）：风险预警
 
-**Action Type（v4.4新增F-50语音助手，与Todo配合使用）**:
+**Action Type（v5.2，与Todo配合使用）**:
 - `contact` 联系触达 | `send` 发送资料 | `research` 调研分析
 - `prepare` 准备工作 | `decide` 决策确认 | `monitor` 监控跟踪
 
@@ -114,10 +114,10 @@
 
 ## 📚 相关文档
 
-- 技术设计：`../architecture/EventLink_技术设计_v1.md`
-- 评审报告：`../reports/EventLink_DevSquad_真实AI评审报告.md`
+- 技术设计：`../architecture/PromiseLink_技术设计_v1.md`
+- 评审报告：`../reports/PromiseLink_DevSquad_真实AI评审报告.md`
 - 项目状态：`../PROJECT_STATUS.md`
 
 ---
 
-*最后更新: 2026-06-05*
+*最后更新: 2026-06-14*

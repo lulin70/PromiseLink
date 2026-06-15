@@ -5,8 +5,8 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from eventlink.models.todo import Todo
-from eventlink.services.implicit_feedback import ImplicitFeedbackCollector
+from promiselink.models.todo import Todo
+from promiselink.services.implicit_feedback import ImplicitFeedbackCollector
 from tests.conftest import create_test_event, make_user_id
 
 

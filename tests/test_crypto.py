@@ -1,5 +1,5 @@
 """Tests for PII encryption utilities."""
-from eventlink.core.crypto import (
+from promiselink.core.crypto import (
     encrypt_value, decrypt_value,
     encrypt_pii_in_properties, decrypt_pii_in_properties,
     PII_PREFIX,

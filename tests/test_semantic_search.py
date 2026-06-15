@@ -8,12 +8,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from eventlink.services.embedding_provider import (
+from promiselink.services.embedding_provider import (
     DEFAULT_EMBEDDING_MODEL,
     EMBEDDING_DIMENSIONS,
     EmbeddingProvider,
 )
-from eventlink.services.semantic_search import SemanticSearchEngine
+from promiselink.services.semantic_search import SemanticSearchEngine
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -55,18 +55,20 @@ class TestEmbeddingProvider:
         fake_emb = _make_fake_embedding()
         mock_response = _mock_embedding_response([fake_emb])
 
-        with patch("eventlink.services.embedding_provider.AsyncOpenAI") as mock_client_cls:
+        with patch("promiselink.services.embedding_provider.AsyncOpenAI") as mock_client_cls:
             mock_client = MagicMock()
             mock_client.embeddings = MagicMock()
             mock_client.embeddings.create = AsyncMock(return_value=mock_response)
             mock_client_cls.return_value = mock_client
 
             provider = EmbeddingProvider.__new__(EmbeddingProvider)
+            provider._provider = "api"
             provider._client = mock_client
             provider._model = DEFAULT_EMBEDDING_MODEL
             provider._cache = {}
             provider._cache_hits = 0
             provider._cache_misses = 0
+            provider._local_model = None
 
             result = await provider.embed("hello world")
 
@@ -83,18 +85,20 @@ class TestEmbeddingProvider:
         fake_emb = _make_fake_embedding()
         mock_response = _mock_embedding_response([fake_emb])
 
-        with patch("eventlink.services.embedding_provider.AsyncOpenAI") as mock_client_cls:
+        with patch("promiselink.services.embedding_provider.AsyncOpenAI") as mock_client_cls:
             mock_client = MagicMock()
             mock_client.embeddings = MagicMock()
             mock_client.embeddings.create = AsyncMock(return_value=mock_response)
             mock_client_cls.return_value = mock_client
 
             provider = EmbeddingProvider.__new__(EmbeddingProvider)
+            provider._provider = "api"
             provider._client = mock_client
             provider._model = DEFAULT_EMBEDDING_MODEL
             provider._cache = {}
             provider._cache_hits = 0
             provider._cache_misses = 0
+            provider._local_model = None
 
             # First call — cache miss
             r1 = await provider.embed("hello")
@@ -116,18 +120,20 @@ class TestEmbeddingProvider:
         fake_embs = [_make_fake_embedding(seed=i) for i in range(3)]
         mock_response = _mock_embedding_response(fake_embs)
 
-        with patch("eventlink.services.embedding_provider.AsyncOpenAI") as mock_client_cls:
+        with patch("promiselink.services.embedding_provider.AsyncOpenAI") as mock_client_cls:
             mock_client = MagicMock()
             mock_client.embeddings = MagicMock()
             mock_client.embeddings.create = AsyncMock(return_value=mock_response)
             mock_client_cls.return_value = mock_client
 
             provider = EmbeddingProvider.__new__(EmbeddingProvider)
+            provider._provider = "api"
             provider._client = mock_client
             provider._model = DEFAULT_EMBEDDING_MODEL
             provider._cache = {}
             provider._cache_hits = 0
             provider._cache_misses = 0
+            provider._local_model = None
 
             results = await provider.embed_batch(texts)
 
@@ -143,7 +149,7 @@ class TestEmbeddingProvider:
         fake_emb_alpha = _make_fake_embedding(seed=0)
         fake_emb_beta = _make_fake_embedding(seed=1)
 
-        with patch("eventlink.services.embedding_provider.AsyncOpenAI") as mock_client_cls:
+        with patch("promiselink.services.embedding_provider.AsyncOpenAI") as mock_client_cls:
             mock_client = MagicMock()
             mock_client.embeddings = MagicMock()
             # Only "beta" is uncached, so API returns 1 embedding
@@ -153,10 +159,12 @@ class TestEmbeddingProvider:
             mock_client_cls.return_value = mock_client
 
             provider = EmbeddingProvider.__new__(EmbeddingProvider)
+            provider._provider = "api"
             provider._client = mock_client
             provider._model = DEFAULT_EMBEDDING_MODEL
             provider._cache_hits = 0
             provider._cache_misses = 0
+            provider._local_model = None
 
             # Pre-populate cache
             import hashlib
@@ -208,11 +216,13 @@ class TestSemanticSearchEngine:
     def provider(self):
         """Create an EmbeddingProvider with mocked client."""
         provider = EmbeddingProvider.__new__(EmbeddingProvider)
+        provider._provider = "api"
         provider._client = MagicMock()
         provider._model = DEFAULT_EMBEDDING_MODEL
         provider._cache = {}
         provider._cache_hits = 0
         provider._cache_misses = 0
+        provider._local_model = None
         return provider
 
     @pytest.fixture

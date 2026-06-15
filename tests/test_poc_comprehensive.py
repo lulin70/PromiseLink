@@ -1,7 +1,7 @@
-"""POC Comprehensive Integration, Stress, and Security Tests for EventLink.
+"""POC Comprehensive Integration, Stress, and Security Tests for PromiseLink.
 
 Tests against a running backend at http://localhost:8001 with:
-- EVENTLINK_POC_SECRET=eventlink2024
+- PROMISELINK_POC_SECRET=promiselink2024
 - LLM_API_KEY configured
 
 Test classes:
@@ -9,11 +9,16 @@ Test classes:
   2. TestConcurrentStress     — 并发压力测试
   3. TestSecurityDeep         — 深度安全测试
   4. TestUserJourney          — 用户旅程测试
+
+NOTE: These tests require a running backend server and are skipped by default.
+Run with: pytest -m integration --run-integration
 """
 
 import concurrent.futures
+import logging
 import time
 import uuid
+import os
 
 import httpx
 import pytest
@@ -23,10 +28,28 @@ from jose import jwt
 
 BASE_URL = "http://localhost:8001"
 API_PREFIX = "/api/v1"
-POC_SECRET = "eventlink2024"
+POC_SECRET = os.environ.get("POC_SECRET", "promiselink2024")
 
 
 # ── Fixtures ──
+
+
+def _is_server_available():
+    """Check if the integration test server is running."""
+    try:
+        with httpx.Client(base_url=BASE_URL, timeout=5.0) as c:
+            resp = c.get(f"{API_PREFIX}/health")
+            return resp.status_code == 200
+    except (httpx.ConnectError, httpx.TimeoutException, Exception):
+        return False
+
+
+# Skip entire module if server is not available
+pytestmark = pytest.mark.skipif(
+    not _is_server_available(),
+    reason="Integration tests require a running backend at http://localhost:8001. "
+           "Start the server with PROMISELINK_POC_SECRET=promiselink2024 and run with --run-integration",
+)
 
 
 @pytest.fixture(scope="module")
@@ -69,6 +92,34 @@ def _login_as(client, uid=None):
     return _login_with_retry(client, uid)
 
 
+logger = logging.getLogger(__name__)
+
+
+def wait_for_pipeline(client, event_id, headers, timeout=60, interval=2):
+    """Poll the API until the event status changes from 'processing'.
+
+    Returns the event dict when pipeline completes.
+    Raises AssertionError on timeout.
+    """
+    start = time.time()
+    while time.time() - start < timeout:
+        resp = client.get(f"{API_PREFIX}/events", headers=headers)
+        if resp.status_code == 200:
+            events = resp.json().get("items", [])
+            event = next((e for e in events if e["id"] == event_id), None)
+            if event and event.get("status") != "processing":
+                logger.info("Pipeline completed for event %s in %.1fs (status=%s)",
+                            event_id, time.time() - start, event.get("status"))
+                return event
+        elapsed = time.time() - start
+        logger.debug("Pipeline still processing event %s (%.1fs elapsed)", event_id, elapsed)
+        time.sleep(interval)
+    raise AssertionError(
+        f"Pipeline did not complete for event {event_id} within {timeout}s. "
+        "LLM processing may be slow or unavailable."
+    )
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # 1. TestPipelineIntegration — Pipeline全链路集成测试
 # ══════════════════════════════════════════════════════════════════════════════
@@ -99,7 +150,7 @@ class TestPipelineIntegration:
         event_id = resp.json()["id"]
 
         # Wait for pipeline (LLM processing takes time)
-        time.sleep(30)
+        wait_for_pipeline(self.client, event_id, self.headers)
 
         # Verify entity extracted (LLM-dependent, may fail if LLM is slow/unavailable)
         resp = self.client.get(f"{API_PREFIX}/entities", headers=self.headers)
@@ -151,6 +202,7 @@ class TestPipelineIntegration:
     @pytest.mark.slow
     def test_multiple_events_accumulate_entities(self):
         """多次事件应累积联系人（实体解析可能合并相似实体）"""
+        event_ids = []
         for i in range(3):
             resp = self.client.post(
                 f"{API_PREFIX}/events",
@@ -168,8 +220,11 @@ class TestPipelineIntegration:
                     f"Event creation returned {resp.status_code}. "
                     "Server may be overloaded from previous test's background pipeline processing."
                 )
+            event_ids.append(resp.json()["id"])
 
-        time.sleep(30)
+        # Wait for all events to finish processing
+        for eid in event_ids:
+            wait_for_pipeline(self.client, eid, self.headers)
 
         resp = self.client.get(f"{API_PREFIX}/entities", headers=self.headers)
         if resp.status_code != 200:
@@ -332,8 +387,8 @@ class TestSecurityDeep:
             "sub": "attacker",
             "iat": int(time.time()) - 3600,
             "exp": int(time.time()) - 1800,  # Expired 30 min ago
-            "iss": "eventlink",
-            "aud": "eventlink-api",
+            "iss": "promiselink",
+            "aud": "promiselink-api",
         }
         # Use a wrong secret — even if the token is well-formed, wrong secret should fail
         expired_token = jwt.encode(expired_payload, "wrong_secret", algorithm="HS256")
@@ -412,9 +467,10 @@ class TestSecurityDeep:
             },
         )
         assert resp.status_code in (200, 201)
+        event_id = resp.json()["id"]
 
         # Wait for pipeline to extract entities
-        time.sleep(15)
+        wait_for_pipeline(client, event_id, _headers, timeout=30, interval=2)
 
         # Check entities don't expose raw encrypted values
         resp = client.get(f"{API_PREFIX}/entities", headers=_headers)
@@ -474,8 +530,8 @@ class TestSecurityDeep:
                     f"Unexpected status {resp.status_code} for payload: {payload[:30]}"
                 )
         if findings:
-            pytest.skip(
-                "XSS input handling findings (not blocking): " + "; ".join(findings)
+            assert False, (
+                "XSS input handling failures: " + "; ".join(findings)
             )
 
     def test_input_validation_oversized(self, client):
@@ -527,8 +583,8 @@ class TestSecurityDeep:
                     f"Unexpected status {resp.status_code} for SQL injection payload: {payload[:30]}"
                 )
         if findings:
-            pytest.skip(
-                "SQL injection handling findings (not blocking): " + "; ".join(findings)
+            assert False, (
+                "SQL injection handling failures: " + "; ".join(findings)
             )
 
     def test_rate_limiting_login(self, client):
@@ -550,12 +606,7 @@ class TestSecurityDeep:
         rate_limited = sum(1 for s in results if s == 429)
         unauth = sum(1 for s in results if s == 401)
         # We expect at least some 429 responses (rate limiting kicks in after 10 unauth requests per minute)
-        # If no 429, the login endpoint may not be rate-limited
-        if rate_limited == 0:
-            pytest.skip(
-                f"Login rate limiting not triggered: 429={rate_limited}, 401={unauth}. "
-                f"This may indicate the login endpoint is not protected by rate_limit_dependency."
-            )
+        # If no 429, the login endpoint is not rate-limited — this is a security failure
         assert rate_limited > 0, (
             f"Login endpoint should have rate limiting. "
             f"429: {rate_limited}, 401: {unauth}, "

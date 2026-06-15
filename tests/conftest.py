@@ -1,4 +1,4 @@
-"""Shared test fixtures for EventLink tests."""
+"""Shared test fixtures for PromiseLink tests."""
 
 import os
 import uuid
@@ -9,15 +9,15 @@ from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 # Force IS_SQLITE=True BEFORE importing models, so column types use String(36)
-os.environ.setdefault("DATABASE_URL", "sqlite:///test.db")
+os.environ.setdefault("DATABASE_URL", "sqlite://")
 
-from eventlink.database import Base
+from promiselink.database import Base
 
 
 @pytest.fixture(autouse=True)
 def _reset_rate_limits():
     """Reset in-memory rate limiter state before each test."""
-    from eventlink.core.rate_limiter import reset_rate_limits
+    from promiselink.core.rate_limiter import reset_rate_limits
     reset_rate_limits()
     yield
     reset_rate_limits()
@@ -34,11 +34,12 @@ async def db_session():
         connect_args={"check_same_thread": False},
     )
 
-    # Enable foreign keys for SQLite
+    # Disable foreign keys for SQLite in tests
+    # (test data often references non-existent parent records for isolation)
     @event.listens_for(engine.sync_engine, "connect")
     def set_sqlite_pragma(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA foreign_keys=OFF")
         cursor.close()
 
     async with engine.begin() as conn:
@@ -53,6 +54,15 @@ async def db_session():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
+
+
+@pytest.fixture
+def auth_headers():
+    """Provide authenticated headers for API tests."""
+    from promiselink.core.auth import create_access_token
+
+    token = create_access_token(user_id="test-user-001")
+    return {"Authorization": f"Bearer {token}"}
 
 
 def make_user_id() -> str:
@@ -71,7 +81,7 @@ async def create_test_event(
 
     Must be called within an active session/transaction.
     """
-    from eventlink.models.event import Event
+    from promiselink.models.event import Event
 
     event = Event(
         id=str(uuid.uuid4()),

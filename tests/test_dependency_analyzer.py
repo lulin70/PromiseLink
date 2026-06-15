@@ -15,9 +15,9 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from eventlink.models.entity import Entity
-from eventlink.models.todo import Todo
-from eventlink.services.dependency_analyzer import DependencyAnalyzer
+from promiselink.models.entity import Entity
+from promiselink.models.todo import Todo
+from promiselink.services.dependency_analyzer import DependencyAnalyzer
 from tests.conftest import create_test_event, make_user_id
 
 

@@ -5,10 +5,10 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from eventlink.models.entity import Entity
-from eventlink.models.event import Event
-from eventlink.models.todo import Todo
-from eventlink.services.context_matcher import ContextMatcher
+from promiselink.models.entity import Entity
+from promiselink.models.event import Event
+from promiselink.models.todo import Todo
+from promiselink.services.context_matcher import ContextMatcher
 from tests.conftest import create_test_event, make_user_id
 
 

@@ -1,4 +1,4 @@
-# EventLink LLM Prompt模板库
+# PromiseLink LLM Prompt模板库
 
 > **版本**: 0.4.1 (POC阶段, F-36新增Template 25)
 > **最后更新**: 2026-06-07
@@ -16,7 +16,7 @@
 所有模板通过 `LLMClient.call()` 调用，使用Python `str.format()` 填充变量：
 
 ```python
-from eventlink.services.llm_client import LLMClient
+from promiselink.services.llm_client import LLMClient
 
 llm = LLMClient(config)
 
@@ -117,7 +117,7 @@ result = await llm.call(
 
 **Prompt**:
 ```
-你是一个EventLink输入分类器。请判断以下用户输入属于哪种scope。
+你是一个PromiseLink输入分类器。请判断以下用户输入属于哪种scope。
 
 8种scope定义：
 1. card（名片）：名片扫描/OCR识别结果，包含姓名、公司、职位、联系方式等结构化或半结构化信息
@@ -1256,7 +1256,7 @@ Action类型（必须从6种中选择最匹配的一种）：
 
 **Prompt**:
 ```
-你是一个EventLink关系分析专家。请根据以下信息生成完整的RelationshipBrief。
+你是一个PromiseLink关系分析专家。请根据以下信息生成完整的RelationshipBrief。
 
 目标人物：
 {person_info}
@@ -1448,7 +1448,7 @@ Action类型（必须从6种中选择最匹配的一种）：
 
 **Prompt**:
 ```
-你是一个EventLink关系阶段分析师。请分析以下关系是否可以推进到下一阶段。
+你是一个PromiseLink关系阶段分析师。请分析以下关系是否可以推进到下一阶段。
 
 重要原则：
 1. 仅提供建议，不自动升级关系阶段
@@ -1671,7 +1671,7 @@ Action类型（必须从6种中选择最匹配的一种）：
 
 **Prompt**:
 ```
-你是EventLink商务助手的语音回答生成器。根据日程数据生成简洁自然的口语化中文回答。
+你是PromiseLink商务助手的语音回答生成器。根据日程数据生成简洁自然的口语化中文回答。
 此回答将通过TTS语音播报给用户(可能在开车)。
 
 严格规则:
@@ -1710,7 +1710,7 @@ Action类型（必须从6种中选择最匹配的一种）：
 
 **Prompt**:
 ```
-你是EventLink商务助手的语音回答生成器。根据待办承诺数据生成口语化中文回答。
+你是PromiseLink商务助手的语音回答生成器。根据待办承诺数据生成口语化中文回答。
 用户可能在开车,回答要简洁清晰。
 
 规则:
@@ -1746,7 +1746,7 @@ Action类型（必须从6种中选择最匹配的一种）：
 
 **Prompt**:
 ```
-你是EventLink商务助手的语音回答生成器。根据人物关系进展数据生成口语化回答。
+你是PromiseLink商务助手的语音回答生成器。根据人物关系进展数据生成口语化回答。
 
 规则:
 1. 45字以内
@@ -1780,7 +1780,7 @@ Action类型（必须从6种中选择最匹配的一种）：
 
 **Prompt**:
 ```
-你是EventLink商务助手的语音回答生成器。根据多日范围日程数据生成口语化中文回答。
+你是PromiseLink商务助手的语音回答生成器。根据多日范围日程数据生成口语化中文回答。
 此回答将通过TTS语音播报给用户(可能在开车)。
 
 规则:
@@ -1815,7 +1815,7 @@ Action类型（必须从6种中选择最匹配的一种）：
 
 **Prompt**:
 ```
-你是EventLink商务助手的语音回答生成器。根据关系优先级数据生成行动建议。
+你是PromiseLink商务助手的语音回答生成器。根据关系优先级数据生成行动建议。
 此回答将通过TTS语音播报给用户(可能在开车)。
 
 规则:
@@ -1866,7 +1866,7 @@ Action类型（必须从6种中选择最匹配的一种）：
 
 **Prompt**:
 ```
-你是一个EventLink人物分析专家。请从以下文本中提取{person_name}的关注点（concerns）和能力（capabilities）。
+你是一个PromiseLink人物分析专家。请从以下文本中提取{person_name}的关注点（concerns）和能力（capabilities）。
 
 定义：
 - concerns（关注点）：此人关心什么、有什么痛点、有什么需求
@@ -1983,7 +1983,7 @@ Action类型（必须从6种中选择最匹配的一种）：
 
 **Prompt**:
 ```
-你是一个EventLink事件标题生成器。请根据以下事件原始文本生成一个简洁的标题。
+你是一个PromiseLink事件标题生成器。请根据以下事件原始文本生成一个简洁的标题。
 
 规则：
 1. 标题长度不超过20个字符

@@ -5,10 +5,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from eventlink.models.entity import Entity
-from eventlink.services.entity_extractor import EntityExtractor, ExtractedPerson
-from eventlink.services.llm_client import LLMClient
-from eventlink.prompts.entity_extraction import (
+from promiselink.models.entity import Entity
+from promiselink.services.entity_extractor import EntityExtractor, ExtractedPerson
+from promiselink.services.llm_client import LLMClient
+from promiselink.prompts.entity_extraction import (
     TEMPLATE_1_CARD_EXTRACTION,
     TEMPLATE_2_CONVERSATION_EXTRACTION,
 )

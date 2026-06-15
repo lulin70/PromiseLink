@@ -1,4 +1,4 @@
-# EventLink 产品定位升级 - PM+架构师讨论报告
+# PromiseLink 产品定位升级 - PM+架构师讨论报告
 
 > 日期: 2026-06-01
 > 反馈来源: 外部创业者李总
@@ -6,7 +6,7 @@
 ---
 
 ## 产品经理(PM)
-# EventLink 产品定位升级与MVP优化方案
+# PromiseLink 产品定位升级与MVP优化方案
 
 ## 1. 定位升级评估：完全同意
 
@@ -66,20 +66,20 @@
 
 ## 5. PRD产品概述重写
 
-**旧版：** EventLink是智能商务社交平台，通过AI技术帮助用户管理人脉关系
+**旧版：** PromiseLink是智能商务社交平台，通过AI技术帮助用户管理人脉关系
 
 **新版：**
-EventLink是商务关系管理AI助手。帮您把每次见面、每通电话、每个可能的合作机会，自动整理成清晰的待办事项。不用再担心"上次和他聊到哪了""这个人能帮什么忙"——EventLink记得比您清楚，并在合适的时机提醒您行动。
+PromiseLink是商务关系管理AI助手。帮您把每次见面、每通电话、每个可能的合作机会，自动整理成清晰的待办事项。不用再担心"上次和他聊到哪了""这个人能帮什么忙"——PromiseLink记得比您清楚，并在合适的时机提醒您行动。
 
 **核心场景：** 展会认识50人→语音速记关键信息→AI识别3个高优先级商机→一周内完成精准跟进
 
 ## 6. 数字名片小程序对接POC方案
 
 **技术方案（最小化集成）：**
-1. **Webhook触发：** 小程序扫码后POST联系人JSON到EventLink API
-2. **数据映射：** `{name, company, title, phone, wechat}` → EventLink Contact模型
+1. **Webhook触发：** 小程序扫码后POST联系人JSON到PromiseLink API
+2. **数据映射：** `{name, company, title, phone, wechat}` → PromiseLink Contact模型
 3. **智能补全：** 弹窗询问："刚扫了张三的名片，你们主要聊了什么？"用户补充→触发商机识别
-4. **双向同步（可选）：** EventLink更新联系人备注→回写到小程序（需小程序开放API）
+4. **双向同步（可选）：** PromiseLink更新联系人备注→回写到小程序（需小程序开放API）
 
 **POC验证目标：** 1周内完成扫码→建档→补充会话→生成商机全流程，跑通10个真实case
 
@@ -88,7 +88,7 @@ EventLink是商务关系管理AI助手。帮您把每次见面、每通电话、
 **总结：** 定位升级是战略正确决策。MVP聚焦"快速建档+会话速记+商机识别+行动提醒"4个功能，用语音速记+微信导入解决冷启动，2周内用20个种子用户验证商机准确性。
 
 ## 架构师(Architect)
-# EventLink 架构评估与调整建议
+# PromiseLink 架构评估与调整建议
 
 ## 1. 同意定位升级吗？为什么？
 
@@ -151,7 +151,7 @@ EventLink是商务关系管理AI助手。帮您把每次见面、每通电话、
 
 ## 5. PRD产品概述重写文案
 
-**EventLink - 商务关系管理AI助手**
+**PromiseLink - 商务关系管理AI助手**
 
 帮助商务人士把每次见面、每段对话、每个潜在合作机会，自动转化为清晰的下一步行动。
 
@@ -166,15 +166,15 @@ EventLink是商务关系管理AI助手。帮您把每次见面、每通电话、
 **方案A：Webhook回调（推荐）**
 ```
 数字名片小程序 → 用户扫码/交换名片 
-→ 触发Webhook POST到EventLink API
+→ 触发Webhook POST到PromiseLink API
 → 携带JSON: {name, phone, company, wechat, exchange_time}
-→ EventLink自动创建联系人+打标签"刚认识"
+→ PromiseLink自动创建联系人+打标签"刚认识"
 ```
 
 **方案B：二维码跳转**
 ```
-EventLink生成带参数二维码 → 嵌入数字名片
-→ 对方扫码后跳转到EventLink H5建档页
+PromiseLink生成带参数二维码 → 嵌入数字名片
+→ 对方扫码后跳转到PromiseLink H5建档页
 → 预填充名片信息+添加备注入口
 ```
 
@@ -191,7 +191,7 @@ EventLink生成带参数二维码 → 嵌入数字名片
 
 ## 共识结论
 
-# EventLink 产品定位与MVP方案共识总结
+# PromiseLink 产品定位与MVP方案共识总结
 
 ## 1. 产品定位最终定义
 
@@ -278,7 +278,7 @@ EventLink生成带参数二维码 → 嵌入数字名片
 ## 4. PRD产品概述重写
 
 ### 产品概述
-**EventLink - 商务关系管理AI助手**
+**PromiseLink - 商务关系管理AI助手**
 
 帮助商务人士把每次见面、每段对话、每个潜在合作机会，自动转化为清晰的下一步行动。
 
@@ -290,7 +290,7 @@ EventLink生成带参数二维码 → 嵌入数字名片
 
 ### 与竞品差异
 - **名片全能王**：工具属性，扫完即走，低频使用
-- **EventLink**：助手属性，持续记录沟通，高频陪伴，商机不遗漏
+- **PromiseLink**：助手属性，持续记录沟通，高频陪伴，商机不遗漏
 
 ---
 
@@ -332,9 +332,9 @@ EventLink生成带参数二维码 → 嵌入数字名片
 ```
 流程：
 数字名片小程序 → 用户扫码/交换名片 
-→ 触发Webhook POST到EventLink API
+→ 触发Webhook POST到PromiseLink API
 → 携带JSON: {name, phone, company, wechat, exchange_time, event_name}
-→ EventLink自动创建联系人+打标签"刚认识@某活动"
+→ PromiseLink自动创建联系人+打标签"刚认识@某活动"
 → 弹窗："刚扫了张三的名片，你们主要聊了什么？"
 → 用户补充会话 → 触发商机识别
 ```

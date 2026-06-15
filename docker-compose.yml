@@ -1,14 +1,19 @@
 version: '3.8'
 
+# Profiles usage:
+#   docker compose up                                    → starts only the app (SQLite mode)
+#   docker compose --profile full up                     → starts app + postgres + redis
+# Other docker-compose files (docker-compose.basic.yml, etc.) serve specific use cases.
+
 services:
   # FastAPI application
-  eventlink:
+  promiselink:
     build: .
-    container_name: eventlink-api
+    container_name: promiselink-api
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://eventlink:eventlink_password@postgres:5432/eventlink
+      - DATABASE_URL=postgresql+asyncpg://promiselink:promiselink_password@postgres:5432/promiselink
       - APP_ENV=staging
       - DEBUG=false
       - LOG_LEVEL=INFO
@@ -16,35 +21,38 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=${SECRET_KEY:-change-me-in-staging}
       - LLM_API_KEY=${LLM_API_KEY:-}
-      - EVENTLINK_POC_SECRET=${EVENTLINK_POC_SECRET:-}
+      - POC_SECRET=${POC_SECRET:-}
     volumes:
       - ./data:/app/data
     depends_on:
       postgres:
         condition: service_healthy
+        required: false
       redis:
         condition: service_started
-    command: uvicorn eventlink.main:app --host 0.0.0.0 --port 8000 --workers 2
+        required: false
+    command: uvicorn promiselink.main:app --host 0.0.0.0 --port 8000 --workers 2
     networks:
-      - eventlink-network
+      - promiselink-network
     restart: unless-stopped
 
   # PostgreSQL
   postgres:
     image: postgres:15-alpine
-    container_name: eventlink-postgres
+    container_name: promiselink-postgres
+    profiles: ["full"]
     environment:
-      POSTGRES_DB: eventlink
-      POSTGRES_USER: eventlink
-      POSTGRES_PASSWORD: eventlink_password
+      POSTGRES_DB: promiselink
+      POSTGRES_USER: promiselink
+      POSTGRES_PASSWORD: promiselink_password
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - eventlink-network
+      - promiselink-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U eventlink"]
+      test: ["CMD-SHELL", "pg_isready -U promiselink"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -53,11 +61,12 @@ services:
   # Redis
   redis:
     image: redis:7-alpine
-    container_name: eventlink-redis
+    container_name: promiselink-redis
+    profiles: ["full"]
     ports:
       - "6379:6379"
     networks:
-      - eventlink-network
+      - promiselink-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -69,5 +78,5 @@ volumes:
   postgres_data:
 
 networks:
-  eventlink-network:
+  promiselink-network:
     driver: bridge

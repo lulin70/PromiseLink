@@ -1,24 +1,33 @@
-# EventLink 数据库设计文档
+# PromiseLink 数据库设计文档
 
-> **版本**: 0.2.8 (POC阶段)
-> **日期**: 2026-06-07
-> **阶段**: POC (0.2.x series)
+> **版本**: 3.0 (三级产品模型)
+> **日期**: 2026-06-11
+> **阶段**: 基础版过渡期
 > **设计师**: 架构师团队
-> **参考**: PRD v4.3, 技术设计 v2.7 §3.1
-> **状态**: 李总v1.2+许总POC反馈融合修订
+> **参考**: PRD v5.0, 技术设计 v3.0 §3.1
+> **状态**: 三级产品模型(基础版/专业版/定制版)重构
+> **v3.0变更**: 三级产品模型重构——Phase1→专业版、Phase2→定制版；SQLite确认为基础版+专业版长期方案，PG/Redis仅定制版；新增relay_connections表(网关中继连接)、ai_usage_logs表(AI用量计费)；resource/demand字段标注为定制版使用
 > **v2.6变更**: score_audit_logs表calculation_factors扩展dependency_score/context_score审计字段
 > **v2.7变更**: 新增vector_embeddings表(F-57)、vec_entities虚拟表(F-57)、语义搜索数据存储
 > **v2.8变更**: Event模型event_type约束新增'email'和'wechat_forward'，Todo模型properties JSONB新增resource_overuse类型
+> **v2.9变更**: todos表扩展fulfillment_status/fulfilled_at/overdue_notified_at字段(F-68)，新增reminder_preferences表(F-69)，新增reminder_logs表(F-69)
 
 ---
 
 ## 1. 设计原则
 
-### 1.1 PoC阶段策略
-- **开发环境**: SQLite（零依赖，快速启动）
-- **生产环境**: PostgreSQL 15（高性能、JSONB、全文索引）
-- **数据规模**: 单用户1万条记录以内
+### 1.1 数据库策略（三级产品模型）
+
+| 产品层级 | 数据库 | 说明 |
+|---------|--------|------|
+| **基础版**（本地免费） | SQLite | 零依赖，快速启动，单用户完全够用 |
+| **专业版**（网关中继） | SQLite | 长期方案，通过relay gateway提供云端AI能力 |
+| **定制版**（团队） | PostgreSQL 15 + Redis | 销售团队多用户场景，高性能、JSONB、全文索引 |
+
+- **数据规模**: 单用户1万条记录以内（SQLite处理百万行无压力）
 - **范式**: 实用主义优先，适度反范式化（company/title提取到实体表）
+
+> **决策变更（2026-06-11）**：基础版和专业版长期使用SQLite，不做PG/Redis迁移。PG/Redis仅在定制版中按需引入。此决策消除了基础版和专业版的数据库迁移风险，简化部署和运维。
 
 ### 1.2 数据原则
 - **事件驱动**: Event是一切数据的源头
@@ -119,6 +128,9 @@ erDiagram
         jsonb context
         timestamptz due_date
         timestamptz snooze_until
+        varchar fulfillment_status "兑现状态（v2.9新增）"
+        timestamptz fulfilled_at "兑现时间（v2.9新增）"
+        timestamptz overdue_notified_at "逾期通知时间（v2.9新增）"
         uuid user_id FK
         timestamptz created_at
         timestamptz updated_at
@@ -184,6 +196,48 @@ erDiagram
         float asr_error_rate "ASR错误率"
         timestamptz created_at
         timestamptz updated_at
+    }
+
+    USERS ||--o| REMINDER_PREFERENCES : "configures"
+    REMINDER_PREFERENCES {
+        varchar user_id PK "用户ID"
+        jsonb preferred_times "偏好提醒时间"
+        integer fatigue_threshold "疲劳阈值"
+        time quiet_hours_start "免打扰开始"
+        time quiet_hours_end "免打扰结束"
+        timestamp updated_at "更新时间"
+    }
+
+    USERS ||--o{ REMINDER_LOGS : "receives"
+    TODOS ||--o{ REMINDER_LOGS : "tracked_by"
+    REMINDER_LOGS {
+        varchar id PK
+        varchar user_id FK "用户ID"
+        varchar todo_id FK "关联Todo"
+        varchar reminder_type "提醒类型"
+        timestamp sent_at "发送时间"
+        varchar action_taken "用户响应"
+        integer response_latency_seconds "响应延迟(秒)"
+    }
+
+    USERS ||--o{ RELAY_CONNECTIONS : "connects"
+    RELAY_CONNECTIONS {
+        uuid id PK
+        uuid user_id FK "用户ID"
+        varchar connection_id "连接唯一标识"
+        timestamptz connected_at "连接建立时间"
+        timestamptz last_heartbeat "最近心跳时间"
+        varchar status "连接状态"
+    }
+
+    USERS ||--o{ AI_USAGE_LOGS : "consumes"
+    AI_USAGE_LOGS {
+        uuid id PK
+        uuid user_id FK "用户ID"
+        varchar action_type "AI动作类型"
+        integer tokens_used "Token消耗量"
+        float cost "调用成本(元)"
+        timestamptz created_at "创建时间"
     }
 ```
 
@@ -354,7 +408,7 @@ CREATE UNIQUE INDEX idx_entities_user_name_company
 
 > **迁移说明**: concerns/capabilities 存储在现有 properties JSONB 列中，无需 Schema 变更。原有 concern 数组保持兼容，新增 concerns/capabilities 字段为结构化版本。
 
-> **注意**: `resource` 和 `demand` 字段为 **Phase2** 使用，当前阶段保留结构但暂不主动填充。
+> **注意**: `resource` 和 `demand` 字段为 **定制版** 使用，当前阶段保留结构但暂不主动填充。
 
 **resource_sensitivity枚举说明**:
 | 值 | 说明 | 匹配行为 |
@@ -362,7 +416,7 @@ CREATE UNIQUE INDEX idx_entities_user_name_company
 | `matchable` | 可参与匹配 | 该实体的资源/需求可被匹配算法发现和推荐 |
 | `no_match` | 不可匹配 | 该实体不参与任何匹配推荐，仅做记录留存 |
 
-**resource字段详细结构**（Phase2）:
+**resource字段详细结构**（定制版）:
 ```json
 {
   "tags": ["标签1", "标签2"],
@@ -372,7 +426,7 @@ CREATE UNIQUE INDEX idx_entities_user_name_company
 - `tags`: 资源标签数组，用于关键词匹配（keyword维度25%权重）
 - `description`: 资源的自然语言描述，用于LLM语义匹配（llm维度10%权重）
 
-**demand字段详细结构**（Phase2）:
+**demand字段详细结构**（定制版）:
 ```json
 {
   "tags": ["标签1", "标签2"],
@@ -556,6 +610,9 @@ CREATE UNIQUE INDEX idx_briefs_user_person ON relationship_briefs(user_id, perso
 | completed_rank | INTEGER | - | NULL | 完成序号(隐式反馈用, v2.5新增) |
 | dynamic_score | FLOAT | - | NULL | 动态优先级分(v2.5新增) |
 | score_calculated_at | TIMESTAMPTZ | - | NULL | 评分时间(v2.5新增) |
+| fulfillment_status | VARCHAR(20) | - | 'pending' | 承诺兑现状态(F-68, v2.9新增) |
+| fulfilled_at | TIMESTAMPTZ | - | NULL | 兑现时间(F-68, v2.9新增) |
+| overdue_notified_at | TIMESTAMPTZ | - | NULL | 逾期通知时间(F-68, v2.9新增) |
 
 **CHECK约束（v2.0新增）**:
 ```sql
@@ -570,6 +627,20 @@ ALTER TABLE todos ADD CONSTRAINT check_dynamic_score_range
 ALTER TABLE todos ADD CONSTRAINT check_score_timestamp_valid
     CHECK (score_calculated_at IS NULL OR score_calculated_at <= CURRENT_TIMESTAMP);
 ```
+
+**CHECK约束（v2.9新增, F-68）**:
+```sql
+ALTER TABLE todos ADD COLUMN fulfillment_status VARCHAR(20) DEFAULT 'pending'
+  CHECK (fulfillment_status IN ('pending', 'fulfilled', 'overdue', 'broken'));
+ALTER TABLE todos ADD COLUMN fulfilled_at TIMESTAMP;
+ALTER TABLE todos ADD COLUMN overdue_notified_at TIMESTAMP;
+-- 注意：due_date字段已存在，无需新增
+```
+
+**fulfillment_status与status正交说明（F-68, v2.9新增）**:
+- **status**: 任务执行状态(pending/in_progress/done/dismissed/snoozed)
+- **fulfillment_status**: 承诺兑现语义(pending/fulfilled/overdue/broken)
+- 仅action_type为promise/their_promise的Todo有fulfillment_status语义
 
 **action_type枚举说明（F-45，v2.0新增）**:
 
@@ -702,7 +773,7 @@ CREATE UNIQUE INDEX idx_todos_completed_rank ON todos(user_id, completed_rank) W
 
 ### 3.5 Users表（用户表）
 
-**用途**: 用户账号管理（Phase 1暂时单用户）
+**用途**: 用户账号管理（基础版/专业版暂时单用户）
 
 | 字段名 | 类型 | 约束 | 默认值 | 说明 |
 |--------|------|------|--------|------|
@@ -745,14 +816,14 @@ CREATE UNIQUE INDEX idx_users_email ON users(email) WHERE email IS NOT NULL;
 | 值 | 说明 |
 |----|------|
 | `poc_v1` | PoC二维模型（urgency + importance） |
-| `phase1_v1` | Phase1四维模型（urgency + importance + dependency + context） |
+| `phase1_v1` | 专业版四维模型（urgency + importance + dependency + context） |
 
 **calculated_by枚举说明**:
 
 | 值 | 说明 |
 |----|------|
 | `PriorityScorer` | PoC二维评分器 |
-| `PriorityScorerV2` | Phase1四维评分器 |
+| `PriorityScorerV2` | 专业版四维评分器 |
 
 **triggered_by枚举说明**:
 
@@ -794,7 +865,7 @@ CREATE INDEX idx_score_audit_todo ON score_audit_logs(todo_id, created_at DESC);
 }
 ```
 
-> **v2.6扩展说明**: calculation_factors 新增 `dependency_score`、`context_score`、`dependency_raw`、`context_raw` 字段，用于审计 F-55 依赖性全图谱路径分析和 F-56 场景匹配Event表驱动的计算因子。Phase1 启用四维模型后，审计日志将完整记录四个维度的得分和原始计算因子。
+> **v2.6扩展说明**: calculation_factors 新增 `dependency_score`、`context_score`、`dependency_raw`、`context_raw` 字段，用于审计 F-55 依赖性全图谱路径分析和 F-56 场景匹配Event表驱动的计算因子。专业版启用四维模型后，审计日志将完整记录四个维度的得分和原始计算因子。
 
 ---
 
@@ -836,6 +907,178 @@ UNIQUE(user_id, adapter_name)
 - `config_encrypted` 使用 AES-256-GCM 加密存储 API 密钥等敏感配置
 - 解密密钥通过环境变量注入，不存储在数据库中
 - 读取配置时应用层解密，API响应中不返回配置内容
+
+---
+
+### 3.5d ReminderPreferences表（提醒偏好表）[v2.9新增, F-69]
+
+**用途**: 存储用户个性化提醒偏好设置，支撑智能提醒引擎的自适应调度。
+
+| 字段名 | 类型 | 约束 | 默认值 | 说明 |
+|--------|------|------|--------|------|
+| user_id | VARCHAR(36) | PRIMARY KEY | - | 用户ID（与users.id一致） |
+| preferred_times | JSONB | - | '["09:00","20:00"]' | 偏好提醒时间列表 |
+| fatigue_threshold | INTEGER | - | 5 | 疲劳阈值（每日最大提醒数） |
+| quiet_hours_start | TIME | - | '22:00' | 免打扰开始时间 |
+| quiet_hours_end | TIME | - | '08:00' | 免打扰结束时间 |
+| updated_at | TIMESTAMP | - | CURRENT_TIMESTAMP | 更新时间 |
+
+**DDL**:
+```sql
+CREATE TABLE reminder_preferences (
+  user_id VARCHAR(36) PRIMARY KEY,
+  preferred_times JSONB DEFAULT '["09:00","20:00"]',
+  fatigue_threshold INTEGER DEFAULT 5,
+  quiet_hours_start TIME DEFAULT '22:00',
+  quiet_hours_end TIME DEFAULT '08:00',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**preferred_times JSONB结构示例**:
+```json
+["09:00", "20:00"]
+```
+> 用户偏好的提醒推送时间点列表，提醒引擎仅在这些时间窗口内推送提醒。
+
+---
+
+### 3.5e ReminderLogs表（提醒日志表）[v2.9新增, F-69]
+
+**用途**: 记录每次提醒的发送及用户响应情况，支撑提醒效果分析和策略优化。
+
+| 字段名 | 类型 | 约束 | 默认值 | 说明 |
+|--------|------|------|--------|------|
+| id | VARCHAR(36) | PRIMARY KEY | - | 主键 |
+| user_id | VARCHAR(36) | NOT NULL | - | 用户ID |
+| todo_id | VARCHAR(36) | NOT NULL, FK(todos.id) | - | 关联Todo ID |
+| reminder_type | VARCHAR(30) | NOT NULL | - | 提醒类型 |
+| sent_at | TIMESTAMP | NOT NULL | CURRENT_TIMESTAMP | 发送时间 |
+| action_taken | VARCHAR(20) | - | NULL | 用户响应动作 |
+| response_latency_seconds | INTEGER | - | NULL | 响应延迟（秒） |
+
+**DDL**:
+```sql
+CREATE TABLE reminder_logs (
+  id VARCHAR(36) PRIMARY KEY,
+  user_id VARCHAR(36) NOT NULL,
+  todo_id VARCHAR(36) NOT NULL REFERENCES todos(id),
+  reminder_type VARCHAR(30) NOT NULL CHECK (reminder_type IN ('promise_due', 'followup', 'stage_suggestion', 'dormant_contact')),
+  sent_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  action_taken VARCHAR(20) CHECK (action_taken IN ('completed', 'snoozed', 'dismissed', 'ignored')),
+  response_latency_seconds INTEGER,
+  FOREIGN KEY (todo_id) REFERENCES todos(id)
+);
+CREATE INDEX idx_reminder_logs_user_sent ON reminder_logs(user_id, sent_at);
+```
+
+**reminder_type枚举说明**:
+
+| reminder_type | 中文名 | 说明 |
+|---------------|--------|------|
+| `promise_due` | 承诺到期提醒 | 承诺即将到期或已到期时触发 |
+| `followup` | 跟进提醒 | 需要后续跟进的事项提醒 |
+| `stage_suggestion` | 阶段推进建议 | 关系阶段推进建议提醒 |
+| `dormant_contact` | 沉默联系人提醒 | 长时间未互动的联系人提醒 |
+
+**action_taken枚举说明**:
+
+| action_taken | 中文名 | 说明 |
+|--------------|--------|------|
+| `completed` | 已完成 | 用户完成待办 |
+| `snoozed` | 延迟 | 用户选择延迟提醒 |
+| `dismissed` | 忽略 | 用户主动忽略 |
+| `ignored` | 未响应 | 用户未做任何操作 |
+
+---
+
+### 3.5f RelayConnections表（网关中继连接表）[v3.0新增, 📋专业版（尚未实现）]
+
+**用途**: 记录专业版用户通过relay gateway的连接状态，支撑网关中继服务的连接管理和心跳检测。
+
+> **产品层级说明**: 此表仅在 **专业版** 中使用。基础版为本地运行，无需中继连接；定制版为自部署服务，不使用共享网关。
+
+| 字段名 | 类型 | 约束 | 默认值 | 说明 |
+|--------|------|------|--------|------|
+| id | UUID | PRIMARY KEY | gen_random_uuid() | 主键 |
+| user_id | UUID | NOT NULL, FK(users.id) | - | 用户ID |
+| connection_id | VARCHAR(100) | NOT NULL, UNIQUE | - | 连接唯一标识（WebSocket connection ID） |
+| connected_at | TIMESTAMPTZ | NOT NULL | NOW() | 连接建立时间 |
+| last_heartbeat | TIMESTAMPTZ | NOT NULL | NOW() | 最近心跳时间 |
+| status | VARCHAR(20) | NOT NULL | 'connected' | 连接状态 |
+
+**status枚举说明**:
+
+| 值 | 说明 |
+|----|------|
+| `connected` | 连接活跃 |
+| `disconnected` | 连接断开 |
+| `reconnecting` | 重连中 |
+
+**DDL**:
+```sql
+CREATE TABLE relay_connections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id),
+  connection_id VARCHAR(100) NOT NULL UNIQUE,
+  connected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_heartbeat TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  status VARCHAR(20) NOT NULL DEFAULT 'connected'
+    CHECK (status IN ('connected', 'disconnected', 'reconnecting'))
+);
+CREATE INDEX idx_relay_connections_user ON relay_connections(user_id);
+CREATE INDEX idx_relay_connections_status ON relay_connections(status);
+CREATE INDEX idx_relay_connections_heartbeat ON relay_connections(last_heartbeat);
+```
+
+---
+
+### 3.5g AIUsageLogs表（AI用量日志表）[v3.0新增, 📋专业版（尚未实现）]
+
+**用途**: 记录AI调用的用量和成本，支撑专业版/定制版的用量计费和成本分析。
+
+> **产品层级说明**: 基础版不记录AI用量（本地免费）；专业版通过网关中继调用AI，需记录用量；定制版自部署AI服务，需记录成本。
+
+| 字段名 | 类型 | 约束 | 默认值 | 说明 |
+|--------|------|------|--------|------|
+| id | UUID | PRIMARY KEY | gen_random_uuid() | 主键 |
+| user_id | UUID | NOT NULL, FK(users.id) | - | 用户ID |
+| action_type | VARCHAR(30) | NOT NULL | - | AI动作类型 |
+| tokens_used | INTEGER | - | 0 | Token消耗量 |
+| cost | FLOAT | - | 0.0 | 调用成本（元） |
+| created_at | TIMESTAMPTZ | NOT NULL | NOW() | 创建时间 |
+
+**action_type枚举说明**:
+
+| 值 | 说明 |
+|----|------|
+| `entity_extraction` | 实体抽取 |
+| `todo_generation` | Todo生成 |
+| `embedding` | 向量嵌入 |
+| `semantic_search` | 语义搜索 |
+| `voice_nlu` | 语音NLU |
+| `ocr` | OCR识别 |
+| `asr` | 语音识别 |
+| `tts` | 语音合成 |
+| `title_generation` | 标题生成 |
+| `brief_update` | 推进卡更新 |
+
+**DDL**:
+```sql
+CREATE TABLE ai_usage_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id),
+  action_type VARCHAR(30) NOT NULL
+    CHECK (action_type IN ('entity_extraction', 'todo_generation', 'embedding',
+      'semantic_search', 'voice_nlu', 'ocr', 'asr', 'tts',
+      'title_generation', 'brief_update')),
+  tokens_used INTEGER DEFAULT 0,
+  cost FLOAT DEFAULT 0.0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_ai_usage_user_time ON ai_usage_logs(user_id, created_at DESC);
+CREATE INDEX idx_ai_usage_action ON ai_usage_logs(action_type);
+```
 
 ---
 
@@ -906,11 +1149,11 @@ CREATE INDEX idx_voice_sessions_created ON voice_sessions(created_at);
 
 ---
 
-### 3.7 VoiceTurns表（多轮对话轮次表）[F-50新增，Phase 1.2启用]
+### 3.7 VoiceTurns表（多轮对话轮次表）[F-50新增，专业版启用]
 
 **用途**: 存储多轮对话中的每一轮交互内容，支持上下文延续和澄清追问。
 
-> **⚠️ Phase说明**: 此表在 **Phase 1.1** 不创建（单轮问答模式）。**Phase 1.2** 启用多轮对话后激活。POC阶段如使用SQLite，JSONB字段以TEXT存储JSON格式。
+> **⚠️ 产品层级说明**: 此表在 **基础版** 不创建（单轮问答模式）。**专业版** 启用多轮对话后激活。POC阶段如使用SQLite，JSONB字段以TEXT存储JSON格式。
 
 | 字段名 | 类型 | 约束 | 默认值 | 说明 |
 |--------|------|------|--------|------|
@@ -1071,24 +1314,26 @@ ORDER BY priority DESC, created_at ASC;
 
 ## 5. 数据迁移方案
 
-### 5.1 SQLite → PostgreSQL 迁移
+### 5.1 SQLite → PostgreSQL 迁移（定制版专用）
 
-**场景**: 开发环境SQLite数据迁移到生产PostgreSQL
+> **注意**：基础版和专业版长期使用SQLite，此迁移仅适用于销售团队定制版。
+
+**场景**: 基础版/专业版SQLite数据迁移到定制版PostgreSQL
 
 **步骤**:
 
 ```bash
 # 1. 导出SQLite数据为SQL
-sqlite3 eventlink_dev.db .dump > dump.sql
+sqlite3 promiselink_dev.db .dump > dump.sql
 
 # 2. 转换SQL语法（脚本处理）
 python scripts/sqlite_to_pg.py dump.sql > pg_dump.sql
 
 # 3. 创建PostgreSQL schema
-psql -U eventlink -d eventlink_prod -f schema.sql
+psql -U promiselink -d promiselink_prod -f schema.sql
 
 # 4. 导入数据
-psql -U eventlink -d eventlink_prod -f pg_dump.sql
+psql -U promiselink -d promiselink_prod -f pg_dump.sql
 
 # 5. 验证数据完整性
 python scripts/verify_migration.py
@@ -1308,7 +1553,7 @@ alembic revision --autogenerate -m "add F-50 voice assistant tables"
 | 索引 | 3个（voice_sessions）+ 1个（voice_turns）+ 1个（voice_analytics）= **5个** |
 | 唯一约束 | 1个（voice_turns: session_id + turn_number）+ 1个（voice_analytics: date + user_id + intent）= **2个** |
 | 外键 | voice_sessions.user_id → users.id, voice_turns.session_id → voice_sessions.id (CASCADE), voice_analytics.user_id → users.id = **3个** |
-| Phase说明 | voice_turns表在Phase 1.2启用，Phase 1.1可跳过创建 |
+| Phase说明 | voice_turns表在专业版启用，基础版可跳过创建 |
 
 **Alembic迁移代码**:
 ```python
@@ -1320,13 +1565,13 @@ Create Date: 2026-06-05
 
 迁移内容:
 1. 新增 voice_sessions 表（语音会话，18字段+3索引）
-2. 新增 voice_turns 表（多轮对话轮次，9字段+唯一约束，Phase 1.2启用）
+2. 新增 voice_turns 表（多轮对话轮次，9字段+唯一约束，专业版启用）
 3. 新增 voice_analytics 表（分析聚合表，12字段+唯一约束）
 4. 共计: 3张表 + 5个索引 + 2个唯一约束 + 3个外键
 
 注意:
 - SQLite兼容: JSONB→TEXT(JSON格式存储)，INET→VARCHAR(45)
-- voice_turns在Phase 1.1不使用，但建议提前建表以简化后续迁移
+- voice_turns在基础版不使用，但建议提前建表以简化后续迁移
 - voice_analytics为聚合表，由定时任务写入，业务代码不直接操作
 """
 from alembic import op
@@ -1365,7 +1610,7 @@ def upgrade():
     op.create_foreign_key('fk_voice_sessions_user', 'voice_sessions', 'users',
                           ['user_id'], ['id'])
 
-    # === 2. voice_turns 表（Phase 1.2启用） ===
+    # === 2. voice_turns 表（专业版启用） ===
     op.create_table(
         'voice_turns',
         sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True,
@@ -1538,7 +1783,7 @@ FROM entities;
 
 ### 7.2 数据隔离（单用户）
 
-> **设计决策**: EventLink定位为AI驱动的**个人商务关系经营助手**，明确排除RBAC、多租户和团队协作。数据隔离通过应用层user_id过滤实现，不使用数据库行级安全（RLS）。
+> **设计决策**: PromiseLink定位为AI驱动的**个人商务关系经营助手**，明确排除RBAC、多租户和团队协作。数据隔离通过应用层user_id过滤实现，不使用数据库行级安全（RLS）。
 
 **应用层过滤原则**:
 1. 所有查询必须携带`user_id`条件
@@ -1643,7 +1888,7 @@ async def get_entity_with_associations(
 
 ### 7.3 数据主权
 
-> **核心原则**: 用户对自己的所有数据拥有完全控制权。EventLink作为个人商务关系经营助手，数据主权是不可妥协的底线。
+> **核心原则**: 用户对自己的所有数据拥有完全控制权。PromiseLink作为个人商务关系经营助手，数据主权是不可妥协的底线。
 
 **数据所有权声明**:
 1. 用户创建的所有数据（事件、实体、关联、待办）归用户所有
@@ -1769,7 +2014,7 @@ SELECT 'todos', COUNT(*)
 #!/bin/bash
 # scripts/backup.sh
 DATE=$(date +%Y%m%d)
-pg_dump -U eventlink eventlink_prod | gzip > backup_${DATE}.sql.gz
+pg_dump -U promiselink promiselink_prod | gzip > backup_${DATE}.sql.gz
 
 # 保留最近7天
 find backup_*.sql.gz -mtime +7 -delete
@@ -1788,16 +2033,16 @@ archive_command = 'cp %p /backup/wal_archive/%f'
 **恢复到指定时间点**:
 ```bash
 # 1. 停止服务
-systemctl stop eventlink
+systemctl stop promiselink
 
 # 2. 恢复基础备份
-gunzip -c backup_20260602.sql.gz | psql -U eventlink eventlink_prod
+gunzip -c backup_20260602.sql.gz | psql -U promiselink promiselink_prod
 
 # 3. 应用WAL日志
-pg_waldump /backup/wal_archive/* | psql -U eventlink eventlink_prod
+pg_waldump /backup/wal_archive/* | psql -U promiselink promiselink_prod
 
 # 4. 启动服务
-systemctl start eventlink
+systemctl start promiselink
 ```
 
 ---
@@ -1894,7 +2139,7 @@ embedding = struct.unpack(f"{dims}f", blob)
 -- 仅当sqlite-vec扩展可用时创建
 CREATE VIRTUAL TABLE IF NOT EXISTS vec_entities
 USING vec0(
-    embedding float[384]    # PoC使用本地模型384维（Phase2迁移pgvector时改为768维）
+    embedding float[384]    # 基础版/专业版使用本地模型384维（定制版迁移pgvector时改为768维）
 );
 ```
 
@@ -1904,16 +2149,16 @@ USING vec0(
 - 查询使用 `WHERE embedding MATCH ? AND k = ?` 语法
 - sqlite-vec不可用时自动降级，不影响功能
 
-**Phase 2 迁移说明**:
+**定制版迁移说明**（基础版/专业版无需迁移）：
 
-| 特性 | PoC (SQLite) | Phase 2 (PostgreSQL) |
-|------|-------------|---------------------|
+| 特性 | 基础版/专业版 (SQLite) | 定制版 (PostgreSQL) |
+|------|----------------|---------------------|
 | 向量列类型 | BLOB（API模式3072字节/本地模式1536字节） | vector(768) (pgvector) |
 | 索引 | sqlite-vec虚拟表 | IVFFlat / HNSW索引 |
 | 查询 | Python余弦 / sqlite-vec | `<=>` 余弦距离操作符 |
 | 存储 | 单文件SQLite | PG独立表空间 |
 
-**Phase 2 迁移DDL**:
+**定制版迁移DDL**（基础版/专业版无需执行）:
 ```sql
 -- PostgreSQL + pgvector
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -1950,9 +2195,10 @@ CREATE INDEX idx_vec_cosine ON vector_embeddings
 | **v2.6** | **2026-06-06** | **F-55/F-56 评分审计扩展：①score_audit_logs.calculation_factors JSONB结构扩展，新增dependency_score/context_score/dependency_raw/context_raw字段，用于审计依赖性全图谱路径分析(F-55)和场景匹配Event表驱动(F-56)的计算因子②todos表确认已有dynamic_score/score_calculated_at/completed_rank字段（F-51/F-52已加），无需新增DDL变更③Phase1启用四维模型后审计日志将完整记录四维得分及原始计算因子** |
 | **v2.7** | **2026-06-06** | **F-57/F-58 语义搜索与关联发现增强：①新增vector_embeddings表（8字段+2索引+唯一约束，target_type枚举entity/event，embedding BLOB存储API模式768维/本地降级384维float32向量，source_text用于缓存校验，user_id数据隔离）②新增vec_entities虚拟表（sqlite-vec vec0扩展，embedding float[384]（PoC本地模型），可选创建，不可用时Python余弦降级）③Phase2迁移DDL（PostgreSQL+pgvector，vector(768)列类型+IVFFlat索引）** |
 | **v2.8** | **2026-06-07** | **F-08/F-21/F-36/F-39/EmailAdapter/WeChatForwardAdapter 数据库变更：①events表event_type枚举扩展新增'email'和'wechat_forward'（无需DDL变更，VARCHAR(20)足够）②events表source枚举扩展新增'csv_import'/'email'/'wechat_forward'（无需DDL变更）③todos表properties JSONB新增resource_overuse子类型结构（risk_type/target_entity_id/request_count/window_days/severity，无需DDL变更）④ER图EVENTS节点event_type注释更新** |
-| **v2.9** | **2026-06-08** | **score_audit_logs表实现：①score_audit_logs表新增score_version字段（VARCHAR(20)，评分模型版本poc_v1/phase1_v1）②新增calculated_by字段（VARCHAR(50)，计算器标识PriorityScorer/PriorityScorerV2）③triggered_by枚举新增scorer_update值④主键改为INTEGER AUTOINCREMENT（SQLite兼容）⑤标记实现状态为已实现** |
+| **v2.9** | **2026-06-11** | **F-68/F-69 承诺兑现追踪与智能提醒引擎：①todos表新增3字段：fulfillment_status(承诺兑现状态pending/fulfilled/overdue/broken, CHECK约束)、fulfilled_at(兑现时间)、overdue_notified_at(逾期通知时间)（F-68）②fulfillment_status与status正交说明：status为任务执行状态，fulfillment_status为承诺兑现语义，仅action_type为promise/their_promise的Todo有fulfillment_status语义（F-68）③新增reminder_preferences提醒偏好表（6字段，user_id主键，preferred_times JSONB偏好时间列表，fatigue_threshold疲劳阈值，quiet_hours免打扰时段）（F-69）④新增reminder_logs提醒日志表（7字段+1索引，reminder_type枚举4值promise_due/followup/stage_suggestion/dormant_contact，action_taken枚举4值completed/snoozed/dismissed/ignored，response_latency_seconds响应延迟）（F-69）⑤ER图新增REMINDER_PREFERENCES/REMINDER_LOGS节点及关系线⑥score_audit_logs表新增score_version字段（VARCHAR(20)，评分模型版本poc_v1/phase1_v1）⑦新增calculated_by字段（VARCHAR(50)，计算器标识PriorityScorer/PriorityScorerV2）⑧triggered_by枚举新增scorer_update值⑨主键改为INTEGER AUTOINCREMENT（SQLite兼容）⑩标记实现状态为已实现** |
+| **v3.0** | **2026-06-11** | **三级产品模型重构：①数据库策略重构为三级产品模型（基础版SQLite/专业版SQLite+网关中继/定制版PG+Redis）②Phase1→专业版、Phase2→定制版全量术语替换③新增relay_connections网关中继连接表（6字段+3索引，专业版使用，WebSocket连接管理+心跳检测）④新增ai_usage_logs AI用量日志表（6字段+2索引，专业版/定制版使用，10种action_type枚举，token消耗+成本记录）⑤ER图新增RELAY_CONNECTIONS/AI_USAGE_LOGS节点及关系线⑥resource/demand字段标注从Phase2更新为定制版⑦SQLite确认为基础版+专业版长期方案，PG/Redis仅定制版** |
 | v2.1 | TBD | 添加用户反馈表 |
 
 ---
 
-*最后更新: 2026-06-08*
+*最后更新: 2026-06-11*

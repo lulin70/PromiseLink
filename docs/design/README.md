@@ -1,4 +1,4 @@
-# EventLink 详细设计文档
+# PromiseLink 详细设计文档
 
 > **目录**: `docs/design/`  
 > **用途**: 存放详细设计文档、UI/UX设计、数据库设计、API设计等
@@ -56,22 +56,22 @@
 ### 当前已有设计（嵌入在其他文档中）
 
 **数据模型**：
-- 位置：`../architecture/EventLink_技术设计_v1.md` §3
+- 位置：`../architecture/PromiseLink_技术设计_v1.md` §3
 - 内容：4张核心表（Event/Entity/Association/Todo）
 - 状态：基本完整，生产环境需补充ER图
 
 **P0核心算法**：
-- 位置：`../architecture/EventLink_技术设计_v1.md` §4
+- 位置：`../architecture/PromiseLink_技术设计_v1.md` §4
 - 内容：实体归一、商机匹配、Todo状态机
 - 状态：有完整Python代码，可直接实现
 
 **API设计**：
-- 位置：`../architecture/EventLink_技术设计_v1.md` §5
+- 位置：`../architecture/PromiseLink_技术设计_v1.md` §5
 - 内容：RESTful端点定义 + JSON示例
 - 状态：基本完整，需补充OpenAPI规范
 
 **安全设计**：
-- 位置：`../architecture/EventLink_技术设计_v1.md` §6
+- 位置：`../architecture/PromiseLink_技术设计_v1.md` §6
 - 内容：传输/认证/加密/审计
 - 状态：设计层面完成，实施后需安全测试
 
@@ -127,7 +127,7 @@
 
 ## 📚 相关文档
 
-- 技术设计：`../architecture/EventLink_技术设计_v1.md`
+- 技术设计：`../architecture/PromiseLink_技术设计_v1.md`
 - 产品需求：`../spec/PRD_v1.md`
 - 项目计划：`../planning/README.md`
 - 项目状态：`../PROJECT_STATUS.md`

@@ -3,7 +3,7 @@
 import pytest
 from datetime import date, timedelta
 
-from eventlink.core.natural_date import (
+from promiselink.core.natural_date import (
     NaturalDateResult,
     parse_natural_date,
     _generate_label,

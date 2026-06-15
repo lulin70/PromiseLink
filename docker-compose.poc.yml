@@ -1,5 +1,5 @@
 # =============================================================================
-# EventLink PoC 阶段 Docker Compose 部署配置
+# PromiseLink PoC 阶段 Docker Compose 部署配置
 # =============================================================================
 # 定位：AI驱动的个人商务关系经营助手 - PoC（概念验证）阶段
 #
@@ -25,7 +25,7 @@
 version: "3.8"
 
 services:
-  eventlink-api:
+  promiselink-api:
     # ------------------------------------------------------------------
     # 镜像构建：基于项目根目录的 Dockerfile
     # PoC 阶段复用现有 Dockerfile，后续阶段可按需定制
@@ -33,8 +33,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: eventlink:poc
-    container_name: eventlink-api
+    image: promiselink:poc
+    container_name: promiselink-api
 
     # ------------------------------------------------------------------
     # 端口映射：仅暴露 API 端口
@@ -51,8 +51,8 @@ services:
       - .env.poc
     environment:
       # 以下变量可在 docker-compose 层面覆盖 .env.poc 中的值
-      - EVENTLINK_STAGE=poc
-      - EVENTLINK_DB_PATH=/data/eventlink_poc.db
+      - PROMISELINK_STAGE=poc
+      - PROMISELINK_DB_PATH=/data/promiselink_poc.db
 
     # ------------------------------------------------------------------
     # 数据卷：持久化 SQLite 数据库文件
@@ -99,13 +99,13 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-        tag: "eventlink-{{.Name}}"
+        tag: "promiselink-{{.Name}}"
 
     # ------------------------------------------------------------------
     # 网络：独立桥接网络，为后续扩展（小程序网关等）预留隔离空间
     # ------------------------------------------------------------------
     networks:
-      - eventlink-poc-net
+      - promiselink-poc-net
 
     # ------------------------------------------------------------------
     # 重启策略：除非手动停止，否则自动重启
@@ -125,22 +125,22 @@ services:
   # ==================================================================
   postgres:
     image: postgres:16-alpine
-    container_name: eventlink-postgres
+    container_name: promiselink-postgres
     environment:
-      POSTGRES_DB: eventlink
-      POSTGRES_USER: eventlink
-      POSTGRES_PASSWORD: ${PG_PASSWORD:-eventlink_dev}
+      POSTGRES_DB: promiselink
+      POSTGRES_USER: promiselink
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-promiselink_dev}
     ports:
       - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U eventlink"]
+      test: ["CMD-SHELL", "pg_isready -U promiselink"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - eventlink-poc-net
+      - promiselink-poc-net
     restart: unless-stopped
 
   # ==================================================================
@@ -149,7 +149,7 @@ services:
   # ==================================================================
   redis:
     image: redis:7-alpine
-    container_name: eventlink-redis
+    container_name: promiselink-redis
     ports:
       - "6379:6379"
     volumes:
@@ -160,22 +160,22 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - eventlink-poc-net
+      - promiselink-poc-net
     restart: unless-stopped
 
 # =============================================================================
 # 网络：PoC 专用桥接网络
 # =============================================================================
 networks:
-  eventlink-poc-net:
+  promiselink-poc-net:
     driver: bridge
-    name: eventlink-poc
+    name: promiselink-poc
 
 # =============================================================================
 # 数据卷：持久化存储
 # =============================================================================
 volumes:
   pg_data:
-    name: eventlink-pg-data
+    name: promiselink-pg-data
   redis_data:
-    name: eventlink-redis-data
+    name: promiselink-redis-data

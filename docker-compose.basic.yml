@@ -1,0 +1,68 @@
+# =============================================================================
+# PromiseLink 基础版 Docker Compose
+# SQLite单文件数据库，零外部依赖
+# 适用于个人本地部署
+#
+# 使用方法：
+#   1. cp .env.basic.example .env.basic
+#   2. 编辑 .env.basic 填入 LLM_API_KEY
+#   3. docker compose -f docker-compose.basic.yml up -d --build
+#   4. 浏览器打开 http://localhost:8000
+# =============================================================================
+
+version: "3.8"
+
+services:
+  promiselink-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: promiselink:basic
+    container_name: promiselink-api
+
+    ports:
+      - "8000:8000"
+
+    env_file:
+      - .env.basic
+    environment:
+      - APP_ENV=production
+      - DATABASE_URL=sqlite+aiosqlite:///data/promiselink.db
+      - REDIS_ENABLED=false
+
+    volumes:
+      - ./data:/data
+      - ./frontend/dist:/app/static:ro
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "promiselink-{{.Name}}"
+
+    networks:
+      - promiselink-basic-net
+
+    restart: unless-stopped
+
+networks:
+  promiselink-basic-net:
+    driver: bridge
+    name: promiselink-basic

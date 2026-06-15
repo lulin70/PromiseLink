@@ -1,4 +1,4 @@
-# EventLink 安全设计文档 — 数据保护与主权
+# PromiseLink 安全设计文档 — 数据保护与主权
 
 > **版本**: v3.0 (托管PoC模式更新)
 > **拆分日期**: 2026-06-08
@@ -8,7 +8,7 @@
 
 ---
 
-## 导航：EventLink 安全设计文档（v2.9 拆分版）
+## 导航：PromiseLink 安全设计文档（v2.9 拆分版）
 
 | 文档 | 攻击面 | 主要内容 |
 |------|--------|----------|
@@ -25,7 +25,7 @@
 
 ### 3.1 PII字段加密（AES-256-GCM）
 
-EventLink对敏感个人信息（PII）实施字段级加密，即使数据库文件被获取也无法直接读取明文。
+PromiseLink对敏感个人信息（PII）实施字段级加密，即使数据库文件被获取也无法直接读取明文。
 
 **加密策略**：
 
@@ -126,10 +126,10 @@ properties = {
 ```nginx
 server {
     listen 443 ssl http2;
-    server_name eventlink.com;
+    server_name promiselink.com;
 
-    ssl_certificate /etc/letsencrypt/live/eventlink.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/eventlink.com/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/promiselink.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/promiselink.com/privkey.pem;
     ssl_protocols TLSv1.3;
     ssl_ciphers TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256;
     ssl_prefer_server_ciphers on;
@@ -152,7 +152,7 @@ server {
 from sqlalchemy import create_engine
 
 db_key = os.environ.get("SQLCIPHER_KEY", "default-dev-key")
-engine = create_engine(f"sqlite:///./data/eventlink.db?key={db_key}",
+engine = create_engine(f"sqlite:///./data/promiselink.db?key={db_key}",
                        module=sqlcipher3)
 ```
 
@@ -213,7 +213,7 @@ class KeyManager:
     def __init__(self, master_key: bytes):
         self._master_key = master_key
 
-    def derive_data_key(self, context: str = "eventlink-data-v1") -> bytes:
+    def derive_data_key(self, context: str = "promiselink-data-v1") -> bytes:
         """从主密钥派生数据密钥"""
         hkdf = HKDF(
             algorithm=hashes.SHA256(),
@@ -234,7 +234,7 @@ class KeyManager:
         return hkdf.derive(data_key)
 
 # 初始化
-master_key = os.environ.get("EVENTLINK_MASTER_KEY", "").encode()
+master_key = os.environ.get("PROMISELINK_MASTER_KEY", "").encode()
 if not master_key:
     master_key = os.urandom(32)  # PoC: 随机生成
 km = KeyManager(master_key)
@@ -278,7 +278,7 @@ phone_key = km.derive_field_key(data_key, "phone")
 3. **导出同等执行**：数据导出功能（JSON/CSV）在生成导出文件时，同样调用 `redact_pii_from_text()` 执行脱敏处理，确保导出文件中不包含明文PII
 
 ```python
-# 实现位置：src/eventlink/core/text_utils.py
+# 实现位置：src/promiselink/core/text_utils.py
 import re
 
 def redact_pii_from_text(text: str) -> str:
@@ -302,7 +302,7 @@ def redact_pii_from_text(text: str) -> str:
 
 ### 3.7 concern/promise/contribution数据安全（v1.1新增）
 
-EventLink的Todo数据中包含三类具有特殊安全属性的字段，需分别实施差异化的安全策略：
+PromiseLink的Todo数据中包含三类具有特殊安全属性的字段，需分别实施差异化的安全策略：
 
 | 数据类型 | 所属字段 | 数据性质 | 安全等级 | 安全策略 |
 |----------|----------|----------|----------|----------|
@@ -380,11 +380,11 @@ class ContributionService:
 
 ### 7.1 数据所有权声明
 
-> **EventLink数据主权声明**
+> **PromiseLink数据主权声明**
 >
-> 1. 用户通过EventLink录入的所有数据（包括但不限于联系人信息、事件记录、待办事项、关联关系）的**所有权归用户个人所有**。
-> 2. EventLink及其运营方仅作为**数据处理者**，不拥有用户数据，不将用户数据用于任何商业目的。
-> 3. EventLink不会在用户之间共享、交换或匹配数据。所有匹配逻辑均为"用户的需求匹配用户自己人脉的供给"。
+> 1. 用户通过PromiseLink录入的所有数据（包括但不限于联系人信息、事件记录、待办事项、关联关系）的**所有权归用户个人所有**。
+> 2. PromiseLink及其运营方仅作为**数据处理者**，不拥有用户数据，不将用户数据用于任何商业目的。
+> 3. PromiseLink不会在用户之间共享、交换或匹配数据。所有匹配逻辑均为"用户的需求匹配用户自己人脉的供给"。
 > 4. 用户有权随时导出、查看、删除自己的全部数据。
 
 **托管模式补充声明**：
@@ -533,7 +533,7 @@ async def data_summary(user_id: str = Depends(get_current_user)):
 
 ### 7.6 数据私密性（无跨用户数据访问）
 
-EventLink作为**个人商务关系经营助手**，核心安全保证：
+PromiseLink作为**个人商务关系经营助手**，核心安全保证：
 
 - ✅ 所有API查询强制`WHERE user_id = ?`过滤
 - ✅ 无公开API、无资源搜索、无用户发现功能

@@ -7,12 +7,12 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from eventlink.core.exceptions import InvalidTodoTypeError
-from eventlink.models.entity import Entity
-from eventlink.models.event import Event
-from eventlink.models.todo import Todo
-from eventlink.services.llm_client import LLMClient
-from eventlink.services.todo_generator import (
+from promiselink.core.exceptions import InvalidTodoTypeError
+from promiselink.models.entity import Entity
+from promiselink.models.event import Event
+from promiselink.models.todo import Todo
+from promiselink.services.llm_client import LLMClient
+from promiselink.services.todo_generator import (
     DUE_DATE_OFFSETS,
     PRIORITY_MAP,
     VALID_TODO_TYPES,
@@ -225,14 +225,14 @@ class TestSanitizeInput:
 
     def test_sanitize_input_truncation(self):
         """Text exceeding max_len is truncated."""
-        from eventlink.core.text_utils import sanitize_llm_input
+        from promiselink.core.text_utils import sanitize_llm_input
         long_text = "a" * 10000
         result = sanitize_llm_input(long_text, max_len=8000)
         assert len(result) == 8000
 
     def test_sanitize_input_removes_null_chars(self):
         """Null characters and replacement characters are removed."""
-        from eventlink.core.text_utils import sanitize_llm_input
+        from promiselink.core.text_utils import sanitize_llm_input
         text = "hello\x00world\ufffdtest"
         result = sanitize_llm_input(text)
         assert "\x00" not in result
@@ -243,13 +243,13 @@ class TestSanitizeInput:
 
     def test_sanitize_input_empty_string(self):
         """Empty string returns empty string."""
-        from eventlink.core.text_utils import sanitize_llm_input
+        from promiselink.core.text_utils import sanitize_llm_input
         result = sanitize_llm_input("")
         assert result == ""
 
     def test_sanitize_input_none_like_empty(self):
         """Falsy empty string returns empty string."""
-        from eventlink.core.text_utils import sanitize_llm_input
+        from promiselink.core.text_utils import sanitize_llm_input
         result = sanitize_llm_input("")
         assert result == ""
 
@@ -314,7 +314,8 @@ class TestExtractPromises:
         generator = TodoGenerator(llm, db_session)
 
         result = await generator._extract_promises(
-            "我说好下周一前把AI项目的资料发给您", "李总: 投资总监 @ 盛恒资本"
+            "我说好下周一前把AI项目的资料发给您", "李总: 投资总监 @ 盛恒资本",
+            "2026-06-14T10:00:00+00:00"
         )
 
         assert len(result) == 1
@@ -341,7 +342,7 @@ class TestExtractPromises:
         llm = _make_llm_client(call_return=empty_response)
         generator = TodoGenerator(llm, db_session)
 
-        result = await generator._extract_promises("some text", "无")
+        result = await generator._extract_promises("some text", "无", "2026-06-14T10:00:00+00:00")
 
         assert result == []
 
@@ -351,7 +352,7 @@ class TestExtractPromises:
         llm = _make_llm_client(call_return="not valid json {{{")
         generator = TodoGenerator(llm, db_session)
 
-        result = await generator._extract_promises("some text", "无")
+        result = await generator._extract_promises("some text", "无", "2026-06-14T10:00:00+00:00")
 
         assert result == []
 
@@ -377,7 +378,7 @@ class TestExtractPromises:
         llm = _make_llm_client(call_return=response)
         generator = TodoGenerator(llm, db_session)
 
-        result = await generator._extract_promises("some text", "无")
+        result = await generator._extract_promises("some text", "无", "2026-06-14T10:00:00+00:00")
 
         assert len(result) == 1
         assert result[0].due_date is not None
@@ -400,7 +401,8 @@ class TestExtractCares:
         generator = TodoGenerator(llm, db_session)
 
         result = await generator._extract_cares(
-            "李总说他最近一直在看AI赛道的项目", "李总: 投资总监 @ 盛恒资本"
+            "李总说他最近一直在看AI赛道的项目", "李总: 投资总监 @ 盛恒资本",
+            "2026-06-14T10:00:00+00:00"
         )
 
         assert len(result) == 1
@@ -425,7 +427,7 @@ class TestExtractCares:
         llm = _make_llm_client(call_return=empty_response)
         generator = TodoGenerator(llm, db_session)
 
-        result = await generator._extract_cares("some text", "无")
+        result = await generator._extract_cares("some text", "无", "2026-06-14T10:00:00+00:00")
 
         assert result == []
 

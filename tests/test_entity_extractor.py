@@ -5,19 +5,19 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from eventlink.models.entity import Entity
-from eventlink.models.event import Event
-from eventlink.services.entity_extractor import (
+from promiselink.models.entity import Entity
+from promiselink.models.event import Event
+from promiselink.services.entity_extractor import (
     EntityExtractor,
     ExtractedPerson,
     ExtractionResult,
 )
-from eventlink.services.entity_resolution import (
+from promiselink.services.entity_resolution import (
     EntityResolutionEngine,
     ResolutionAction,
     ResolutionResult,
 )
-from eventlink.services.llm_client import LLMClient
+from promiselink.services.llm_client import LLMClient
 from tests.conftest import create_test_event, make_user_id
 
 # ── Mock Data ──
@@ -449,14 +449,14 @@ class TestSanitizeInput:
 
     def test_sanitize_input_truncation(self):
         """Text exceeding max_len is truncated."""
-        from eventlink.core.text_utils import sanitize_llm_input
+        from promiselink.core.text_utils import sanitize_llm_input
         long_text = "a" * 15000
         result = sanitize_llm_input(long_text, max_len=10000)
         assert len(result) == 10000
 
     def test_sanitize_input_removes_code_fences(self):
         """Markdown code fences are removed."""
-        from eventlink.core.text_utils import sanitize_llm_input
+        from promiselink.core.text_utils import sanitize_llm_input
         text = "some text ```python\nprint('hello')\n``` more text"
         result = sanitize_llm_input(text)
         assert "```" not in result
@@ -465,14 +465,14 @@ class TestSanitizeInput:
 
     def test_sanitize_input_strips_whitespace(self):
         """Leading/trailing whitespace is stripped."""
-        from eventlink.core.text_utils import sanitize_llm_input
+        from promiselink.core.text_utils import sanitize_llm_input
         text = "  hello world  "
         result = sanitize_llm_input(text)
         assert result == "hello world"
 
     def test_sanitize_input_short_text_unchanged(self):
         """Short text within limit is unchanged (except stripping)."""
-        from eventlink.core.text_utils import sanitize_llm_input
+        from promiselink.core.text_utils import sanitize_llm_input
         text = "hello world"
         result = sanitize_llm_input(text)
         assert result == "hello world"

@@ -1,4 +1,4 @@
-# EventLink 许总PoC反馈 — DevSquad PM+Architect 联合深度评审报告
+# PromiseLink 许总PoC反馈 — DevSquad PM+Architect 联合深度评审报告
 
 > **报告编号**: DS-REV-2026-013
 > **评审方法**: DevSquad MultiAgentDispatcher（Mock模式 + 人工深度双角色分析）
@@ -7,9 +7,9 @@
 > **输入材料**:
 > - 许总反馈原文+WORKBUDDY分析：`docs/external/for_许总/20260604_许总POC反馈_符合想象_四点确认.md`
 > - PRD v4.2：`docs/spec/PRD_V1.md`
-> - 技术设计v2.3：`docs/architecture/EventLink_技术设计_v1.md`
-> - 李总v1.2建议：`docs/external/for_李总/EventLink_PoC技术整改与产品演进建议_v1.2_融合分形宇宙外部合作SOP .md`
-> - 前置评审报告：`docs/internal/EventLink_李总v1.2_DevSquad_PM_Arch_评审报告.md`
+> - 技术设计v2.3：`docs/architecture/PromiseLink_技术设计_v1.md`
+> - 李总v1.2建议：`docs/external/for_李总/PromiseLink_PoC技术整改与产品演进建议_v1.2_融合分形宇宙外部合作SOP .md`
+> - 前置评审报告：`docs/internal/PromiseLink_李总v1.2_DevSquad_PM_Arch_评审报告.md`
 
 ---
 
@@ -26,7 +26,7 @@
 
 ### 1.2 核心结论
 
-**许总的"符合想象"是EventLink项目迄今为止收到的最有价值的用户验证信号。**
+**许总的"符合想象"是PromiseLink项目迄今为止收到的最有价值的用户验证信号。**
 
 其4点反馈不是新需求，而是用用户语言对PRD已有能力的再确认和视角补充。这恰恰证明：
 1. PRD的核心功能规划方向正确——用户能用自己的语言描述出我们设计的能力
@@ -218,7 +218,7 @@ L3 引擎 话题标签体系 (config/taxonomy):
 | 对外沟通/Slogan | ✅ 是 | 强化"终身陪伴"属性 | 直接回应许总的语言 |
 | PRD愿景段落 | ✅ 是 | 在现有愿景基础上增加"终身"维度 | 保持一致 |
 | 技术设计 | ❌ 不变 | CarryMem集成路径不变 | 技术路径不受叙事影响 |
-| 产品名称 | ⚠️ 讨论 | EventLink本身不改名，但可以加副标题 | 名称变更成本高 |
+| 产品名称 | ⚠️ 讨论 | PromiseLink本身不改名，但可以加副标题 | 名称变更成本高 |
 
 **建议的新Slogan组合**：
 - 主Slogan（不变）："让每一次连接，都有回应。"（李总v1.2已确认）
@@ -272,7 +272,7 @@ CarryMem 集成架构（技术设计v2.3 §5）：
 > **技术建议**：
 > - "终身"不是一个技术功能，而是**数据持久化 + 记忆累积 + 持续学习**的综合体现
 > - 当前架构已经为此做好了准备（Protocol接口 + 数据主权 + 导出/删除）
-> - 如果许总真的将EventLink视为"终身工具"，那么**数据迁移/备份/长期存储**应该被提升为Phase 1的P1需求（而非Phase 2）
+> - 如果许总真的将PromiseLink视为"终身工具"，那么**数据迁移/备份/长期存储**应该被提升为Phase 1的P1需求（而非Phase 2）
 > - **建议新增P1项**：用户数据定期备份 + 一键导出（让用户感觉到"我的数据永远在我手里"）
 
 #### PM+Arch 共识
@@ -479,7 +479,7 @@ TTS 完整链路（技术设计v2.3已定义）：
 
 ```
 ┌──────────────────────────────────────────────┐
-│  EventLink 首页（小程序原生）                  │
+│  PromiseLink 首页（小程序原生）                  │
 │                                               │
 │  ┌─── 今日日程（许总需求：日视图）─────────┐  │
 │  │                                        │  │
@@ -597,7 +597,7 @@ Week 6-7 (Phase 1 Plus): N-4话题节点图谱 + TTS完整集成
 - 您随时可以提出更多想法，我们持续迭代
 
 再次感谢您的信任和反馈！
-林总 & EventLink团队
+林总 & PromiseLink团队
 2026-06-04
 ```
 

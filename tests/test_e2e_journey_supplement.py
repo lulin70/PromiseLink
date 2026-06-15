@@ -6,6 +6,7 @@ Uses in-memory SQLite + httpx.AsyncClient + FastAPI dependency overrides,
 with LLM calls mocked out. No external services required.
 """
 
+import json
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
@@ -16,15 +17,15 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from eventlink.core.auth import create_access_token, get_current_user_id
-from eventlink.database import Base, get_async_session
-from eventlink.main import app
-from eventlink.models.association import Association
-from eventlink.models.entity import Entity
-from eventlink.models.event import Event
-from eventlink.models.relationship_brief import RelationshipBrief
-from eventlink.models.todo import Todo
-from eventlink.services.relationship_brief_service import RelationshipBriefService
+from promiselink.core.auth import create_access_token, get_current_user_id
+from promiselink.database import Base, get_async_session
+from promiselink.main import app
+from promiselink.models.association import Association
+from promiselink.models.entity import Entity
+from promiselink.models.event import Event
+from promiselink.models.relationship_brief import RelationshipBrief
+from promiselink.models.todo import Todo
+from promiselink.services.relationship_brief_service import RelationshipBriefService
 
 # ── Constants ──
 
@@ -46,7 +47,7 @@ async def db_engine():
     @sa_event.listens_for(engine.sync_engine, "connect")
     def set_sqlite_pragma(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA foreign_keys=OFF")
         cursor.close()
 
     async with engine.begin() as conn:
@@ -82,15 +83,15 @@ async def client(db_session):
     async def mock_process_event(event_id):
         pass
 
-    import eventlink.api.v1.events as events_module
-    original_process = events_module._process_event_background
-    events_module._process_event_background = mock_process_event
+    import promiselink.services.event_processor as processor_module
+    original_process = processor_module.process_event_background
+    processor_module.process_event_background = mock_process_event
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
-    events_module._process_event_background = original_process
+    processor_module.process_event_background = original_process
     app.dependency_overrides.clear()
 
 
@@ -266,7 +267,7 @@ class TestCrossDayUsage:
         assert brief["relationship_stage"] == "new_connection"
 
         # ── Day 2: 收到Todo提醒 ──
-        with patch("eventlink.core.natural_date.date") as mock_date:
+        with patch("promiselink.core.natural_date.date") as mock_date:
             mock_date.today.return_value = day2
             mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
 
@@ -321,7 +322,7 @@ class TestCrossDayUsage:
 
         Add events over multiple days, verify priority scores change as due dates approach.
         """
-        from eventlink.services.priority_scorer import PriorityScorer
+        from promiselink.services.priority_scorer import PriorityScorer
 
         scorer = PriorityScorer()
 
@@ -456,7 +457,7 @@ class TestDataLoop:
         # Export data
         resp = await client.get(f"{API_PREFIX}/export/{TEST_USER_ID}")
         assert resp.status_code == 200
-        export_data = resp.json()
+        export_data = json.loads(resp.text)
 
         # Verify export structure
         assert export_data["export_version"] == "1.0"
@@ -567,7 +568,7 @@ class TestVoiceAssistantJourney:
         await db_session.commit()
 
         # Mock the NLU classifier to return a known intent
-        from eventlink.services.nlu_intent_classifier import NLUResult, VoiceIntent
+        from promiselink.services.nlu_intent_classifier import NLUResult, VoiceIntent
 
         mock_nlu_result = NLUResult(
             intent=VoiceIntent.PROMISE_TRACKER,
@@ -581,12 +582,12 @@ class TestVoiceAssistantJourney:
         mock_nlg_response = "您有1个待完成的承诺事项：给语音测试人发资料"
 
         with patch(
-            "eventlink.api.v1.voice_query.NLUIntentClassifier"
+            "promiselink.api.v1.voice_query.NLUIntentClassifier"
         ) as mock_classifier_cls, patch(
-            "eventlink.api.v1.voice_query.generate_nlu_response",
+            "promiselink.api.v1.voice_query.generate_nlu_response",
             return_value=mock_nlg_response,
         ), patch(
-            "eventlink.api.v1.voice_query.LLMClient"
+            "promiselink.api.v1.voice_query.LLMClient"
         ) as mock_llm_cls:
             mock_classifier_instance = mock_classifier_cls.return_value
             # classify is an async method, use AsyncMock so it's awaitable

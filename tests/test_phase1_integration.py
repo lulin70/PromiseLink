@@ -22,15 +22,15 @@ import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from eventlink.database import Base
-from eventlink.models.entity import Entity
-from eventlink.models.event import Event
-from eventlink.models.todo import Todo
-from eventlink.services.embedding_provider import (
+from promiselink.database import Base
+from promiselink.models.entity import Entity
+from promiselink.models.event import Event
+from promiselink.models.todo import Todo
+from promiselink.services.embedding_provider import (
     LOCAL_EMBEDDING_DIMENSIONS,
     EmbeddingProvider,
 )
-from eventlink.services.semantic_search import SemanticSearchEngine
+from promiselink.services.semantic_search import SemanticSearchEngine
 
 
 # ---------------------------------------------------------------------------
@@ -189,7 +189,7 @@ async def test_db_path_consistency_across_connections(real_db_path):
 
 def test_default_db_path_from_settings():
     """SemanticSearchEngine._default_db_path should derive from Settings.database_url."""
-    from eventlink.config import get_settings
+    from promiselink.config import get_settings
     settings = get_settings()
     derived = SemanticSearchEngine._default_db_path()
 
@@ -197,9 +197,13 @@ def test_default_db_path_from_settings():
     if settings.database_url.startswith("sqlite:///"):
         expected = settings.database_url[len("sqlite:///"):]
         assert derived == expected, f"Expected {expected}, got {derived}"
+    elif settings.database_url.startswith("sqlite://"):
+        # In-memory or empty path (e.g., "sqlite://")
+        expected = settings.database_url[len("sqlite://"):]
+        assert derived == expected, f"Expected {expected}, got {derived}"
     else:
         # Non-sqlite fallback
-        assert derived == "data/eventlink.db"
+        assert derived == "data/promiselink.db"
 
 
 # ---------------------------------------------------------------------------
@@ -209,7 +213,7 @@ def test_default_db_path_from_settings():
 @pytest.mark.asyncio
 async def test_priority_scorer_v2_with_real_db(real_db_session, user_id):
     """PriorityScorerV2 computes four-dimensional scores with real DB data."""
-    from eventlink.services.priority_scorer import PriorityScorerV2
+    from promiselink.services.priority_scorer import PriorityScorerV2
 
     # Create event + entity + todo in real DB
     event = Event(

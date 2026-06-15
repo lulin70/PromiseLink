@@ -1,2 +1,0 @@
-# EventLink backup - run every 6 hours
-0 */6 * * * /opt/eventlink/scripts/backup.sh >> /opt/eventlink/logs/backup.log 2>&1

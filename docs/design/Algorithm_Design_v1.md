@@ -1,4 +1,4 @@
-# EventLink 算法设计文档
+# PromiseLink 算法设计文档
 
 > **版本**: 0.2.8 (POC阶段)
 > **日期**: 2026-06-07
@@ -30,7 +30,7 @@
 
 ### 1.1 算法概述
 
-实体归一是EventLink的核心基础算法，负责判断新抽取的实体是否与已有实体为同一对象。算法采用5步递进策略，从精确到模糊逐步匹配，每步产生置信度分数，根据阈值决定自动合并、人工确认或创建新实体。
+实体归一是PromiseLink的核心基础算法，负责判断新抽取的实体是否与已有实体为同一对象。算法采用5步递进策略，从精确到模糊逐步匹配，每步产生置信度分数，根据阈值决定自动合并、人工确认或创建新实体。
 
 **核心类**: `EntityResolutionEngine`
 
@@ -1822,7 +1822,7 @@ class SemanticSearchEngine:
     async def build_index(self, user_id: str) -> int:
         """为用户构建向量索引，返回索引条目数"""
         import asyncio
-        from eventlink.core.database import get_session
+        from promiselink.core.database import get_session
 
         async with get_session() as session:
             # 1. 获取所有Entity文本
@@ -2330,7 +2330,7 @@ re.compile(
 
 ### 3.1 敏感度定义
 
-EventLink采用2级敏感度模型，控制资源是否参与匹配：
+PromiseLink采用2级敏感度模型，控制资源是否参与匹配：
 
 | 级别 | 值 | 含义 | 参与匹配 |
 |------|----|------|----------|
@@ -3906,7 +3906,7 @@ Event Ingest Pipeline (v2.0):
 
 ---
 
-*本文档为EventLink算法设计v2.8完整版。所有算法与8条铁律保持一致，字段名使用todo_type（非todo_nature）、callability（非availability），敏感度为2级（matchable/no_match），明确排除RBAC/多租户/团队协作/他人资源匹配/原生APP。v2.0新增：InputScope分类器(§0)、Promise双向动作识别(§4.2a)、Todo降噪(§4.9)、RelationshipStage状态机(§6)、Pipeline Step0/8(§9)、关联发现HOT/COLD分离(§7.5)。[0.2.1新增]：NLU意图识别引擎(§11, F-50)。[v2.5新增]：PriorityScorer算法(§2.10)、ImplicitFeedbackCollector算法(§2.11)、Concern/Capability解析规则(§2.12)。[v2.6新增]：DependencyAnalyzer算法(§2.13, F-55)、ContextMatcher算法(§2.14, F-56)。[v2.7新增]：EmbeddingProvider算法(§2.15, F-57)、SemanticSearchEngine算法(§2.16, F-57)、关联发现语义增强算法(§2.17, F-58)。[v2.8新增]：ResourceOveruseDetector算法(§2.18, F-39)、VoiceQueryService算法(§2.19, F-50)、WeChatForwardAdapter算法(§2.20, PRD §5.17)。参考基线：技术设计v2.7 §4。*
+*本文档为PromiseLink算法设计v2.8完整版。所有算法与8条铁律保持一致，字段名使用todo_type（非todo_nature）、callability（非availability），敏感度为2级（matchable/no_match），明确排除RBAC/多租户/团队协作/他人资源匹配/原生APP。v2.0新增：InputScope分类器(§0)、Promise双向动作识别(§4.2a)、Todo降噪(§4.9)、RelationshipStage状态机(§6)、Pipeline Step0/8(§9)、关联发现HOT/COLD分离(§7.5)。[0.2.1新增]：NLU意图识别引擎(§11, F-50)。[v2.5新增]：PriorityScorer算法(§2.10)、ImplicitFeedbackCollector算法(§2.11)、Concern/Capability解析规则(§2.12)。[v2.6新增]：DependencyAnalyzer算法(§2.13, F-55)、ContextMatcher算法(§2.14, F-56)。[v2.7新增]：EmbeddingProvider算法(§2.15, F-57)、SemanticSearchEngine算法(§2.16, F-57)、关联发现语义增强算法(§2.17, F-58)。[v2.8新增]：ResourceOveruseDetector算法(§2.18, F-39)、VoiceQueryService算法(§2.19, F-50)、WeChatForwardAdapter算法(§2.20, PRD §5.17)。参考基线：技术设计v2.7 §4。*
 
 ---
 

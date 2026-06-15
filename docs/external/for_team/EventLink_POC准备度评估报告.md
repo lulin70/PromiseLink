@@ -1,6 +1,6 @@
 <!-- ⚠️ 本文档已过时，仅供参考。引用的PRD版本(v3.6)和技术设计版本(v1.7)均已更新，当前最新版本请参考PRD v4.0和技术设计v2.2。 -->
 
-# EventLink POC准备度评估报告
+# PromiseLink POC准备度评估报告
 
 > **评估时间**: 2026-06-02 20:24  
 > **评估人**: Kiro AI  
@@ -150,7 +150,7 @@ P8: 实施阶段 (Implementation)
 
 **Kiro评估**: ✅ **完全准确**
 
-- EventLink目录下确实无任何Python代码
+- PromiseLink目录下确实无任何Python代码
 - 无项目结构、无依赖配置、无Docker实例
 - 仅有丰富的文档（MD/HTML），但文档≠代码
 
@@ -201,9 +201,9 @@ P2 Gate 判定: 🟡 有条件通过 — 架构设计完整，等待许总对技
 
 ```bash
 # 建议的项目结构
-EventLink/
+PromiseLink/
 ├── src/
-│   ├── eventlink/
+│   ├── promiselink/
 │   │   ├── __init__.py
 │   │   ├── main.py                    # FastAPI应用入口
 │   │   ├── config.py                  # 配置管理
@@ -458,7 +458,7 @@ LLM_TEMPERATURE=0.3
 
 ## 九、最终判断
 
-### EventLink的POC是否准备好开工？
+### PromiseLink的POC是否准备好开工？
 
 **Kiro的判断**: 🟡 **50%准备好**
 
@@ -480,7 +480,7 @@ LLM_TEMPERATURE=0.3
 
 **一句话总结**: 
 
-> EventLink不缺设计，缺的是第一行代码。WorkBuddy对"P0三项未补齐"的判断不准确，但对"脚手架未搭建"的诊断完全正确。建议立即搭建FastAPI项目框架（3天），然后等许总数据到位后进入3周PoC冲刺。
+> PromiseLink不缺设计，缺的是第一行代码。WorkBuddy对"P0三项未补齐"的判断不准确，但对"脚手架未搭建"的诊断完全正确。建议立即搭建FastAPI项目框架（3天），然后等许总数据到位后进入3周PoC冲刺。
 
 ---
 

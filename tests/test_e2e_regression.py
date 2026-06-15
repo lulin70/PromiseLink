@@ -22,11 +22,11 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import select
 
-from eventlink.models.association import Association
-from eventlink.models.entity import Entity
-from eventlink.models.event import Event
-from eventlink.models.todo import Todo
-from eventlink.services.data_source_adapter import (
+from promiselink.models.association import Association
+from promiselink.models.entity import Entity
+from promiselink.models.event import Event
+from promiselink.models.todo import Todo
+from promiselink.services.data_source_adapter import (
     DataSourceAdapter,
     EmailAdapter,
     ManualAdapter,
@@ -35,8 +35,8 @@ from eventlink.services.data_source_adapter import (
     get_adapter,
     register_adapter,
 )
-from eventlink.services.implicit_feedback import ImplicitFeedbackCollector
-from eventlink.services.priority_scorer import PriorityScorer, IMPORTANCE_WEIGHTS
+from promiselink.services.implicit_feedback import ImplicitFeedbackCollector
+from promiselink.services.priority_scorer import PriorityScorer, IMPORTANCE_WEIGHTS
 from tests.conftest import create_test_event, make_user_id
 
 
@@ -378,7 +378,7 @@ async def test_e2e_concern_capability_in_entity(db_session):
 @pytest.mark.asyncio
 async def test_e2e_association_with_dict_concern(db_session):
     """E2E: Association discovery handles dict-format concern/capability."""
-    from eventlink.services.association_discovery import AssociationDiscoveryEngine
+    from promiselink.services.association_discovery import AssociationDiscoveryEngine
 
     user_id = make_user_id()
     event = await create_test_event(db_session, user_id)

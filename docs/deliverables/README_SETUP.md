@@ -1,6 +1,6 @@
 <!-- ⚠️ 本文档已过时，仅供参考。Todo类型名和部分文件名已更新（如card_scan→card_save，todo_type枚举值已变更），请参考最新版PRD v4.0。 -->
 
-# EventLink 项目脚手架搭建完成 ✅
+# PromiseLink 项目脚手架搭建完成 ✅
 
 ## 已完成的工作
 
@@ -11,19 +11,19 @@
 - ✅ `.env.example` - 环境变量模板
 
 ### 2. 数据库层
-- ✅ `src/eventlink/database.py` - 数据库连接管理（支持SQLite和PostgreSQL）
-- ✅ `src/eventlink/models/event.py` - Event模型
-- ✅ `src/eventlink/models/entity.py` - Entity模型
-- ✅ `src/eventlink/models/association.py` - Association模型
-- ✅ `src/eventlink/models/todo.py` - Todo + SnoozeSchedule模型
+- ✅ `src/promiselink/database.py` - 数据库连接管理（支持SQLite和PostgreSQL）
+- ✅ `src/promiselink/models/event.py` - Event模型
+- ✅ `src/promiselink/models/entity.py` - Entity模型
+- ✅ `src/promiselink/models/association.py` - Association模型
+- ✅ `src/promiselink/models/todo.py` - Todo + SnoozeSchedule模型
 
 所有模型完全对齐技术设计文档v1.7 §3.1规范。
 
 ### 3. API层
-- ✅ `src/eventlink/main.py` - FastAPI应用入口
-- ✅ `src/eventlink/config.py` - 配置管理
-- ✅ `src/eventlink/api/v1/health.py` - 健康检查接口
-- ✅ `src/eventlink/api/v1/events.py` - Event接入API
+- ✅ `src/promiselink/main.py` - FastAPI应用入口
+- ✅ `src/promiselink/config.py` - 配置管理
+- ✅ `src/promiselink/api/v1/health.py` - 健康检查接口
+- ✅ `src/promiselink/api/v1/events.py` - Event接入API
 
 ### 4. Docker配置
 - ✅ `Dockerfile` - 应用容器化
@@ -37,7 +37,7 @@
 
 ```bash
 # 1. 进入项目目录
-cd EventLink
+cd PromiseLink
 
 # 2. 创建虚拟环境
 python3.11 -m venv venv
@@ -54,7 +54,7 @@ cp .env.example .env
 mkdir -p data
 
 # 6. 启动应用
-python -m uvicorn eventlink.main:app --reload
+python -m uvicorn promiselink.main:app --reload
 
 # 访问 API 文档
 open http://localhost:8000/docs
@@ -83,7 +83,7 @@ docker-compose --profile postgres --profile redis up --build
 ### 1. 健康检查
 ```bash
 curl http://localhost:8000/api/v1/health
-# 预期输出：{"status":"healthy","timestamp":"...","service":"eventlink"}
+# 预期输出：{"status":"healthy","timestamp":"...","service":"promiselink"}
 ```
 
 ### 2. 数据库连接测试
@@ -115,9 +115,9 @@ curl http://localhost:8000/api/v1/events
 ## 项目结构
 
 ```
-EventLink/
+PromiseLink/
 ├── src/
-│   └── eventlink/
+│   └── promiselink/
 │       ├── __init__.py
 │       ├── main.py              # FastAPI应用入口 ✅
 │       ├── config.py            # 配置管理 ✅
@@ -194,7 +194,7 @@ LLM_API_KEY=sk-ant-xxx          # 你的API密钥
 LLM_MODEL=claude-sonnet-4-20250514
 
 # 数据库（PoC阶段用SQLite即可）
-DATABASE_URL=sqlite:///./data/eventlink.db
+DATABASE_URL=sqlite:///./data/promiselink.db
 
 # 实体归一阈值
 ENTITY_RESOLUTION_AUTO_MERGE_THRESHOLD=0.85
@@ -212,7 +212,7 @@ OPPORTUNITY_MATCH_POTENTIAL_THRESHOLD=0.60
 ### Q1: 如何切换到PostgreSQL？
 A: 修改 `.env` 中的 `DATABASE_URL`：
 ```bash
-DATABASE_URL=postgresql://user:password@localhost:5432/eventlink
+DATABASE_URL=postgresql://user:password@localhost:5432/promiselink
 ```
 然后用 `docker-compose --profile postgres up` 启动。
 
@@ -220,7 +220,7 @@ DATABASE_URL=postgresql://user:password@localhost:5432/eventlink
 A: FastAPI启动时会自动调用 `init_db()` 创建所有表。
 
 ### Q3: 如何添加新的API端点？
-A: 在 `src/eventlink/api/v1/` 下创建新文件，然后在 `main.py` 中 `include_router`。
+A: 在 `src/promiselink/api/v1/` 下创建新文件，然后在 `main.py` 中 `include_router`。
 
 ### Q4: P0三项算法在哪里实现？
 A: 
@@ -236,7 +236,7 @@ A:
 
 - **项目负责人**: 林总（CarryMem团队）
 - **合作方**: 许总（IAMHERE数字名片）
-- **技术文档**: `docs/architecture/EventLink_技术设计_v1.md`
+- **技术文档**: `docs/architecture/PromiseLink_技术设计_v1.md`
 - **产品需求**: `docs/spec/PRD_v1.md`
 
 ---

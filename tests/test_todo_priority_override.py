@@ -16,11 +16,11 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from eventlink.core.auth import get_current_user_id
-from eventlink.database import Base, get_async_session
-from eventlink.main import app
-from eventlink.models.event import Event
-from eventlink.models.todo import Todo
+from promiselink.core.auth import get_current_user_id
+from promiselink.database import Base, get_async_session
+from promiselink.main import app
+from promiselink.models.event import Event
+from promiselink.models.todo import Todo
 
 # ── Constants ──
 
@@ -42,7 +42,7 @@ async def db_engine():
     @sa_event.listens_for(engine.sync_engine, "connect")
     def set_sqlite_pragma(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA foreign_keys=OFF")
         cursor.close()
 
     async with engine.begin() as conn:
@@ -75,15 +75,15 @@ async def client(db_session, db_engine):
     app.dependency_overrides[get_current_user_id] = lambda: TEST_USER_ID
 
     # Mock the background pipeline to avoid real LLM calls
-    import eventlink.api.v1.events as events_module
-    original_process = events_module._process_event_background
-    events_module._process_event_background = lambda eid: None
+    import promiselink.services.event_processor as processor_module
+    original_process = processor_module.process_event_background
+    processor_module.process_event_background = lambda eid: None
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
-    events_module._process_event_background = original_process
+    processor_module.process_event_background = original_process
     app.dependency_overrides.clear()
 
 

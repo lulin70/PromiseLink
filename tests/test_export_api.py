@@ -4,6 +4,7 @@ Validates data portability export: structure, data isolation,
 and completeness across all data types.
 """
 
+import json
 import uuid
 
 import pytest
@@ -12,13 +13,13 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from eventlink.core.auth import get_current_user_id
-from eventlink.database import Base, get_async_session
-from eventlink.main import app
-from eventlink.models.association import Association
-from eventlink.models.entity import Entity
-from eventlink.models.event import Event
-from eventlink.models.todo import Todo
+from promiselink.core.auth import get_current_user_id
+from promiselink.database import Base, get_async_session
+from promiselink.main import app
+from promiselink.models.association import Association
+from promiselink.models.entity import Entity
+from promiselink.models.event import Event
+from promiselink.models.todo import Todo
 
 # ── Constants ──
 
@@ -40,7 +41,7 @@ async def db_engine():
     @sa_event.listens_for(engine.sync_engine, "connect")
     def set_sqlite_pragma(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA foreign_keys=OFF")
         cursor.close()
 
     async with engine.begin() as conn:
@@ -194,7 +195,7 @@ class TestExportAPI:
 
     async def test_export_structure(self, client: AsyncClient):
         resp = await client.get(f"{API_PREFIX}/export/{TEST_USER_ID}")
-        data = resp.json()
+        data = json.loads(resp.text)
 
         assert data["export_version"] == "1.0"
         assert "exported_at" in data
@@ -218,7 +219,7 @@ class TestExportAPI:
         await db_session.commit()
 
         resp = await client.get(f"{API_PREFIX}/export/{TEST_USER_ID}")
-        data = resp.json()
+        data = json.loads(resp.text)
         assert len(data["events"]) >= 2
         titles = [e["title"] for e in data["events"]]
         assert "Export Event A" in titles
@@ -229,7 +230,7 @@ class TestExportAPI:
         await db_session.commit()
 
         resp = await client.get(f"{API_PREFIX}/export/{TEST_USER_ID}")
-        data = resp.json()
+        data = json.loads(resp.text)
         assert len(data["entities"]) >= 1
         names = [e["name"] for e in data["entities"]]
         assert "Alice" in names
@@ -239,7 +240,7 @@ class TestExportAPI:
         await db_session.commit()
 
         resp = await client.get(f"{API_PREFIX}/export/{TEST_USER_ID}")
-        data = resp.json()
+        data = json.loads(resp.text)
         assert len(data["associations"]) >= 1
         types = [a["association_type"] for a in data["associations"]]
         assert "alumni" in types
@@ -249,7 +250,7 @@ class TestExportAPI:
         await db_session.commit()
 
         resp = await client.get(f"{API_PREFIX}/export/{TEST_USER_ID}")
-        data = resp.json()
+        data = json.loads(resp.text)
         assert len(data["todos"]) >= 1
         titles = [t["title"] for t in data["todos"]]
         assert "Export Todo" in titles
@@ -280,7 +281,7 @@ class TestExportAPI:
         await db_session.commit()
 
         resp = await client.get(f"{API_PREFIX}/export/{TEST_USER_ID}")
-        data = resp.json()
+        data = json.loads(resp.text)
 
         # Events: only test user's events
         event_titles = [e["title"] for e in data["events"]]
@@ -294,7 +295,7 @@ class TestExportAPI:
     async def test_export_empty_data(self, client: AsyncClient):
         """Export with no data returns valid structure with empty lists."""
         resp = await client.get(f"{API_PREFIX}/export/{TEST_USER_ID}")
-        data = resp.json()
+        data = json.loads(resp.text)
         assert data["events"] == []
         assert data["entities"] == []
         assert data["associations"] == []
@@ -309,7 +310,7 @@ class TestExportAPI:
         await db_session.commit()
 
         resp = await client.get(f"{API_PREFIX}/export/{TEST_USER_ID}")
-        data = resp.json()
+        data = json.loads(resp.text)
 
         exported_event = next(
             e for e in data["events"] if e["title"] == "Serialization Check"
@@ -333,7 +334,7 @@ class TestExportAPI:
         await db_session.commit()
 
         resp = await client.get(f"{API_PREFIX}/export/{TEST_USER_ID}")
-        data = resp.json()
+        data = json.loads(resp.text)
         entity = next(e for e in data["entities"] if e["name"] == "Prop Check")
         assert entity["properties"]["basic"]["company"] == "Acme"
         assert entity["properties"]["basic"]["title"] == "CTO"

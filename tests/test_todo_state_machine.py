@@ -6,9 +6,10 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from eventlink.core.exceptions import InvalidTransitionError
-from eventlink.models.todo import Todo
-from eventlink.services.todo_state_machine import (
+from promiselink.core.exceptions import InvalidTransitionError
+from promiselink.models.event import Event
+from promiselink.models.todo import Todo
+from promiselink.services.todo_state_machine import (
     TERMINAL_STATES,
     VALID_TRANSITIONS,
     TodoStateMachine,
@@ -20,7 +21,20 @@ def _create_todo(session: AsyncSession, user_id: str, status: str = "pending") -
     """Helper to create a Todo object.
     
     Uses string IDs for SQLite compatibility (IS_SQLITE=True in tests).
+    Creates a parent Event first to satisfy the FK constraint.
     """
+    event_id = str(uuid.uuid4())
+    event = Event(
+        id=event_id,
+        user_id=user_id,
+        event_type="manual",
+        source="test",
+        title="Test event",
+        raw_text="test content",
+        status="completed",
+    )
+    session.add(event)
+    
     todo = Todo(
         id=str(uuid.uuid4()),
         user_id=user_id,
@@ -28,7 +42,7 @@ def _create_todo(session: AsyncSession, user_id: str, status: str = "pending") -
         title="Test todo",
         status=status,
         priority=3,
-        source_event_id=str(uuid.uuid4()),
+        source_event_id=event_id,
     )
     session.add(todo)
     return todo
@@ -258,7 +272,7 @@ class TestPromiseFulfillmentUnit:
     """Unit tests for PromiseFulfillmentEngine (non-DB)."""
 
     def test_sensitivity_filter_matchable(self):
-        from eventlink.services.promise_fulfillment import SensitivityFilter
+        from promiselink.services.promise_fulfillment import SensitivityFilter
 
         sf = SensitivityFilter()
         entity = type("MockEntity", (), {
@@ -267,7 +281,7 @@ class TestPromiseFulfillmentUnit:
         assert sf.check(entity) is True
 
     def test_sensitivity_filter_no_match(self):
-        from eventlink.services.promise_fulfillment import SensitivityFilter
+        from promiselink.services.promise_fulfillment import SensitivityFilter
 
         sf = SensitivityFilter()
         entity = type("MockEntity", (), {
@@ -276,14 +290,14 @@ class TestPromiseFulfillmentUnit:
         assert sf.check(entity) is False
 
     def test_sensitivity_filter_default(self):
-        from eventlink.services.promise_fulfillment import SensitivityFilter
+        from promiselink.services.promise_fulfillment import SensitivityFilter
 
         sf = SensitivityFilter()
         entity = type("MockEntity", (), {"properties": {}})()
         assert sf.check(entity) is True  # Default is matchable
 
     def test_sensitivity_batch_filter(self):
-        from eventlink.services.promise_fulfillment import SensitivityFilter
+        from promiselink.services.promise_fulfillment import SensitivityFilter
 
         sf = SensitivityFilter()
         matchable = type("E", (), {"properties": {"resource_sensitivity": "matchable"}})()
@@ -295,7 +309,7 @@ class TestPromiseFulfillmentUnit:
         assert len(filtered) == 1
 
     def test_poc_weights(self):
-        from eventlink.services.promise_fulfillment import POC_WEIGHTS
+        from promiselink.services.promise_fulfillment import POC_WEIGHTS
 
         assert POC_WEIGHTS["keyword_overlap"] == 0.35
         assert POC_WEIGHTS["callability"] == 0.35

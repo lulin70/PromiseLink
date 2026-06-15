@@ -10,8 +10,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from eventlink.services.data_source_adapter import RawEvent, get_adapter
-from eventlink.services.email_adapter import (
+from promiselink.services.data_source_adapter import RawEvent, get_adapter
+from promiselink.services.email_adapter import (
     EmailAdapter,
     EmailMessage,
     _decode_header_value,
@@ -235,7 +235,7 @@ class TestEmailAdapterConnect:
     @pytest.mark.asyncio
     async def test_connect_ssl_success(self):
         adapter = EmailAdapter()
-        with patch("eventlink.services.email_adapter.imaplib.IMAP4_SSL") as mock_imap:
+        with patch("promiselink.services.email_adapter.imaplib.IMAP4_SSL") as mock_imap:
             mock_conn = MagicMock()
             mock_imap.return_value = mock_conn
 
@@ -249,7 +249,7 @@ class TestEmailAdapterConnect:
     @pytest.mark.asyncio
     async def test_connect_non_ssl(self):
         adapter = EmailAdapter()
-        with patch("eventlink.services.email_adapter.imaplib.IMAP4") as mock_imap:
+        with patch("promiselink.services.email_adapter.imaplib.IMAP4") as mock_imap:
             mock_conn = MagicMock()
             mock_imap.return_value = mock_conn
 
@@ -264,7 +264,7 @@ class TestEmailAdapterConnect:
     @pytest.mark.asyncio
     async def test_connect_failure(self):
         adapter = EmailAdapter()
-        with patch("eventlink.services.email_adapter.imaplib.IMAP4_SSL") as mock_imap:
+        with patch("promiselink.services.email_adapter.imaplib.IMAP4_SSL") as mock_imap:
             mock_imap.side_effect = imaplib.IMAP4.error("Connection refused")
 
             result = await adapter.connect("bad.host", "user", "pass")

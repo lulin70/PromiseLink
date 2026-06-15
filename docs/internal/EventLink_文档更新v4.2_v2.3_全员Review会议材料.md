@@ -1,4 +1,4 @@
-# EventLink 文档更新 v4.2/v2.3 — 全员Review会议材料
+# PromiseLink 文档更新 v4.2/v2.3 — 全员Review会议材料
 
 > **日期**：2026-06-04
 > **版本**：PRD v4.2 + 技术设计 v2.3
@@ -227,7 +227,7 @@ PRD v4.2 + 技术设计 v2.3（文档落地）
 | Q-2 | 陈宇欣团队名片API开发时间表？ | WORKBUDDY定稿 | 影响数据导入策略 | 通过许总推动 |
 | Q-3 | PoC首批种子用户每人每周产生多少记录？ | 产品侧 | 影响性能容量规划 | 保守估计3-5条/周 |
 | Q-4 | 许总是否认同杀手场景"别忘了我已经知道的"？ | 产品侧 | 影响价值主张表述 | 已在WORKBUDDY定稿中确认 |
-| Q-5 | 是否需要同时更新 CarryMem 的记忆类型配置？ | 架构侧 | NeedInsight是否纳入CarryMem | 建议：暂不，EventLink先独立验证 |
+| Q-5 | 是否需要同时更新 CarryMem 的记忆类型配置？ | 架构侧 | NeedInsight是否纳入CarryMem | 建议：暂不，PromiseLink先独立验证 |
 
 ---
 
@@ -278,11 +278,11 @@ Week 3 (可选):
 | 文档 | 路径 | 状态 |
 |------|------|------|
 | PRD v4.2（本次更新） | `docs/spec/PRD_V1.md` | ✅ 已更新 |
-| 技术设计 v2.3（本次更新） | `docs/architecture/EventLink_技术设计_v1.md` | ✅ 已更新 |
-| 李总v1.2原文 | `docs/external/for_李总/EventLink_PoC技术整改与产品演进建议_v1.2_融合分形宇宙外部合作SOP .md` | 输入参考 |
-| WORKBUDDY定稿 | `docs/external/for_team/EventLink_李总v1.2审阅_产品定位定稿_2026-06-04.md` | 输入参考 |
-| DevSquad评审报告 | `docs/internal/EventLink_李总v1.2_DevSquad_PM_Arch_评审报告.md` | ✅ 已生成 |
-| **本Review材料** | `docs/internal/EventLink_文档更新v4.2_v2.3_全员Review会议材料.md` | 📝 本文档 |
+| 技术设计 v2.3（本次更新） | `docs/architecture/PromiseLink_技术设计_v1.md` | ✅ 已更新 |
+| 李总v1.2原文 | `docs/external/for_李总/PromiseLink_PoC技术整改与产品演进建议_v1.2_融合分形宇宙外部合作SOP .md` | 输入参考 |
+| WORKBUDDY定稿 | `docs/external/for_team/PromiseLink_李总v1.2审阅_产品定位定稿_2026-06-04.md` | 输入参考 |
+| DevSquad评审报告 | `docs/internal/PromiseLink_李总v1.2_DevSquad_PM_Arch_评审报告.md` | ✅ 已生成 |
+| **本Review材料** | `docs/internal/PromiseLink_文档更新v4.2_v2.3_全员Review会议材料.md` | 📝 本文档 |
 
 ---
 

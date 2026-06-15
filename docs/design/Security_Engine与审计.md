@@ -1,4 +1,4 @@
-# EventLink 安全设计文档 — Engine与审计
+# PromiseLink 安全设计文档 — Engine与审计
 
 > **版本**: v2.9 (POC阶段)
 > **拆分日期**: 2026-06-08
@@ -8,7 +8,7 @@
 
 ---
 
-## 导航：EventLink 安全设计文档（v2.9 拆分版）
+## 导航：PromiseLink 安全设计文档（v2.9 拆分版）
 
 | 文档 | 攻击面 | 主要内容 |
 |------|--------|----------|
@@ -733,7 +733,7 @@ flowchart TD
 
 ### 10.1 OWASP Top 10对照检查
 
-| OWASP Top 10 (2021) | 风险 | EventLink防护措施 | 测试方法 | 阶段 |
+| OWASP Top 10 (2021) | 风险 | PromiseLink防护措施 | 测试方法 | 阶段 |
 |----------------------|------|-------------------|----------|------|
 | A01-权限控制失效 | 越权访问其他用户数据 | user_id应用层过滤 | 修改JWT中user_id尝试越权 | PoC+ |
 | A02-加密机制失效 | PII明文存储 | AES-256-GCM字段加密 | 检查数据库文件中PII是否加密 | Phase1+ |
@@ -788,12 +788,12 @@ jobs:
       - name: bandit scan
         run: pip install bandit && bandit -r src/ -ll -ii
       - name: trivy scan
-        run: trivy image eventlink:latest
+        run: trivy image promiselink:latest
 ```
 
 ### 10.4 依赖安全评估（v2.0新增）
 
-> **对应 OWASP A06-易受攻击组件**：EventLink 的 Python 依赖库可能包含已知漏洞，需建立持续监控机制。
+> **对应 OWASP A06-易受攻击组件**：PromiseLink 的 Python 依赖库可能包含已知漏洞，需建立持续监控机制。
 
 **核心依赖及风险评估**：
 
@@ -842,5 +842,5 @@ updates:
 # 手动安全扫描命令（开发阶段）
 pip-audit -r requirements.txt --desc       # 详细CVE描述
 bandit -r src/ -ll -f json -o bandit-report.json  # 输出JSON报告
-trivy image --severity HIGH,CRITICAL eventlink:latest  # 仅报告高危
+trivy image --severity HIGH,CRITICAL promiselink:latest  # 仅报告高危
 ```

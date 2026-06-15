@@ -16,9 +16,9 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from eventlink.models.entity import Entity
-from eventlink.models.todo import Todo
-from eventlink.services.resource_overuse_detector import (
+from promiselink.models.entity import Entity
+from promiselink.models.todo import Todo
+from promiselink.services.resource_overuse_detector import (
     OVERUSE_THRESHOLD,
     ResourceOveruseDetector,
 )
