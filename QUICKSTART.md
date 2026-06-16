@@ -24,9 +24,31 @@ cp .env.basic.example .env
 
 ```env
 LLM_API_KEY=sk-your-key-here
-LLM_BASE_URL=https://api.moka-ai.com/v1
-LLM_MODEL=moka/claude-sonnet-4-6
 ```
+
+选择 LLM 提供商（设置 `LLM_PROVIDER` 后，`LLM_BASE_URL` 和 `LLM_MODEL` 会自动填充）：
+
+| LLM_PROVIDER | LLM_BASE_URL | LLM_MODEL |
+|---|---|---|
+| `moka_ai`（默认） | `https://api.moka-ai.com/v1` | `moka/claude-sonnet-4-6` |
+| `openai` | `https://api.openai.com/v1` | `gpt-5.5` |
+| `anthropic` | `https://api.anthropic.com/v1` | `claude-sonnet-4-6-20250514` |
+
+示例 — 使用 OpenAI GPT-5.5：
+
+```env
+LLM_PROVIDER=openai
+LLM_API_KEY=sk-your-openai-key
+```
+
+示例 — 使用 Anthropic Claude Sonnet 4.6：
+
+```env
+LLM_PROVIDER=anthropic
+LLM_API_KEY=sk-ant-your-anthropic-key
+```
+
+> 也可手动覆盖 `LLM_BASE_URL` 和 `LLM_MODEL`，优先级高于预设值。
 
 > 开发环境下 `SECRET_KEY` 会自动生成随机密钥，无需手动配置。
 
@@ -85,9 +107,10 @@ curl http://localhost:8000/api/v1/promises?view=my-promises \
 | `APP_EDITION` | `basic` | 版本：basic（基础版）或 pro（专业版） |
 | `SECRET_KEY` | 自动生成 | JWT 签名密钥，生产环境必须配置 |
 | `POC_SECRET` | `promiselink2026` | PoC 登录密码 |
+| `LLM_PROVIDER` | `moka_ai` | LLM 提供商：moka_ai / openai / anthropic |
 | `LLM_API_KEY` | 空 | LLM API 密钥 |
-| `LLM_BASE_URL` | `https://api.moka-ai.com/v1` | LLM API 地址 |
-| `LLM_MODEL` | `moka/claude-sonnet-4-6` | LLM 模型名称 |
+| `LLM_BASE_URL` | 自动填充 | LLM API 地址（根据 LLM_PROVIDER 自动设置） |
+| `LLM_MODEL` | 自动填充 | LLM 模型名称（根据 LLM_PROVIDER 自动设置） |
 | `DATABASE_URL` | `sqlite:///./data/promiselink.db` | 数据库连接 |
 | `LOG_LEVEL` | `INFO` | 日志级别 |
 

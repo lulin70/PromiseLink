@@ -5,7 +5,8 @@ description = "AI-driven personal business relationship management assistant (Pr
 authors = [{name = "CarryMem Team", email = "team@carrymem.com"}]
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
+license = "AGPL-3.0"
+classifiers = ["License :: OSI Approved :: GNU Affero General Public License v3"]
 
 dependencies = [
     "fastapi>=0.109.0",

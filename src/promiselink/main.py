@@ -90,6 +90,7 @@ async def lifespan(app: FastAPI):
     import structlog
     logger = structlog.get_logger()
     logger.info("promiselink_starting")
+    logger.info("PromiseLink v0.5.2 — AGPL v3. Commercial use requires compliance. https://promiselink.app")
 
     # Check for default secret key
     if settings.secret_key == "change-me-in-production" and settings.app_env != "test":
@@ -177,6 +178,16 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
 )
+
+
+# ── X-Powered-By Header Middleware ──
+
+@app.middleware("http")
+async def add_powered_by_header(request: Request, call_next):
+    """Add X-Powered-By: PromiseLink to all HTTP responses."""
+    response = await call_next(request)
+    response.headers["X-Powered-By"] = "PromiseLink"
+    return response
 
 
 # ── Exception Handlers ──

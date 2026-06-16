@@ -353,19 +353,23 @@ class TestJourney1RecordInteraction:
         self, client: AsyncClient, db_session: AsyncSession
     ):
         """Step 3: User views dashboard and sees the new event."""
-        # Create event for today
-        today_ts = datetime.now(timezone.utc)
+        # Create event for today (use UTC+8 local date to match dashboard query)
+        _CST = timezone(timedelta(hours=8))
+        now_local = datetime.now(_CST)
+        today_local = now_local.date()
+        # Store as naive UTC (matching how the DB stores timestamps)
+        event_ts = now_local.astimezone(timezone.utc).replace(tzinfo=None)
         event = await insert_event(
             db_session,
             title="和张总见面",
-            timestamp=today_ts,
+            timestamp=event_ts,
             status="completed",
         )
         await db_session.commit()
 
         # View dashboard for today
         with patch("promiselink.core.natural_date.date") as mock_date:
-            mock_date.today.return_value = today_ts.date()
+            mock_date.today.return_value = today_local
             mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
 
             resp = await client.get(

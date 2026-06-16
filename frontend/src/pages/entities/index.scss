@@ -138,8 +138,8 @@
     width: 100%;
     background: #fff;
     border-radius: 24px 24px 0 0;
-    padding: 32px;
-    max-height: 70vh;
+    padding: 32px 32px 100px 32px;
+    max-height: 80vh;
     overflow-y: auto;
 
     .modal-header {
@@ -190,13 +190,17 @@
         }
 
         .delete-entity-btn {
+          display: inline-block;
           font-size: 24px;
-          color: #c4a7a0;
-          padding: 8px 0;
+          color: #fff;
+          background: #c4a7a0;
+          padding: 10px 24px;
+          border-radius: 8px;
           cursor: pointer;
+          margin-top: 12px;
 
           &:active {
-            opacity: 0.6;
+            opacity: 0.7;
           }
         }
 

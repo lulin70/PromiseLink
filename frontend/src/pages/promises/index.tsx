@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { View, Text, ScrollView, Input } from '@tarojs/components'
-import { getPromises, getPromiseStats, login as apiLogin, PromiseItem, PromiseStatsResponse, getPendingConfirmations, ConfirmationItem, getNudgeDraft, updatePromiseStatus } from '../../services/api'
+import { getPromises, getPromiseStats, login as apiLogin, PromiseItem, PromiseStatsResponse, getPendingConfirmations, getNudgeDraft, updatePromiseStatus, confirmTodo } from '../../services/api'
 import { isLoggedIn, setToken, setUserId, saveLoginCredentials } from '../../services/auth'
 import { navigateToEntity, navigateToEvent } from '../../services/navigation'
 import Taro from '@tarojs/taro'
@@ -17,7 +17,6 @@ const STATUS_FILTERS = [
   { value: 'fulfilled', label: '已兑现' },
   { value: 'overdue', label: '已逾期' },
   { value: 'broken', label: '已违背' },
-  { value: 'to_confirm', label: '待确认' },
 ]
 
 const STATUS_COLORS: Record<string, string> = {
@@ -25,7 +24,6 @@ const STATUS_COLORS: Record<string, string> = {
   fulfilled: '#52c41a',
   overdue: '#ff4d4f',
   broken: '#8c8c8c',
-  to_confirm: '#1890ff',
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -33,7 +31,6 @@ const STATUS_LABELS: Record<string, string> = {
   fulfilled: '已兑现',
   overdue: '已逾期',
   broken: '已违背',
-  to_confirm: '待确认',
 }
 
 export default function PromisesPage() {
@@ -54,6 +51,7 @@ export default function PromisesPage() {
   const [nudgeLoading, setNudgeLoading] = useState(false)
   const [nudgeCopied, setNudgeCopied] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [pendingConfirmCount, setPendingConfirmCount] = useState(0)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -131,32 +129,16 @@ export default function PromisesPage() {
       setError('')
       const status = STATUS_FILTERS[activeStatus].value || undefined
 
-      // F-E1: Special handling for "待确认" filter
-      if (status === 'to_confirm') {
-        const items = await getPendingConfirmations()
-        // Convert ConfirmationItem[] to display format
-        setPromises(items.map(item => ({
-          todo_id: item.todo_id,
-          entity_id: undefined,
-          action_type: item.action_type || 'my_promise',
-          description: item.description,
-          due_date: item.due_date,
-          fulfillment_status: 'to_confirm',
-          created_at: undefined,
-        } as PromiseItem)))
-        // Still load stats for the summary bar
-        const statsRes = await getPromiseStats()
-        setStats(statsRes)
-        return
-      }
-
       const view = VIEW_TABS[activeView].value
-      const [promiseRes, statsRes] = await Promise.all([
+      const [promiseRes, statsRes, pendingItems] = await Promise.all([
         getPromises(view, status, 0, 20, searchQuery || undefined),
         getPromiseStats(),
+        getPendingConfirmations(),
       ])
+      // Show all promises including unconfirmed, but mark them
       setPromises(promiseRes.items)
       setStats(statsRes)
+      setPendingConfirmCount(pendingItems.length)
     } catch (err) {
       const msg = err instanceof Error ? err.message : '加载失败'
       if (msg.includes('401')) { setShowLogin(true); setError('') }
@@ -191,6 +173,14 @@ export default function PromisesPage() {
             <Text className='stat-number success'>{(stats.fulfillment_rate * 100).toFixed(0)}%</Text>
             <Text className='stat-label'>兑现率</Text>
           </View>
+        </View>
+      )}
+
+      {/* Pending confirmation hint */}
+      {pendingConfirmCount > 0 && (
+        <View className='confirm-hint-bar' onClick={() => Taro.switchTab({ url: '/pages/events/index' })}>
+          <Text className='confirm-hint-text'>{pendingConfirmCount}条承诺待确认，请在事件详情或下方确认或忽略</Text>
+          <Text className='confirm-hint-arrow'>→</Text>
         </View>
       )}
 
@@ -258,23 +248,37 @@ export default function PromisesPage() {
             </Text>
           </View>
         )}
-        {promises.map(promise => (
-          <View key={promise.todo_id} className={`promise-card ${promise.fulfillment_status === 'to_confirm' ? 'pending-confirm' : ''}`}>
+        {promises.map(promise => {
+          const isUnconfirmed = promise.confirmation_status === 'pending' || promise.confirmation_status === 'auto_set'
+          return (
+          <View key={promise.todo_id} className={`promise-card ${isUnconfirmed ? 'unconfirmed' : ''}`}>
+            {isUnconfirmed && (
+              <View className='ai-confirm-banner'>
+                <Text className='ai-confirm-text'>AI生成，待用户确认</Text>
+                <View className='ai-confirm-btns'>
+                  <Text className='ai-confirm-btn confirm-btn' onClick={(e) => {
+                    e.stopPropagation()
+                    confirmTodo(promise.todo_id, { confirmation_status: 'confirmed' }).then(() => loadData())
+                  }}>确认</Text>
+                  <Text className='ai-confirm-btn ignore-btn' onClick={(e) => {
+                    e.stopPropagation()
+                    confirmTodo(promise.todo_id, { confirmation_status: 'rejected' }).then(() => loadData())
+                  }}>忽略</Text>
+                </View>
+              </View>
+            )}
             <View className='promise-header'>
               <View
                 className='status-badge'
                 style={{ background: STATUS_COLORS[promise.fulfillment_status] || '#999' }}
               >
                 <Text className='status-text'>
-                  {promise.fulfillment_status === 'to_confirm' ? '待确认' : (STATUS_LABELS[promise.fulfillment_status] || promise.fulfillment_status)}
+                  {STATUS_LABELS[promise.fulfillment_status] || promise.fulfillment_status}
                 </Text>
               </View>
               <Text className='promise-action'>
                 {promise.action_type === 'my_promise' ? '我的承诺' : '对方承诺'}
               </Text>
-              {promise.fulfillment_status === 'to_confirm' && (
-                <Text className='confirm-hint'>AI提取，待你确认</Text>
-              )}
             </View>
             {promise.description && (
               <Text className='promise-desc'>{promise.description}</Text>
@@ -298,7 +302,7 @@ export default function PromisesPage() {
                 className='source-event-link'
                 onClick={(e) => { e.stopPropagation(); navigateToEvent(promise.source_event_id!) }}
               >
-                来源: {promise.source_event_title || '查看事件'}
+                来源: {promise.source_event_date ? `${promise.source_event_date} ` : ''}{promise.source_event_title || '查看事件'}
               </Text>
             )}
             <View className='promise-footer'>
@@ -354,7 +358,7 @@ export default function PromisesPage() {
               )}
             </View>
           </View>
-        ))}
+        )})}
       </ScrollView>
 
       {/* F-E2: Nudge Draft Popup */}

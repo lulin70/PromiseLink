@@ -1115,7 +1115,7 @@ async def main() -> None:
     print("║          PromiseLink  演示  —  PoC阶段                 ║")
     print("║                                                          ║")
     print("║   AI驱动的个人商务关系经营助手                          ║")
-    print("║   「让每一次连接，都有回应」                              ║")
+    print("║   「让每一次连接，都更有价值」                              ║")
     print("║                                                          ║")
     print("╚══════════════════════════════════════════════════════════╝")
     print(RESET)
@@ -1209,7 +1209,7 @@ async def main() -> None:
     print(f"\n  {BOLD}产品定位回顾:{RESET}")
     print(f"  PromiseLink = AI驱动的个人商务关系经营助手")
     print(f"  核心循环: 互动→关注→承诺→帮助→反馈 (利他优先)")
-    print(f"  Slogan: \"让每一次连接，都有回应\"")
+    print(f"  Slogan: \"让每一次连接，都更有价值\"")
 
     print(f"\n  {BOLD}许总价值点:{RESET}")
     print(f"  1. 语音交互 — 开车时也能管理关系 (F-50 NLU已实现)")
