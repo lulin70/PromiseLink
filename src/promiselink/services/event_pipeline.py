@@ -140,8 +140,8 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
             _row = _r.scalar_one_or_none()
             if _row:
                 _resolved_user_id = str(_row)
-    except Exception:
-        logger.warning("pipeline_user_id_resolution_failed", event_id=str(event_id))
+    except Exception as resolve_err:
+        logger.warning("pipeline_user_id_resolution_failed", event_id=str(event_id), error=str(resolve_err))
 
     pipeline_lock = get_pipeline_lock(user_id=_resolved_user_id)
     async with pipeline_lock:
@@ -221,8 +221,8 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
                         if event and event.status == "processing":
                             event.status = "failed"
                             event.processed_at = datetime.now(timezone.utc)
-            except Exception:
-                logger.error("pipeline_failed_to_mark_failed", event_id=str(event_id))
+            except Exception as mark_failed_err:
+                logger.error("pipeline_failed_to_mark_failed", event_id=str(event_id), error=str(mark_failed_err))
 
         finally:
             await llm_client.close()

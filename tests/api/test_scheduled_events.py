@@ -5,7 +5,7 @@ cancelled cleanup, boundary conditions, and dashboard integration.
 """
 
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 import pytest_asyncio
@@ -797,12 +797,16 @@ class TestDashboardDayViewIncludesScheduledEvents:
     async def test_day_view_includes_scheduled_events(
         self, client: AsyncClient, db_session: AsyncSession
     ):
-        # Create a scheduled event for today
-        now = datetime.now(UTC)
-        today_scheduled = now.replace(hour=14, minute=0, second=0, microsecond=0)
-        # Ensure it's in the future so status is pending
-        if today_scheduled <= now:
-            today_scheduled = now + timedelta(hours=2)
+        # Create a scheduled event for today (using UTC+8 local time to match dashboard logic)
+        _CST = timezone(timedelta(hours=8))
+        now_local = datetime.now(_CST)
+        # Set scheduled time to 1 hour from now, but ensure it stays within today
+        today_scheduled_local = now_local + timedelta(hours=1)
+        # If that pushes past midnight, use a time earlier today instead
+        if today_scheduled_local.date() != now_local.date():
+            today_scheduled_local = now_local.replace(hour=15, minute=0, second=0, microsecond=0)
+        # Convert to naive UTC for database storage (dashboard queries in UTC range)
+        today_scheduled = today_scheduled_local.astimezone(timezone.utc).replace(tzinfo=None)
 
         await insert_scheduled_event(
             db_session,
@@ -830,8 +834,14 @@ class TestDashboardDayViewIncludesScheduledEvents:
     async def test_day_view_summary_includes_schedule_counts(
         self, client: AsyncClient, db_session: AsyncSession
     ):
-        now = datetime.now(UTC)
-        future_today = now + timedelta(hours=3)
+        _CST = timezone(timedelta(hours=8))
+        now_local = datetime.now(_CST)
+        future_today_local = now_local + timedelta(hours=1)
+        # If that pushes past midnight, use a time earlier today instead
+        if future_today_local.date() != now_local.date():
+            future_today_local = now_local.replace(hour=15, minute=0, second=0, microsecond=0)
+        # Convert to naive UTC for database storage
+        future_today = future_today_local.astimezone(timezone.utc).replace(tzinfo=None)
 
         await insert_scheduled_event(
             db_session,

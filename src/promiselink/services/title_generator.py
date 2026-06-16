@@ -4,7 +4,10 @@ Extracted from event_pipeline.py to break the circular dependency:
 event_pipeline → steps → event_pipeline.
 """
 
+from promiselink.core.logging import get_logger
 from promiselink.services.llm_client import LLMClient
+
+logger = get_logger("promiselink.title_generator")
 
 
 async def generate_event_title(llm_client: LLMClient, raw_text: str) -> str | None:
@@ -32,5 +35,6 @@ async def generate_event_title(llm_client: LLMClient, raw_text: str) -> str | No
         if len(title) > 50:
             title = title[:47] + "..."
         return title if title else None
-    except Exception:
+    except Exception as exc:
+        logger.warning("title_generation_failed", error=str(exc))
         return None

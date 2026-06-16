@@ -417,8 +417,8 @@ class FileStoreProvider:
     async def health_check(self) -> bool:
         try:
             return self.entries_dir.exists() and self.entries_dir.is_dir()
-        except Exception:
-            logger.warning("file_memory_health_check_failed")
+        except Exception as exc:
+            logger.warning("file_memory_health_check_failed", error=str(exc))
             return False
 
 
@@ -610,8 +610,8 @@ class CarryMemProvider:
         try:
             response = await client.get("/health")
             return response.status_code == 200
-        except Exception:
-            logger.warning("carrymem_health_check_failed")
+        except Exception as exc:
+            logger.warning("carrymem_health_check_failed", error=str(exc))
             return False
 
     async def close(self) -> None:

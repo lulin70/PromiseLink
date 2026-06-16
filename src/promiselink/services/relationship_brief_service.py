@@ -262,10 +262,11 @@ class RelationshipBriefService:
                     data["basic_info"] = self._build_basic_info(db_entity)
                     if "basic_info" not in modules_updated:
                         modules_updated.append("basic_info")
-            except Exception:
+            except Exception as exc:
                 logger.debug(
                     "brief_basic_info_db_fallback_failed",
                     person_entity_id=person_entity_id,
+                    error=str(exc),
                 )
 
         # 3. Update interaction_freq
@@ -673,8 +674,8 @@ class RelationshipBriefService:
                             "evidence": cr.get("evidence", {}),
                             "confidence": cr.get("confidence", 0),
                         })
-        except Exception:
-            logger.debug("cold_discovery_failed_best_effort", entity_id=entity_id)
+        except Exception as exc:
+            logger.debug("cold_discovery_failed_best_effort", entity_id=entity_id, error=str(exc))
 
         return entries
 

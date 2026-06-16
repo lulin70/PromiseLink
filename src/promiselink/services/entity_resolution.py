@@ -638,7 +638,7 @@ class EntityResolutionEngine:
             score = self._parse_llm_confidence(response)
             return score, {"llm_judgment": score}
         except Exception as e:
-            logger.warning("llm_resolution_failed", error=str(e))
+            logger.warning("llm_resolution_failed", error=str(e), exc_info=True)
             return 0.0, {}
 
     # ── Helper Methods ──

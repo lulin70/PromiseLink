@@ -401,10 +401,10 @@ class EmailAdapter(DataSourceAdapter):
             try:
                 self._connection.close()
                 self._connection.logout()
-            except Exception:
+            except Exception as exc:
                 logger.debug(
                     "email_adapter_disconnect_error",
-                    error="connection close/logout failed",
+                    error=str(exc),
                 )
             finally:
                 self._connection = None

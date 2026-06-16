@@ -156,7 +156,8 @@ def _summarize_module(key: str, data: dict) -> str:
     if fn:
         try:
             return fn(data)
-        except Exception:
+        except Exception as exc:
+            logger.debug("brief_summary_format_failed", key=key, error=str(exc))
             return "数据异常"
 
     return str(module_data)[:80] if module_data else "暂无数据"
