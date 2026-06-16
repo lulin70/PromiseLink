@@ -421,8 +421,8 @@ export interface PromiseItem {
 export interface PromiseListResponse {
   items: PromiseItem[]
   total: number
-  page: number
-  page_size: number
+  offset: number
+  limit: number
 }
 
 export interface PromiseStatsResponse {
@@ -435,14 +435,14 @@ export interface PromiseStatsResponse {
 export async function getPromises(
   view: string = 'my-promises',
   status?: string,
-  page: number = 1,
-  page_size: number = 20,
+  offset: number = 0,
+  limit: number = 20,
   search?: string
 ): Promise<PromiseListResponse> {
   return request<PromiseListResponse>({
     method: 'GET',
     path: '/promises',
-    params: { view, status, page, page_size, search },
+    params: { view, status, offset, limit, search },
   })
 }
 

@@ -152,7 +152,7 @@ export default function PromisesPage() {
 
       const view = VIEW_TABS[activeView].value
       const [promiseRes, statsRes] = await Promise.all([
-        getPromises(view, status, 1, 20, searchQuery || undefined),
+        getPromises(view, status, 0, 20, searchQuery || undefined),
         getPromiseStats(),
       ])
       setPromises(promiseRes.items)

@@ -248,7 +248,7 @@ PromiseLink/
 │   ├── config.py                     # 配置管理
 │   ├── database.py                   # 数据库连接（SQLite+PG异步）
 │   │
-│   ├── models/                       # 数据模型（8个文件，11个模型类）
+│   ├── models/                       # 数据模型（9个文件，11个模型类）
 │   │   ├── event.py                  # Event模型
 │   │   ├── entity.py                 # Entity模型
 │   │   ├── association.py            # Association模型
@@ -258,7 +258,7 @@ PromiseLink/
 │   │   ├── reminder.py               # Reminder模型
 │   │   └── score_audit_log.py        # ScoreAuditLog模型
 │   │
-│   ├── api/v1/                       # REST API
+│   ├── api/v1/                       # REST API（22个路由模块 / 72个API端点）
 │   │   ├── events.py                 # POST/GET/DELETE /events
 │   │   ├── entities.py               # GET /entities
 │   │   ├── associations.py           # GET /associations
@@ -278,7 +278,7 @@ PromiseLink/
 │   │   ├── voice_query.py            # 语音查询API
 │   │   └── wechat_forward.py         # 微信转发API
 │   │
-│   ├── services/                     # 核心业务逻辑
+│   ├── services/                     # 核心业务逻辑（38个模块）
 │   │   ├── event_pipeline.py         # 事件处理管线(728→227行重构)
 │   │   ├── steps/                    # Pipeline Step类(13个Step)
 │   │   ├── entity_extractor.py       # LLM实体抽取
@@ -467,7 +467,7 @@ PromiseLink/
 | Todo API | ✅ 完成 | `src/promiselink/api/v1/todos.py` | GET/POST/PATCH /api/v1/todos |
 | Auth API (JWT) | ✅ 完成 | `src/promiselink/api/v1/auth.py` + `core/auth.py` | JWT认证端点 |
 | Health API | ✅ 完成 | `src/promiselink/api/v1/health.py` | 基础+数据库健康检查 |
-| 数据库模型 | ✅ 完成 | `src/promiselink/models/` 8个文件 | Event/Entity/Association/Todo/RelationshipBrief/VoiceSession/Reminder/ScoreAuditLog |
+| 数据库模型 | ✅ 完成 | `src/promiselink/models/` 9个文件 | Event/Entity/Association/Todo/RelationshipBrief/VoiceSession/Reminder/ScoreAuditLog |
 | 数据库连接 | ✅ 完成 | `src/promiselink/database.py` | SQLite+PostgreSQL异步支持 |
 | 实体抽取模块 | ✅ 完成 | `services/entity_extractor.py` + prompts | LLM NER pipeline |
 | 实体归一引擎 | ✅ 完成 | `services/entity_resolution.py` | 5步算法含人工确认 |
