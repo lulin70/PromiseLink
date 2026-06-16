@@ -2,13 +2,13 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
-## [0.6.0] - 2026-06-16
+## [0.5.2] - 2026-06-16
 
 ### Added
 - **APP_EDITION配置**: config.py新增`app_edition`字段(basic/pro)，支持基础版/专业版产品分层
 - **HMAC开发环境自动生成**: 开发环境下secret_key自动生成随机密钥，防止token伪造
 - **POC_SECRET默认值**: `promiselink2026`作为PoC登录默认密码
-- **版本架构文档**: 0.6.0版本架构说明与文档一致性更新
+- **版本架构文档**: 版本架构说明与文档一致性更新
 
 ### Fixed
 - **SQL注入修复**: ilike搜索转义SQL通配符，防止注入攻击

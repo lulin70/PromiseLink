@@ -325,7 +325,7 @@ async def generate_gentle_nudge(
         if message and len(message.strip()) > 5:
             return message.strip()[:120]  # Cap at 120 chars
     except Exception as exc:
-        _logger.warning("gentle_nudge_llm_fallback", error=str(exc))
+        _logger.warning("gentle_nudge_llm_fallback", error=str(exc), exc_info=True)
 
     # Fallback template (no LLM available)
     return f"{entity_name}，之前提到的{todo.description or todo.title or '那件事'}不知进展如何？方便的话跟我同步一下情况，不着急。"

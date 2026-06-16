@@ -8,8 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.config import get_settings
 from promiselink.core.auth import get_current_user_id
+from promiselink.core.logging import get_logger
 from promiselink.database import get_async_session
 from promiselink.schemas.api_responses import HealthResponse
+
+logger = get_logger("promiselink.health")
 
 router = APIRouter()
 
@@ -42,8 +45,9 @@ async def health_check_db(
     try:
         await session.execute(text("SELECT 1"))
         db_status = "connected"
-    except Exception:
+    except Exception as exc:
         db_status = "error"
+        logger.warning("health_db_check_failed", error=str(exc))
 
     return HealthResponse(
         status="healthy" if db_status == "connected" else "unhealthy",
@@ -71,9 +75,10 @@ async def health_check_full(
     try:
         await session.execute(text("SELECT 1"))
         components["database"] = {"status": "healthy", "type": "sqlite"}
-    except Exception:
+    except Exception as exc:
         components["database"] = {"status": "unhealthy"}
         overall_healthy = False
+        logger.warning("health_full_db_check_failed", error=str(exc))
 
     # 2. Redis / Cache check
     try:
@@ -88,10 +93,11 @@ async def health_check_full(
             components["cache"] = {"status": "degraded", "backend": "memory"}
         try:
             await cache.delete(test_key)
-        except Exception:
-            pass
-    except Exception:
+        except Exception as exc:
+            logger.debug("health_cache_cleanup_failed", error=str(exc))
+    except Exception as exc:
         components["cache"] = {"status": "degraded", "backend": "memory"}
+        logger.warning("health_cache_check_failed", error=str(exc))
 
     # 3. LLM API check (lightweight — just verify config exists, no URL/model exposure)
     try:
@@ -102,9 +108,10 @@ async def health_check_full(
         else:
             components["llm"] = {"status": "not_configured"}
             overall_healthy = False
-    except Exception:
+    except Exception as exc:
         components["llm"] = {"status": "error"}
         overall_healthy = False
+        logger.warning("health_llm_check_failed", error=str(exc))
 
     return HealthResponse(
         status="healthy" if overall_healthy else "degraded",

@@ -300,6 +300,7 @@ async def batch_create_events(
             )
 
         except Exception as e:
+            logger.warning("batch_event_create_failed", index=idx, error=str(e))
             failed.append({
                 "index": idx,
                 "error": str(e),
