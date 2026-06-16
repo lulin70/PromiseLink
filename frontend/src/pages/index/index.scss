@@ -190,6 +190,23 @@
     }
   }
 
+  .export-btn {
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px;
+    text-align: center;
+    border: 1px solid #e0e0e0;
+
+    &:active {
+      background: #f5f5f5;
+    }
+
+    .export-btn-text {
+      font-size: 28px;
+      color: #8c8c8c;
+    }
+  }
+
   .event-item {
     display: flex;
     background: #fff;

@@ -208,6 +208,38 @@ export async function acceptDegradedEvent(eventId: string): Promise<EventRespons
   })
 }
 
+// P0: Delete event
+export async function deleteEvent(eventId: string): Promise<void> {
+  return request<void>({
+    method: 'DELETE',
+    path: `/events/${eventId}`,
+  })
+}
+
+// P1: Batch create events
+export interface BatchEventCreateItem {
+  event_type: string
+  source: string
+  title?: string
+  raw_text?: string
+  metadata?: Record<string, unknown>
+}
+
+export interface BatchEventCreateResponse {
+  created: EventCreateResponse[]
+  failed: Array<{ index: number; error: string }>
+  total_requested: number
+  total_created: number
+}
+
+export async function batchCreateEvents(events: BatchEventCreateItem[]): Promise<BatchEventCreateResponse> {
+  return request<BatchEventCreateResponse>({
+    method: 'POST',
+    path: '/events/batch',
+    body: { events },
+  })
+}
+
 // ── Todos ──
 
 export interface TodoResponse {
@@ -261,6 +293,28 @@ export async function dismissTodo(todoId: string): Promise<TodoResponse> {
   })
 }
 
+// P0: Delete todo
+export async function deleteTodo(todoId: string): Promise<void> {
+  return request<void>({
+    method: 'DELETE',
+    path: `/todos/${todoId}`,
+  })
+}
+
+// P2: Get todo detail
+export interface TodoDetailResponse extends TodoResponse {
+  properties?: Record<string, unknown> | null
+  snoozed_until?: string | null
+  completed_at?: string | null
+}
+
+export async function getTodoDetail(todoId: string): Promise<TodoDetailResponse> {
+  return request<TodoDetailResponse>({
+    method: 'GET',
+    path: `/todos/${todoId}`,
+  })
+}
+
 // ── Entities ──
 
 export interface EntityResponse {
@@ -308,6 +362,14 @@ export async function updateEntity(
     method: 'PATCH',
     path: `/entities/${entityId}`,
     body: data,
+  })
+}
+
+// P0: Delete entity
+export async function deleteEntity(entityId: string): Promise<void> {
+  return request<void>({
+    method: 'DELETE',
+    path: `/entities/${entityId}`,
   })
 }
 
@@ -770,5 +832,306 @@ export async function cancelScheduledEvent(id: string, data?: CancelRequest): Pr
     method: 'POST',
     path: `/scheduled-events/${id}/cancel`,
     body: data || {},
+  })
+}
+
+// P1: Create scheduled event
+export async function createScheduledEvent(data: ScheduledEventCreateRequest): Promise<ScheduledEventResponse> {
+  return request<ScheduledEventResponse>({
+    method: 'POST',
+    path: '/scheduled-events',
+    body: data,
+  })
+}
+
+// P2: Update scheduled event
+export async function updateScheduledEvent(
+  id: string,
+  data: Partial<ScheduledEventCreateRequest>
+): Promise<ScheduledEventResponse> {
+  return request<ScheduledEventResponse>({
+    method: 'PATCH',
+    path: `/scheduled-events/${id}`,
+    body: data,
+  })
+}
+
+// P2: Delete scheduled event
+export async function deleteScheduledEvent(id: string): Promise<void> {
+  return request<void>({
+    method: 'DELETE',
+    path: `/scheduled-events/${id}`,
+  })
+}
+
+// ── Dashboard Range View (P1) ──
+
+export interface RangeViewEventItem {
+  id: string
+  event_type: string
+  title: string
+  timestamp?: string
+  status: string
+}
+
+export interface RangeViewTodoItem {
+  id: string
+  todo_type: string
+  title: string
+  status: string
+  due_date?: string
+}
+
+export interface RangeViewResponse {
+  range_start: string
+  range_end: string
+  label: string
+  total_events: number
+  total_todos: number
+  events: RangeViewEventItem[]
+  todos: RangeViewTodoItem[]
+}
+
+export async function getDashboardRangeView(startDate: string, endDate: string): Promise<RangeViewResponse> {
+  return request<RangeViewResponse>({
+    method: 'GET',
+    path: '/dashboard/range-view',
+    params: { start_date: startDate, end_date: endDate },
+  })
+}
+
+// ── Morning Brief (P1) ──
+
+export interface MorningBriefResponse {
+  date: string
+  greeting: string
+  pending_promises: number
+  pending_cares: number
+  overdue_todos: number
+  today_events: number
+  today_todos: number
+  key_persons: string[]
+  summary_text: string
+}
+
+export async function getMorningBrief(): Promise<MorningBriefResponse> {
+  return request<MorningBriefResponse>({
+    method: 'GET',
+    path: '/dashboard/morning-brief',
+  })
+}
+
+// ── Aggregated Relationship Brief (P1) ──
+
+export interface BriefModuleItem {
+  module_name: string
+  display_name: string
+  icon: string
+  has_data: boolean
+  summary: string
+  detail?: unknown
+  priority?: string
+}
+
+export interface RelationshipBriefAggregatedResponse {
+  id: string
+  person_entity_id: string
+  person_name?: string
+  person_company?: string
+  relationship_stage: string
+  stage_label: string
+  stage_color: string
+  stage_icon: string
+  strength_score: number
+  strength_label: string
+  last_interaction_date?: string
+  last_interaction_summary?: string
+  interaction_freq_summary?: string
+  modules: BriefModuleItem[]
+  suggested_actions: string[]
+  version: number
+  last_updated_at?: unknown
+}
+
+export async function getAggregatedRelationshipBrief(entityId: string): Promise<RelationshipBriefAggregatedResponse> {
+  return request<RelationshipBriefAggregatedResponse>({
+    method: 'GET',
+    path: `/persons/${entityId}/relationship-brief/aggregated`,
+  })
+}
+
+// ── Demand Input (P1) ──
+
+export interface ExtractedDemand {
+  tag: string
+  detail: string
+  related_entity_id?: string
+}
+
+export interface DemandInputResponse {
+  status: string
+  demand_id: string
+  extracted: ExtractedDemand
+}
+
+export async function createDemand(text: string, source: string = 'text'): Promise<DemandInputResponse> {
+  return request<DemandInputResponse>({
+    method: 'POST',
+    path: '/demands',
+    body: { text, source },
+  })
+}
+
+// ── Data Export (P1) ──
+
+export async function exportData(userId: string): Promise<Record<string, unknown>> {
+  return request<Record<string, unknown>>({
+    method: 'GET',
+    path: `/export/${userId}`,
+  })
+}
+
+// ── Reminders (P1) ──
+
+export interface ReminderItem {
+  todo_id: string
+  todo_type: string
+  title: string
+  description?: string
+  priority: number
+  dynamic_score?: number
+  due_date?: string
+  reminder_type: string
+  related_entity_id?: string
+}
+
+export interface DailyReminderResponse {
+  items: ReminderItem[]
+  total_pending: number
+  fatigue_remaining: number
+  is_quiet_hours: boolean
+}
+
+export async function getDailyReminders(): Promise<DailyReminderResponse> {
+  return request<DailyReminderResponse>({
+    method: 'GET',
+    path: '/reminders/daily',
+  })
+}
+
+export interface ReminderActionResponse {
+  todo_id: string
+  action: string
+  new_status: string
+}
+
+export async function actionReminder(todoId: string, action: string, snoozeHours?: number): Promise<ReminderActionResponse> {
+  return request<ReminderActionResponse>({
+    method: 'POST',
+    path: `/reminders/${todoId}/action`,
+    body: { action, snooze_hours: snoozeHours },
+  })
+}
+
+// ── Credit Scores List (P2) ──
+
+export interface CreditScoreListResponse {
+  items: CreditScoreResponse[]
+  total: number
+}
+
+export async function getCreditScores(minInteractions: number = 2, limit: number = 20): Promise<CreditScoreListResponse> {
+  return request<CreditScoreListResponse>({
+    method: 'GET',
+    path: '/entities/credit-scores',
+    params: { min_interactions: minInteractions, limit },
+  })
+}
+
+// ── Stage Map (P2) ──
+
+export interface StageMapItem {
+  value: string
+  label: string
+  color: string
+  icon: string
+  description: string
+  order: number
+}
+
+export interface StageMapResponse {
+  stages: StageMapItem[]
+}
+
+export async function getStageMap(): Promise<StageMapResponse> {
+  return request<StageMapResponse>({
+    method: 'GET',
+    path: '/entities/stage-map',
+  })
+}
+
+// ── Relationship Briefs List (P2) ──
+
+export interface RelationshipBriefResponse {
+  id: string
+  user_id: string
+  person_entity_id: string
+  relationship_stage: string
+  brief_data: Record<string, unknown>
+  version: number
+  last_updated_at?: unknown
+  created_at?: unknown
+}
+
+export async function getRelationshipBriefs(
+  stage?: string,
+  limit: number = 50,
+  offset: number = 0
+): Promise<PaginatedResponse<RelationshipBriefResponse>> {
+  return request<PaginatedResponse<RelationshipBriefResponse>>({
+    method: 'GET',
+    path: '/relationship-briefs',
+    params: { stage, limit, offset },
+  })
+}
+
+export async function updateRelationshipBrief(
+  briefId: string,
+  data: { notes?: string; brief_data_partial?: Record<string, unknown>; expected_version: number }
+): Promise<RelationshipBriefResponse> {
+  return request<RelationshipBriefResponse>({
+    method: 'PATCH',
+    path: `/relationship-briefs/${briefId}`,
+    body: data,
+  })
+}
+
+// ── Reminder Preferences (P2) ──
+
+export interface ReminderPreferenceResponse {
+  user_id: string
+  preferred_times: string[]
+  fatigue_threshold: number
+  quiet_hours_start: string
+  quiet_hours_end: string
+}
+
+export async function getReminderPreferences(): Promise<ReminderPreferenceResponse> {
+  return request<ReminderPreferenceResponse>({
+    method: 'GET',
+    path: '/reminders/preferences',
+  })
+}
+
+export async function updateReminderPreferences(data: {
+  preferred_times?: string[]
+  fatigue_threshold?: number
+  quiet_hours_start?: string
+  quiet_hours_end?: string
+}): Promise<ReminderPreferenceResponse> {
+  return request<ReminderPreferenceResponse>({
+    method: 'PATCH',
+    path: '/reminders/preferences',
+    body: data,
   })
 }

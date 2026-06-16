@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { View, Text, ScrollView, Button, Input } from '@tarojs/components'
 import Taro from '@tarojs/taro'
-import { getDashboard, DayViewResponse, login as apiLogin, SupplyDemandMatch, getSupplyDemand, RelationshipHealthResponse, getRelationshipHealth, CareRemindersResponse, getCareReminders } from '../../services/api'
-import { isLoggedIn, setToken, setUserId, saveLoginCredentials } from '../../services/auth'
+import { getDashboard, DayViewResponse, login as apiLogin, SupplyDemandMatch, getSupplyDemand, RelationshipHealthResponse, getRelationshipHealth, CareRemindersResponse, getCareReminders, exportData } from '../../services/api'
+import { isLoggedIn, setToken, setUserId, saveLoginCredentials, getUserId } from '../../services/auth'
 import { navigateToEvent } from '../../services/navigation'
 import './index.scss'
 
@@ -82,6 +82,31 @@ export default function Index() {
       setLoginError('登录失败: ' + msg)
     } finally {
       setLoginLoading(false)
+    }
+  }
+
+  async function handleExportData() {
+    try {
+      const userId = getUserId()
+      if (!userId) {
+        Taro.showToast({ title: '请先登录', icon: 'error' })
+        return
+      }
+      Taro.showLoading({ title: '导出中...' })
+      const data = await exportData(userId)
+      Taro.hideLoading()
+      // Create downloadable JSON
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `promiselink-export-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      Taro.showToast({ title: '导出成功', icon: 'success' })
+    } catch (err) {
+      Taro.hideLoading()
+      Taro.showToast({ title: '导出失败', icon: 'error' })
     }
   }
 
@@ -184,6 +209,13 @@ export default function Index() {
           <View className='section'>
             <View className='quick-input' onClick={() => Taro.navigateTo({ url: '/pages/input/index' })}>
               <Text className='quick-input-placeholder'>快速录入事件、待办、承诺...</Text>
+            </View>
+          </View>
+
+          {/* Data Export */}
+          <View className='section'>
+            <View className='export-btn' onClick={handleExportData}>
+              <Text className='export-btn-text'>📦 导出数据</Text>
             </View>
           </View>
 

@@ -189,6 +189,17 @@
           min-height: 36px;
         }
 
+        .delete-entity-btn {
+          font-size: 24px;
+          color: #c4a7a0;
+          padding: 8px 0;
+          cursor: pointer;
+
+          &:active {
+            opacity: 0.6;
+          }
+        }
+
         .detail-edit-row {
           flex: 1;
           display: flex;

@@ -236,7 +236,7 @@ class TestDayViewTodosOverdueFlag:
         # Seed a todo due on TARGET_DATE but mark it as overdue by patching today forward
         await _seed_todo(db_session, "过期待办", days_offset=0, status="pending")
 
-        with patch("promiselink.api.v1.dashboard.date") as mock_date:
+        with patch("promiselink.api.v1.dashboard_day_view.date") as mock_date:
             mock_date.today.return_value = date(2026, 6, 10)  # Well past due
             mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
 
@@ -253,7 +253,7 @@ class TestDayViewTodosOverdueFlag:
     async def test_done_todo_not_overdue(self, client: AsyncClient, db_session: AsyncSession):
         await _seed_todo(db_session, "已完成", days_offset=-5, status="done")
 
-        with patch("promiselink.api.v1.dashboard.date") as mock_date:
+        with patch("promiselink.api.v1.dashboard_day_view.date") as mock_date:
             mock_date.today.return_value = date(2026, 6, 10)
             mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
 

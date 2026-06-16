@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { View, Text, ScrollView } from '@tarojs/components'
 import Taro from '@tarojs/taro'
-import { getEvents, getEventDetail, retryEvent, updateTodoStatus, dismissTodo, getScheduledEvents, cancelScheduledEvent, EventResponse, EventDetailResponse, ScheduledEventResponse } from '../../services/api'
+import { getEvents, getEventDetail, retryEvent, updateTodoStatus, dismissTodo, deleteEvent, getScheduledEvents, cancelScheduledEvent, createScheduledEvent, EventResponse, EventDetailResponse, ScheduledEventResponse } from '../../services/api'
 import { isLoggedIn } from '../../services/auth'
 import { navigateToEntity } from '../../services/navigation'
 import { NAV_EVENTS } from '../../services/navigation'
@@ -80,6 +80,14 @@ export default function EventsPage() {
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // P1: Create scheduled event state
+  const [showCreateSchedule, setShowCreateSchedule] = useState(false)
+  const [scheduleTopic, setScheduleTopic] = useState('')
+  const [scheduleDate, setScheduleDate] = useState('')
+  const [scheduleTime, setScheduleTime] = useState('')
+  const [scheduleParticipants, setScheduleParticipants] = useState('')
+  const [scheduleLocation, setScheduleLocation] = useState('')
+  const [creatingSchedule, setCreatingSchedule] = useState(false)
 
   useEffect(() => {
     if (!isLoggedIn()) {
@@ -202,6 +210,60 @@ export default function EventsPage() {
     }
   }
 
+  async function handleDeleteEvent(eventId: string) {
+    try {
+      const res = await Taro.showModal({
+        title: '确认删除',
+        content: '确认删除此事件？',
+        confirmText: '删除',
+        cancelText: '取消',
+        confirmColor: '#ff4d4f',
+      })
+      if (!res.confirm) return
+      await deleteEvent(eventId)
+      Taro.showToast({ title: '已删除', icon: 'success' })
+      setExpandedId(null)
+      setExpandedDetail(null)
+      loadEvents()
+    } catch (err) {
+      Taro.showToast({ title: '删除失败', icon: 'error' })
+    }
+  }
+
+  async function handleCreateSchedule() {
+    if (!scheduleTopic.trim() || !scheduleDate || !scheduleTime) {
+      Taro.showToast({ title: '请填写主题和时间', icon: 'error' })
+      return
+    }
+    try {
+      setCreatingSchedule(true)
+      const scheduledAt = new Date(`${scheduleDate}T${scheduleTime}:00+08:00`).toISOString()
+      const participants = scheduleParticipants
+        ? scheduleParticipants.split(/[,，、]/).map(name => ({ name: name.trim() }))
+        : []
+      await createScheduledEvent({
+        scheduled_at: scheduledAt,
+        topic: scheduleTopic.trim(),
+        participants,
+        location: scheduleLocation.trim() || undefined,
+        event_type: 'meeting',
+      })
+      Taro.showToast({ title: '已创建预定日程', icon: 'success' })
+      setShowCreateSchedule(false)
+      setScheduleTopic('')
+      setScheduleDate('')
+      setScheduleTime('')
+      setScheduleParticipants('')
+      setScheduleLocation('')
+      // Switch to upcoming tab and refresh
+      setActiveFilter(3)
+    } catch (err) {
+      Taro.showToast({ title: '创建失败', icon: 'error' })
+    } finally {
+      setCreatingSchedule(false)
+    }
+  }
+
   return (
     <View className='page-events'>
       <View className='header'>
@@ -256,6 +318,11 @@ export default function EventsPage() {
         )}
 
         {/* Scheduled Event Cards (预定日程) */}
+        {activeFilter === 3 && (
+          <View className='create-schedule-btn' onClick={() => setShowCreateSchedule(true)}>
+            <Text>+ 新建预定日程</Text>
+          </View>
+        )}
         {scheduledEvents.map(se => (
           <View
             key={se.id}
@@ -397,6 +464,18 @@ export default function EventsPage() {
                   <Text className='detail-label'>创建时间</Text>
                   <Text className='detail-value'>{new Date(expandedDetail.created_at).toLocaleString('zh-CN')}</Text>
                 </View>
+                {/* Delete button */}
+                <View className='detail-row'>
+                  <Text
+                    className='delete-event-btn'
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDeleteEvent(expandedDetail.id)
+                    }}
+                  >
+                    🗑 删除此事件
+                  </Text>
+                </View>
                 {expandedDetail.related_todos && expandedDetail.related_todos.length > 0 && (
                   <View className='detail-row detail-section'>
                     <Text className='detail-label'>相关待办 ({expandedDetail.related_todos.length})</Text>
@@ -411,13 +490,13 @@ export default function EventsPage() {
                                 <Text className='related-todo-btn done-btn' onClick={(e) => {
                                   e.stopPropagation()
                                   updateTodoStatus(todo.id, 'done').then(() => {
-                                    if (expandedDetail) loadEventDetail(expandedDetail.id)
+                                    if (expandedDetail) getEventDetail(expandedDetail.id).then(setExpandedDetail)
                                   })
                                 }}>完成</Text>
                                 <Text className='related-todo-btn dismiss-btn' onClick={(e) => {
                                   e.stopPropagation()
                                   dismissTodo(todo.id).then(() => {
-                                    if (expandedDetail) loadEventDetail(expandedDetail.id)
+                                    if (expandedDetail) getEventDetail(expandedDetail.id).then(setExpandedDetail)
                                   })
                                 }}>忽略</Text>
                               </>
@@ -433,6 +512,74 @@ export default function EventsPage() {
           </View>
         ))}
       </ScrollView>
+
+      {/* Create Scheduled Event Modal */}
+      {showCreateSchedule && (
+        <View className='modal-overlay' onClick={() => setShowCreateSchedule(false)}>
+          <View className='modal-content create-schedule-modal' onClick={e => e.stopPropagation()}>
+            <View className='modal-header'>
+              <Text className='modal-title'>新建预定日程</Text>
+              <Text className='modal-close' onClick={() => setShowCreateSchedule(false)}>✕</Text>
+            </View>
+            <View className='modal-body'>
+              <View className='form-group'>
+                <Text className='form-label'>主题 *</Text>
+                <input
+                  className='form-input'
+                  type='text'
+                  placeholder='如：与张总讨论合作'
+                  value={scheduleTopic}
+                  onInput={e => setScheduleTopic(e.currentTarget.value)}
+                />
+              </View>
+              <View className='form-group'>
+                <Text className='form-label'>日期 *</Text>
+                <input
+                  className='form-input'
+                  type='date'
+                  value={scheduleDate}
+                  onInput={e => setScheduleDate(e.currentTarget.value)}
+                />
+              </View>
+              <View className='form-group'>
+                <Text className='form-label'>时间 *</Text>
+                <input
+                  className='form-input'
+                  type='time'
+                  value={scheduleTime}
+                  onInput={e => setScheduleTime(e.currentTarget.value)}
+                />
+              </View>
+              <View className='form-group'>
+                <Text className='form-label'>参与者</Text>
+                <input
+                  className='form-input'
+                  type='text'
+                  placeholder='用逗号分隔多人'
+                  value={scheduleParticipants}
+                  onInput={e => setScheduleParticipants(e.currentTarget.value)}
+                />
+              </View>
+              <View className='form-group'>
+                <Text className='form-label'>地点</Text>
+                <input
+                  className='form-input'
+                  type='text'
+                  placeholder='如：望京SOHO'
+                  value={scheduleLocation}
+                  onInput={e => setScheduleLocation(e.currentTarget.value)}
+                />
+              </View>
+              <View
+                className={`submit-schedule-btn ${creatingSchedule ? 'loading' : ''}`}
+                onClick={creatingSchedule ? undefined : handleCreateSchedule}
+              >
+                <Text>{creatingSchedule ? '创建中...' : '创建预定'}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   )
 }

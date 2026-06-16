@@ -239,6 +239,18 @@
         }
       }
 
+      .delete-btn {
+        background: #fafafa;
+        border: 2px solid #d9d9d9;
+        border-radius: 8px;
+        padding: 8px 24px;
+
+        Text {
+          color: #c4a7a0;
+          font-size: 24px;
+        }
+      }
+
       .dismiss-btn {
         background: #fff1f0;
         border: 2px solid #ffa39e;
