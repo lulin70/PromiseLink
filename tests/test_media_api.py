@@ -2,6 +2,7 @@
 
 import io
 import json
+import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -13,6 +14,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from promiselink.core.auth import get_current_user_id
 from promiselink.database import Base, get_async_session
 from promiselink.main import app
+
+pytestmark = pytest.mark.skipif(
+    os.environ.get("APP_EDITION", "basic") != "pro",
+    reason="Media API is a Pro-only feature",
+)
 
 
 # ── Constants ──

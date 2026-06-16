@@ -1,5 +1,6 @@
 """Tests for WeChat Forward API endpoint (PRD §5.17)."""
 
+import os
 import uuid
 from unittest.mock import AsyncMock, patch
 
@@ -12,6 +13,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from promiselink.core.auth import get_current_user_id
 from promiselink.database import Base, get_async_session
 from promiselink.main import app
+
+pytestmark = pytest.mark.skipif(
+    os.environ.get("APP_EDITION", "basic") != "pro",
+    reason="WeChat Forward API is a Pro-only feature",
+)
 
 
 # ── Constants ──

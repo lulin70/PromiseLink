@@ -109,7 +109,8 @@ async def list_todos(
     if priority is not None:
         query = query.where(Todo.priority == priority)
     if search:
-        query = query.where(Todo.description.ilike(f"%{search}%"))
+        escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        query = query.where(Todo.description.ilike(f"%{escaped}%", escape="\\"))
 
     # Count total
     count_query = select(func.count()).select_from(Todo).where(Todo.user_id == user_id)
@@ -120,7 +121,8 @@ async def list_todos(
     if priority is not None:
         count_query = count_query.where(Todo.priority == priority)
     if search:
-        count_query = count_query.where(Todo.description.ilike(f"%{search}%"))
+        escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        count_query = count_query.where(Todo.description.ilike(f"%{escaped}%", escape="\\"))
     total = (await session.execute(count_query)).scalar() or 0
 
     # Apply sort

@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     debug: bool = False
     log_level: str = "INFO"
+    app_edition: str = "basic"  # "basic" or "pro"
 
     # API
     api_host: str = "0.0.0.0"
@@ -31,6 +32,16 @@ class Settings(BaseSettings):
     cors_origins: list[str] = Field(
         default_factory=lambda: ["http://localhost:3000", "http://localhost:8000"]
     )
+
+    @field_validator("app_edition", mode="before")
+    @classmethod
+    def validate_app_edition(cls, v: Any) -> str:
+        """Validate app_edition is either 'basic' or 'pro'."""
+        if isinstance(v, str):
+            v_lower = v.lower()
+            if v_lower in ("basic", "pro"):
+                return v_lower
+        raise ValueError("app_edition must be either 'basic' or 'pro'")
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -53,13 +64,20 @@ class Settings(BaseSettings):
     wechat_app_secret: str = Field(default="")
 
     # Authentication
-    secret_key: str = Field(default="change-me-in-production")
+    secret_key: str = Field(
+        default="change-me-in-production",
+        description="JWT signing key; MUST be changed for any deployment. "
+                    "Generate with: python -c \"import secrets; print(secrets.token_urlsafe(32))\"",
+    )
     pii_encryption_key: str = Field(default="", description="Independent key for PII encryption; if empty, falls back to secret_key")
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
     poc_anonymous_access: bool = Field(default=False, description="PoC only: allow unauthenticated access with default user")
-    poc_secret: str = Field(default="", description="PoC login secret; empty = PoC login disabled")
+    poc_secret: str = Field(
+        default="promiselink2026",
+        description="PoC login secret; please change this default password immediately",
+    )
     allow_insecure_key: bool = Field(default=False, description="Allow default secret key in non-test environments (development convenience)")
     trusted_proxies: list[str] = Field(default_factory=list, description="Trusted reverse proxy IPs for X-Forwarded-For")
 
@@ -130,21 +148,39 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":
-        """Validate critical settings in non-development environments."""
+        """Validate critical settings and auto-fix insecure defaults."""
+        import secrets
+
         if self.secret_key == "change-me-in-production":
-            import structlog
-            structlog.get_logger().warning(
-                "⚠️  DEFAULT SECRET KEY DETECTED ⚠️",
-                note="Secret key is still the default value 'change-me-in-production'. "
-                     "Set SECRET_KEY env var immediately. This is insecure for any deployment.",
-            )
+            if self.app_env == "development":
+                # Auto-generate a random key in development to prevent token forgery
+                self.secret_key = secrets.token_urlsafe(32)
+                import structlog
+                structlog.get_logger().warning(
+                    "⚠️  AUTO-GENERATED SECRET KEY",
+                    note="SECRET_KEY was the default 'change-me-in-production'. "
+                         "A random key has been generated for this session. "
+                         "Tokens will be invalid after restart. "
+                         "Set SECRET_KEY in .env for persistent sessions.",
+                )
+            else:
+                if self.allow_insecure_key:
+                    import structlog
+                    structlog.get_logger().warning(
+                        "⚠️  DEFAULT SECRET KEY IN NON-DEVELOPMENT ENVIRONMENT",
+                        note="This is extremely insecure. Set SECRET_KEY immediately.",
+                    )
+                else:
+                    raise ValueError(
+                        "secret_key must be changed from default in non-development environments. "
+                        "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\""
+                    )
+
         if not self.llm_api_key:
             import structlog
             structlog.get_logger().warning("llm_api_key_empty", note="Set LLM_API_KEY env var")
 
         if self.app_env != "development":
-            if self.secret_key == "change-me-in-production":
-                raise ValueError("secret_key must be changed from default in non-development environments")
             if not self.llm_api_key:
                 raise ValueError("llm_api_key must be set in non-development environments")
         return self

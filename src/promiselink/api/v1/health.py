@@ -27,6 +27,7 @@ async def health_check():
         "timestamp": datetime.now(UTC).isoformat(),
         "service": "promiselink",
         "version": get_settings().app_version,
+        "edition": get_settings().app_edition,
     }
 
 

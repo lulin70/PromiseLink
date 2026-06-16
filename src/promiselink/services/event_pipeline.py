@@ -141,7 +141,7 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
             if _row:
                 _resolved_user_id = str(_row)
     except Exception:
-        pass
+        logger.warning("pipeline_user_id_resolution_failed", event_id=str(event_id))
 
     pipeline_lock = get_pipeline_lock(user_id=_resolved_user_id)
     async with pipeline_lock:

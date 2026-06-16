@@ -418,7 +418,7 @@ class FileStoreProvider:
         try:
             return self.entries_dir.exists() and self.entries_dir.is_dir()
         except Exception:
-            logger.debug("file_memory_health_check_failed")
+            logger.warning("file_memory_health_check_failed")
             return False
 
 
@@ -611,7 +611,7 @@ class CarryMemProvider:
             response = await client.get("/health")
             return response.status_code == 200
         except Exception:
-            logger.debug("carrymem_health_check_failed")
+            logger.warning("carrymem_health_check_failed")
             return False
 
     async def close(self) -> None:

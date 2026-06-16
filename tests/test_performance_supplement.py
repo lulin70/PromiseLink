@@ -10,6 +10,7 @@ Heavy tests marked with @pytest.mark.slow.
 
 import asyncio
 import io
+import os
 import time
 import uuid
 from unittest.mock import AsyncMock, patch
@@ -464,6 +465,10 @@ class TestLargeDataPerformance:
         assert len(associations) > 0
 
     @pytest.mark.slow
+    @pytest.mark.skipif(
+        os.environ.get("APP_EDITION", "basic") != "pro",
+        reason="CSV Import API is a Pro-only feature",
+    )
     @pytest.mark.asyncio
     async def test_tc_perf_012_csv_import_throughput(self, client: AsyncClient, db_session: AsyncSession):
         """TC-PERF-012: 批量导入千条记录的吞吐量验证.

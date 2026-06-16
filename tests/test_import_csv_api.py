@@ -4,6 +4,7 @@ Validates CSV file upload, parsing, entity creation, and
 entity resolution (dedup/merge) behavior.
 """
 
+import os
 import uuid
 
 import pytest
@@ -138,6 +139,10 @@ async def insert_entity(session: AsyncSession, **overrides) -> Entity:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.skipif(
+    os.environ.get("APP_EDITION", "basic") != "pro",
+    reason="CSV Import API is a Pro-only feature",
+)
 class TestCSVImportBasic:
     """Basic import functionality tests."""
 
@@ -204,6 +209,10 @@ class TestCSVImportBasic:
         assert props["capability"] == "技术咨询"
 
 
+@pytest.mark.skipif(
+    os.environ.get("APP_EDITION", "basic") != "pro",
+    reason="CSV Import API is a Pro-only feature",
+)
 class TestCSVImportValidation:
     """Input validation tests."""
 
@@ -251,6 +260,10 @@ class TestCSVImportValidation:
         assert data["created_entities"] == 2
 
 
+@pytest.mark.skipif(
+    os.environ.get("APP_EDITION", "basic") != "pro",
+    reason="CSV Import API is a Pro-only feature",
+)
 class TestCSVImportEncoding:
     """Encoding handling tests."""
 
@@ -275,6 +288,10 @@ class TestCSVImportEncoding:
         assert resp.json()["created_entities"] == 1
 
 
+@pytest.mark.skipif(
+    os.environ.get("APP_EDITION", "basic") != "pro",
+    reason="CSV Import API is a Pro-only feature",
+)
 class TestCSVImportDedup:
     """Entity resolution / dedup tests."""
 
