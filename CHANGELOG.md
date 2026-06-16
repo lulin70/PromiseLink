@@ -2,6 +2,27 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [0.6.0] - 2026-06-16
+
+### Added
+- **APP_EDITION配置**: config.py新增`app_edition`字段(basic/pro)，支持基础版/专业版产品分层
+- **HMAC开发环境自动生成**: 开发环境下secret_key自动生成随机密钥，防止token伪造
+- **POC_SECRET默认值**: `promiselink2026`作为PoC登录默认密码
+- **版本架构文档**: 0.6.0版本架构说明与文档一致性更新
+
+### Fixed
+- **SQL注入修复**: ilike搜索转义SQL通配符，防止注入攻击
+- **前端updateEntity修复**: 实体更新API调用参数修正
+- **前端分页参数修复**: promises分页参数从page/page_size统一为offset/limit
+- **X-Forwarded-For欺骗漏洞**: `_get_client_ip()`仅信任配置的trusted_proxies
+- **Rate Limiter安全加固**: 4个API端点添加限流保护
+
+### Changed
+- **E2E测试改进**: 测试框架增强，覆盖更多用户场景
+- **文档重命名**: 12个EventLink命名文件统一重命名为PromiseLink
+- **测试数量**: 1314测试通过, 60个测试文件, 22个路由模块, 72个API端点
+- **安装命令**: `pip install -r requirements.txt` → `pip install -e '.[dev]'`
+
 ## [0.5.1] - 2026-06-14
 
 ### Fixed — P1 技术债清零

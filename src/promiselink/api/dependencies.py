@@ -29,12 +29,17 @@ async def rate_limit_dependency(
         limit = settings.rate_limit_authenticated
     else:
         # Use client IP for unauthenticated requests
-        # Support X-Forwarded-For for reverse proxy scenarios
-        forwarded = request.headers.get("x-forwarded-for", "")
-        if forwarded:
-            client_ip = forwarded.split(",")[0].strip()
+        # Only trust X-Forwarded-For if trusted proxies are configured
+        # and the direct connection is from a trusted proxy
+        direct_ip = request.client.host if request.client else "unknown"
+        if settings.trusted_proxies and direct_ip in settings.trusted_proxies:
+            forwarded = request.headers.get("x-forwarded-for", "")
+            if forwarded:
+                client_ip = forwarded.split(",")[0].strip()
+            else:
+                client_ip = direct_ip
         else:
-            client_ip = request.client.host if request.client else "unknown"
+            client_ip = direct_ip
         key = f"ip:{client_ip}"
         limit = settings.rate_limit_unauthenticated
 
@@ -63,11 +68,17 @@ async def rate_limit_llm_dependency(
     if user_id:
         key = f"llm:user:{user_id}"
     else:
-        forwarded = request.headers.get("x-forwarded-for", "")
-        if forwarded:
-            client_ip = forwarded.split(",")[0].strip()
+        # Only trust X-Forwarded-For if trusted proxies are configured
+        # and the direct connection is from a trusted proxy
+        direct_ip = request.client.host if request.client else "unknown"
+        if settings.trusted_proxies and direct_ip in settings.trusted_proxies:
+            forwarded = request.headers.get("x-forwarded-for", "")
+            if forwarded:
+                client_ip = forwarded.split(",")[0].strip()
+            else:
+                client_ip = direct_ip
         else:
-            client_ip = request.client.host if request.client else "unknown"
+            client_ip = direct_ip
         key = f"llm:ip:{client_ip}"
 
     limit = settings.rate_limit_llm

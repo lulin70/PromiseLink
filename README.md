@@ -8,7 +8,7 @@
 
 ```bash
 # 1. 安装依赖
-pip install -r requirements.txt
+pip install -e '.[dev]'
 
 # 2. 配置环境变量
 cp .env.basic.example .env
@@ -48,7 +48,7 @@ PromiseLink/
 │   │   ├── demand_input.py     # 需求输入
 │   │   ├── auth.py             # 认证
 │   │   ├── wechat_forward.py / email_sync.py  # 数据接入
-│   ├── services/               # 核心引擎（36个模块）
+│   ├── services/               # 核心引擎（38个模块）
 │   │   ├── event_pipeline.py   # 13步事件处理管线
 │   │   ├── entity_extractor.py    # LLM实体提取
 │   │   ├── entity_resolution.py    # 实体归一（5步算法）
@@ -70,7 +70,7 @@ PromiseLink/
 │   ├── prompts/                # LLM Prompt模板
 │   └── main.py                 # FastAPI入口
 ├── docs/                       # 文档体系
-├── tests/                      # 测试（41+个文件 / 1224+用例）
+├── tests/                      # 测试（60个文件 / 1314用例）
 ├── data/                       # SQLite数据存储
 └── docker-compose.yml          # Docker配置
 ```
@@ -128,13 +128,13 @@ PromiseLink/
 - [x] PRD v5.2（关系经营核心闭环 + 向量化语义能力）
 - [x] 技术设计 v3.2（Insight Engine + DataSourceAdapter + 向量语义）
 - [x] P0核心算法全部实现（实体归一/承诺履行/状态机/关联发现/动态评分）
-- [x] FastAPI完整实现（19个API路由）
-- [x] 28+个服务模块（Pipeline/NLG/SemanticSearch/MemoryProvider等）
-- [x] 8个模型文件，11个模型类（entity/event/todo/association/relationship_brief/voice_session等）
+- [x] FastAPI完整实现（22个路由模块 / 72个API端点）
+- [x] 38个服务模块（Pipeline/NLG/SemanticSearch/MemoryProvider等）
+- [x] 9个模型文件，11个模型类（entity/event/todo/association/relationship_brief/voice_session等）
 - [x] DataSourceAdapter抽象层（手动/语音/微信/CSV/邮件）
 - [x] CarryMem协议解耦（NullMemoryProvider优雅降级）
 - [x] 加密体系（HMAC-SHA256 + 字段级加密 + 行级安全）
-- [x] 41+个测试文件 / **1224+测试用例** / **73%覆盖率**
+- [x] 60个测试文件 / **1314测试用例** / **73%覆盖率**
 - [x] Docker + CI/CD + Alembic 就绪
 - [x] PoC Demo 4/4场景通过
 
@@ -189,11 +189,11 @@ curl "http://localhost:8000/api/v1/entities/search?q=技术合作"
 
 | 指标 | 数值 |
 |------|------|
-| 测试用例 | **1224+ passed, 0 failed** |
+| 测试用例 | **1314 passed, 0 failed** |
 | 代码覆盖率 | **73%** |
-| API路由 | **19个** |
-| 服务模块 | **36个** |
-| 数据模型 | **8个文件，11个模型类** |
+| API路由 | **22个路由模块 / 72个API端点** |
+| 服务模块 | **38个** |
+| 数据模型 | **9个文件，11个模型类** |
 | 文档版本 | PRD v5.2 / Tech v3.2 |
 | 产品层级 | 基础版(本地免费) / 专业版(网关中继) / 定制版(团队) |
 | 总体进度 | **85%** |
