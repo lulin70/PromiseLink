@@ -81,6 +81,9 @@ class EventTodoRef(BaseModel):
     todo_type: str
     title: str
     status: str
+    confirmation_status: str | None = None
+    action_type: str | None = None
+    evidence_quote: str | None = None
 
 
 class EventDetailResponse(EventResponse):
@@ -516,13 +519,19 @@ async def get_event(
 
     # Fetch related todos
     todo_result = await session.execute(
-        select(_Todo.id, _Todo.todo_type, _Todo.title, _Todo.status)
+        select(
+            _Todo.id, _Todo.todo_type, _Todo.title, _Todo.status,
+            _Todo.confirmation_status, _Todo.action_type, _Todo.evidence_quote,
+        )
         .where(_Todo.source_event_id == str(event_id))
         .order_by(_Todo.created_at.asc())
     )
     related_todos = [
-        EventTodoRef(id=str(tid), todo_type=ttype, title=ttitle, status=tstatus)
-        for tid, ttype, ttitle, tstatus in todo_result.fetchall()
+        EventTodoRef(
+            id=str(tid), todo_type=ttype, title=ttitle, status=tstatus,
+            confirmation_status=tconf, action_type=taction, evidence_quote=tevidence,
+        )
+        for tid, ttype, ttitle, tstatus, tconf, taction, tevidence in todo_result.fetchall()
     ]
 
     return EventDetailResponse.model_validate(event, from_attributes=True).model_copy(update={"related_todos": related_todos})

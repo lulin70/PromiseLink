@@ -291,13 +291,17 @@
       }
 
       .delete-event-btn {
+        display: inline-block;
         font-size: 24px;
-        color: #c4a7a0;
-        padding: 8px 0;
+        color: #fff;
+        background: #c4a7a0;
+        padding: 10px 24px;
+        border-radius: 8px;
         cursor: pointer;
+        margin-top: 12px;
 
         &:active {
-          opacity: 0.6;
+          opacity: 0.7;
         }
       }
 
@@ -312,10 +316,44 @@
         padding: 8px 0;
         border-bottom: 1px solid #f8f8f8;
 
+        &.pending-confirm-item {
+          flex-direction: column;
+          align-items: flex-start;
+          background: #f0f5ff;
+          padding: 12px;
+          border-radius: 8px;
+          margin-bottom: 8px;
+          border-bottom: none;
+        }
+
+        .related-todo-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: 100%;
+        }
+
         .related-todo-title {
           font-size: 24px;
           color: #333;
           flex: 1;
+          line-height: 1.4;
+        }
+
+        .todo-action-tag {
+          font-size: 18px;
+          color: #a0b0c4;
+          background: #e8edf5;
+          padding: 2px 8px;
+          border-radius: 4px;
+          flex-shrink: 0;
+        }
+
+        .evidence-quote {
+          font-size: 20px;
+          color: #888;
+          font-style: italic;
+          margin: 6px 0;
           line-height: 1.4;
         }
 
@@ -325,11 +363,22 @@
           gap: 8px;
           flex-shrink: 0;
           margin-left: 8px;
+
+          .pending-confirm-item & {
+            margin-left: 0;
+            margin-top: 6px;
+            width: 100%;
+          }
         }
 
         .related-todo-status {
           font-size: 22px;
           color: #999;
+        }
+
+        .pending-confirm-status {
+          color: #1890ff;
+          font-weight: 500;
         }
 
         .related-todo-btn {
@@ -348,6 +397,18 @@
           color: #999;
           background: #fafafa;
           border: 1px solid #e8e8e8;
+        }
+
+        .confirm-btn {
+          color: #fff;
+          background: #a0c4a8;
+          border: 1px solid #a0c4a8;
+        }
+
+        .reject-btn {
+          color: #c4a7a0;
+          background: #fff;
+          border: 1px solid #c4a7a0;
         }
       }
     }

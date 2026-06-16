@@ -245,7 +245,7 @@ export default function TodosPage() {
                     className='source-event-link'
                     onClick={(e) => { e.stopPropagation(); navigateToEvent(todo.source_event_id!) }}
                   >
-                    来源: {todo.source_event_title || '查看事件'}
+                    来源: {todo.source_event_date ? `${todo.source_event_date} ` : ''}{todo.source_event_title || '查看事件'}
                   </Text>
                 )}
                 {todo.due_date && (

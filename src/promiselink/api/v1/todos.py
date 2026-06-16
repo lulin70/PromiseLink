@@ -40,6 +40,7 @@ class TodoResponse(BaseModel):
     due_date: datetime | None = None
     source_event_id: uuid.UUID | str | None = None
     source_event_title: str | None = None
+    source_event_date: str | None = None
     created_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -159,15 +160,18 @@ async def list_todos(
         )
         entity_names = {str(eid): name for eid, name in entity_result.all()}
 
-    # Fetch event titles for source_event_ids
+    # Fetch event titles and dates for source_event_ids
     event_ids = [t.source_event_id for t in todos if t.source_event_id]
     event_titles: dict[str, str] = {}
+    event_dates: dict[str, str] = {}
     if event_ids:
         from promiselink.models.event import Event
         event_result = await session.execute(
-            select(Event.id, Event.title).where(Event.id.in_([str(eid) for eid in event_ids]))
+            select(Event.id, Event.title, Event.created_at).where(Event.id.in_([str(eid) for eid in event_ids]))
         )
-        event_titles = {str(eid): title for eid, title in event_result.all()}
+        for eid, title, created in event_result.all():
+            event_titles[str(eid)] = title
+            event_dates[str(eid)] = created.strftime("%m-%d") if created else None
 
     items = []
     for t in todos:
@@ -186,6 +190,7 @@ async def list_todos(
             due_date=t.due_date,
             source_event_id=t.source_event_id,
             source_event_title=event_titles.get(str(t.source_event_id)) if t.source_event_id else None,
+            source_event_date=event_dates.get(str(t.source_event_id)) if t.source_event_id else None,
             created_at=t.created_at,
         )
         items.append(item)

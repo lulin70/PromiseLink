@@ -66,6 +66,11 @@ async function request<T>({ method, path, body, params, _retryCount = 0 }: Reque
     throw new Error(`API Error ${res.status}: ${errorText}`)
   }
 
+  // 204 No Content has no body
+  if (res.status === 204) {
+    return undefined as T
+  }
+
   return res.json()
 }
 
@@ -257,6 +262,7 @@ export interface TodoResponse {
   due_date?: string
   source_event_id?: string
   source_event_title?: string
+  source_event_date?: string
   created_at?: string
   action_type?: string
   fulfillment_status?: string
@@ -475,9 +481,11 @@ export interface PromiseItem {
   description?: string
   due_date?: string
   fulfillment_status: string
+  confirmation_status?: string
   created_at?: string
   source_event_id?: string
   source_event_title?: string
+  source_event_date?: string
 }
 
 export interface PromiseListResponse {

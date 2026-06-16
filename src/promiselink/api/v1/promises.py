@@ -30,8 +30,10 @@ class PromiseItem(BaseModel):
     description: Optional[str] = None
     due_date: Optional[datetime] = None
     fulfillment_status: str
+    confirmation_status: Optional[str] = None
     source_event_id: Optional[str] = None
     source_event_title: Optional[str] = None
+    source_event_date: Optional[str] = None
     created_at: Optional[datetime] = None
 
 
@@ -106,15 +108,18 @@ async def list_promises(
         )
         entity_names = {str(eid): name for eid, name in entity_result.all()}
 
-    # Fetch event titles for source_event_ids
+    # Fetch event titles and dates for source_event_ids
     event_ids = [t.source_event_id for t in results if t.source_event_id]
     event_titles: dict[str, str] = {}
+    event_dates: dict[str, str] = {}
     if event_ids:
         from promiselink.models.event import Event
         event_result = await session.execute(
-            select(Event.id, Event.title).where(Event.id.in_([str(eid) for eid in event_ids]))
+            select(Event.id, Event.title, Event.created_at).where(Event.id.in_([str(eid) for eid in event_ids]))
         )
-        event_titles = {str(eid): title for eid, title in event_result.all()}
+        for eid, title, created in event_result.all():
+            event_titles[str(eid)] = title
+            event_dates[str(eid)] = created.strftime("%m-%d") if created else None
 
     items = []
     for t in results:
@@ -129,8 +134,10 @@ async def list_promises(
                 description=t.description,
                 due_date=t.due_date,
                 fulfillment_status=t.fulfillment_status or "pending",
+                confirmation_status=t.confirmation_status,
                 source_event_id=seid,
                 source_event_title=event_titles.get(seid) if seid else None,
+                source_event_date=event_dates.get(seid) if seid else None,
                 created_at=t.created_at,
             )
         )

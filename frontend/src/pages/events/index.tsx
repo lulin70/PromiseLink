@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { View, Text, ScrollView } from '@tarojs/components'
 import Taro from '@tarojs/taro'
-import { getEvents, getEventDetail, retryEvent, updateTodoStatus, dismissTodo, deleteEvent, getScheduledEvents, cancelScheduledEvent, createScheduledEvent, EventResponse, EventDetailResponse, ScheduledEventResponse } from '../../services/api'
+import { getEvents, getEventDetail, retryEvent, updateTodoStatus, dismissTodo, deleteEvent, confirmTodo, getScheduledEvents, cancelScheduledEvent, createScheduledEvent, EventResponse, EventDetailResponse, ScheduledEventResponse } from '../../services/api'
 import { isLoggedIn } from '../../services/auth'
 import { navigateToEntity } from '../../services/navigation'
 import { NAV_EVENTS } from '../../services/navigation'
@@ -480,30 +480,60 @@ export default function EventsPage() {
                   <View className='detail-row detail-section'>
                     <Text className='detail-label'>相关待办 ({expandedDetail.related_todos.length})</Text>
                     <View className='related-todos'>
-                      {expandedDetail.related_todos.map(todo => (
-                        <View key={todo.id} className='related-todo-item'>
-                          <Text className='related-todo-title'>{todo.title}</Text>
-                          <View className='related-todo-actions'>
-                            <Text className='related-todo-status'>{todo.status === 'done' ? '已完成' : todo.status === 'dismissed' ? '已忽略' : '待处理'}</Text>
-                            {todo.status === 'pending' && (
-                              <>
-                                <Text className='related-todo-btn done-btn' onClick={(e) => {
-                                  e.stopPropagation()
-                                  updateTodoStatus(todo.id, 'done').then(() => {
-                                    if (expandedDetail) getEventDetail(expandedDetail.id).then(setExpandedDetail)
-                                  })
-                                }}>完成</Text>
-                                <Text className='related-todo-btn dismiss-btn' onClick={(e) => {
-                                  e.stopPropagation()
-                                  dismissTodo(todo.id).then(() => {
-                                    if (expandedDetail) getEventDetail(expandedDetail.id).then(setExpandedDetail)
-                                  })
-                                }}>忽略</Text>
-                              </>
+                      {expandedDetail.related_todos.map(todo => {
+                        const isPendingConfirm = todo.confirmation_status === 'pending' || todo.confirmation_status === 'auto_set'
+                        const actionLabel = todo.action_type === 'my_promise' ? '我的承诺' : todo.action_type === 'their_promise' ? '对方承诺' : ''
+                        return (
+                          <View key={todo.id} className={`related-todo-item ${isPendingConfirm ? 'pending-confirm-item' : ''}`}>
+                            <View className='related-todo-header'>
+                              <Text className='related-todo-title'>{todo.title}</Text>
+                              {actionLabel && <Text className='todo-action-tag'>{actionLabel}</Text>}
+                            </View>
+                            {isPendingConfirm && todo.evidence_quote && (
+                              <Text className='evidence-quote'>"{todo.evidence_quote}"</Text>
                             )}
+                            <View className='related-todo-actions'>
+                              {isPendingConfirm ? (
+                                <>
+                                  <Text className='related-todo-status pending-confirm-status'>待确认</Text>
+                                  <Text className='related-todo-btn confirm-btn' onClick={(e) => {
+                                    e.stopPropagation()
+                                    confirmTodo(todo.id, { confirmation_status: 'confirmed' }).then(() => {
+                                      if (expandedDetail) getEventDetail(expandedDetail.id).then(setExpandedDetail)
+                                    })
+                                  }}>确认</Text>
+                                  <Text className='related-todo-btn reject-btn' onClick={(e) => {
+                                    e.stopPropagation()
+                                    confirmTodo(todo.id, { confirmation_status: 'rejected' }).then(() => {
+                                      if (expandedDetail) getEventDetail(expandedDetail.id).then(setExpandedDetail)
+                                    })
+                                  }}>忽略</Text>
+                                </>
+                              ) : (
+                                <>
+                                  <Text className='related-todo-status'>{todo.status === 'done' ? '已完成' : todo.status === 'dismissed' ? '已忽略' : '待处理'}</Text>
+                                  {todo.status === 'pending' && (
+                                    <>
+                                      <Text className='related-todo-btn done-btn' onClick={(e) => {
+                                        e.stopPropagation()
+                                        updateTodoStatus(todo.id, 'done').then(() => {
+                                          if (expandedDetail) getEventDetail(expandedDetail.id).then(setExpandedDetail)
+                                        })
+                                      }}>完成</Text>
+                                      <Text className='related-todo-btn dismiss-btn' onClick={(e) => {
+                                        e.stopPropagation()
+                                        dismissTodo(todo.id).then(() => {
+                                          if (expandedDetail) getEventDetail(expandedDetail.id).then(setExpandedDetail)
+                                        })
+                                      }}>忽略</Text>
+                                    </>
+                                  )}
+                                </>
+                              )}
+                            </View>
                           </View>
-                        </View>
-                      ))}
+                        )
+                      })}
                     </View>
                   </View>
                 )}
