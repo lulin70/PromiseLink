@@ -204,19 +204,26 @@ else:
 print("\n📋 阶段 6：搜索与导出")
 
 # 步骤 12: 搜索事件
-status, data = api_call("GET", "/events", body=None)
-# Add search param via URL
-search_url = f"/events?search=合作"
+import urllib.parse
+search_url = f"/events?search={urllib.parse.quote('合作')}"
 status, data = api_call("GET", search_url)
 if status == 200:
-    log_ok(f"事件搜索成功，匹配 {data.get('total', 0)} 条")
+    total = data.get('total', 0)
+    if total > 0:
+        log_ok(f"事件搜索成功，匹配 {total} 条")
+    else:
+        log_ok("事件搜索接口正常（无匹配结果，可能未配置LLM管道未处理）")
 else:
     log_fail(f"事件搜索失败: {status}")
 
 # 步骤 13: 搜索实体
-status, data = api_call("GET", "/entities?search=张")
+status, data = api_call("GET", f"/entities?search={urllib.parse.quote('张')}")
 if status == 200:
-    log_ok(f"实体搜索成功，匹配 {data.get('total', 0)} 个")
+    total = data.get('total', 0)
+    if total > 0:
+        log_ok(f"实体搜索成功，匹配 {total} 个")
+    else:
+        log_ok("实体搜索接口正常（无匹配结果，可能未配置LLM管道未处理）")
 else:
     log_fail(f"实体搜索失败: {status}")
 
@@ -228,7 +235,7 @@ else:
     log_fail(f"关系简报查询失败: {status}")
 
 # 步骤 15: 数据导出
-status, data = api_call("GET", "/export/json")
+status, data = api_call("GET", "/export/e2e-test-user")
 if status == 200:
     log_ok("数据导出成功")
 else:
