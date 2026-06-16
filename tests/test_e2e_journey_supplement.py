@@ -7,6 +7,7 @@ with LLM calls mocked out. No external services required.
 """
 
 import json
+import os
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
@@ -542,6 +543,10 @@ class TestDataLoop:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.skipif(
+    os.environ.get("APP_EDITION", "basic") != "pro",
+    reason="Voice Assistant is a Pro-only feature",
+)
 class TestVoiceAssistantJourney:
     """Voice assistant complete journey tests."""
 

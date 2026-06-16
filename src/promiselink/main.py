@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from promiselink.api.v1 import associations, auth, dashboard, demand_input, email_sync, entities, events, export, health, import_csv, media, privacy, promises, reminders, relationship_briefs, scheduled_events, todos, voice, voice_query, wechat_forward
+from promiselink.api.v1 import associations, auth, dashboard, demand_input, entities, events, export, health, promises, reminders, relationship_briefs, scheduled_events, todos
 from promiselink.config import get_settings
 from promiselink.core.exceptions import BusinessError, PromiseLinkError, LLMError, NotFoundError, ValidationError, ForbiddenError, UnauthorizedError, ConflictError
 from promiselink.database import close_db, init_db
@@ -279,7 +279,7 @@ async def internal_error_handler(request, exc):
     )
 
 
-# Include routers
+# Include routers — Basic routes (always registered)
 app.include_router(health.router, prefix=settings.api_prefix, tags=["Health"])
 app.include_router(auth.router, prefix=settings.api_prefix, tags=["Auth"])
 app.include_router(events.router, prefix=settings.api_prefix, tags=["Events"])
@@ -288,18 +288,22 @@ app.include_router(associations.router, prefix=settings.api_prefix, tags=["Assoc
 app.include_router(todos.router, prefix=settings.api_prefix, tags=["Todos"])
 app.include_router(dashboard.router, prefix=settings.api_prefix, tags=["Dashboard"])
 app.include_router(relationship_briefs.router, prefix=settings.api_prefix, tags=["RelationshipBriefs"])
-app.include_router(voice.router, prefix=settings.api_prefix, tags=["Voice"])
-app.include_router(voice_query.router, prefix=settings.api_prefix, tags=["Voice"])
 app.include_router(demand_input.router, prefix=settings.api_prefix, tags=["DemandInput"])
 app.include_router(export.router, prefix=settings.api_prefix, tags=["Export"])
-app.include_router(import_csv.router, prefix=settings.api_prefix, tags=["Import"])
-app.include_router(email_sync.router, prefix=settings.api_prefix, tags=["Email"])
-app.include_router(wechat_forward.router, prefix=settings.api_prefix, tags=["WeChatForward"])
-app.include_router(media.router, prefix=settings.api_prefix, tags=["Media"])
-app.include_router(privacy.router, prefix=settings.api_prefix, tags=["Privacy"])
 app.include_router(promises.router, prefix=settings.api_prefix, tags=["Promises"])
 app.include_router(reminders.router, prefix=settings.api_prefix, tags=["Reminders"])
 app.include_router(scheduled_events.router, prefix=settings.api_prefix, tags=["ScheduledEvents"])
+
+# Pro-only routes (only registered when app_edition == "pro")
+if settings.app_edition == "pro":
+    from promiselink.api.v1 import voice, voice_query, media, email_sync, wechat_forward, import_csv, privacy
+    app.include_router(voice.router, prefix=settings.api_prefix, tags=["Voice"])
+    app.include_router(voice_query.router, prefix=settings.api_prefix, tags=["VoiceQuery"])
+    app.include_router(media.router, prefix=settings.api_prefix, tags=["Media"])
+    app.include_router(email_sync.router, prefix=settings.api_prefix, tags=["EmailSync"])
+    app.include_router(wechat_forward.router, prefix=settings.api_prefix, tags=["WeChatForward"])
+    app.include_router(import_csv.router, prefix=settings.api_prefix, tags=["ImportCSV"])
+    app.include_router(privacy.router, prefix=settings.api_prefix, tags=["Privacy"])
 
 
 # ── Static Files (H5 Frontend) ──

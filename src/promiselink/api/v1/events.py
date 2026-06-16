@@ -438,7 +438,8 @@ async def list_events(
     if status:
         query = query.where(Event.status == status)
     if search:
-        query = query.where(Event.title.ilike(f"%{search}%") | Event.raw_text.ilike(f"%{search}%"))
+        escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        query = query.where(Event.title.ilike(f"%{escaped}%", escape="\\") | Event.raw_text.ilike(f"%{escaped}%", escape="\\"))
     
     # Count total
     count_query = select(func.count()).select_from(Event).where(Event.user_id == user_id)
@@ -447,7 +448,8 @@ async def list_events(
     if status:
         count_query = count_query.where(Event.status == status)
     if search:
-        count_query = count_query.where(Event.title.ilike(f"%{search}%") | Event.raw_text.ilike(f"%{search}%"))
+        escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        count_query = count_query.where(Event.title.ilike(f"%{escaped}%", escape="\\") | Event.raw_text.ilike(f"%{escaped}%", escape="\\"))
     total = (await session.execute(count_query)).scalar() or 0
     
     # Fetch paginated

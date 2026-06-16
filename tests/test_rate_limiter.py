@@ -1,5 +1,6 @@
 """Tests for F-24 Rate Limiter and F-23 Privacy Protection API."""
 
+import os
 import uuid
 
 import pytest
@@ -159,12 +160,20 @@ async def test_rate_limiter_llm_endpoints_lower_limit(client):
 # ── Privacy API Tests ──
 
 
+@pytest.mark.skipif(
+    os.environ.get("APP_EDITION", "basic") != "pro",
+    reason="Privacy API is a Pro-only feature",
+)
 async def test_privacy_data_summary_requires_auth(unauth_client):
     """GET /privacy/data-summary without token → 401."""
     response = await unauth_client.get(f"{API_PREFIX}/privacy/data-summary")
     assert response.status_code == 401
 
 
+@pytest.mark.skipif(
+    os.environ.get("APP_EDITION", "basic") != "pro",
+    reason="Privacy API is a Pro-only feature",
+)
 async def test_privacy_data_summary_returns_counts(client, db_session):
     """GET /privacy/data-summary returns correct counts of user data."""
     # Create some test data
@@ -228,6 +237,10 @@ async def test_privacy_data_summary_returns_counts(client, db_session):
     assert data["voice_sessions"] == 0
 
 
+@pytest.mark.skipif(
+    os.environ.get("APP_EDITION", "basic") != "pro",
+    reason="Privacy API is a Pro-only feature",
+)
 async def test_privacy_delete_user_data(client, db_session):
     """DELETE /privacy/user-data removes all user data."""
     from promiselink.models.event import Event

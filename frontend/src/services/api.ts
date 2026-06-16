@@ -307,7 +307,7 @@ export async function updateEntity(
   return request<EntityDetailResponse>({
     method: 'PATCH',
     path: `/entities/${entityId}`,
-    data,
+    body: data,
   })
 }
 
@@ -647,30 +647,10 @@ export interface StageInfoResponse {
   suggestion: StageSuggestion | null
 }
 
-export interface StageMapItem {
-  value: string
-  label: string
-  color: string
-  icon: string
-  description: string
-  order: number
-}
-
-export interface StageMapResponse {
-  stages: StageMapItem[]
-}
-
 export async function getStageInfo(entityId: string): Promise<StageInfoResponse> {
   return request<StageInfoResponse>({
     method: 'GET',
     path: `/entities/${entityId}/stage-info`,
-  })
-}
-
-export async function getStageMap(): Promise<StageMapResponse> {
-  return request<StageMapResponse>({
-    method: 'GET',
-    path: '/entities/stage-map',
   })
 }
 
@@ -756,14 +736,6 @@ export interface CancelRequest {
   cancel_reason?: string
 }
 
-export async function createScheduledEvent(data: ScheduledEventCreateRequest): Promise<ScheduledEventResponse> {
-  return request<ScheduledEventResponse>({
-    method: 'POST',
-    path: '/scheduled-events',
-    body: data,
-  })
-}
-
 export async function getScheduledEvents(
   status?: string,
   scheduled_from?: string,
@@ -781,24 +753,6 @@ export async function getScheduledEvents(
 export async function getScheduledEventDetail(id: string): Promise<ScheduledEventResponse> {
   return request<ScheduledEventResponse>({
     method: 'GET',
-    path: `/scheduled-events/${id}`,
-  })
-}
-
-export async function updateScheduledEvent(
-  id: string,
-  data: Partial<ScheduledEventCreateRequest>,
-): Promise<ScheduledEventResponse> {
-  return request<ScheduledEventResponse>({
-    method: 'PATCH',
-    path: `/scheduled-events/${id}`,
-    body: data,
-  })
-}
-
-export async function deleteScheduledEvent(id: string): Promise<void> {
-  return request<void>({
-    method: 'DELETE',
     path: `/scheduled-events/${id}`,
   })
 }

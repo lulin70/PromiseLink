@@ -38,7 +38,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -e ".[dev,test]"
+          pip install -e ".[dev]"
           pip install pytest pytest-cov pytest-asyncio httpx
 
       - name: Run linting

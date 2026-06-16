@@ -10,6 +10,7 @@ with LLM calls mocked out. No external services required.
 import base64
 import io
 import json
+import os
 import uuid
 from unittest.mock import patch
 
@@ -328,6 +329,10 @@ class TestVectorInjection:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.skipif(
+    os.environ.get("APP_EDITION", "basic") != "pro",
+    reason="CSV Import API is a Pro-only feature",
+)
 class TestCSVImportSecurity:
     """CSV import security tests."""
 

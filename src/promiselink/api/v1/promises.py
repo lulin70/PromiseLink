@@ -79,7 +79,8 @@ async def list_promises(
         conditions.append(Todo.fulfillment_status == status)
 
     if search:
-        conditions.append(Todo.description.ilike(f"%{search}%"))
+        escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        conditions.append(Todo.description.ilike(f"%{escaped}%", escape="\\"))
 
     # Count
     count_q = select(func.count()).select_from(Todo).where(and_(*conditions))
@@ -268,7 +269,7 @@ async def get_nudge_draft(
                     is_fallback=cached.get("is_fallback", False),
                 )
         except (json.JSONDecodeError, TypeError):
-            pass
+            logger.warning("nudge_draft_cache_parse_failed", todo_id=todo_id)
 
     # Generate new nudge
     nudge_text = await generate_gentle_nudge(session, todo, config)

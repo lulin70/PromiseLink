@@ -643,6 +643,10 @@ class TestDashboardIntegration:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.skipif(
+    os.environ.get("APP_EDITION", "basic") != "pro",
+    reason="Privacy API is a Pro-only feature",
+)
 class TestPrivacyAPIIntegration:
     """Verify privacy endpoints: data-summary, export, and user-data DELETE."""
 

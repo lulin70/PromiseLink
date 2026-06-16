@@ -130,15 +130,20 @@ async def scan_dormant_contacts(
     # Step 2: Get last interaction per entity via source_event_id + todos
     # Event model has no entity_id or related_entity_ids field
     # Use: Entity.source_event_id → Event, and Todo.related_entity_id → latest todo
-    all_events = []  # Simplified: use entity's own data instead
+    from promiselink.models.event import Event
+    stmt = select(Event).where(Event.user_id == user_id)
+    result = await session.execute(stmt)
+    all_events = list(result.scalars().all())
 
     # Group events by entity_id to find latest per entity
     entity_events: dict[str, tuple[datetime, str, str | None]] = {}
     for evt in all_events:
-        eid = evt[0]  # entity_id stored in event (if applicable)
-        # Also check raw_text for entity name mentions
-        if eid and eid not in entity_events:
-            entity_events[eid] = (evt[1], evt[2], evt[3])
+        # Search raw_text for entity name mentions to associate events with entities
+        for entity in entities:
+            if entity.name and entity.name in (evt.raw_text or ""):
+                eid_str = str(entity.id)
+                if eid_str not in entity_events:
+                    entity_events[eid_str] = (evt.timestamp, evt.title, evt.raw_text)
 
     # Step 3: Count todos per entity (for relationship depth)
     todo_count_q = (
@@ -181,12 +186,12 @@ async def scan_dormant_contacts(
             # Try to find any event mentioning this entity's name
             name_matches = [
                 e for e in all_events
-                if e[2] and entity.name in e[2]
+                if e.raw_text and entity.name in e.raw_text
             ]
             if name_matches:
-                last_time = name_matches[0][0]
-                last_title = name_matches[0][1]
-                last_raw = name_matches[0][2] or ""
+                last_time = name_matches[0].timestamp
+                last_title = name_matches[0].title
+                last_raw = name_matches[0].raw_text or ""
             else:
                 last_time = entity.created_at
 

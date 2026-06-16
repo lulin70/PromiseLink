@@ -2446,6 +2446,10 @@ class TestRelationshipBriefsAPI:
 # ══════════════════════════════════════════════════════════════════
 
 
+@pytest.mark.skipif(
+    os.environ.get("APP_EDITION", "basic") != "pro",
+    reason="Email Sync API is a Pro-only feature",
+)
 class TestEmailSyncAPI:
     """Tests for Email Sync endpoint."""
 
