@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { View, Text, Textarea, Button, Picker, Input } from '@tarojs/components'
-import { createEvent, uploadEventFile, getEventDetail, getPendingConfirmations, confirmTodo, retryEvent, acceptDegradedEvent, recordScheduledEvent, getScheduledEventDetail, EventCreateResponse, ConfirmationItem } from '../../services/api'
+import { createEvent, uploadEventFile, getEventDetail, getPendingConfirmations, confirmTodo, retryEvent, acceptDegradedEvent, recordScheduledEvent, getScheduledEventDetail, createDemand, EventCreateResponse, ConfirmationItem } from '../../services/api'
 import { isLoggedIn } from '../../services/auth'
 import Taro, { useRouter } from '@tarojs/taro'
 import './index.scss'
@@ -45,6 +45,11 @@ export default function InputPage() {
   // File upload state
   const [inputMode, setInputMode] = useState<'text' | 'file'>('text')
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
+  // P1: Demand mode state
+  const [inputTab, setInputTab] = useState<'event' | 'demand'>('event')
+  const [demandText, setDemandText] = useState('')
+  const [demandLoading, setDemandLoading] = useState(false)
+  const [demandResult, setDemandResult] = useState<{ tag: string; detail: string; related_entity_id?: string } | null>(null)
 
   // Scheduled event record mode state
   const [isRecordMode, setIsRecordMode] = useState(false)
@@ -226,6 +231,24 @@ export default function InputPage() {
     setSelectedFile(null)
   }
 
+  async function handleDemandSubmit() {
+    if (!demandText.trim()) {
+      setError('请输入需求内容')
+      return
+    }
+    try {
+      setDemandLoading(true)
+      setError('')
+      const res = await createDemand(demandText.trim())
+      setDemandResult(res.extracted)
+      setDemandText('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '需求录入失败')
+    } finally {
+      setDemandLoading(false)
+    }
+  }
+
   // F-E1: Confirm a pending promise
   async function handleConfirm(todoId: string) {
     try {
@@ -297,8 +320,84 @@ export default function InputPage() {
 
       {!result ? (
         <View className='content'>
-          {/* Event Type Selector */}
-          <View className='form-section'>
+          {/* Input Tab: Event / Demand */}
+          <View className='input-tab-toggle'>
+            <View
+              className={`input-tab ${inputTab === 'event' ? 'active' : ''}`}
+              onClick={() => setInputTab('event')}
+            >
+              <Text>事件录入</Text>
+            </View>
+            <View
+              className={`input-tab ${inputTab === 'demand' ? 'active' : ''}`}
+              onClick={() => setInputTab('demand')}
+            >
+              <Text>需求</Text>
+            </View>
+          </View>
+
+          {inputTab === 'demand' ? (
+            /* Demand Input Mode */
+            <View className='form-section'>
+              <Text className='section-label'>需求内容</Text>
+              <Textarea
+                className='text-input'
+                value={demandText}
+                onInput={e => setDemandText(e.detail.value)}
+                placeholder='输入一句话需求，如：我需要找一个靠谱的装修团队、想了解融资渠道...'
+                maxlength={2000}
+                autoFocus
+              />
+              <Text className='char-count'>{demandText.length}/2000</Text>
+              {error && (
+                <View className='error-msg'>
+                  <Text>✗ {error}</Text>
+                </View>
+              )}
+              <Button
+                className='submit-btn'
+                onClick={handleDemandSubmit}
+                loading={demandLoading}
+                disabled={demandLoading || !demandText.trim()}
+              >
+                {demandLoading ? '提交中...' : '提交需求'}
+              </Button>
+              {demandResult && (
+                <View className='demand-result-card'>
+                  <Text className='demand-result-title'>需求已录入</Text>
+                  <View className='demand-result-row'>
+                    <Text className='demand-result-label'>标签</Text>
+                    <Text className='demand-result-value'>{demandResult.tag}</Text>
+                  </View>
+                  <View className='demand-result-row'>
+                    <Text className='demand-result-label'>详情</Text>
+                    <Text className='demand-result-value'>{demandResult.detail}</Text>
+                  </View>
+                  {demandResult.related_entity_id && (
+                    <View className='demand-result-row'>
+                      <Text className='demand-result-label'>关联人脉</Text>
+                      <Text className='demand-result-value'>已关联</Text>
+                    </View>
+                  )}
+                  <Button
+                    className='reset-btn'
+                    onClick={() => setDemandResult(null)}
+                    style={{ marginTop: '16px' }}
+                  >
+                    继续录入
+                  </Button>
+                </View>
+              )}
+              <View className='tips'>
+                <Text className='tips-title'>需求录入提示</Text>
+                <Text className='tips-item'>· 一句话描述你的需求，系统自动提取标签</Text>
+                <Text className='tips-item'>· 提到人名会自动关联到已有联系人</Text>
+                <Text className='tips-item'>· 需求会记录在人脉档案中，方便供需匹配</Text>
+              </View>
+            </View>
+          ) : (
+          <View>
+            <View className='form-section'>
             <Text className='section-label'>事件类型</Text>
             <Picker
               mode='selector'
@@ -400,6 +499,8 @@ export default function InputPage() {
             <Text className='tips-item'>· 承诺类内容会自动标记，如"我答应..."、"他说会..."</Text>
             <Text className='tips-item'>· 文件上传支持 .txt 和 .md 格式</Text>
           </View>
+          </View>
+          )}
         </View>
       ) : (
         /* Result View */

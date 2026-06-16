@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { View, Text, Input, ScrollView } from '@tarojs/components'
-import { getEntities, getEntityDetail, getEntityHistory, login as apiLogin, EntityResponse, EntityDetailResponse, EntityHistoryResponse, DormantContactItem, getDormantContacts, CreditScoreResponse, getCreditScore, StageInfoResponse, getStageInfo, dismissTodo, updateEntity } from '../../services/api'
+import { getEntities, getEntityDetail, getEntityHistory, login as apiLogin, EntityResponse, EntityDetailResponse, EntityHistoryResponse, DormantContactItem, getDormantContacts, CreditScoreResponse, getCreditScore, StageInfoResponse, getStageInfo, dismissTodo, updateEntity, deleteEntity } from '../../services/api'
 import { isLoggedIn, setToken, setUserId, saveLoginCredentials } from '../../services/auth'
 import { NAV_EVENTS, navigateToEvent } from '../../services/navigation'
 import Taro from '@tarojs/taro'
@@ -224,6 +224,26 @@ export default function EntitiesPage() {
     setEditingValue(currentValue)
   }
 
+  async function handleDeleteEntity() {
+    if (!detail) return
+    try {
+      const res = await Taro.showModal({
+        title: '确认删除',
+        content: '确认删除此人脉？相关待办和关联也会被删除',
+        confirmText: '删除',
+        cancelText: '取消',
+        confirmColor: '#ff4d4f',
+      })
+      if (!res.confirm) return
+      await deleteEntity(detail.id)
+      Taro.showToast({ title: '已删除', icon: 'success' })
+      closeDetail()
+      loadEntities()
+    } catch (err) {
+      Taro.showToast({ title: '删除失败', icon: 'error' })
+    }
+  }
+
   return (
     <View className='page-entities'>
       <View className='header'>
@@ -339,6 +359,19 @@ export default function EntitiesPage() {
               <View className='detail-row'>
                 <Text className='detail-label'>置信度</Text>
                 <Text className='detail-value'>{(detail.confidence * 100).toFixed(0)}%</Text>
+              </View>
+
+              {/* Delete entity button */}
+              <View className='detail-row'>
+                <Text
+                  className='delete-entity-btn'
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDeleteEntity()
+                  }}
+                >
+                  🗑 删除此人脉
+                </Text>
               </View>
 
               {/* F-E5: Credit Score */}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { View, Text, ScrollView, Input } from '@tarojs/components'
-import { getTodos, updateTodoStatus, dismissTodo, login as apiLogin, TodoResponse } from '../../services/api'
+import { getTodos, updateTodoStatus, dismissTodo, deleteTodo, login as apiLogin, TodoResponse } from '../../services/api'
 import { isLoggedIn, setToken, setUserId, saveLoginCredentials } from '../../services/auth'
 import { navigateToEntity, navigateToEvent } from '../../services/navigation'
 import Taro from '@tarojs/taro'
@@ -137,6 +137,24 @@ export default function TodosPage() {
     }
   }
 
+  async function handleDeleteTodo(todoId: string) {
+    try {
+      const res = await Taro.showModal({
+        title: '确认删除',
+        content: '确认删除此待办？',
+        confirmText: '删除',
+        cancelText: '取消',
+        confirmColor: '#ff4d4f',
+      })
+      if (!res.confirm) return
+      await deleteTodo(todoId)
+      Taro.showToast({ title: '已删除', icon: 'success' })
+      setTodos(prev => prev.filter(t => t.id !== todoId))
+    } catch (err) {
+      Taro.showToast({ title: '删除失败', icon: 'error' })
+    }
+  }
+
   function getPriorityInfo(priority: number) {
     return PRIORITY_MAP[priority] || { label: '未知', color: '#999' }
   }
@@ -237,6 +255,12 @@ export default function TodosPage() {
               <View className='todo-actions'>
                 {todo.status !== 'done' && todo.status !== 'dismissed' && (
                   <>
+                    <View
+                      className='delete-btn'
+                      onClick={() => handleDeleteTodo(todo.id)}
+                    >
+                      <Text>🗑 删除</Text>
+                    </View>
                     <View
                       className='dismiss-btn'
                       onClick={() => handleDismiss(todo.id)}

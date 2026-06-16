@@ -290,6 +290,17 @@
         }
       }
 
+      .delete-event-btn {
+        font-size: 24px;
+        color: #c4a7a0;
+        padding: 8px 0;
+        cursor: pointer;
+
+        &:active {
+          opacity: 0.6;
+        }
+      }
+
       .related-todos {
         margin-top: 8px;
       }
@@ -435,5 +446,120 @@
         Text { color: #fff; }
       }
     }
+  .create-schedule-btn {
+    background: #a0b0c4;
+    color: #fff;
+    text-align: center;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    font-size: 28px;
+
+    &:active {
+      opacity: 0.7;
+    }
+
+    Text {
+      color: #fff;
+      font-size: 28px;
+    }
+  }
+
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .modal-content {
+    background: #fff;
+    border-radius: 16px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 24px;
+      border-bottom: 1px solid #f0f0f0;
+
+      .modal-title {
+        font-size: 32px;
+        font-weight: bold;
+        color: #333;
+      }
+
+      .modal-close {
+        font-size: 36px;
+        color: #999;
+        padding: 0 8px;
+      }
+    }
+
+    .modal-body {
+      padding: 24px;
+
+      .form-group {
+        margin-bottom: 20px;
+
+        .form-label {
+          font-size: 26px;
+          color: #666;
+          margin-bottom: 8px;
+          display: block;
+        }
+
+        .form-input {
+          width: 100%;
+          height: 72px;
+          border: 1px solid #e0e0e0;
+          border-radius: 12px;
+          padding: 0 20px;
+          font-size: 26px;
+          box-sizing: border-box;
+          background: #fafafa;
+
+          &:focus {
+            border-color: #a0b0c4;
+            background: #fff;
+          }
+        }
+      }
+
+      .submit-schedule-btn {
+        background: #a0b0c4;
+        color: #fff;
+        text-align: center;
+        padding: 20px;
+        border-radius: 12px;
+        font-size: 28px;
+        margin-top: 20px;
+
+        &:active {
+          opacity: 0.7;
+        }
+
+        &.loading {
+          opacity: 0.6;
+          pointer-events: none;
+        }
+
+        Text {
+          color: #fff;
+          font-size: 28px;
+        }
+      }
+    }
   }
 }
+}
+
