@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Create demo data for poc-user so they see real content on login"""
-import httpx, time, json
+import json
+import time
+
+import httpx
 
 BASE = "http://localhost:8002/api/v1"
 c = httpx.Client(timeout=60)
@@ -9,7 +12,7 @@ c = httpx.Client(timeout=60)
 r = c.post(f"{BASE}/auth/login", json={"poc_secret": "promiselink2026", "user_id": "poc-user"})
 token = r.json()["access_token"]
 h = {"Authorization": f"Bearer {token}"}
-print(f"Logged in as poc-user")
+print("Logged in as poc-user")
 
 # Create 3 demo events with real Chinese business scenarios
 events = [
@@ -19,13 +22,13 @@ events = [
         "raw_text": "今天下午2点和张伟总在望京SOHO星巴克见面聊了新项目合作。张总说他们公司正在做数字化转型，需要一套数据中台方案，预算80-100万。要求下周五（6月20日）前提交技术方案和报价。还介绍了技术负责人李明给我对接。另外张总说如果本周能先出初步架构图更好，他下周二要给CEO汇报。"
     },
     {
-        "event_type": "call", 
+        "event_type": "call",
         "source": "manual",
         "raw_text": "刚才给王芳打了个电话跟进上个月CRM系统项目进度。王芳说客户催得比较急问能不能加两个人手。她还提了一个新需求：客户希望增加移动端审批流程模块（合同里没有）。我承诺明天中午12点前给她回复评估结果和额外收费方案。"
     },
     {
         "event_type": "wechat_forward",
-        "source": "manual", 
+        "source": "manual",
         "raw_text": "微信收到陈建国转发消息，是他们HR总监刘洋发的。刘洋说公司想找供应商做年度培训体系搭建，预算50万内，主要需要领导力培训和新人入职培训两个方向。陈建国推荐了我们。刘洋希望下周安排线上会议聊具体需求。我回复说方便时联系我确定时间。"
     },
 ]
@@ -37,7 +40,7 @@ for i, evt in enumerate(events):
     assert r.status_code in (200, 201), f"Failed: {r.status_code} {r.text[:200]}"
     event_id = r.json().get("id") or r.json().get("event", {}).get("id")
     print(f"      Event ID: {event_id}")
-    
+
     # Wait for pipeline
     for j in range(30):
         time.sleep(2)
@@ -50,7 +53,7 @@ for i, evt in enumerate(events):
             if j % 3 == 2:
                 print(f"      ...processing ({j*2}s)")
     else:
-        print(f"      Pipeline timeout")
+        print("      Pipeline timeout")
 
 # Check results
 print("\n=== Results for poc-user ===")

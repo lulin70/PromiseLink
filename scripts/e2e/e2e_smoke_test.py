@@ -4,8 +4,8 @@
 import json
 import sys
 import time
-import urllib.request
 import urllib.error
+import urllib.request
 
 BASE = "http://localhost:8002/api/v1"
 USER_ID = "e2e-test-user-001"
@@ -86,7 +86,6 @@ def main():
     results.append(("Data Export", ok, f"status={status}, events={len(data.get('events',[]))}, entities={len(data.get('entities',[]))}, todos={len(data.get('todos',[]))}"))
 
     # 10. File upload (txt)
-    import io
     boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
     txt_content = "会议纪要：和李总讨论了Q3销售策略，李总希望我们提供定制化方案。"
     body = (

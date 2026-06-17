@@ -20,3 +20,42 @@ $text-secondary: #8a8a8a;
 $border-color: #e0ddd8;
 $bg-white: #ffffff;
 $bg-gray: #f5f3f0;
+
+// ── Responsive breakpoints (desktop adaptation) ──
+// Taro H5: rpx auto-converts to vw on mobile, but desktop needs max-width container
+@media screen and (min-width: 768px) {
+  // Tablet & desktop: constrain content width, center align
+  page {
+    max-width: 750px;
+    margin: 0 auto;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+    min-height: 100vh;
+  }
+
+  // Scale up font sizes slightly for larger screens
+  .page-index,
+  .page-events,
+  .page-entities,
+  .page-promises,
+  .page-todos,
+  .page-input {
+    max-width: 750px;
+    margin: 0 auto;
+  }
+}
+
+@media screen and (min-width: 1024px) {
+  // Large desktop: wider container for better readability
+  page {
+    max-width: 900px;
+  }
+
+  .page-index,
+  .page-events,
+  .page-entities,
+  .page-promises,
+  .page-todos,
+  .page-input {
+    max-width: 900px;
+  }
+}

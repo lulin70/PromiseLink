@@ -3,7 +3,10 @@
 End-to-end test simulating WeChat Mini Program user journey.
 Tests: Login → Create Event → Check Entities → Check Todos → Complete Todo
 """
-import urllib.request, json, sys, time, os
+import json
+import os
+import time
+import urllib.request
 
 BASE = "http://localhost:8000/api/v1"
 
@@ -103,7 +106,7 @@ def main():
                 # Then set to done
                 status, data = api("PATCH", f"/todos/{todo_id}", {"status": "done"}, token=token)
                 if status == 200:
-                    print(f"    OK - todo marked as done")
+                    print("    OK - todo marked as done")
                 else:
                     print(f"    WARN - done transition failed: {status}")
             else:

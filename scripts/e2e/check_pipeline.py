@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Check event pipeline status"""
-import httpx, asyncio, json, sys
+import asyncio
+
+import httpx
+
 
 async def check():
     async with httpx.AsyncClient(base_url="http://localhost:8002", timeout=60) as c:

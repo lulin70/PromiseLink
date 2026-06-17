@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """PromiseLink PoC E2E Acceptance Test — 模拟许总的核心用户旅程"""
-import asyncio, json, uuid, os
+import asyncio
+import os
+import uuid
+
 import httpx
 
 BASE = "http://localhost:8001/api/v1"
@@ -74,7 +77,7 @@ async def main():
             "title": "Discuss deployment with client"
         })
         assert r.status_code in (200, 201), f"Create event2 failed: {r.status_code}"
-        print(f"  OK - Second event recorded")
+        print("  OK - Second event recorded")
 
         # Step 7: View updated todos
         print("\n[Step 7] View updated todos")
@@ -88,7 +91,7 @@ async def main():
         print("\n[Step 8] Privacy data summary")
         r = await c.get(f"{BASE}/privacy/data-summary", headers=h)
         if r.status_code == 200:
-            print(f"  OK - data summary retrieved")
+            print("  OK - data summary retrieved")
         else:
             print(f"  WARN - status: {r.status_code}")
 

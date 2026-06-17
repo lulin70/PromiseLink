@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Verify batch events were processed by pipeline."""
-import urllib.request, json, sys, os
+import json
+import os
+import urllib.request
 
 BASE = "http://localhost:8000/api/v1"
 

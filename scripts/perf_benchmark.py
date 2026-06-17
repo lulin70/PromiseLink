@@ -5,11 +5,12 @@ Tests P95 latency < 500ms for all core endpoints.
 Rate limit: 60 req/min for authenticated users. We use 10 req/endpoint with delays.
 """
 import asyncio
-import time
-import statistics
-import uuid
-import httpx
 import os
+import statistics
+import time
+import uuid
+
+import httpx
 
 BASE_URL = "http://localhost:8001/api/v1"
 POC_SECRET = os.environ.get("POC_SECRET", "promiselink2026")

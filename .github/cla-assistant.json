@@ -1,0 +1,9 @@
+{
+  "template": "cla-assistant/cla-agreement",
+  "signed": [],
+  "allowList": ["lulin70"],
+  "threshold": 5,
+  "label": "cla: yes",
+  "requireLabel": "cla: yes",
+  "enabled": true
+}

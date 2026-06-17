@@ -10,7 +10,6 @@ Usage:
 """
 
 import asyncio
-import json
 import sys
 
 import httpx
@@ -271,7 +270,7 @@ async def seed():
             sys.exit(1)
         token = r.json()["access_token"]
         headers = {"Authorization": f"Bearer {token}"}
-        print(f"\n  登录成功")
+        print("\n  登录成功")
 
         # Check existing data
         r = await c.get(f"{BASE_URL}/entities", headers=headers)
@@ -299,11 +298,11 @@ async def seed():
 
             # Wait for pipeline between events (avoid overwhelming LLM API)
             if i < len(EVENTS) - 1:
-                print(f"  等待Pipeline处理...")
+                print("  等待Pipeline处理...")
                 await asyncio.sleep(30)
 
         # Final wait for last event pipeline
-        print(f"\n  等待最后一条事件Pipeline处理...")
+        print("\n  等待最后一条事件Pipeline处理...")
         await asyncio.sleep(40)
 
         # Show results

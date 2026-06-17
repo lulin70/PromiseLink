@@ -3,7 +3,12 @@
 PromiseLink PoC Demo - 模拟许总的真实使用场景
 完整用户旅程：登录 → 记录交流 → 查看待办 → 查看关系 → 记录承诺 → 完成待办
 """
-import httpx, uuid, time, json, os
+import json
+import os
+import time
+import uuid
+
+import httpx
 
 BASE = "http://localhost:8001/api/v1"
 SECRET = os.environ.get("POC_SECRET", "promiselink2026")
@@ -194,7 +199,7 @@ def demo():
                 r = c.patch(f"{BASE}/todos/{todo_id}", headers=h, json={"status": "done"})
                 print(f"  [PATCH /todos/{todo_id[:8]} -> done] status={r.status_code}")
                 if r.status_code == 200:
-                    print(f"  待办已标记为完成!")
+                    print("  待办已标记为完成!")
                 else:
                     print(f"  响应: {r.text[:100]}")
 
@@ -225,11 +230,11 @@ def demo():
         total_todos = r.json().get("total", 0)
         completed = sum(1 for t in r.json().get("items", []) if t.get("status") == "done")
 
-        print(f"  +──────────────────────────────────────+")
+        print("  +──────────────────────────────────────+")
         print(f"  | 事件记录:  {total_events:>3} 条                     |")
         print(f"  | 联系人:    {total_entities:>3} 人                     |")
         print(f"  | 待办事项:  {total_todos:>3} 项 (已完成: {completed})       |")
-        print(f"  +──────────────────────────────────────+")
+        print("  +──────────────────────────────────────+")
 
         # ═══════════════════════════════════════════════════════════
         # Final

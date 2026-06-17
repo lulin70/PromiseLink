@@ -4,9 +4,10 @@
 Verifies key security controls are in place.
 """
 import asyncio
-import uuid
-import httpx
 import os
+import uuid
+
+import httpx
 
 BASE_URL = "http://localhost:8001/api/v1"
 POC_SECRET = os.environ.get("POC_SECRET", "promiselink2026")
