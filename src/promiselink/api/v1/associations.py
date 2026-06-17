@@ -75,7 +75,7 @@ async def list_associations(
     result = await session.execute(stmt)
     associations = result.scalars().all()
 
-    return PaginatedResponse(items=associations, total=total, limit=min(limit, 500), offset=offset)
+    return PaginatedResponse(items=list(associations), total=total, limit=min(limit, 500), offset=offset)
 
 
 @router.get(

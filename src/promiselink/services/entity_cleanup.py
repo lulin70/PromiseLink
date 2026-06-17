@@ -107,7 +107,7 @@ async def delete_event_cascade(
                 Todo.related_entity_id.in_(entity_ids),
             )
         )
-        deleted["todos"] += todo_entity_result.rowcount
+        deleted["todos"] += todo_entity_result.rowcount  # type: ignore[attr-defined]
 
         # Delete entities
         entity_del_result = await session.execute(

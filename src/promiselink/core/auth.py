@@ -2,7 +2,7 @@
 
 import os
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Any, cast
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -128,7 +128,7 @@ def create_access_token(user_id: str) -> str:
     return encoded_jwt  # type: ignore[no-any-return]
 
 
-def verify_token(token: str) -> dict:
+def verify_token(token: str) -> dict[Any, Any]:
     """Verify and decode a JWT token. Returns the payload dict."""
     settings = get_settings()
     try:
@@ -139,7 +139,7 @@ def verify_token(token: str) -> dict:
             issuer="promiselink",
             audience="promiselink-api",
         )
-        return payload
+        return cast(dict[Any, Any], payload)
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

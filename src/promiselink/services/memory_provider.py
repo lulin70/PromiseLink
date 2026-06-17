@@ -23,7 +23,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 
 from promiselink.core.logging import get_logger
 
@@ -260,7 +260,7 @@ class FileStoreProvider:
         path = self._entity_index_path()
         if path.exists():
             with open(path, encoding="utf-8") as f:
-                return json.load(f)
+                return cast(dict[str, list[str]], json.load(f))
         return {}
 
     def _save_entity_index(self, index: dict[str, list[str]]) -> None:

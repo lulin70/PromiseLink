@@ -217,7 +217,7 @@ export default function EventsPage() {
         content: '确认删除此事件？',
         confirmText: '删除',
         cancelText: '取消',
-        confirmColor: '#ff4d4f',
+        confirmColor: '#C4A7A0',
       })
       if (!res.confirm) return
       await deleteEvent(eventId)

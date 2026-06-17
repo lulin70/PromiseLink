@@ -30,9 +30,9 @@ const TYPE_COLORS: Record<string, string> = {
 }
 
 const PRIORITY_MAP: Record<number, { label: string; color: string }> = {
-  1: { label: '紧急', color: '#ff4d4f' },
+  1: { label: '紧急', color: '#C4A7A0' },
   2: { label: '高', color: '#fa8c16' },
-  3: { label: '中', color: '#1890ff' },
+  3: { label: '中', color: '#7B9EA8' },
   4: { label: '低', color: '#999' },
   5: { label: '低', color: '#d9d9d9' },
 }
@@ -144,7 +144,7 @@ export default function TodosPage() {
         content: '确认删除此待办？',
         confirmText: '删除',
         cancelText: '取消',
-        confirmColor: '#ff4d4f',
+        confirmColor: '#C4A7A0',
       })
       if (!res.confirm) return
       await deleteTodo(todoId)

@@ -1,6 +1,7 @@
 """Smart Follow-up Reminder API endpoints (F-69)."""
 
 from datetime import UTC, datetime, time, timedelta
+from typing import cast
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -197,7 +198,7 @@ async def get_daily_reminders(
     return DailyReminderResponse(
         items=items,
         total_pending=total_pending,
-        fatigue_remaining=fatigue_remaining - len(items),
+        fatigue_remaining=cast(int, fatigue_remaining) - len(items),
         is_quiet_hours=quiet,
     )
 
@@ -251,9 +252,9 @@ async def take_reminder_action(
     )
     log_entry = log_result.scalar_one_or_none()
     if log_entry:
-        log_entry.action_taken = req.action
+        log_entry.action_taken = req.action  # type: ignore[assignment]
         latency = (datetime.now(UTC) - log_entry.sent_at).total_seconds()
-        log_entry.response_latency_seconds = int(latency)
+        log_entry.response_latency_seconds = int(latency)  # type: ignore[assignment]
 
     await session.commit()
 

@@ -1,7 +1,7 @@
 """Credit score calculation service with batch query support."""
 
 
-from sqlalchemy import func, select
+from sqlalchemy import Integer, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.models.todo import Todo
@@ -38,7 +38,7 @@ class CreditScoreService:
                 Todo.related_entity_id,
                 func.count().label("total"),
                 func.sum(
-                    func.cast(Todo.fulfillment_status == "fulfilled", type_=None)
+                    func.cast(Todo.fulfillment_status == "fulfilled", type_=Integer)
                 ).label("fulfilled"),
             )
             .where(
@@ -57,7 +57,7 @@ class CreditScoreService:
                 Todo.related_entity_id,
                 func.count().label("total"),
                 func.sum(
-                    func.cast(Todo.fulfillment_status == "fulfilled", type_=None)
+                    func.cast(Todo.fulfillment_status == "fulfilled", type_=Integer)
                 ).label("fulfilled"),
             )
             .where(
