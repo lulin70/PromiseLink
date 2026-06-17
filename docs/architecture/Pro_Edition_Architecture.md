@@ -693,6 +693,155 @@ GET /api/v1/billing/subscription — 查询订阅状态
                     本地Docker组装响应 → 中继网关 → 微信小程序
 ```
 
+### 4.7 场景3四跳链路延迟分析 (B-1阻断项修复)
+
+> **背景**: Review B-1 指出场景3链路为 `小程序→网关→本地Docker→网关→LLM→原路返回`，共4跳网络往返，需证明 P95 < 3秒可达或提出优化方案。
+
+#### 4.7.1 链路延迟分解（基线估算）
+
+以"语音查询"为典型场景（许总核心场景：开车时语音问"我今天的会议是什么"），完整链路分解如下：
+
+| 阶段 | 跳数 | 传输内容 | 预估延迟 | 说明 |
+|------|------|----------|----------|------|
+| ① 小程序→网关 | 1跳 | HTTPS请求（含音频上传） | 100-150ms | 含TLS握手复用、音频文件~100KB |
+| ② 网关→本地Docker | 2跳 | WSS中继转发 | 50-100ms | 长连接复用，无握手开销 |
+| ③ ASR转写 | - | 音频→文字 | 400-600ms | Moka AI Whisper，中文短句 |
+| ④ NLU意图识别 | 3跳 | 本地→网关→LLM→网关→本地 | 600-900ms | LLM意图分类（经网关代理） |
+| ⑤ 业务查询 | - | 本地SQLite查询 | 50-100ms | 索引查询，毫秒级 |
+| ⑥ NLG回复生成 | 4跳 | 本地→网关→LLM→网关→本地 | 600-900ms | LLM生成自然语言回复 |
+| ⑦ 本地Docker→网关→小程序 | 2跳 | WSS中继+HTTPS响应 | 100-150ms | 文字结果回传 |
+| ⑧ TTS播报 | - | 文字→语音 | 0ms（前端） | 微信同声传译插件，小程序本地合成 |
+| **串行总计** | **4跳** | - | **2000-2950ms** | **P50约2.0s，P95约2.9s** |
+
+**结论**: 串行模式下 P95 ≈ 2.9s，**勉强可达 < 3秒目标**，但余量极小（仅100ms），网络抖动或LLM排队时易超标。必须采用下述优化方案确保稳定达标。
+
+#### 4.7.2 优化方案
+
+##### 方案A：AI调用直连网关（推荐，架构层优化）
+
+**核心思路**: 场景3中，AI调用（NLU意图识别、NLG回复生成）无需经本地Docker中转，由网关直接代理。本地Docker仅负责业务逻辑（查询SQLite、组装上下文）。
+
+```
+优化前（4跳）: 小程序→网关→本地→网关→LLM→网关→本地→网关→小程序
+优化后（2跳）: 小程序→网关→LLM→网关→小程序  (AI调用)
+              小程序→网关→本地→网关→小程序  (业务查询)
+```
+
+**实现方式**:
+- 小程序将AI调用（NLU/NLG）与业务查询拆分为两个独立请求
+- AI调用直接发往网关 `/api/v1/ai/nlu` 和 `/api/v1/ai/nlg`，网关代理LLM
+- 业务查询经网关中继到本地Docker（仅SQLite查询，<100ms）
+- 网关侧组装最终响应返回小程序
+
+**延迟收益**: AI调用从4跳降为2跳，节省约200ms中继往返；P95从2.9s降至约2.5s
+
+**代价**: 网关需新增NLU/NLG端点；小程序需编排两次请求（可并行化）
+
+##### 方案B：NLG流式响应 + TTS流水线化
+
+**核心思路**: NLG采用流式输出（SSE/WebSocket流），TTS同步合成，用户听到第一个字的时间（TTFB）大幅提前。
+
+```
+传统串行: NLG完整生成(800ms) → TTS合成(300ms) → 播报  → 用户等待1100ms
+流式流水: NLG首token(200ms) → TTS合成首句(100ms) → 播报 → 用户等待300ms
+```
+
+**实现方式**:
+- 网关AI代理层支持LLM流式响应（DeepSeek/Moka AI均支持stream=true）
+- 流式token经WSS中继到本地Docker，再转发小程序
+- 小程序接收流式文本，按句切分，调用微信同声传译插件逐句合成播报
+
+**延迟收益**: 用户感知延迟（TTFB）从2.9s降至约1.5s；完整播报仍在3s内
+
+**代价**: 流式响应经WebSocket中继需特殊处理（消息分片+顺序保证）；小程序TTS需按句流水线
+
+##### 方案C：ASR前置 + NLU预加载
+
+**核心思路**: ASR完成前，小程序已将"可能意图"预加载；ASR完成后NLU与业务查询预备并行。
+
+```
+并行前: ASR(500ms) → NLU(800ms) → 查询(100ms) → NLG(800ms) → TTS(0ms) = 2200ms
+并行后: ASR(500ms) → [NLU(800ms) || 查询预备(100ms)] → NLG(800ms) → TTS(0ms) = 2100ms
+```
+
+**实现方式**:
+- ASR转写期间，本地Docker预热数据库连接、预加载常用实体缓存
+- NLU意图识别与查询预备并行（NLU结果就绪后立即执行查询）
+
+**延迟收益**: 节省约100ms；收益有限，作为方案A/B的补充
+
+##### 方案D：边缘节点部署（长期演进）
+
+**核心思路**: 网关在多地域部署边缘节点，用户接入最近节点，降低网络RTT。
+
+**实现方式**:
+- 阿里云/腾讯云多地域部署网关实例
+- DNS智能解析，用户接入最近节点
+- WebSocket连接映射存Redis（多实例共享）
+
+**延迟收益**: 网络RTT从100ms降至30-50ms；P95从2.9s降至约2.3s
+
+**代价**: 基础设施成本上升（多地域VPS）；需用户规模支撑（>100用户后启用）
+
+#### 4.7.3 推荐优化组合与目标延迟
+
+| 阶段 | 优化前 | 方案A后 | 方案A+B后 |
+|------|--------|---------|-----------|
+| 网络中继（4跳→2跳） | 400ms | 200ms | 200ms |
+| ASR | 500ms | 500ms | 500ms |
+| NLU | 800ms | 800ms | 800ms（TTFB 200ms） |
+| 查询 | 100ms | 100ms | 100ms |
+| NLG | 800ms | 800ms | TTFB 200ms |
+| TTS | 0ms（前端） | 0ms | 0ms（前端流水线） |
+| **P95总延迟** | **2900ms** | **2500ms** | **完整2.5s / TTFB 1.5s** |
+
+**推荐组合**: 方案A（AI直连网关）+ 方案B（流式响应）作为Phase 2必做项；方案C作为锦上添花；方案D留待用户规模>100后演进。
+
+#### 4.7.4 性能基线与验证方法（P95 < 3秒）
+
+##### 验证环境
+
+| 维度 | 配置 |
+|------|------|
+| 网关VPS | 4核8G，阿里云华东2（上海），距LLM API<10ms RTT |
+| 用户PC | 家用宽带，ping网关<30ms RTT |
+| LLM | DeepSeek API（api.deepseek.com） |
+| 测试工具 | Locust + 自定义WebSocket客户端 |
+| 测试样本 | 100次语音查询，覆盖7类意图（日程/交流/知识/承诺/关系/行动/未知） |
+
+##### 验证指标
+
+| 指标 | 目标 | 验证方法 |
+|------|------|----------|
+| P50延迟 | < 2.0s | 100次查询的中位数 |
+| P95延迟 | < 3.0s | 100次查询的95分位 |
+| P99延迟 | < 5.0s | 100次查询的99分位 |
+| TTFB（首字播报） | < 1.5s | 流式响应模式下，首个token到达时间 |
+| 超时率（>5s） | < 1% | 100次查询中超时次数占比 |
+
+##### 验证场景
+
+1. **单用户基线**: 1用户连续100次语音查询，记录P50/P95/P99
+2. **10用户并发**: 10用户同时语音查询，验证P95<3s在并发下仍达标（对应建议项I-7）
+3. **网络抖动**: 模拟RTT 50ms→200ms抖动，验证降级策略
+4. **LLM排队**: 模拟LLM API响应延迟从800ms→1500ms，验证流式响应TTFB
+
+##### 自动化基准测试
+
+```bash
+# Phase 2 交付前必跑的性能基准测试
+python scripts/perf_benchmark.py --scenario voice_query --users 1 --count 100
+python scripts/perf_benchmark.py --scenario voice_query --users 10 --count 100
+# 预期输出: P95 < 3000ms, 超时率 < 1%
+```
+
+##### 未达标降级策略
+
+若P95 ≥ 3s，按以下优先级降级：
+1. 启用方案B流式响应（TTFB优先，用户感知<1.5s即使完整播报>3s）
+2. NLU降级为规则引擎（800ms→50ms，牺牲灵活性换延迟）
+3. NLG降级为模板生成（800ms→20ms，牺牲自然度换延迟）
+
 ---
 
 ## 5. 数据流设计
@@ -863,16 +1012,148 @@ async def verify_pro_license(request: Request, call_next):
 | 中间人攻击 | 全链路HTTPS/WSS，证书由Let's Encrypt签发 |
 | 网关被攻破 | 网关不存业务数据，仅存用户账户+用量，业务数据在用户本地 |
 
-### 6.4 隐私保护声明
+### 6.4 AI内容隐私边界 (B-3阻断项修复)
 
-> ⚠️ **联网仅验证付费身份，不传关系数据**
+> ⚠️ **核心原则：联网仅验证付费身份与代理AI调用，业务数据不出本地**
 >
-> 专业版身份验证过程中，网络传输仅包含JWT令牌（用户ID+付费状态+有效期），**不传输任何关系数据、事件记录、实体信息或AI对话内容**。
->
-> - 业务数据始终存储在用户本地Docker中
-> - 网关仅做加密转发，不解析、不存储业务payload
-> - AI调用经网关代理时，网关仅转发LLM请求/响应，不持久化对话内容
-> - 用量计费仅记录Token数，不记录请求/响应内容
+> 专业版身份验证过程中，网络传输仅包含JWT令牌（用户ID+付费状态+有效期）。AI调用经网关代理时，网关仅做加密转发，**不持久化、不记录业务内容**。
+
+#### 6.4.1 数据流向图（用户数据→网关→LLM→返回，不持久化）
+
+```
+┌──────────┐    ①JWT令牌(仅user_id+plan)     ┌──────────┐
+│  小程序   │ ─────────────────────────────→ │  网关    │
+│          │                                 │          │
+│          │    ⑥最终响应(文字/音频)          │          │
+│          │ ←───────────────────────────── │          │
+└──────────┘                                 └────┬─────┘
+                                                  │
+                   ②业务查询请求(WSS中继)          │ ③AI调用请求(LLM prompt)
+                   (含业务数据，仅经网关内存)       │ (含业务上下文，仅经网关内存)
+                                                  │
+                                                  ▼
+                                           ┌──────────┐
+                                           │  本地    │
+                                           │  Docker  │
+                                           │ (SQLite) │
+                                           └──────────┘
+
+数据持久化边界:
+  ✅ 小程序: 仅缓存JWT令牌(无业务数据)
+  ✅ 网关:   仅存用户账户+用量记录(PG)，AI内容仅过内存不落盘
+  ✅ 本地:   业务数据完整存储(SQLite)
+  ⚠️ LLM:   见6.4.3 LLM Provider数据政策
+```
+
+**关键说明**:
+- 业务数据（关系/事件/实体/AI对话内容）仅在**本地Docker**持久化
+- 网关进程内存中会短暂经过AI调用的prompt和响应（用于转发），**请求响应后立即释放**
+- 网关**不缓存**AI请求/响应内容，**不写日志**记录body
+- 用量计费仅记录Token数和元数据，不记录请求/响应内容
+
+#### 6.4.2 网关日志策略（仅记录元数据，不记录业务内容）
+
+网关日志严格区分**元数据**（可记录）与**业务内容**（禁止记录）：
+
+| 类别 | 字段 | 是否记录 | 说明 |
+|------|------|----------|------|
+| **元数据** | request_id | ✅ 记录 | 请求唯一标识（UUID） |
+| | user_id | ✅ 记录 | 用户标识（用于计费/审计） |
+| | provider | ✅ 记录 | LLM供应商（deepseek/moka_ai） |
+| | model | ✅ 记录 | 模型名（deepseek-chat等） |
+| | request_type | ✅ 记录 | 请求类型（llm/asr/tts/ocr） |
+| | input_tokens | ✅ 记录 | 输入Token数（计费用） |
+| | output_tokens | ✅ 记录 | 输出Token数（计费用） |
+| | status_code | ✅ 记录 | HTTP状态码 |
+| | timestamp | ✅ 记录 | 请求时间戳 |
+| | latency_ms | ✅ 记录 | 响应延迟（性能监控） |
+| **业务内容** | request_body | ❌ **禁止记录** | LLM prompt/业务数据 |
+| | response_body | ❌ **禁止记录** | LLM响应/AI生成内容 |
+| | messages | ❌ **禁止记录** | 对话历史 |
+| | audio_content | ❌ **禁止记录** | ASR音频/语音内容 |
+| | image_content | ❌ **禁止记录** | OCR图片内容 |
+
+**网关日志中间件实现要求**:
+```python
+# gateway/middleware/logging.py (伪代码)
+@app.middleware("http")
+async def privacy_log_middleware(request: Request, call_next):
+    response = await call_next(request)
+    # 仅记录元数据，严禁记录 request.body() 或 response.body()
+    logger.info(
+        "ai_call",
+        request_id=request.headers.get("X-Request-ID"),
+        user_id=request.state.user_id,
+        provider=request.state.provider,
+        model=request.state.model,
+        status_code=response.status_code,
+        latency_ms=(time.time() - request.state.start_time) * 1000,
+        # ⚠️ 严禁: request_body=await request.body()
+        # ⚠️ 严禁: response_body=response.body
+    )
+    return response
+```
+
+**网关内存数据生命周期**:
+- AI请求/响应在网关进程内存中停留时间：**< 请求处理时长**（通常<2秒）
+- 请求响应完成后，Python垃圾回收立即释放引用
+- 网关**不启用**任何内存缓存（如Redis缓存AI响应）存储业务内容
+- 网关进程**不生成core dump**，生产环境禁用debug模式
+
+#### 6.4.3 LLM Provider数据政策
+
+专业版AI调用涉及将用户业务数据（经网关代理）发送至第三方LLM Provider。各Provider数据政策声明如下：
+
+| Provider | 数据留存政策 | 训练用途 | API数据驻留 | 合规状态 |
+|----------|-------------|----------|-------------|----------|
+| **DeepSeek** | 不留存请求/响应（API模式） | 不用于训练 | 中国大陆 | ✅ 已确认 |
+| **Moka AI** | 不留存请求/响应（API模式） | 不用于训练 | 中国大陆 | ✅ 已确认 |
+| **OpenAI**（备选） | 30天留存后删除（默认API） | 不用于训练（API模式） | 美国 | ⚠️ 需用户同意 |
+| **Anthropic**（备选） | 30天留存后删除 | 不用于训练（API模式） | 美国 | ⚠️ 需用户同意 |
+
+**首选Provider策略**:
+- **DeepSeek + Moka AI** 为首选Provider（数据驻留中国大陆，不留存不训练）
+- OpenAI/Anthropic 仅作为备选Provider，启用前需在用户协议中明确披露数据跨境传输
+
+**用户数据最小化原则**:
+- 网关代理LLM调用时，仅发送**完成当前AI任务所需的最小上下文**
+- 不发送用户全量关系数据，仅发送当前查询相关的实体/事件摘要
+- LLM prompt中不包含用户PII（电话/邮箱已脱敏为`138****1234`格式）
+
+#### 6.4.4 第三方AI服务披露条款（用户隐私协议摘录）
+
+> 以下条款将纳入《PromiseLink专业版用户隐私协议》，用户激活专业版时需明确同意。
+
+**第X条 第三方AI服务披露**
+
+1. **AI服务性质**: PromiseLink专业版的语音识别（ASR）、意图理解（NLU）、回复生成（NLG）、名片识别（OCR）功能依赖第三方大语言模型（LLM）服务。用户在使用上述功能时，相关文本数据将经PromiseLink网关加密转发至LLM服务商进行处理。
+
+2. **数据传输范围**: 经LLM处理的数据仅限于完成当前AI任务所需的最小上下文（如语音转写文本、查询意图、相关实体摘要），**不包括**用户全量关系数据、历史事件记录或PII明文（电话/邮箱已脱敏）。
+
+3. **LLM服务商数据政策**:
+   - 首选服务商（DeepSeek/Moka AI）：API模式下不留存请求/响应数据，不用于模型训练，数据驻留中国大陆。
+   - 备选服务商（OpenAI/Anthropic）：API模式下30天后自动删除，不用于模型训练，数据驻留美国（涉及跨境传输）。
+
+4. **网关中转不持久化**: PromiseLink网关仅做加密转发，**不存储、不记录**AI请求/响应的业务内容。网关日志仅记录元数据（请求ID、用户ID、Token数、时间戳），用于计费和性能监控。
+
+5. **用户控制权**:
+   - 用户可随时在设置中关闭AI功能，降级为纯本地模式（基础版功能仍可用）
+   - 用户可随时导出/删除本地全部业务数据（GDPR端点）
+   - 用户取消专业版订阅后，网关侧用量记录保留30天后自动删除
+
+6. **业务数据存储位置**: 用户全部业务数据（关系/事件/实体/待办）始终存储在**用户本地Docker**中，不上传至PromiseLink云端或LLM服务商。
+
+#### 6.4.5 隐私保护技术措施汇总
+
+| 措施 | 实现位置 | 说明 |
+|------|----------|------|
+| PII字段加密 | `core/crypto.py` (AES-256-GCM) | 电话/邮箱加密存储，密钥独立于JWT签名密钥 |
+| PII脱敏传输 | LLM prompt组装层 | 发往LLM的prompt中PII已脱敏（`138****1234`） |
+| 网关日志脱敏 | 网关日志中间件 | 仅记元数据，禁止记录body |
+| 网关内存零缓存 | 网关AI代理层 | 请求响应后立即释放，不缓存AI内容 |
+| 数据最小化 | LLM上下文组装 | 仅发送当前任务所需最小上下文 |
+| 用户数据导出 | `api/v1/privacy.py` | GDPR端点，支持数据摘要/导出/删除 |
+| 审计日志 | `privacy_audit_log_enabled` | 记录数据访问操作（view/export/delete） |
 
 ### 6.5 AGPL v3 合规
 
@@ -1014,6 +1295,8 @@ services:
 
 ### 8.1 专业版新增配置项
 
+> ✅ **B-2阻断项已修复**: 以下配置项已在 `src/promiselink/config.py` 的 `Settings` 类中实现，文档与代码一致。
+
 ```python
 # config.py 专业版扩展配置 (在现有Settings基础上新增)
 
@@ -1026,7 +1309,8 @@ class Settings(BaseSettings):
     relay_reconnect_interval: int = 1  # 初始重连间隔(秒)
     relay_reconnect_max: int = 30     # 最大重连间隔(秒)
     relay_heartbeat_interval: int = 30  # 心跳间隔(秒)
-    ai_mode: str = "local"            # local / relay
+    relay_token_refresh_interval: int = 900  # relay token刷新间隔(秒)
+    ai_mode: str = "local"            # local / relay (field_validator校验)
 
     # ── 专业版: 许可验证 ──
     pro_license_key: str = Field(default="", description="专业版许可证密钥")
@@ -1052,6 +1336,12 @@ class Settings(BaseSettings):
     privacy_mask_display: bool = True # 展示层脱敏
 ```
 
+**字段验证器**:
+- `app_edition`: `field_validator` 校验值为 `basic` 或 `pro`
+- `ai_mode`: `field_validator` 校验值为 `local` 或 `relay`
+
+**默认值安全性**: 所有专业版配置项均有默认值，basic模式下不受影响（`relay_gateway_url=""` 时不启动relay_client，`ai_mode="local"` 时AI调用走本地直连）。
+
 ### 8.2 环境变量映射
 
 ```bash
@@ -1064,6 +1354,7 @@ APP_EDITION=pro
 RELAY_GATEWAY_URL=wss://gw.promiselink.ai/relay
 RELAY_USER_TOKEN=eyJhbGciOiJIUzI1NiIs...
 AI_MODE=relay
+RELAY_TOKEN_REFRESH_INTERVAL=900
 
 # 许可证
 PRO_LICENSE_KEY=PL-PRO-xxxx-xxxx

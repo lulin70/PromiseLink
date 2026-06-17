@@ -49,6 +49,16 @@ class Settings(BaseSettings):
                 return v_lower
         raise ValueError("app_edition must be either 'basic' or 'pro'")
 
+    @field_validator("ai_mode", mode="before")
+    @classmethod
+    def validate_ai_mode(cls, v: Any) -> str:
+        """Validate ai_mode is either 'local' or 'relay'."""
+        if isinstance(v, str):
+            v_lower = v.lower()
+            if v_lower in ("local", "relay"):
+                return v_lower
+        raise ValueError("ai_mode must be either 'local' or 'relay'")
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, v: Any) -> list[str]:
@@ -131,6 +141,30 @@ class Settings(BaseSettings):
     ocr_provider: str = "moka_ai"
     media_max_audio_size_mb: int = 25
     media_max_image_size_mb: int = 10
+
+    # ── Pro Edition: Gateway Relay ──
+    relay_gateway_url: str = Field(default="", description="网关WSS地址，设置即启用relay_client")
+    relay_user_token: str = Field(default="", description="网关JWT令牌")
+    relay_reconnect_interval: int = 1  # 初始重连间隔(秒)
+    relay_reconnect_max: int = 30  # 最大重连间隔(秒)
+    relay_heartbeat_interval: int = 30  # 心跳间隔(秒)
+    relay_token_refresh_interval: int = 900  # relay token刷新间隔(秒)
+    ai_mode: str = "local"  # local / relay
+
+    # ── Pro Edition: License Verification ──
+    pro_license_key: str = Field(default="", description="专业版许可证密钥")
+
+    # ── Pro Edition: Email Sync ──
+    email_imap_host: str = ""
+    email_imap_port: int = 993
+    email_imap_ssl: bool = True
+    email_username: str = ""
+    email_password: str = ""  # 应用专用密码
+    email_sync_interval: int = 300  # 同步间隔(秒)，0=手动
+
+    # ── Pro Edition: Privacy Data Management ──
+    privacy_audit_log_enabled: bool = True
+    privacy_mask_display: bool = True  # 展示层脱敏
 
     # Rate Limiting (basic版适当放宽)
     rate_limit_enabled: bool = True
