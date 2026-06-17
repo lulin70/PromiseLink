@@ -8,26 +8,29 @@ with LLM calls mocked out. No external services required.
 """
 
 import base64
-import io
 import json
 import os
 import uuid
-from unittest.mock import patch
+from datetime import UTC
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event as sa_event, select
+from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from promiselink.core.auth import create_access_token, get_current_user_id
-from promiselink.core.crypto import PII_PREFIX, decrypt_value, encrypt_pii_in_properties, encrypt_value
+from promiselink.core.crypto import (
+    PII_PREFIX,
+    decrypt_value,
+    encrypt_pii_in_properties,
+    encrypt_value,
+)
 from promiselink.core.text_utils import sanitize_llm_input
 from promiselink.database import Base, get_async_session
 from promiselink.main import app
 from promiselink.models.entity import Entity
 from promiselink.models.event import Event
-from promiselink.models.todo import Todo
 
 # ── Constants ──
 
@@ -262,9 +265,9 @@ class TestVectorInjection:
         Test that malicious embedding vectors (wrong dimensions, NaN, etc.)
         are handled gracefully by the SemanticSearchEngine.
         """
-        import tempfile
-        from promiselink.services.semantic_search import SemanticSearchEngine
         from unittest.mock import AsyncMock
+
+        from promiselink.services.semantic_search import SemanticSearchEngine
 
         # Use a temp file so the SQLite table persists across connections
         db_file = str(tmp_path / "vec_test.db")
@@ -295,8 +298,9 @@ class TestVectorInjection:
         Test that search results are properly scoped to the requesting user,
         preventing cross-user data leakage through search.
         """
-        from promiselink.services.semantic_search import SemanticSearchEngine
         from unittest.mock import AsyncMock
+
+        from promiselink.services.semantic_search import SemanticSearchEngine
 
         db_file = str(tmp_path / "vec_poison_test.db")
 
@@ -391,7 +395,7 @@ class TestCSVImportSecurity:
         """
         # CSV with UTF-8 BOM
         bom = b"\xef\xbb\xbf"
-        csv_content = bom + "name,company,title\n张三,测试公司,工程师\n".encode("utf-8")
+        csv_content = bom + "name,company,title\n张三,测试公司,工程师\n".encode()
 
         resp = await client.post(
             f"{API_PREFIX}/import/csv",
@@ -545,13 +549,14 @@ class TestDataExportSecurity:
 
         # Create a tampered token (modify user_id claim)
         from jose import jwt
+
         from promiselink.config import get_settings
         settings = get_settings()
 
         tampered_payload = {
             "sub": OTHER_USER_ID,  # Different user
-            "iat": datetime.now(timezone.utc),
-            "exp": datetime.now(timezone.utc) + timedelta(minutes=30),
+            "iat": datetime.now(UTC),
+            "exp": datetime.now(UTC) + timedelta(minutes=30),
             "iss": "promiselink",
             "aud": "promiselink-api",
         }
@@ -587,4 +592,4 @@ class TestDataExportSecurity:
 
 
 # Need these imports for the ticket replay test
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta

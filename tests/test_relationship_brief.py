@@ -19,7 +19,7 @@ Covers:
 """
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,7 +32,6 @@ from promiselink.services.relationship_brief_service import (
     BriefGenerationResult,
     RelationshipBriefService,
 )
-
 
 # ── Helper Functions ──────────────────────────────────────────
 
@@ -97,7 +96,7 @@ def make_event(
         source="test",
         title=title,
         raw_text=raw_text,
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         status="completed",
     )
 
@@ -207,7 +206,7 @@ class TestUpdateBriefFromEvent:
                 todo_type="promise",
                 title="发送报价单",
                 action_type="my_promise",
-                due_date=datetime.now(timezone.utc) + timedelta(days=3),
+                due_date=datetime.now(UTC) + timedelta(days=3),
             ),
             make_todo(
                 todo_type="followup",
@@ -265,7 +264,7 @@ class TestCalculateStrengthScore:
             "their_concerns": ["成本", "稳定性"],
             "my_contributions": ["分享报告"],
             "last_interaction": {
-                "date": datetime.now(timezone.utc).isoformat(),
+                "date": datetime.now(UTC).isoformat(),
             },
         }
         score = RelationshipBriefService._calculate_strength_score(data)
@@ -289,12 +288,12 @@ class TestGenerateNextActions:
 
     def test_overdue_promise_priority_reminder(self):
         """Test 8: Overdue my_promise triggers high-priority reminder."""
-        past_due = datetime.now(timezone.utc) - timedelta(days=2)
+        past_due = datetime.now(UTC) - timedelta(days=2)
         data = {
             "basic_info": {"name": "张三"},
             "relationship_stage": "value_response",
             "last_interaction": {
-                "date": datetime.now(timezone.utc).isoformat(),
+                "date": datetime.now(UTC).isoformat(),
             },
             "open_promises": {
                 "my_promises": [
@@ -382,8 +381,9 @@ TEST_USER_ID = "00000000-0000-0000-0000-000000000001"
 def api_client(db_session: AsyncSession):
     """Create an httpx AsyncClient with DB dependency overridden."""
     from httpx import ASGITransport, AsyncClient
-    from promiselink.database import get_async_session
+
     from promiselink.core.auth import get_current_user_id
+    from promiselink.database import get_async_session
     from promiselink.main import app
 
     app.dependency_overrides[get_async_session] = lambda: db_session  # type: ignore[return-value]
@@ -548,8 +548,8 @@ class TestAPIRBAC:
         await db_session.commit()
 
         # Switch auth to a different user
-        from promiselink.main import app as main_app
         from promiselink.core.auth import get_current_user_id
+        from promiselink.main import app as main_app
 
         other_user_id = "99999999-9999-9999-9999-999999999999"
         main_app.dependency_overrides[get_current_user_id] = lambda: other_user_id
@@ -612,7 +612,7 @@ class TestGenerateNextActionsMultipleRules:
 
     def test_stale_interaction_triggers_contact_action(self):
         """Last interaction > 7 days ago should suggest contacting."""
-        old_date = datetime.now(timezone.utc) - timedelta(days=14)
+        old_date = datetime.now(UTC) - timedelta(days=14)
         data = {
             "basic_info": {"name": "王五"},
             "relationship_stage": "value_response",
@@ -632,7 +632,7 @@ class TestGenerateNextActionsMultipleRules:
             "basic_info": {"name": "赵六"},
             "relationship_stage": "understanding_needs",
             "last_interaction": {
-                "date": datetime.now(timezone.utc).isoformat(),
+                "date": datetime.now(UTC).isoformat(),
             },
             "open_promises": {"my_promises": [], "their_promises": []},
             "their_concerns": [],
@@ -645,8 +645,8 @@ class TestGenerateNextActionsMultipleRules:
 
     def test_max_five_actions(self):
         """Should never return more than 5 actions (3 standard + 2 association-based)."""
-        past_due = datetime.now(timezone.utc) - timedelta(days=2)
-        stale_date = datetime.now(timezone.utc) - timedelta(days=14)
+        past_due = datetime.now(UTC) - timedelta(days=2)
+        stale_date = datetime.now(UTC) - timedelta(days=14)
         data = {
             "basic_info": {"name": "钱七"},
             "relationship_stage": "understanding_needs",
@@ -1202,7 +1202,7 @@ class TestNextActionsAssociationBased:
             "basic_info": {"name": "张三"},
             "relationship_stage": "value_response",
             "last_interaction": {
-                "date": datetime.now(timezone.utc).isoformat(),
+                "date": datetime.now(UTC).isoformat(),
             },
             "open_promises": {"my_promises": [], "their_promises": []},
             "their_concerns": [],
@@ -1227,7 +1227,7 @@ class TestNextActionsAssociationBased:
             "basic_info": {"name": "供应商A"},
             "relationship_stage": "value_response",
             "last_interaction": {
-                "date": datetime.now(timezone.utc).isoformat(),
+                "date": datetime.now(UTC).isoformat(),
             },
             "open_promises": {"my_promises": [], "their_promises": []},
             "their_concerns": [],
@@ -1260,7 +1260,7 @@ class TestNextActionsAssociationBased:
             "basic_info": {"name": "测试人"},
             "relationship_stage": "new_connection",
             "last_interaction": {
-                "date": datetime.now(timezone.utc).isoformat(),
+                "date": datetime.now(UTC).isoformat(),
             },
             "open_promises": {"my_promises": [], "their_promises": []},
             "their_concerns": [],

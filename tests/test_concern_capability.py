@@ -1,17 +1,13 @@
 """Tests for F-53: concern/capability enhanced extraction."""
 
 import uuid
-from unittest.mock import AsyncMock, MagicMock
-
-import pytest
 
 from promiselink.models.entity import Entity
-from promiselink.services.entity_extractor import EntityExtractor, ExtractedPerson
-from promiselink.services.llm_client import LLMClient
 from promiselink.prompts.entity_extraction import (
     TEMPLATE_1_CARD_EXTRACTION,
     TEMPLATE_2_CONVERSATION_EXTRACTION,
 )
+from promiselink.services.entity_extractor import EntityExtractor, ExtractedPerson
 
 
 def test_extracted_person_has_concern_capability_fields():

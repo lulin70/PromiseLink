@@ -13,10 +13,10 @@ from fastapi import APIRouter, Depends
 
 from promiselink.api.dependencies import rate_limit_dependency
 from promiselink.api.v1.dashboard_day_view import router as day_view_router
-from promiselink.api.v1.dashboard_range_view import router as range_view_router
 from promiselink.api.v1.dashboard_morning_brief import router as morning_brief_router
-from promiselink.api.v1.dashboard_supply_demand import router as supply_demand_router
+from promiselink.api.v1.dashboard_range_view import router as range_view_router
 from promiselink.api.v1.dashboard_relationship_health import router as relationship_health_router
+from promiselink.api.v1.dashboard_supply_demand import router as supply_demand_router
 
 router = APIRouter(
     prefix="/dashboard",

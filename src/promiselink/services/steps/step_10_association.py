@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import time
 
-from sqlalchemy import select
-
 from promiselink.core.logging import get_logger
 from promiselink.services.steps.context import PipelineContext, PipelineStep
 
@@ -19,6 +17,7 @@ class Step10_AssociationDiscovery(PipelineStep):
 
     async def execute(self, context: PipelineContext) -> PipelineContext:
         from promiselink.database import AsyncSessionLocal
+
         # Import from event_pipeline to preserve test-patch compatibility
         from promiselink.services.event_pipeline import AssociationDiscoveryEngine
 
@@ -26,6 +25,8 @@ class Step10_AssociationDiscovery(PipelineStep):
         user_id = context.user_id
         entities = context.entities
         merged_ids = context.merged_entity_ids
+        assert context.result is not None
+        assert user_id is not None
 
         _t6 = time.monotonic()
         try:

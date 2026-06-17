@@ -1,11 +1,11 @@
 """JWT authentication and authorization utilities."""
 
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
 from promiselink.config import get_settings
@@ -114,18 +114,18 @@ async def get_optional_user_id(
 def create_access_token(user_id: str) -> str:
     """Create a JWT access token for the given user_id."""
     settings = get_settings()
-    expire = datetime.now(timezone.utc) + timedelta(
+    expire = datetime.now(UTC) + timedelta(
         minutes=settings.access_token_expire_minutes
     )
     to_encode = {
         "sub": user_id,
-        "iat": datetime.now(timezone.utc),
+        "iat": datetime.now(UTC),
         "exp": expire,
         "iss": "promiselink",
         "aud": "promiselink-api",
     }
     encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
-    return encoded_jwt
+    return encoded_jwt  # type: ignore[no-any-return]
 
 
 def verify_token(token: str) -> dict:

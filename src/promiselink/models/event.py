@@ -8,13 +8,13 @@ from sqlalchemy import JSON, CheckConstraint, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from promiselink.database import Base, IS_SQLITE, _uuid_default
+from promiselink.database import IS_SQLITE, Base, _uuid_default
 
 
 class Event(Base):
     """
     Event model representing input from card_save, meeting, call, or manual sources.
-    
+
     Schema aligned with Technical Design v1.7 §3.1
     """
 
@@ -36,23 +36,23 @@ class Event(Base):
         index=True,
     )
     event_type: Mapped[str] = mapped_column(
-        String(20), 
+        String(20),
         nullable=False,
         index=True,
     )
     source: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False, default="未命名")
     timestamp: Mapped[datetime] = mapped_column(nullable=False, index=True, default=func.now())
-    
+
     # Raw content (max 500KB as per Technical Design §3.1)
     raw_text: Mapped[str | None] = mapped_column(Text)
-    
+
     # Metadata as JSON (SQLite) or JSONB (PostgreSQL)
     metadata_: Mapped[dict[str, Any] | None] = mapped_column(
         "metadata",
         JSONB if not IS_SQLITE else JSON,
     )
-    
+
     # Processing status
     status: Mapped[str] = mapped_column(
         String(20),
@@ -75,7 +75,7 @@ class Event(Base):
         index=True,
     )
     input_scope_confidence: Mapped[float | None] = mapped_column(nullable=True)
-    
+
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(nullable=False, default=func.now())
     processed_at: Mapped[datetime | None] = mapped_column()

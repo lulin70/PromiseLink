@@ -4,16 +4,13 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-import pytest_asyncio
 
 from promiselink.models.event import Event
 from promiselink.services.input_scope_classifier import (
-    ClassificationResult,
     InputScope,
     InputScopeClassifier,
 )
 from promiselink.services.llm_client import LLMClient
-
 
 # ── Helpers ──
 

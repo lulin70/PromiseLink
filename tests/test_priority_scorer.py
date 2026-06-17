@@ -1,25 +1,22 @@
 """Tests for PriorityScorer — F-51 Dynamic priority scoring."""
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
-import pytest_asyncio
 
 from promiselink.services.priority_scorer import (
     DEFAULT_IMPORTANCE,
-    IMPORTANCE_WEIGHTS,
+    URGENCY_3_DAYS,
+    URGENCY_7_DAYS,
     URGENCY_NO_DUE,
     URGENCY_OVERDUE,
     URGENCY_TODAY,
-    URGENCY_3_DAYS,
-    URGENCY_7_DAYS,
     W_IMPORTANCE,
     W_URGENCY,
     PriorityScorer,
 )
-from tests.conftest import make_user_id, create_test_event
-
+from tests.conftest import create_test_event, make_user_id
 
 # ── Unit tests (pure calculation, no DB) ──
 
@@ -53,7 +50,7 @@ class TestUrgency:
 
     def test_overdue_has_max_urgency(self):
         scorer = PriorityScorer()
-        now = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
+        now = datetime(2026, 6, 6, 12, 0, tzinfo=UTC)
         due = now - timedelta(days=1)
         result = scorer.calculate(todo_type="help", due_date=due, now=now)
         assert result.urgency == URGENCY_OVERDUE
@@ -65,21 +62,21 @@ class TestUrgency:
 
     def test_due_today(self):
         scorer = PriorityScorer()
-        now = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
+        now = datetime(2026, 6, 6, 12, 0, tzinfo=UTC)
         due = now + timedelta(hours=6)
         result = scorer.calculate(todo_type="help", due_date=due, now=now)
         assert result.urgency == URGENCY_TODAY
 
     def test_due_within_3_days(self):
         scorer = PriorityScorer()
-        now = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
+        now = datetime(2026, 6, 6, 12, 0, tzinfo=UTC)
         due = now + timedelta(days=2)
         result = scorer.calculate(todo_type="help", due_date=due, now=now)
         assert result.urgency == URGENCY_3_DAYS
 
     def test_due_within_7_days(self):
         scorer = PriorityScorer()
-        now = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
+        now = datetime(2026, 6, 6, 12, 0, tzinfo=UTC)
         due = now + timedelta(days=5)
         result = scorer.calculate(todo_type="help", due_date=due, now=now)
         assert result.urgency == URGENCY_7_DAYS
@@ -91,7 +88,7 @@ class TestCompositeScore:
     def test_composite_score_formula(self):
         """Verify Score = 0.4*urgency + 0.6*importance (before tiebreaker)."""
         scorer = PriorityScorer()
-        now = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
+        now = datetime(2026, 6, 6, 12, 0, tzinfo=UTC)
         # overdue promise: urgency=1.0, importance=0.9, priority=3 (no adj)
         result = scorer.calculate(
             todo_type="promise",
@@ -105,7 +102,7 @@ class TestCompositeScore:
     def test_score_range_0_to_1(self):
         """Score should always be in [0.0, 1.0] range."""
         scorer = PriorityScorer()
-        now = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
+        now = datetime(2026, 6, 6, 12, 0, tzinfo=UTC)
         # Test extreme combinations
         # Overdue risk with priority=1 → max possible
         result_max = scorer.calculate(
@@ -128,7 +125,7 @@ class TestCompositeScore:
     def test_priority_tiebreaker(self):
         """Lower static priority number should yield slightly higher score."""
         scorer = PriorityScorer()
-        now = datetime(2026, 6, 6, 12, 0, tzinfo=timezone.utc)
+        now = datetime(2026, 6, 6, 12, 0, tzinfo=UTC)
         due = now + timedelta(days=2)
 
         result_p1 = scorer.calculate(
@@ -177,7 +174,7 @@ class TestScoreAndUpdateTodo:
             todo_type="promise",
             title="Test promise",
             priority=2,
-            due_date=datetime.now(timezone.utc) + timedelta(days=1),
+            due_date=datetime.now(UTC) + timedelta(days=1),
             source_event_id=event.id,
         )
         db_session.add(todo)

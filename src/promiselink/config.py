@@ -55,8 +55,8 @@ class Settings(BaseSettings):
         """Parse CORS origins from string or list."""
         if isinstance(v, str):
             import json
-            return json.loads(v)
-        return v
+            return json.loads(v)  # type: ignore[no-any-return]
+        return v  # type: ignore[no-any-return]
 
     # Database
     database_url: str = "sqlite:///./data/promiselink.db"

@@ -5,7 +5,7 @@ All IMAP network calls are mocked; no real server connections.
 
 import email as email_lib
 import imaplib
-from datetime import datetime, timezone
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -15,12 +15,9 @@ from promiselink.services.email_adapter import (
     EmailAdapter,
     EmailMessage,
     _decode_header_value,
-    _extract_attachments,
-    _extract_body_html,
     _extract_body_text,
     parse_email_message,
 )
-
 
 # ── Fixtures ──
 
@@ -54,10 +51,10 @@ def _make_multipart_email(
     attachments: list[tuple[str, bytes]] | None = None,
 ) -> bytes:
     """Build a multipart email with text, html, and optional attachments."""
+    from email import encoders
+    from email.mime.base import MIMEBase
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
-    from email.mime.base import MIMEBase
-    from email import encoders
 
     msg = MIMEMultipart()
     msg["Message-ID"] = message_id

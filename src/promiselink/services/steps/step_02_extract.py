@@ -27,6 +27,9 @@ class Step02_ExtractEntities(PipelineStep):
         event_id = context.event_id
         settings = context.settings
         llm_client = context.llm_client
+        assert context.result is not None
+        assert settings is not None
+        assert llm_client is not None
 
         extraction = None
         entities: list[Entity] = []

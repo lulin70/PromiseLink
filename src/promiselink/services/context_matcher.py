@@ -6,7 +6,8 @@ Boosts Todo priority when the related person has an upcoming meeting/call.
 Design reference: PromiseLink_技术设计_v1.md v2.7 §4.10.1a
 """
 
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
+from typing import cast
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,7 +48,7 @@ class ContextMatcher:
         if not todo.related_entity_id:
             return 0.0
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Step 1: Find upcoming meeting/call events in the next 24h
         # We look for events with event_type meeting/call that were recently created
@@ -73,7 +74,7 @@ class ContextMatcher:
             # Normalize to offset-aware UTC for comparison
             evt_time = e.created_at
             if evt_time.tzinfo is None:
-                evt_time = evt_time.replace(tzinfo=timezone.utc)
+                evt_time = evt_time.replace(tzinfo=UTC)
             if window_start <= evt_time <= window_end:
                 upcoming_events.append(e)
 
@@ -87,12 +88,12 @@ class ContextMatcher:
                 Entity.source_event_id.in_(event_ids),
             )
         )
-        upcoming_entities = result.scalars().all()
+        upcoming_entities = cast(list[Entity], result.scalars().all())
 
         # Step 3: Check if Todo's related entity is in upcoming list
         todo_entity_id = str(todo.related_entity_id)
-        matching_entity = None
-        matching_event = None
+        matching_entity: Entity | None = None
+        matching_event: Event | None = None
 
         for entity in upcoming_entities:
             if str(entity.id) == todo_entity_id:
@@ -111,7 +112,7 @@ class ContextMatcher:
         if matching_event.created_at:
             evt_time = matching_event.created_at
             if evt_time.tzinfo is None:
-                evt_time = evt_time.replace(tzinfo=timezone.utc)
+                evt_time = evt_time.replace(tzinfo=UTC)
             hours_until = max(
                 0, (evt_time - now).total_seconds() / 3600
             )
@@ -145,7 +146,7 @@ class ContextMatcher:
         Returns:
             List of dicts with event, entity, and hours_until info
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         window_end = now + timedelta(hours=self.CONTEXT_WINDOW_HOURS)
 
         result = await session.execute(
@@ -162,7 +163,7 @@ class ContextMatcher:
                 continue
             evt_time = e.created_at
             if evt_time.tzinfo is None:
-                evt_time = evt_time.replace(tzinfo=timezone.utc)
+                evt_time = evt_time.replace(tzinfo=UTC)
             if now <= evt_time <= window_end:
                 hours_until = (evt_time - now).total_seconds() / 3600
 
@@ -170,7 +171,7 @@ class ContextMatcher:
                 result = await session.execute(
                     select(Entity).where(Entity.source_event_id == str(e.id))
                 )
-                entities = result.scalars().all()
+                entities: list[Entity] = list(result.scalars().all())
 
                 upcoming.append({
                     "event_id": str(e.id),

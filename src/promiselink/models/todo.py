@@ -8,13 +8,13 @@ from sqlalchemy import JSON, CheckConstraint, ForeignKey, Index, String, Text, f
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from promiselink.database import Base, IS_SQLITE, _uuid_default
+from promiselink.database import IS_SQLITE, Base, _uuid_default
 
 
 class Todo(Base):
     """
     Todo model representing action items and notifications.
-    
+
     Schema aligned with Technical Design v1.7 §3.1
     Supports 6 todo types (v4.0): 🟢 promise, 🟣 help, 🔵 care, 🟡 followup, ⚪ cooperation_signal, 🔴 risk
     """
@@ -34,14 +34,14 @@ class Todo(Base):
         nullable=False,
         index=True,
     )
-    
+
     # Todo type with emoji indicators
     todo_type: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
-    
+
     # Content
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
-    
+
     # Related entities
     related_entity_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True) if not IS_SQLITE else String(36),
@@ -51,20 +51,20 @@ class Todo(Base):
         UUID(as_uuid=True) if not IS_SQLITE else String(36),
         ForeignKey("associations.id", ondelete="SET NULL"),
     )
-    
+
     # Priority and status
     priority: Mapped[int] = mapped_column(nullable=False, default=3)  # 1=highest, 5=lowest
     status: Mapped[str] = mapped_column(String(15), nullable=False, default="pending", index=True)
-    
+
     # Scheduling
     due_date: Mapped[datetime | None] = mapped_column(index=True)
     reminder_at: Mapped[datetime | None] = mapped_column()
-    
+
     # Additional metadata
     properties: Mapped[dict[str, Any] | None] = mapped_column(
         JSONB if not IS_SQLITE else JSON,
     )
-    
+
     # Source tracking
     source_event_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True) if not IS_SQLITE else String(36),
@@ -182,7 +182,7 @@ class Todo(Base):
 class SnoozeSchedule(Base):
     """
     Snooze schedule for todos with status='snoozed'.
-    
+
     Schema aligned with Technical Design v1.7 §4.6
     """
 
@@ -194,10 +194,10 @@ class SnoozeSchedule(Base):
         ForeignKey("todos.id", ondelete="CASCADE"),
         primary_key=True,
     )
-    
+
     # Original status before snooze
     original_status: Mapped[str] = mapped_column(String(15), nullable=False)
-    
+
     # When to recover
     if not IS_SQLITE:
         recover_at: Mapped[datetime] = mapped_column(
@@ -223,7 +223,7 @@ class SnoozeSchedule(Base):
             return datetime.fromisoformat(self.recover_at)
         except (ValueError, TypeError):
             return None
-    
+
     # Timestamp
     created_at: Mapped[datetime] = mapped_column(nullable=False, default=func.now())
 

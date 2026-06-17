@@ -163,7 +163,7 @@ async def list_todos(
     # Fetch event titles and dates for source_event_ids
     event_ids = [t.source_event_id for t in todos if t.source_event_id]
     event_titles: dict[str, str] = {}
-    event_dates: dict[str, str] = {}
+    event_dates: dict[str, str | None] = {}
     if event_ids:
         from promiselink.models.event import Event
         event_result = await session.execute(

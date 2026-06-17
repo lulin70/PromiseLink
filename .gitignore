@@ -88,3 +88,5 @@ htmlcov/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+*.mp4
+docs/external/**/*.pdf

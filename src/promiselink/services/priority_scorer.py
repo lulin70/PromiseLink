@@ -10,7 +10,7 @@ Design reference: Algorithm_Design_v1.md v2.5 §2.10, Tech Design v2.7 §4.10.1a
 """
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from promiselink.core.logging import get_logger
@@ -121,7 +121,7 @@ class PriorityScorer:
             PriorityScore with composite score and breakdown
         """
         if now is None:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
 
         urgency = self._calc_urgency(due_date, now)
         importance = self._calc_importance(todo_type)
@@ -157,9 +157,9 @@ class PriorityScorer:
 
         # Ensure timezone-aware comparison
         if due_date.tzinfo is None:
-            due_date = due_date.replace(tzinfo=timezone.utc)
+            due_date = due_date.replace(tzinfo=UTC)
         if now.tzinfo is None:
-            now = now.replace(tzinfo=timezone.utc)
+            now = now.replace(tzinfo=UTC)
 
         delta = due_date - now
         days_remaining = delta.total_seconds() / 86400
@@ -203,7 +203,7 @@ class PriorityScorer:
         old_score = todo.dynamic_score
         todo.dynamic_score = result.score
         # Also store score_calculated_at
-        todo.score_calculated_at = datetime.now(timezone.utc)
+        todo.score_calculated_at = datetime.now(UTC)
 
         # Write audit log
         await _write_audit_log(
@@ -250,7 +250,7 @@ class PriorityScorer:
             )
             old_score = todo.dynamic_score
             todo.dynamic_score = result.score
-            todo.score_calculated_at = datetime.now(timezone.utc)
+            todo.score_calculated_at = datetime.now(UTC)
 
             # Write audit log
             await _write_audit_log(
@@ -302,8 +302,8 @@ class PriorityScorerV2(PriorityScorer):
 
     def __init__(self):
         super().__init__()
-        from promiselink.services.dependency_analyzer import DependencyAnalyzer
         from promiselink.services.context_matcher import ContextMatcher
+        from promiselink.services.dependency_analyzer import DependencyAnalyzer
 
         self.dependency_analyzer = DependencyAnalyzer()
         self.context_matcher = ContextMatcher()
@@ -319,7 +319,7 @@ class PriorityScorerV2(PriorityScorer):
         Returns:
             PriorityScore with four-dimensional breakdown
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Dimensions 1-2: PoC baseline
         urgency = self._calc_urgency(todo.due_date, now)
@@ -375,7 +375,7 @@ class PriorityScorerV2(PriorityScorer):
 
         old_score = todo.dynamic_score
         todo.dynamic_score = result.score
-        todo.score_calculated_at = datetime.now(timezone.utc)
+        todo.score_calculated_at = datetime.now(UTC)
 
         # Write audit log
         await _write_audit_log(
@@ -418,7 +418,7 @@ class PriorityScorerV2(PriorityScorer):
             result = await self.score_with_context(todo, session)
             old_score = todo.dynamic_score
             todo.dynamic_score = result.score
-            todo.score_calculated_at = datetime.now(timezone.utc)
+            todo.score_calculated_at = datetime.now(UTC)
 
             # Write audit log
             await _write_audit_log(

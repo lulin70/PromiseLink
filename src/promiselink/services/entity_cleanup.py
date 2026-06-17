@@ -98,7 +98,7 @@ async def delete_event_cascade(
                 ),
             )
         )
-        deleted["associations"] = assoc_result.rowcount
+        deleted["associations"] = assoc_result.rowcount  # type: ignore[attr-defined]
 
         # Delete todos referencing these entities
         todo_entity_result = await session.execute(
@@ -116,7 +116,7 @@ async def delete_event_cascade(
                 Entity.id.in_(entity_ids),
             )
         )
-        deleted["entities"] = entity_del_result.rowcount
+        deleted["entities"] = entity_del_result.rowcount  # type: ignore[attr-defined]
 
     # Always delete todos from this event (even if no entities)
     todo_event_result = await session.execute(
@@ -125,7 +125,7 @@ async def delete_event_cascade(
             Todo.source_event_id == event_id,
         )
     )
-    deleted["todos"] += todo_event_result.rowcount
+    deleted["todos"] += todo_event_result.rowcount  # type: ignore[attr-defined]
 
     logger.info(
         "event_cascade_deleted",

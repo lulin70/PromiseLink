@@ -5,9 +5,7 @@ against an in-memory SQLite database, with LLM calls mocked out.
 """
 
 import uuid
-from datetime import datetime, timedelta
 
-import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event

@@ -1,12 +1,12 @@
 """Unit tests for natural language date parser (natural_date.py)."""
 
-import pytest
 from datetime import date, timedelta
 
+import pytest
+
 from promiselink.core.natural_date import (
-    NaturalDateResult,
-    parse_natural_date,
     _generate_label,
+    parse_natural_date,
 )
 
 

@@ -14,13 +14,13 @@ with LLM calls mocked out. No external services required.
 import json
 import os
 import uuid
-from datetime import date, datetime, timedelta, timezone
-from unittest.mock import patch
+from datetime import UTC, date, datetime
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event as sa_event, select
+from sqlalchemy import event as sa_event
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from promiselink.core.auth import create_access_token, get_current_user_id
@@ -408,7 +408,7 @@ class TestAuthAPIIntegration:
     @pytest.mark.asyncio
     async def test_login_with_poc_secret(self, db_session: AsyncSession):
         """Login via /auth/login with valid poc_secret returns JWT."""
-        from promiselink.config import get_settings, Settings
+        from promiselink.config import get_settings
 
         # Clear cached settings so new instance picks up env var
         get_settings.cache_clear()
@@ -520,8 +520,8 @@ class TestDashboardIntegration:
     ):
         """Day-view returns correct aggregation of events and todos for a date."""
         target_date = "2026-06-04"
-        ts = datetime(2026, 6, 4, 10, 0, 0, tzinfo=timezone.utc)
-        due_dt = datetime(2026, 6, 4, 18, 0, 0, tzinfo=timezone.utc)
+        ts = datetime(2026, 6, 4, 10, 0, 0, tzinfo=UTC)
+        due_dt = datetime(2026, 6, 4, 18, 0, 0, tzinfo=UTC)
 
         # Create events for the target date
         event1 = await insert_event(
@@ -568,8 +568,8 @@ class TestDashboardIntegration:
         self, client: AsyncClient, db_session: AsyncSession
     ):
         """Day-view only shows data for the specified date."""
-        ts_today = datetime(2026, 6, 4, 10, 0, 0, tzinfo=timezone.utc)
-        ts_yesterday = datetime(2026, 6, 3, 10, 0, 0, tzinfo=timezone.utc)
+        ts_today = datetime(2026, 6, 4, 10, 0, 0, tzinfo=UTC)
+        ts_yesterday = datetime(2026, 6, 3, 10, 0, 0, tzinfo=UTC)
 
         await insert_event(db_session, title="今天的事件", timestamp=ts_today)
         await insert_event(db_session, title="昨天的事件", timestamp=ts_yesterday)
@@ -778,7 +778,7 @@ class TestPrivacyAPIIntegration:
         assert resp.status_code == 200
 
         # Verify other user's data still exists
-        from sqlalchemy import select, func
+        from sqlalchemy import func, select
         count = (
             await db_session.execute(
                 select(func.count()).select_from(Event).where(Event.user_id == OTHER_USER_ID)

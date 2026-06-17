@@ -19,8 +19,8 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -37,9 +37,9 @@ from promiselink.models.entity import Entity
 from promiselink.models.event import Event
 from promiselink.models.todo import Todo
 from promiselink.prompts.todo_generation import (
+    TEMPLATE_3_TODO_GENERATION,
     TEMPLATE_11_PROMISE_EXTRACTION,
     TEMPLATE_12_CARE_EXTRACTION,
-    TEMPLATE_3_TODO_GENERATION,
 )
 
 logger = get_logger("promiselink.todo_generator")
@@ -171,7 +171,7 @@ class TodoGenerator:
         persons = self._format_persons(entities)
 
         # Event date for LLM deadline inference
-        event_date = event.timestamp.isoformat() if event.timestamp else datetime.now(timezone.utc).isoformat()
+        event_date = event.timestamp.isoformat() if event.timestamp else datetime.now(UTC).isoformat()
 
         all_generated: list[GeneratedTodo] = []
 
@@ -182,13 +182,13 @@ class TodoGenerator:
             return_exceptions=True,
         )
 
-        promises = promise_care_results[0] if not isinstance(promise_care_results[0], Exception) else []
-        cares = promise_care_results[1] if not isinstance(promise_care_results[1], Exception) else []
+        promises = promise_care_results[0] if not isinstance(promise_care_results[0], BaseException) else []
+        cares = promise_care_results[1] if not isinstance(promise_care_results[1], BaseException) else []
         all_generated.extend(promises)
         all_generated.extend(cares)
 
         for i, r in enumerate(promise_care_results):
-            if isinstance(r, Exception):
+            if isinstance(r, BaseException):
                 logger.warning("parallel_todo_extraction_failed",
                     type=["promises", "cares"][i], error=str(r))
 
@@ -208,11 +208,11 @@ class TodoGenerator:
                 return_exceptions=True,
             )
             for gen_todo in extra_results:
-                if isinstance(gen_todo, Exception):
+                if isinstance(gen_todo, BaseException):
                     logger.warning("parallel_typed_todo_failed",
                         todo_type="unknown", error=str(gen_todo))
                 elif gen_todo is not None:
-                    all_generated.append(gen_todo)
+                    all_generated.append(gen_todo)  # type: ignore[arg-type]
 
         elif event.event_type == "manual":
             gen_followup = await self._generate_typed_todo(
@@ -347,7 +347,7 @@ class TodoGenerator:
             due_date = self._parse_due_date(p.get("suggested_deadline"))
             if not due_date:
                 offset_days = DUE_DATE_OFFSETS.get("promise", 3)
-                due_date = datetime.now(timezone.utc) + timedelta(days=offset_days)
+                due_date = datetime.now(UTC) + timedelta(days=offset_days)
 
             priority_str = p.get("priority", "high")
             generated.append(GeneratedTodo(
@@ -412,7 +412,7 @@ class TodoGenerator:
             priority = priority_map.get(urgency_str, 3)
 
             offset_days = DUE_DATE_OFFSETS.get("care", 7)
-            due_date = datetime.now(timezone.utc) + timedelta(days=offset_days)
+            due_date = datetime.now(UTC) + timedelta(days=offset_days)
 
             title = f"[关注] {c.get('person', '')} — {topic[:20]}" if topic else f"[关注] {detail[:25]}"
             generated.append(GeneratedTodo(
@@ -465,7 +465,7 @@ class TodoGenerator:
                 conversation=conversation,
                 persons=persons,
                 user_context=user_context or "(无)",
-                event_date=event_date or datetime.now(timezone.utc).isoformat(),
+                event_date=event_date or datetime.now(UTC).isoformat(),
             )
             response = await self.llm.call(prompt, max_tokens=1500, temperature=0.3)
             data = extract_json_from_text(response)
@@ -485,7 +485,7 @@ class TodoGenerator:
         due_date = self._parse_due_date(data.get("due_date_suggestion"))
         if not due_date:
             offset_days = DUE_DATE_OFFSETS.get(todo_type, 7)
-            due_date = datetime.now(timezone.utc) + timedelta(days=offset_days)
+            due_date = datetime.now(UTC) + timedelta(days=offset_days)
 
         context_data = data.get("context", {})
 
@@ -631,7 +631,7 @@ class TodoGenerator:
                 title=title[:60],
                 description=relevant_sentence or f"文本中包含承诺关键词「{keyword}」，请确认具体承诺内容",
                 priority=1,
-                due_date=datetime.now(timezone.utc) + timedelta(days=3),
+                due_date=datetime.now(UTC) + timedelta(days=3),
                 properties={
                     "source_text": relevant_sentence[:200] if relevant_sentence else None,
                     "rule_based_fallback": True,
@@ -659,7 +659,7 @@ class TodoGenerator:
                 title=title[:60],
                 description=relevant_sentence or f"文本中包含关注关键词「{keyword}」，请确认对方关注点",
                 priority=3,
-                due_date=datetime.now(timezone.utc) + timedelta(days=7),
+                due_date=datetime.now(UTC) + timedelta(days=7),
                 properties={
                     "source_text": relevant_sentence[:200] if relevant_sentence else None,
                     "rule_based_fallback": True,
@@ -687,7 +687,7 @@ class TodoGenerator:
                 title=title[:60],
                 description=relevant_sentence or f"文本中包含跟进关键词「{keyword}」，请确认跟进事项",
                 priority=3,
-                due_date=datetime.now(timezone.utc) + timedelta(days=7),
+                due_date=datetime.now(UTC) + timedelta(days=7),
                 properties={
                     "source_text": relevant_sentence[:200] if relevant_sentence else None,
                     "rule_based_fallback": True,
@@ -720,7 +720,6 @@ class TodoGenerator:
         Returns:
             True if a similar todo exists, False otherwise.
         """
-        from difflib import SequenceMatcher
 
         # Extract target person from generated todo properties
         props = gen.properties or {}
@@ -788,7 +787,7 @@ class TodoGenerator:
             # Handle various ISO 8601 formats
             dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=UTC)
             return dt
         except (ValueError, TypeError):
             return None

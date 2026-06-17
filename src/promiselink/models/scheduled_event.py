@@ -8,7 +8,7 @@ from sqlalchemy import JSON, CheckConstraint, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from promiselink.database import Base, IS_SQLITE, _uuid_default
+from promiselink.database import IS_SQLITE, Base, _uuid_default
 
 
 class ScheduledEvent(Base):

@@ -8,7 +8,6 @@ from promiselink.core.exceptions import (
     DatabaseError,
     DuplicateEntityError,
     EntityNotFoundError,
-    PromiseLinkError,
     InfrastructureError,
     InvalidTodoTypeError,
     InvalidTransitionError,
@@ -17,6 +16,7 @@ from promiselink.core.exceptions import (
     LLMRateLimitError,
     LLMResponseParseError,
     LLMTimeoutError,
+    PromiseLinkError,
     SensitivityViolationError,
 )
 

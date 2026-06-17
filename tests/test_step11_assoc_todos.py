@@ -2,8 +2,7 @@
 
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 from sqlalchemy import select
@@ -344,7 +343,7 @@ class TestDeduplication:
         )
 
         # Pre-create a pending todo with the same title
-        expected_title = f"约甲和乙同城见面"
+        expected_title = "约甲和乙同城见面"
         existing_todo = Todo(
             id=_uid(),
             user_id=user_id,

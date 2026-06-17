@@ -27,7 +27,6 @@ from promiselink.services.promise_fulfillment import (
     SensitivityFilter,
 )
 
-
 # ── Helpers ──
 
 TEST_USER_ID = str(uuid.uuid4())

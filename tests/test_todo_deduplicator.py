@@ -2,15 +2,12 @@
 
 import uuid
 
-import pytest
-
 from promiselink.models.todo import Todo
 from promiselink.services.todo_deduplicator import (
     DeduplicationResult,
     TodoDeduplicator,
 )
 from tests.conftest import make_user_id
-
 
 # ── Helpers ──
 

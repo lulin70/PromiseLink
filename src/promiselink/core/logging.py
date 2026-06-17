@@ -60,7 +60,7 @@ def get_logger(name: str = "promiselink") -> structlog.stdlib.BoundLogger:
     Returns:
         A bound structlog logger instance.
     """
-    return structlog.get_logger(name)
+    return structlog.get_logger(name)  # type: ignore[no-any-return]
 
 
 def new_request_id() -> str:

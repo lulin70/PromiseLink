@@ -32,7 +32,7 @@ class Step09_MemoryStorage(PipelineStep):
                 )
                 event = db_result.scalar_one_or_none()
 
-            if event:
+            if event and memory is not None:
                 entity_ids = [str(e.id) for e in entities] if entities else []
                 await memory.store_raw(
                     event_id=event_id,

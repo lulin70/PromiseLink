@@ -76,7 +76,7 @@ async def create_test_event(
     raw_text: str = "Test event",
     source: str = "test",
     title: str = "Test Event",
-) -> "Event":
+):
     """Create a test Event record for foreign key references.
 
     Must be called within an active session/transaction.

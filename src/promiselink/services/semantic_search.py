@@ -14,7 +14,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 from promiselink.core.logging import get_logger
-from promiselink.services.embedding_provider import EMBEDDING_DIMENSIONS, LOCAL_EMBEDDING_DIMENSIONS, EmbeddingProvider
+from promiselink.services.embedding_provider import (
+    LOCAL_EMBEDDING_DIMENSIONS,
+    EmbeddingProvider,
+)
 
 logger = get_logger("promiselink.semantic_search")
 
@@ -41,7 +44,7 @@ class SemanticSearchEngine:
     def __init__(self, provider: EmbeddingProvider, db_path: str | None = None):
         self.provider = provider
         self.db_path = db_path or self._default_db_path()
-        self._actual_dims = None  # Detected on first embed
+        self._actual_dims: int | None = None  # Detected on first embed
         self._init_db()
 
     @staticmethod
@@ -97,7 +100,7 @@ class SemanticSearchEngine:
                 # Use LOCAL_EMBEDDING_DIMENSIONS (384) since local model is preferred
                 dims = LOCAL_EMBEDDING_DIMENSIONS
                 conn.execute(f"""
-                    CREATE VIRTUAL TABLE IF NOT EXISTS vec_entities 
+                    CREATE VIRTUAL TABLE IF NOT EXISTS vec_entities
                     USING vec0(
                         embedding float[{dims}],
                         target_id TEXT,
@@ -289,7 +292,7 @@ class SemanticSearchEngine:
         norm_b = sum(x * x for x in b) ** 0.5
         if norm_a == 0 or norm_b == 0:
             return 0.0
-        return dot / (norm_a * norm_b)
+        return dot / (norm_a * norm_b)  # type: ignore[no-any-return]
 
     async def get_stats(self, user_id: str | None = None) -> dict:
         """Get indexing statistics."""

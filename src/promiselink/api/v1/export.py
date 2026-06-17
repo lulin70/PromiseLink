@@ -8,8 +8,9 @@ import asyncio
 import sqlite3
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,7 +39,7 @@ def _serialize_model(obj) -> dict:
     differ from DB column names, e.g. ``metadata_`` → ``metadata``).
     Handles UUID and datetime serialization.
     """
-    result = {}
+    result: dict[str, Any] = {}
     mapper = obj.__mapper__
     for column_prop in mapper.column_attrs:
         key = column_prop.key  # Python attribute name

@@ -11,20 +11,20 @@ Usage: python -m tests.perf_entity_resolution
 
 import argparse
 import asyncio
+import os
+import sys
 import time
 import uuid
-import sys
-import os
 
 # Add project root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
+
 from promiselink.database import AsyncSessionLocal, init_db
 from promiselink.models.entity import Entity
 from promiselink.models.event import Event
 from promiselink.services.entity_resolution import EntityResolutionEngine
-
 
 # ── Chinese name data for realistic seeding ──
 
@@ -308,9 +308,9 @@ async def main():
     if target_1k:
         warm = target_1k.get("warm_per_entity_ms", 999)
         bulk = target_1k.get("bulk_per_entity_ms", 999)
-        print(f"\n  Target: Warm resolve < 50ms/entity at 1000 entities")
+        print("\n  Target: Warm resolve < 50ms/entity at 1000 entities")
         print(f"  Result: {warm:.1f}ms/entity → {'PASS' if warm < 50 else 'FAIL'}")
-        print(f"  Target: Bulk resolve < 30ms/entity at 1000 entities")
+        print("  Target: Bulk resolve < 30ms/entity at 1000 entities")
         print(f"  Result: {bulk:.1f}ms/entity → {'PASS' if bulk < 30 else 'FAIL'}")
 
     if api_results:

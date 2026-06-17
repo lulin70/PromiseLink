@@ -10,11 +10,14 @@ from promiselink.services.data_source_adapter import (
     get_adapter,
     register_adapter,
 )
-from promiselink.services.embedding_provider import EmbeddingProvider, EMBEDDING_DIMENSIONS
-from promiselink.services.entity_extractor import EntityExtractor, ExtractionResult, ExtractedPerson
-from promiselink.services.entity_resolution import EntityResolutionEngine, ResolutionAction, ResolutionResult
+from promiselink.services.embedding_provider import EMBEDDING_DIMENSIONS, EmbeddingProvider
+from promiselink.services.entity_extractor import EntityExtractor, ExtractedPerson, ExtractionResult
+from promiselink.services.entity_resolution import (
+    EntityResolutionEngine,
+    ResolutionAction,
+    ResolutionResult,
+)
 from promiselink.services.event_pipeline import process_event_with_short_transactions
-from promiselink.services.steps.context import PipelineResult
 from promiselink.services.implicit_feedback import ImplicitFeedbackCollector
 from promiselink.services.llm_client import LLMClient
 from promiselink.services.memory_provider import (
@@ -28,7 +31,8 @@ from promiselink.services.memory_provider import (
 )
 from promiselink.services.promise_fulfillment import PromiseFulfillmentEngine, SensitivityFilter
 from promiselink.services.semantic_search import SemanticSearchEngine
-from promiselink.services.todo_generator import TodoGenerator, GeneratedTodo
+from promiselink.services.steps.context import PipelineResult
+from promiselink.services.todo_generator import GeneratedTodo, TodoGenerator
 from promiselink.services.todo_state_machine import TodoStateMachine
 
 __all__ = [

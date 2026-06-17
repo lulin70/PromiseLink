@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import re
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -283,8 +283,8 @@ class PromiseBidirectionalHandler:
         Returns:
             PromiseAnalysis from LLM response.
         """
-        event_raw_text = event.raw_text if event else "无关联事件"
-        entity_names = []  # Will be populated by caller via _map_entities
+        event_raw_text = (event.raw_text if event else "无关联事件") or "无关联事件"
+        entity_names: list[str] = []  # Will be populated by caller via _map_entities
 
         prompt = f"""分析以下待办事项的承诺方向性。
 

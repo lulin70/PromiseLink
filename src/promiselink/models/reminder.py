@@ -2,9 +2,9 @@
 
 from datetime import UTC, datetime, time
 
-from sqlalchemy import CheckConstraint, Column, DateTime, Index, Integer, JSON, String, Time
+from sqlalchemy import JSON, CheckConstraint, Column, DateTime, Index, Integer, String, Time
 
-from promiselink.database import Base, IS_SQLITE, _uuid_default
+from promiselink.database import Base, _uuid_default
 
 
 class ReminderPreference(Base):

@@ -1,6 +1,6 @@
 # PromiseLink - AI驱动的个人商务关系经营助手
 
-> **项目状态**: PoC 验收通过 | 基础版打包中 | 1224+ 测试全通过 | 73% 覆盖率
+> **项目状态**: PoC 验收通过 | 基础版打包中 | 1210+ 测试全通过 | 67% 覆盖率
 >
 > **定位**: 先成就关系，再促成合作 — 利他切入的个人商务关系经营系统
 
@@ -70,7 +70,7 @@ PromiseLink/
 │   ├── prompts/                # LLM Prompt模板
 │   └── main.py                 # FastAPI入口
 ├── docs/                       # 文档体系
-├── tests/                      # 测试（60个文件 / 1314用例）
+├── tests/                      # 测试（60个文件 / 1210用例）
 ├── data/                       # SQLite数据存储
 └── docker-compose.yml          # Docker配置
 ```
@@ -189,9 +189,9 @@ curl "http://localhost:8000/api/v1/entities/search?q=技术合作"
 
 | 指标 | 数值 |
 |------|------|
-| 测试用例 | **1314 passed, 0 failed** |
-| 代码覆盖率 | **73%** |
-| API路由 | **22个路由模块 / 72个API端点** |
+| 测试用例 | **1210 passed, 109 skipped, 0 failed** |
+| 代码覆盖率 | **67%** |
+| API路由 | **29个路由文件 / 62个API端点** |
 | 服务模块 | **38个** |
 | 数据模型 | **9个文件，11个模型类** |
 | 文档版本 | PRD v5.2 / Tech v3.2 |
@@ -205,4 +205,4 @@ curl "http://localhost:8000/api/v1/entities/search?q=技术合作"
 
 ## License
 
-MIT
+AGPL-3.0

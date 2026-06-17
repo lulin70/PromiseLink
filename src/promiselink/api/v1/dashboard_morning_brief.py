@@ -1,18 +1,18 @@
 """Dashboard Morning Brief endpoint — 每日晨间摘要."""
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from sqlalchemy import select, func, or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.core.auth import get_current_user_id
 from promiselink.core.logging import get_logger, new_request_id
 from promiselink.database import get_async_session
+from promiselink.models.entity import Entity
 from promiselink.models.event import Event
 from promiselink.models.todo import Todo
-from promiselink.models.entity import Entity
 
 logger = get_logger("promiselink.api.dashboard.morning_brief")
 router = APIRouter(tags=["Dashboard"])
@@ -84,8 +84,8 @@ async def get_morning_brief(
     _CST = timezone(timedelta(hours=8))
     day_start_local = datetime(today.year, today.month, today.day, 0, 0, 0, tzinfo=_CST)
     day_end_local = day_start_local + timedelta(days=1)
-    day_start = day_start_local.astimezone(timezone.utc).replace(tzinfo=None)
-    day_end = day_end_local.astimezone(timezone.utc).replace(tzinfo=None)
+    day_start = day_start_local.astimezone(UTC).replace(tzinfo=None)
+    day_end = day_end_local.astimezone(UTC).replace(tzinfo=None)
     event_result = await session.execute(
         select(func.count()).select_from(Event)
         .where(Event.user_id == user_id)
@@ -115,7 +115,7 @@ async def get_morning_brief(
     key_persons = [row[0] for row in person_result.fetchall()]
 
     # Build greeting and summary
-    hour = datetime.now(timezone.utc).hour
+    hour = datetime.now(UTC).hour
     if hour < 12:
         greeting = "早上好"
     elif hour < 18:

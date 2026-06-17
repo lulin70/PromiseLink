@@ -9,37 +9,29 @@ Implements test cases from the Test Plan:
 Uses in-memory SQLite and mock LLM calls. No external services required.
 """
 
-import asyncio
 import os
-import sqlite3
 import tempfile
 import uuid
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime
+from unittest.mock import MagicMock
 
 import pytest
-import pytest_asyncio
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, select
 
 from promiselink.models.association import Association
 from promiselink.models.entity import Entity
 from promiselink.models.event import Event
 from promiselink.models.todo import Todo
-from promiselink.services.data_source_adapter import RawEvent
-from promiselink.services.email_adapter import EmailAdapter, EmailMessage, parse_email_message
+from promiselink.services.email_adapter import EmailAdapter, EmailMessage
 from promiselink.services.embedding_provider import EmbeddingProvider
 from promiselink.services.memory_provider import (
     CarryMemProvider,
-    FileStoreProvider,
-    MemoryEntry,
     NullMemoryProvider,
     create_memory_provider,
 )
 from promiselink.services.semantic_search import SemanticSearchEngine
 from promiselink.services.wechat_forward_adapter import WeChatForwardAdapter
-from tests.conftest import create_test_event, make_entity_data, make_user_id
-
+from tests.conftest import create_test_event, make_user_id
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  17.1 Pipeline全链路集成测试
@@ -108,7 +100,7 @@ class TestPipelineFullChain:
 
         # Step 13: Mark event completed (step_13)
         event.status = "completed"
-        event.processed_at = datetime.now(timezone.utc)
+        event.processed_at = datetime.now(UTC)
         await db_session.commit()
 
         # Verify: event is completed
@@ -316,7 +308,7 @@ class TestPipelineFullChain:
             db_session.add(entity)
             entities.append(entity)
             event.status = "completed"
-            event.processed_at = datetime.now(timezone.utc)
+            event.processed_at = datetime.now(UTC)
 
         await db_session.commit()
 
@@ -365,7 +357,7 @@ class TestDataAdapters:
             from_addr="zhangsan@example.com",
             from_name="张三",
             to_addrs=["me@example.com"],
-            date=datetime.now(timezone.utc),
+            date=datetime.now(UTC),
             body_text="你好，关于我们之前讨论的AI合作项目，我希望能进一步了解技术方案。期待你的回复。",
             attachments=[],
         )

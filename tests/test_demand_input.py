@@ -3,7 +3,6 @@
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event
@@ -14,7 +13,6 @@ from promiselink.database import Base, get_async_session
 from promiselink.main import app
 from promiselink.models.entity import Entity
 from promiselink.models.event import Event
-
 
 # ── Constants ──
 

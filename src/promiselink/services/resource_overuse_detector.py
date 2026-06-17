@@ -9,9 +9,9 @@ Threshold: 3+ help/their_promise todos to the same entity in 30 days → warning
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.core.logging import get_logger
@@ -65,7 +65,7 @@ class ResourceOveruseDetector:
         Returns:
             OveruseWarning if threshold exceeded, else None.
         """
-        window_start = datetime.now(timezone.utc) - timedelta(days=WINDOW_DAYS)
+        window_start = datetime.now(UTC) - timedelta(days=WINDOW_DAYS)
 
         # Count "索取型" todos toward this entity in the window
         result = await session.execute(
@@ -140,7 +140,7 @@ class ResourceOveruseDetector:
 
         # Dedup: check if a warning Todo already exists for this entity in the window
         # Use Python-side filtering for properties JSON to stay compatible with SQLite
-        window_start = datetime.now(timezone.utc) - timedelta(days=WINDOW_DAYS)
+        window_start = datetime.now(UTC) - timedelta(days=WINDOW_DAYS)
         existing = await session.execute(
             select(Todo).where(
                 and_(

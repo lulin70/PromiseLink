@@ -1,6 +1,6 @@
 """Dashboard Range View endpoint — Phase 1.2: 多日范围视图."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict
@@ -91,8 +91,8 @@ async def get_range_view(
     _CST = timezone(timedelta(hours=8))
     range_start_local = datetime(range_start.year, range_start.month, range_start.day, 0, 0, 0, tzinfo=_CST)
     range_end_local = datetime(range_end.year, range_end.month, range_end.day, 23, 59, 59, tzinfo=_CST)
-    range_start_dt = range_start_local.astimezone(timezone.utc).replace(tzinfo=None)
-    range_end_dt = range_end_local.astimezone(timezone.utc).replace(tzinfo=None)
+    range_start_dt = range_start_local.astimezone(UTC).replace(tzinfo=None)
+    range_end_dt = range_end_local.astimezone(UTC).replace(tzinfo=None)
 
     # Fetch events in range
     event_result = await session.execute(
@@ -123,7 +123,7 @@ async def get_range_view(
         total_todos=len(todos_in_range),
         events=[
             RangeViewEventItem(
-                id=e.id,
+                id=str(e.id),
                 event_type=e.event_type,
                 title=e.title,
                 timestamp=(e.timestamp + timedelta(hours=8)).isoformat() if e.timestamp else None,
@@ -133,7 +133,7 @@ async def get_range_view(
         ],
         todos=[
             RangeViewTodoItem(
-                id=t.id,
+                id=str(t.id),
                 todo_type=t.todo_type,
                 title=t.title,
                 status=t.status,

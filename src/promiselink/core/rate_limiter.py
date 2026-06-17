@@ -6,7 +6,6 @@ LLM-heavy endpoints (/voice/, /media/).
 
 import time
 from collections import defaultdict
-from typing import Optional
 
 from promiselink.config import get_settings
 from promiselink.core.logging import get_logger
@@ -80,7 +79,7 @@ class InMemorySlidingWindow:
         remaining = limit - len(timestamps)
         return True, remaining, 0
 
-    def reset(self, key: Optional[str] = None) -> None:
+    def reset(self, key: str | None = None) -> None:
         """Reset rate limit state for testing."""
         if key:
             self._windows.pop(key, None)
@@ -178,6 +177,6 @@ async def check_rate_limit(
     return await _memory_limiter.is_allowed(key, limit)
 
 
-def reset_rate_limits(key: Optional[str] = None) -> None:
+def reset_rate_limits(key: str | None = None) -> None:
     """Reset in-memory rate limit state (for testing)."""
     _memory_limiter.reset(key)

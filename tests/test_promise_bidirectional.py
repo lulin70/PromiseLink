@@ -11,7 +11,7 @@ Covers:
 """
 
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -21,10 +21,8 @@ from promiselink.models.todo import Todo
 from promiselink.services.promise_bidirectional import (
     ActionType,
     ConfirmationStatus,
-    PromiseAnalysis,
     PromiseBidirectionalHandler,
 )
-
 
 # Helper functions to create test objects
 

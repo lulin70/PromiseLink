@@ -1,12 +1,10 @@
 """Credit score calculation service with batch query support."""
 
-from datetime import date
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.models.todo import Todo
-from promiselink.models.event import Event
 
 
 class CreditScoreService:
@@ -84,7 +82,7 @@ class CreditScoreService:
             )
             .group_by(Todo.related_entity_id)
         )
-        total_rows = dict((await session.execute(total_q)).all())
+        total_rows: dict[str, int] = dict((await session.execute(total_q)).all())  # type: ignore[arg-type]
         # total_rows: entity_id -> total_count
 
         # ── Build results ──

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import and_, select, update
+from sqlalchemy import and_, update
 
 from promiselink.core.logging import get_logger
 from promiselink.models.todo import Todo
@@ -19,8 +19,9 @@ class Step08_Notification(PipelineStep):
     name = "step08_notification"
 
     async def execute(self, context: PipelineContext) -> PipelineContext:
-        event_id = context.event_id
         user_id = context.user_id
+        assert context.result is not None
+        assert user_id is not None
 
         try:
             from promiselink.services.notification_service import notification_service
@@ -41,7 +42,7 @@ class Step08_Notification(PipelineStep):
         try:
             from promiselink.database import AsyncSessionLocal, commit_with_retry
 
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             async with AsyncSessionLocal() as session:
                 overdue_q = (
                     update(Todo)

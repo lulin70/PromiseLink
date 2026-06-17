@@ -23,6 +23,7 @@ class Step06_ResourceOveruse(PipelineStep):
         from promiselink.services.resource_overuse_detector import ResourceOveruseDetector
 
         event_id = context.event_id
+        assert context.result is not None
 
         _t83 = time.monotonic()
         try:

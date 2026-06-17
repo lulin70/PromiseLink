@@ -1,6 +1,5 @@
 """Tests for redact_pii_from_text() PII detection and masking."""
 
-import pytest
 
 from promiselink.core.text_utils import redact_pii_from_text
 

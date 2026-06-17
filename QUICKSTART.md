@@ -3,7 +3,7 @@
 ## 前置条件
 
 - Python 3.11+
-- LLM API Key（推荐 DeepSeek / Moka AI / OpenAI）
+- LLM API Key（推荐 Moka AI / OpenAI / Anthropic）
 
 ## 快速启动
 

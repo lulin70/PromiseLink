@@ -147,13 +147,13 @@ async def delete_user_data(
     assoc_result = await session.execute(
         delete(Association).where(Association.user_id == user_id)
     )
-    associations_deleted = assoc_result.rowcount
+    associations_deleted = assoc_result.rowcount  # type: ignore[attr-defined]
 
     # 2. Todos (references events and entities)
     todos_result = await session.execute(
         delete(Todo).where(Todo.user_id == user_id)
     )
-    todos_deleted = todos_result.rowcount
+    todos_deleted = todos_result.rowcount  # type: ignore[attr-defined]
 
     # 3. Voice sessions (standalone, but has voice_turns FK)
     from promiselink.models.voice_session import VoiceTurn
@@ -180,7 +180,7 @@ async def delete_user_data(
     events_result = await session.execute(
         delete(Event).where(Event.user_id == user_id)
     )
-    events_deleted = events_result.rowcount
+    events_deleted = events_result.rowcount  # type: ignore[attr-defined]
 
     await session.commit()
 

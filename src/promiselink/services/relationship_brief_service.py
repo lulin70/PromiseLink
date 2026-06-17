@@ -18,10 +18,9 @@ Implements 12-module relationship brief generation and management:
 from __future__ import annotations
 
 import copy
-import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Any, TYPE_CHECKING
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from promiselink.services.llm_client import LLMClient
@@ -436,7 +435,7 @@ class RelationshipBriefService:
     def _build_last_interaction(event: Event) -> dict[str, Any]:
         """Build last_interaction dict from an event."""
         return {
-            "date": event.timestamp.isoformat() if event.timestamp else datetime.now(timezone.utc).isoformat(),
+            "date": event.timestamp.isoformat() if event.timestamp else datetime.now(UTC).isoformat(),
             "event_type": event.event_type,
             "summary": (event.title or "")[:200],
         }
@@ -465,7 +464,7 @@ class RelationshipBriefService:
         For PoC, uses simple counting without full history scan.
         """
         # Count total events for this user-person pair via entity references
-        thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+        thirty_days_ago = datetime.now(UTC) - timedelta(days=30)
 
         # Simple approach: count all events for user as proxy
         total_result = await self.session.execute(
@@ -591,7 +590,7 @@ class RelationshipBriefService:
         if date_str:
             try:
                 last_date = datetime.fromisoformat(date_str)
-                days_ago = (datetime.now(timezone.utc) - last_date).days
+                days_ago = (datetime.now(UTC) - last_date).days
                 if days_ago <= 1:
                     score += 20
                 elif days_ago <= 7:
@@ -603,7 +602,7 @@ class RelationshipBriefService:
             except (ValueError, TypeError):
                 pass
 
-        return min(score, 100)
+        return min(score, 100)  # type: ignore[no-any-return]
 
     async def _get_associations_for_entity(self, entity_id: str) -> list[dict]:
         """Fetch associations involving this entity for action generation.
@@ -696,7 +695,7 @@ class RelationshipBriefService:
         Max 5 actions.
         """
         actions: list[dict] = []
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Rule 1: Overdue my promises
         promises = brief_data.get("open_promises", {})

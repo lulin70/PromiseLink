@@ -15,30 +15,23 @@ They validate the full integration path, not individual units.
 """
 
 import uuid
-from datetime import datetime, timezone, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime, timedelta
 
 import pytest
-import pytest_asyncio
 from sqlalchemy import select
 
-from promiselink.models.association import Association
 from promiselink.models.entity import Entity
 from promiselink.models.event import Event
 from promiselink.models.todo import Todo
 from promiselink.services.data_source_adapter import (
-    DataSourceAdapter,
     EmailAdapter,
     ManualAdapter,
-    RawEvent,
     WeChatAdapter,
     get_adapter,
-    register_adapter,
 )
 from promiselink.services.implicit_feedback import ImplicitFeedbackCollector
-from promiselink.services.priority_scorer import PriorityScorer, IMPORTANCE_WEIGHTS
+from promiselink.services.priority_scorer import IMPORTANCE_WEIGHTS, PriorityScorer
 from tests.conftest import create_test_event, make_user_id
-
 
 # ═══════════════════════════════════════════════════════════════
 #  E2E Test 1: Complete Pipeline Flow (mocked LLM)
@@ -155,7 +148,7 @@ async def test_e2e_priority_scoring(db_session):
         description="发送AI项目资料给李总",
         status="pending",
         priority=2,
-        due_date=datetime.now(timezone.utc) + timedelta(days=2),
+        due_date=datetime.now(UTC) + timedelta(days=2),
     )
     todo_care = Todo(
         id=str(uuid.uuid4()),
@@ -305,7 +298,7 @@ async def test_e2e_todo_lifecycle(db_session):
 
     # in_progress → done
     todo.status = "done"
-    todo.completed_at = datetime.now(timezone.utc)
+    todo.completed_at = datetime.now(UTC)
     await db_session.commit()
 
     # Verify final state
@@ -454,7 +447,7 @@ async def test_e2e_priority_and_feedback_integration(db_session):
         description="紧急承诺：今天必须发资料",
         status="pending",
         priority=1,
-        due_date=datetime.now(timezone.utc) + timedelta(hours=3),
+        due_date=datetime.now(UTC) + timedelta(hours=3),
     )
     db_session.add(todo)
     await db_session.commit()
@@ -473,7 +466,7 @@ async def test_e2e_priority_and_feedback_integration(db_session):
 
     # Complete it and record feedback
     todo.status = "done"
-    todo.completed_at = datetime.now(timezone.utc)
+    todo.completed_at = datetime.now(UTC)
     collector = ImplicitFeedbackCollector()
     rank = await collector.record_completion(todo, db_session)
 

@@ -10,8 +10,8 @@ from promiselink.api.v1 import (
     export,
     health,
     promises,
-    reminders,
     relationship_briefs,
+    reminders,
     scheduled_events,
     todos,
 )

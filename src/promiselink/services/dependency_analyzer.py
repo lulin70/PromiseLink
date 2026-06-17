@@ -45,7 +45,7 @@ class DependencyAnalyzer:
             return 0.0
 
         # Step 1: Build promise dependency graph
-        dep_graph = await self._build_promise_dependency_graph(todo.user_id, session)
+        dep_graph = await self._build_promise_dependency_graph(str(todo.user_id), session)
 
         # Step 2: Find blocking chains from this Todo
         blocking_chains = self._find_blocking_chains(todo, dep_graph)

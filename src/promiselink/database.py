@@ -60,7 +60,7 @@ def get_sync_engine():
     if url.startswith("sqlite"):
         # SQLite-specific settings: WAL mode + busy_timeout for concurrency
         engine = create_engine(url, connect_args={"check_same_thread": False}, echo=settings.debug)
-        
+
         @event.listens_for(engine, "connect")
         def set_sqlite_pragma(dbapi_conn, connection_record):
             cursor = dbapi_conn.cursor()
@@ -70,7 +70,7 @@ def get_sync_engine():
             cursor.close()
     else:
         engine = create_engine(url, echo=settings.debug, pool_pre_ping=True)
-    
+
     return engine
 
 
@@ -96,13 +96,13 @@ def get_sync_session() -> Session:
 def get_async_engine():
     """Get asynchronous engine for FastAPI."""
     url = settings.database_url
-    
+
     # Convert SQLite URL to async format
     if url.startswith("sqlite"):
         if "+aiosqlite" not in url:
             url = url.replace("sqlite://", "sqlite+aiosqlite://")
         engine = create_async_engine(url, echo=settings.debug, connect_args={"check_same_thread": False})
-        
+
         @event.listens_for(engine.sync_engine, "connect")
         def set_sqlite_pragma(dbapi_conn, connection_record):
             cursor = dbapi_conn.cursor()
@@ -115,7 +115,7 @@ def get_async_engine():
         if "+asyncpg" not in url:
             url = url.replace("postgresql://", "postgresql+asyncpg://")
         engine = create_async_engine(url, echo=settings.debug, pool_pre_ping=True)
-    
+
     return engine
 
 

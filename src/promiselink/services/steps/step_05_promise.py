@@ -27,6 +27,8 @@ class Step05_PromiseAnalysis(PipelineStep):
 
         event_id = context.event_id
         llm_client = context.llm_client
+        assert context.result is not None
+        assert llm_client is not None
 
         try:
             promise_handler = PromiseBidirectionalHandler(llm_client=llm_client)
@@ -62,7 +64,7 @@ class Step05_PromiseAnalysis(PipelineStep):
                 analysis_results = await asyncio.gather(*analysis_tasks, return_exceptions=True)
 
                 for todo, analysis in zip(fresh_todos, analysis_results):
-                    if isinstance(analysis, Exception):
+                    if isinstance(analysis, BaseException):
                         logger.warning("pipeline_promise_analysis_failed",
                             todo_id=str(todo.id), error=str(analysis))
                         continue
@@ -72,7 +74,7 @@ class Step05_PromiseAnalysis(PipelineStep):
                         todo.beneficiary_id = analysis.beneficiary_entity_id
                         todo.confirmation_status = analysis.confirmation_status.value
                         todo.evidence_quote = analysis.evidence_quote
-                        todo.evidence_event_id = str(current_event.id) if analysis.evidence_quote else None
+                        todo.evidence_event_id = current_event.id if analysis.evidence_quote else None
                         # F-68: Initialize fulfillment_status for promise-type todos
                         if analysis.action_type.value in ("my_promise", "their_promise"):
                             todo.fulfillment_status = "pending"

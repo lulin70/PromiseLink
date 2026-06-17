@@ -4,9 +4,7 @@ Validates txt/md file upload, markdown stripping, encoding handling,
 and input validation (file extension, size limits).
 """
 
-import uuid
 
-import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import event as sa_event
@@ -86,7 +84,7 @@ class TestTxtUpload:
     """Successful .txt file upload tests."""
 
     async def test_upload_txt_returns_201(self, client: AsyncClient):
-        content = "今天和李总讨论了新项目的合作方案".encode("utf-8")
+        content = "今天和李总讨论了新项目的合作方案".encode()
         resp = await client.post(
             f"{API_PREFIX}/events/upload",
             files={"file": ("meeting.txt", content, "text/plain")},
@@ -94,7 +92,7 @@ class TestTxtUpload:
         assert resp.status_code == 201
 
     async def test_upload_txt_creates_event(self, client: AsyncClient, db_session: AsyncSession):
-        content = "今天和李总讨论了新项目的合作方案".encode("utf-8")
+        content = "今天和李总讨论了新项目的合作方案".encode()
         resp = await client.post(
             f"{API_PREFIX}/events/upload",
             files={"file": ("meeting.txt", content, "text/plain")},
@@ -125,7 +123,7 @@ class TestTxtUpload:
         assert event.source == "file_upload"
 
     async def test_upload_txt_custom_event_type(self, client: AsyncClient):
-        content = "和陈宇鑫通了电话".encode("utf-8")
+        content = "和陈宇鑫通了电话".encode()
         resp = await client.post(
             f"{API_PREFIX}/events/upload",
             files={"file": ("call.txt", content, "text/plain")},
@@ -158,7 +156,7 @@ class TestMdUpload:
     """Successful .md file upload tests with markdown stripping."""
 
     async def test_upload_md_returns_201(self, client: AsyncClient):
-        content = "# Meeting Notes\n\nDiscussion about project".encode("utf-8")
+        content = b"# Meeting Notes\n\nDiscussion about project"
         resp = await client.post(
             f"{API_PREFIX}/events/upload",
             files={"file": ("notes.md", content, "text/markdown")},
@@ -245,7 +243,7 @@ class TestUploadValidation:
 
     async def test_reject_no_extension_file(self, client: AsyncClient):
         # File with no extension should be rejected
-        content = "some text".encode("utf-8")
+        content = b"some text"
         resp = await client.post(
             f"{API_PREFIX}/events/upload",
             files={"file": ("noextension", content, "text/plain")},
@@ -253,7 +251,7 @@ class TestUploadValidation:
         assert resp.status_code == 400
 
     async def test_reject_invalid_event_type(self, client: AsyncClient):
-        content = "some text".encode("utf-8")
+        content = b"some text"
         resp = await client.post(
             f"{API_PREFIX}/events/upload",
             files={"file": ("note.txt", content, "text/plain")},

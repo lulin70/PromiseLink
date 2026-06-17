@@ -4,13 +4,12 @@ Architecture Design §8.0.8 — 7-role review P0 gap fix.
 Three categories: BusinessError, LLMError, InfrastructureError.
 """
 
-from typing import Optional
 
 
 class PromiseLinkError(Exception):
     """Base exception for all PromiseLink errors."""
 
-    def __init__(self, message: str, code: str, details: Optional[dict] = None):
+    def __init__(self, message: str, code: str, details: dict | None = None):
         self.message = message
         self.code = code
         self.details = details or {}
@@ -27,7 +26,7 @@ class BusinessError(PromiseLinkError):
 class NotFoundError(BusinessError):
     """Resource not found."""
 
-    def __init__(self, message: str = "Resource not found", details: Optional[dict] = None):
+    def __init__(self, message: str = "Resource not found", details: dict | None = None):
         super().__init__(
             message=message,
             code="NOT_FOUND",
@@ -38,7 +37,7 @@ class NotFoundError(BusinessError):
 class ValidationError(BusinessError):
     """Request validation / bad input error."""
 
-    def __init__(self, message: str = "Validation error", details: Optional[dict] = None):
+    def __init__(self, message: str = "Validation error", details: dict | None = None):
         super().__init__(
             message=message,
             code="VALIDATION_ERROR",
@@ -49,7 +48,7 @@ class ValidationError(BusinessError):
 class ForbiddenError(BusinessError):
     """Access denied / forbidden error."""
 
-    def __init__(self, message: str = "Forbidden", details: Optional[dict] = None):
+    def __init__(self, message: str = "Forbidden", details: dict | None = None):
         super().__init__(
             message=message,
             code="FORBIDDEN",
@@ -60,7 +59,7 @@ class ForbiddenError(BusinessError):
 class UnauthorizedError(BusinessError):
     """Authentication failure error."""
 
-    def __init__(self, message: str = "Unauthorized", details: Optional[dict] = None):
+    def __init__(self, message: str = "Unauthorized", details: dict | None = None):
         super().__init__(
             message=message,
             code="UNAUTHORIZED",
@@ -71,7 +70,7 @@ class UnauthorizedError(BusinessError):
 class ConflictError(BusinessError):
     """Conflict / optimistic lock failure error."""
 
-    def __init__(self, message: str = "Conflict", details: Optional[dict] = None):
+    def __init__(self, message: str = "Conflict", details: dict | None = None):
         super().__init__(
             message=message,
             code="CONFLICT",
@@ -132,7 +131,7 @@ class SensitivityViolationError(BusinessError):
 
     def __init__(self, entity_id: str):
         super().__init__(
-            message=f"Resource marked as no_match, cannot participate in matching",
+            message="Resource marked as no_match, cannot participate in matching",
             code="SENSITIVITY_VIOLATION",
             details={"entity_id": entity_id},
         )

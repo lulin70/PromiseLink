@@ -1,7 +1,7 @@
 """Unit tests for Dashboard API (day-view / range-view endpoints)."""
 
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
@@ -16,7 +16,6 @@ from promiselink.main import app
 from promiselink.models.entity import Entity
 from promiselink.models.event import Event
 from promiselink.models.todo import Todo
-
 
 # ── Constants ──
 
@@ -93,7 +92,7 @@ async def _seed_event(
 ) -> Event:
     """Create a test Event record anchored to TARGET_DATE."""
     target = date(2026, 6, 4) + timedelta(days=days_offset)
-    ts = datetime(target.year, target.month, target.day, hour, 0, 0, tzinfo=timezone.utc)
+    ts = datetime(target.year, target.month, target.day, hour, 0, 0, tzinfo=UTC)
     evt = Event(
         id=str(uuid.uuid4()),
         user_id=TEST_USER_ID,
@@ -121,7 +120,7 @@ async def _seed_todo(
 ) -> Todo:
     """Create a test Todo record anchored to TARGET_DATE."""
     target = date(2026, 6, 4) + timedelta(days=days_offset)
-    due_dt = datetime(target.year, target.month, target.day, 18, 0, 0, tzinfo=timezone.utc)
+    due_dt = datetime(target.year, target.month, target.day, 18, 0, 0, tzinfo=UTC)
     # Use provided event or create a dummy one for FK compliance
     evt_id = str(source_event.id) if source_event else str(uuid.uuid4())
     td = Todo(
