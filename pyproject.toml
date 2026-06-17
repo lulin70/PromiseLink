@@ -87,7 +87,7 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "--cov=promiselink --cov-report=term-missing --cov-report=html"
+addopts = "--cov=promiselink --cov-report=term-missing --cov-report=html --continue-on-collection-errors"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
