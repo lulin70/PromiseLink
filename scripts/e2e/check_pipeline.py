@@ -5,7 +5,7 @@ import httpx, asyncio, json, sys
 async def check():
     async with httpx.AsyncClient(base_url="http://localhost:8002", timeout=60) as c:
         BASE = "http://localhost:8002/api/v1"
-        r = await c.post(f"{BASE}/auth/login", json={"user_id": "demo-user", "poc_secret": "promiselink2024"})
+        r = await c.post(f"{BASE}/auth/login", json={"user_id": "demo-user", "poc_secret": "promiselink2026"})
         token = r.json()["access_token"]
         headers = {"Authorization": f"Bearer {token}"}
 

@@ -4,7 +4,7 @@ import asyncio, json, uuid, os
 import httpx
 
 BASE = "http://localhost:8001/api/v1"
-SECRET = os.environ.get("POC_SECRET", "promiselink2024")
+SECRET = os.environ.get("POC_SECRET", "promiselink2026")
 UID = str(uuid.uuid4())
 
 async def main():

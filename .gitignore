@@ -90,3 +90,6 @@ htmlcov/
 .mypy_cache/
 *.mp4
 docs/external/**/*.pdf
+
+# Debug scripts
+debug_batch.py

@@ -12,7 +12,7 @@ import sys
 import os
 
 BASE = "http://localhost:8001/api/v1"
-SECRET = os.environ.get("POC_SECRET", "promiselink2024")
+SECRET = os.environ.get("POC_SECRET", "promiselink2026")
 
 # 测试用的交流记录（包含"李总"）
 TEST_EVENTS = [

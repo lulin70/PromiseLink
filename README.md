@@ -40,7 +40,7 @@ PromiseLink/
 │   │   ├── association.py      # 关联发现
 │   │   ├── relationship_brief.py  # 关系简报
 │   │   └── voice_session.py    # 语音会话
-│   ├── api/v1/                 # REST API（29个路由文件）
+│   ├── api/v1/                 # REST API（26个路由文件）
 │   │   ├── health.py           # 健康检查
 │   │   ├── events.py           # 事件CRUD + Pipeline触发
 │   │   ├── entities.py         # 实体管理
@@ -136,7 +136,7 @@ PromiseLink/
 - [x] PRD v5.2（关系经营核心闭环 + 向量化语义能力）
 - [x] 技术设计 v3.2（Insight Engine + DataSourceAdapter + 向量语义）
 - [x] P0核心算法全部实现（实体归一/承诺履行/状态机/关联发现/动态评分）
-- [x] FastAPI完整实现（29个路由文件 / 62个API端点）
+- [x] FastAPI完整实现（26个路由文件 / 72个API端点）
 - [x] 38个服务模块（Pipeline/NLG/SemanticSearch/MemoryProvider等）
 - [x] 9个模型文件，11个模型类（entity/event/todo/association/relationship_brief/voice_session等）
 - [x] DataSourceAdapter抽象层（手动/语音/微信/CSV/邮件）
@@ -196,7 +196,7 @@ curl "http://localhost:8000/api/v1/entities/search?q=技术合作"
 |------|------|
 | 测试用例 | **1210 passed, 109 skipped, 0 failed** |
 | 代码覆盖率 | **67%** |
-| API路由 | **29个路由文件 / 62个API端点** |
+| API路由 | **26个路由文件 / 72个API端点** |
 | 服务模块 | **38个** |
 | 数据模型 | **9个文件，11个模型类** |
 | 文档版本 | PRD v5.2 / Tech v3.2 |

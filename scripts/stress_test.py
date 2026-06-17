@@ -19,7 +19,7 @@ import httpx
 import os
 
 BASE = "http://localhost:8001/api/v1"
-SECRET = os.environ.get("POC_SECRET", "promiselink2024")
+SECRET = os.environ.get("POC_SECRET", "promiselink2026")
 READ_CONCURRENCY = 50
 WRITE_DELAY = 3.0  # seconds between sequential writes
 COOLDOWN = 10  # seconds between test groups
