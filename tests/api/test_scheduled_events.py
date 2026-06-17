@@ -632,8 +632,9 @@ class TestRecordCreatesEventWithSource:
         event_id = record_resp.json()["event_id"]
 
         # Verify the Event in DB has source='scheduled_record'
-        from promiselink.models.event import Event
         from sqlalchemy import select
+
+        from promiselink.models.event import Event
 
         result = await db_session.execute(
             select(Event).where(Event.id == event_id)
@@ -806,7 +807,7 @@ class TestDashboardDayViewIncludesScheduledEvents:
         if today_scheduled_local.date() != now_local.date():
             today_scheduled_local = now_local.replace(hour=15, minute=0, second=0, microsecond=0)
         # Convert to naive UTC for database storage (dashboard queries in UTC range)
-        today_scheduled = today_scheduled_local.astimezone(timezone.utc).replace(tzinfo=None)
+        today_scheduled = today_scheduled_local.astimezone(UTC).replace(tzinfo=None)
 
         await insert_scheduled_event(
             db_session,
@@ -841,7 +842,7 @@ class TestDashboardDayViewIncludesScheduledEvents:
         if future_today_local.date() != now_local.date():
             future_today_local = now_local.replace(hour=15, minute=0, second=0, microsecond=0)
         # Convert to naive UTC for database storage
-        future_today = future_today_local.astimezone(timezone.utc).replace(tzinfo=None)
+        future_today = future_today_local.astimezone(UTC).replace(tzinfo=None)
 
         await insert_scheduled_event(
             db_session,
@@ -974,8 +975,9 @@ class TestRecordEventMetadata:
         assert record_resp.status_code == 200
         event_id = record_resp.json()["event_id"]
 
-        from promiselink.models.event import Event
         from sqlalchemy import select
+
+        from promiselink.models.event import Event
 
         result = await db_session.execute(
             select(Event).where(Event.id == event_id)

@@ -20,7 +20,6 @@ from __future__ import annotations
 import json
 import os
 import uuid
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -260,7 +259,7 @@ class FileStoreProvider:
     def _load_entity_index(self) -> dict[str, list[str]]:
         path = self._entity_index_path()
         if path.exists():
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 return json.load(f)
         return {}
 
@@ -330,7 +329,7 @@ class FileStoreProvider:
         query_lower = query.lower()
 
         for entry_file in self.entries_dir.glob("*.json"):
-            with open(entry_file, "r", encoding="utf-8") as f:
+            with open(entry_file, encoding="utf-8") as f:
                 data = json.load(f)
 
             raw_text = data.get("raw_text", "")
@@ -373,7 +372,7 @@ class FileStoreProvider:
         for eid in event_ids:
             path = self._entry_path(eid)
             if path.exists():
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, encoding="utf-8") as f:
                     data = json.load(f)
                 entries.append(
                     MemoryEntry(
@@ -395,7 +394,7 @@ class FileStoreProvider:
             return False
 
         # Load entry to get entity_ids for index cleanup
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
 
         entity_ids = data.get("entity_ids", [])
@@ -560,7 +559,7 @@ class CarryMemProvider:
 
         try:
             response = await client.get(
-                f"/api/v1/notes",
+                "/api/v1/notes",
                 params={"entity_id": entity_id, "limit": limit},
             )
             response.raise_for_status()
@@ -609,7 +608,7 @@ class CarryMemProvider:
 
         try:
             response = await client.get("/health")
-            return response.status_code == 200
+            return response.status_code == 200  # type: ignore[no-any-return]
         except Exception as exc:
             logger.warning("carrymem_health_check_failed", error=str(exc))
             return False

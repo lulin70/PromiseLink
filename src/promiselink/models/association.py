@@ -4,11 +4,20 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, CheckConstraint, Float, ForeignKey, Index, String, UniqueConstraint, func
+from sqlalchemy import (
+    JSON,
+    CheckConstraint,
+    Float,
+    ForeignKey,
+    Index,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from promiselink.database import Base, IS_SQLITE, _uuid_default
+from promiselink.database import IS_SQLITE, Base, _uuid_default
 
 
 class Association(Base):
@@ -34,7 +43,7 @@ class Association(Base):
         nullable=False,
         index=True,
     )
-    
+
     # Source and target entities
     source_entity_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True) if not IS_SQLITE else String(36),
@@ -46,21 +55,21 @@ class Association(Base):
         ForeignKey("entities.id", ondelete="CASCADE"),
         nullable=False,
     )
-    
+
     # Association type: 9 structural + 3 semantic
     #   Structural: alumni, ex_colleague, same_city, competitor, tech_overlap,
     #               deal_link, risk_link, supply_chain, co_occurrence
     #   Semantic:   topic_overlap, supply_demand, industry_chain
     association_type: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
-    
+
     # Strength score with time decay
     strength: Mapped[float] = mapped_column(Float, nullable=False, default=0.5)
-    
+
     # Properties specific to association type
     properties: Mapped[dict[str, Any] | None] = mapped_column(
         JSONB if not IS_SQLITE else JSON,
     )
-    
+
     # Source tracking
     source_event_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True) if not IS_SQLITE else String(36),
@@ -69,7 +78,7 @@ class Association(Base):
     )
     confidence: Mapped[float] = mapped_column(nullable=False, default=1.0)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="confirmed")
-    
+
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(nullable=False, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

@@ -27,6 +27,8 @@ class Step12_RelationshipBriefUpdate(PipelineStep):
         event_id = context.event_id
         user_id = context.user_id
         llm_client = context.llm_client
+        assert context.result is not None
+        assert user_id is not None
 
         _t8 = time.monotonic()
         try:

@@ -14,7 +14,6 @@ from promiselink.services.wechat_forward_adapter import (
     WeChatForwardAdapter,
 )
 
-
 # ── Fixtures ──
 
 @pytest.fixture

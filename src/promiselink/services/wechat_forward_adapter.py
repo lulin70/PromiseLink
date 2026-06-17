@@ -21,10 +21,8 @@ Parsing uses rule-based logic only (no LLM dependency).
 """
 
 import re
-import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Optional
+from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from promiselink.core.logging import get_logger
 from promiselink.models.event import Event
@@ -37,7 +35,7 @@ class ChatMessage:
     """A single chat message extracted from forwarded WeChat content."""
 
     speaker: str
-    time: Optional[str]
+    time: str | None
     content: str
 
 
@@ -112,7 +110,7 @@ class WeChatForwardAdapter:
             raw_text=text,
             metadata_=metadata,
             status="pending",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
         logger.info(
@@ -145,8 +143,8 @@ class WeChatForwardAdapter:
 
         lines = text.strip().split("\n")
         messages: list[ChatMessage] = []
-        current_speaker: Optional[str] = None
-        current_time: Optional[str] = None
+        current_speaker: str | None = None
+        current_time: str | None = None
         current_content_lines: list[str] = []
 
         has_recognized_format = False

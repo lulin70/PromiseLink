@@ -25,6 +25,7 @@ class Step03_SemanticEmbedding(PipelineStep):
 
         event_id = context.event_id
         entities = context.entities
+        assert context.result is not None
 
         _t55 = time.monotonic()
         try:

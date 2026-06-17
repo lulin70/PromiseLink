@@ -219,7 +219,7 @@ async def delete_voice_sessions(
     result = await session.execute(
         delete(VoiceSession).where(VoiceSession.user_id == user_id)
     )
-    deleted_count = result.rowcount
+    deleted_count = result.rowcount  # type: ignore[attr-defined]
 
     logger.info(
         "voice_sessions_deleted",

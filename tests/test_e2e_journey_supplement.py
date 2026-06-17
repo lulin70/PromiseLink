@@ -9,22 +9,22 @@ with LLM calls mocked out. No external services required.
 import json
 import os
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event as sa_event, select
+from sqlalchemy import event as sa_event
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from promiselink.core.auth import create_access_token, get_current_user_id
+from promiselink.core.auth import get_current_user_id
 from promiselink.database import Base, get_async_session
 from promiselink.main import app
 from promiselink.models.association import Association
 from promiselink.models.entity import Entity
 from promiselink.models.event import Event
-from promiselink.models.relationship_brief import RelationshipBrief
 from promiselink.models.todo import Todo
 from promiselink.services.relationship_brief_service import RelationshipBriefService
 
@@ -221,7 +221,7 @@ class TestCrossDayUsage:
         day4 = date(2026, 6, 4)
 
         # ── Day 1: 录入交流 ──
-        day1_ts = datetime(day1.year, day1.month, day1.day, 10, 0, tzinfo=timezone.utc)
+        day1_ts = datetime(day1.year, day1.month, day1.day, 10, 0, tzinfo=UTC)
         event1 = await insert_event(
             db_session,
             title="和王总见面",
@@ -247,7 +247,7 @@ class TestCrossDayUsage:
             related_entity_id=entity1.id,
             status="pending",
             priority=1,
-            due_date=datetime(day2.year, day2.month, day2.day, 18, 0, tzinfo=timezone.utc),
+            due_date=datetime(day2.year, day2.month, day2.day, 18, 0, tzinfo=UTC),
         )
 
         # Create initial relationship brief
@@ -286,7 +286,7 @@ class TestCrossDayUsage:
         assert resp.json()["status"] == "done"
 
         # Add a second interaction on Day3
-        day3_ts = datetime(day3.year, day3.month, day3.day, 14, 0, tzinfo=timezone.utc)
+        day3_ts = datetime(day3.year, day3.month, day3.day, 14, 0, tzinfo=UTC)
         event2 = await insert_event(
             db_session,
             title="和王总深度交流",
@@ -328,10 +328,10 @@ class TestCrossDayUsage:
         scorer = PriorityScorer()
 
         # Use a fixed "now" to make the test deterministic
-        now = datetime(2026, 6, 1, 12, 0, tzinfo=timezone.utc)
+        now = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
 
         # Day 1: Create a promise todo due in 7 days
-        due_date_far = datetime(2026, 6, 8, 18, 0, tzinfo=timezone.utc)
+        due_date_far = datetime(2026, 6, 8, 18, 0, tzinfo=UTC)
 
         event = await insert_event(db_session, title="承诺事项")
         todo = await insert_todo(
@@ -354,7 +354,7 @@ class TestCrossDayUsage:
         )
 
         # Score when 1 day away — higher urgency
-        due_date_near = datetime(2026, 6, 2, 18, 0, tzinfo=timezone.utc)
+        due_date_near = datetime(2026, 6, 2, 18, 0, tzinfo=UTC)
         score_near = scorer.calculate(
             todo_type="promise",
             due_date=due_date_near,
@@ -378,7 +378,7 @@ class TestCrossDayUsage:
         Create an entity with old interaction, verify care todo can be generated.
         """
         # Create entity with an old interaction (30 days ago)
-        old_date = datetime.now(timezone.utc) - timedelta(days=30)
+        old_date = datetime.now(UTC) - timedelta(days=30)
         event = await insert_event(
             db_session,
             title="旧交流",

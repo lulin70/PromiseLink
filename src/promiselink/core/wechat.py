@@ -8,9 +8,9 @@ Implements the WeChat Mini Program login flow:
 Reference: https://developers.weixin.qq.com/miniprogram/dev/framework/open-ability/login.html
 """
 
-import hashlib
-import httpx
 from typing import Any
+
+import httpx
 
 from promiselink.config import get_settings
 from promiselink.core.logging import get_logger

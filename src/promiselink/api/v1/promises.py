@@ -3,7 +3,6 @@
 import json
 import uuid
 from datetime import UTC, datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -24,17 +23,17 @@ logger = get_logger("promiselink.api.promises")
 
 class PromiseItem(BaseModel):
     todo_id: str
-    entity_id: Optional[str] = None
-    entity_name: Optional[str] = None
+    entity_id: str | None = None
+    entity_name: str | None = None
     action_type: str
-    description: Optional[str] = None
-    due_date: Optional[datetime] = None
+    description: str | None = None
+    due_date: datetime | None = None
     fulfillment_status: str
-    confirmation_status: Optional[str] = None
-    source_event_id: Optional[str] = None
-    source_event_title: Optional[str] = None
-    source_event_date: Optional[str] = None
-    created_at: Optional[datetime] = None
+    confirmation_status: str | None = None
+    source_event_id: str | None = None
+    source_event_title: str | None = None
+    source_event_date: str | None = None
+    created_at: datetime | None = None
 
 
 class PromiseListResponse(BaseModel):
@@ -58,7 +57,7 @@ class FulfillmentUpdateRequest(BaseModel):
 @router.get("", response_model=PromiseListResponse)
 async def list_promises(
     view: str = Query("my-promises", description="my-promises or their-promises"),
-    status: Optional[str] = Query(None, description="Filter by fulfillment status"),
+    status: str | None = Query(None, description="Filter by fulfillment status"),
     search: str | None = Query(None, description="Search in description"),
     offset: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
@@ -111,7 +110,7 @@ async def list_promises(
     # Fetch event titles and dates for source_event_ids
     event_ids = [t.source_event_id for t in results if t.source_event_id]
     event_titles: dict[str, str] = {}
-    event_dates: dict[str, str] = {}
+    event_dates: dict[str, str | None] = {}
     if event_ids:
         from promiselink.models.event import Event
         event_result = await session.execute(

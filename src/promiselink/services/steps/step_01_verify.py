@@ -24,6 +24,8 @@ class Step01_VerifyEvent(PipelineStep):
 
         event_id = context.event_id
         llm_client = context.llm_client
+        assert context.result is not None
+        assert llm_client is not None
 
         # Step 1: Quick check if event is still pending
         async with AsyncSessionLocal() as session:

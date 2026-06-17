@@ -15,7 +15,6 @@ from promiselink.models.entity import Entity
 from promiselink.models.event import Event
 from promiselink.models.todo import Todo
 
-
 # ── Constants ──
 
 TEST_USER_ID = "00000000-0000-0000-0000-000000000001"

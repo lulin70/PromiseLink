@@ -28,7 +28,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import and_, select, func as sqlfunc
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.core.logging import get_logger
@@ -490,7 +490,6 @@ class AssociationDiscoveryEngine:
         city = basic.get("city", "")
         company = basic.get("company", "")
 
-        conditions = [Entity.user_id == user_id, Entity.entity_type == "person"]
 
         # Build OR conditions for candidate matching
         or_conditions = []
@@ -616,7 +615,7 @@ class AssociationDiscoveryEngine:
                 continue
             for i in range(len(group)):
                 for j in range(i + 1, len(group)):
-                    pair_key = tuple(sorted([str(group[i].id), str(group[j].id)]))
+                    pair_key = tuple(sorted([str(group[i].id), str(group[j].id)]))  # type: ignore[assignment]
                     if pair_key in existing_pair_keys:
                         continue
                     assoc = self._create_association(
@@ -653,7 +652,7 @@ class AssociationDiscoveryEngine:
 
             for i in range(len(group)):
                 for j in range(i + 1, len(group)):
-                    pair_key = tuple(sorted([str(group[i].id), str(group[j].id)]))
+                    pair_key = tuple(sorted([str(group[i].id), str(group[j].id)]))  # type: ignore[assignment]
                     if pair_key in existing_pair_keys:
                         continue
                     # Check for ex_colleague using inverted index
@@ -689,7 +688,7 @@ class AssociationDiscoveryEngine:
                             },
                         )
                     results.append(assoc)
-                    existing_pair_keys.add(pair_key)
+                    existing_pair_keys.add(pair_key)  # type: ignore[arg-type]
 
         return results
 
@@ -1001,6 +1000,7 @@ class AssociationDiscoveryEngine:
         """
         try:
             import asyncio
+
             from promiselink.services.semantic_search import SemanticSearchEngine
 
             # Derive db_path from Settings (same as SemanticSearchEngine._default_db_path)

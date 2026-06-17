@@ -385,11 +385,10 @@ async def record_scheduled_event(
         )
 
     # Build participants context for raw_text prefix
-    participant_names = ""
     if se.participants:
         names = [p.get("name", "") for p in se.participants if p.get("name")]
         if names:
-            participant_names = f"（与{'、'.join(names)}）"
+            f"（与{'、'.join(names)}）"
 
     # Create Event
     event = Event(

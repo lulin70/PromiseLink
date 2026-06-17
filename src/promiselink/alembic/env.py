@@ -1,22 +1,17 @@
-from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool
-from alembic import context
 import os
 import sys
+from logging.config import fileConfig
+
+from alembic import context
+from sqlalchemy import engine_from_config, pool
 
 # Add project root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from promiselink.database import Base
 from promiselink.config import get_settings
+from promiselink.database import Base
 
 # Import all models so Base.metadata knows about them
-from promiselink.models.event import Event
-from promiselink.models.entity import Entity
-from promiselink.models.todo import Todo, SnoozeSchedule
-from promiselink.models.association import Association
-from promiselink.models.score_audit_log import ScoreAuditLog
-from promiselink.models.reminder import ReminderPreference, ReminderLog
 
 config = context.config
 

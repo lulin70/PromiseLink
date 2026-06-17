@@ -22,12 +22,15 @@ class Step04_TodoGeneration(PipelineStep):
 
     async def execute(self, context: PipelineContext) -> PipelineContext:
         from promiselink.database import AsyncSessionLocal, commit_with_retry
+
         # Import from event_pipeline to preserve test-patch compatibility
         from promiselink.services.event_pipeline import TodoGenerator
 
         event_id = context.event_id
         llm_client = context.llm_client
         entities = context.entities
+        assert context.result is not None
+        assert llm_client is not None
 
         todos: list[Todo] = []
         try:

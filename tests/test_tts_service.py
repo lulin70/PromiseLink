@@ -1,13 +1,12 @@
 """Tests for TTSService — text-to-audio via Moka AI TTS API."""
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 
 from promiselink.config import Settings
-from promiselink.services.tts_service import MAX_TEXT_LENGTH, TTSResult, TTSService
+from promiselink.services.tts_service import MAX_TEXT_LENGTH, TTSService
 
 
 def _make_config() -> Settings:

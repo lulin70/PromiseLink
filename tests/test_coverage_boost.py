@@ -14,7 +14,7 @@ Targets modules with lowest coverage to push overall from 77% to 80%+:
 import os
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -34,7 +34,6 @@ from promiselink.core.logging import configure_logging, get_logger, new_request_
 from promiselink.core.rate_limiter import (
     InMemorySlidingWindow,
     check_rate_limit,
-    reset_rate_limits,
 )
 from promiselink.core.redis import CacheService
 from promiselink.database import Base, get_async_session
@@ -46,7 +45,6 @@ from promiselink.services.notification_service import (
     NotificationService,
 )
 from promiselink.services.steps.context import PipelineContext
-
 
 # ── Shared Fixtures ──
 
@@ -1201,7 +1199,6 @@ class TestCoreLogging:
 
     def test_get_logger_returns_logger(self):
         """get_logger returns a structlog logger proxy."""
-        import structlog
         logger = get_logger("test_module")
         # get_logger returns a BoundLoggerLazyProxy, not BoundLogger directly
         assert logger is not None
@@ -1443,11 +1440,10 @@ class TestMainAppExceptionHandlers:
     @pytest.mark.asyncio
     async def test_business_error_handler(self, client):
         """BusinessError returns 400 with structured error."""
-        from promiselink.core.exceptions import BusinessError
-
         # Use the app's test client to trigger the exception handler directly
         from fastapi import Request
-        from fastapi.responses import JSONResponse
+
+        from promiselink.core.exceptions import BusinessError
 
         # Create a mock request and call the handler directly
         mock_request = MagicMock(spec=Request)
@@ -1466,9 +1462,10 @@ class TestMainAppExceptionHandlers:
     @pytest.mark.asyncio
     async def test_llm_error_handler(self):
         """LLMError returns appropriate status code."""
+        from fastapi import Request
+
         from promiselink.core.exceptions import LLMError, LLMRateLimitError, LLMTimeoutError
         from promiselink.main import llm_error_handler
-        from fastapi import Request
 
         mock_request = MagicMock(spec=Request)
 
@@ -1490,9 +1487,10 @@ class TestMainAppExceptionHandlers:
     @pytest.mark.asyncio
     async def test_promiselink_error_handler(self):
         """PromiseLinkError returns 500 with structured error."""
+        from fastapi import Request
+
         from promiselink.core.exceptions import PromiseLinkError
         from promiselink.main import promiselink_error_handler
-        from fastapi import Request
 
         mock_request = MagicMock(spec=Request)
         exc = PromiseLinkError("internal error", "INTERNAL", {"detail": "test"})
@@ -1561,9 +1559,10 @@ class TestDashboardAPI:
     @pytest.mark.asyncio
     async def test_day_view_with_event_and_todo(self, client, db_session):
         """Day-view returns events and todos for the target date."""
+        from datetime import date as date_type
+
         from promiselink.models.event import Event
         from promiselink.models.todo import Todo
-        from datetime import date as date_type
 
         today = date_type.today()
         event = Event(
@@ -1990,8 +1989,8 @@ class TestTodosAPI:
     @pytest.mark.asyncio
     async def test_list_todos_with_filters(self, client, db_session):
         """GET /todos with type and status filters."""
-        from promiselink.models.todo import Todo
         from promiselink.models.event import Event
+        from promiselink.models.todo import Todo
 
         event = Event(
             id=str(uuid.uuid4()), user_id=TEST_USER_ID, event_type="meeting",
@@ -2037,8 +2036,8 @@ class TestTodosAPI:
     @pytest.mark.asyncio
     async def test_get_todo_detail(self, client, db_session):
         """GET /todos/{id} returns todo detail."""
-        from promiselink.models.todo import Todo
         from promiselink.models.event import Event
+        from promiselink.models.todo import Todo
 
         event = Event(
             id=str(uuid.uuid4()), user_id=TEST_USER_ID, event_type="meeting",
@@ -2064,8 +2063,8 @@ class TestTodosAPI:
     @pytest.mark.asyncio
     async def test_update_todo_status(self, client, db_session):
         """PATCH /todos/{id} with status change uses state machine."""
-        from promiselink.models.todo import Todo
         from promiselink.models.event import Event
+        from promiselink.models.todo import Todo
 
         event = Event(
             id=str(uuid.uuid4()), user_id=TEST_USER_ID, event_type="meeting",
@@ -2093,8 +2092,8 @@ class TestTodosAPI:
     @pytest.mark.asyncio
     async def test_update_todo_with_feedback(self, client, db_session):
         """PATCH /todos/{id} with feedback updates properties."""
-        from promiselink.models.todo import Todo
         from promiselink.models.event import Event
+        from promiselink.models.todo import Todo
 
         event = Event(
             id=str(uuid.uuid4()), user_id=TEST_USER_ID, event_type="meeting",
@@ -2127,8 +2126,8 @@ class TestTodosAPI:
     @pytest.mark.asyncio
     async def test_update_todo_priority_override(self, client, db_session):
         """PATCH /todos/{id} with priority_override sets user priority."""
-        from promiselink.models.todo import Todo
         from promiselink.models.event import Event
+        from promiselink.models.todo import Todo
 
         event = Event(
             id=str(uuid.uuid4()), user_id=TEST_USER_ID, event_type="meeting",
@@ -2166,8 +2165,8 @@ class TestTodosAPI:
     @pytest.mark.asyncio
     async def test_delete_todo(self, client, db_session):
         """DELETE /todos/{id} deletes a todo."""
-        from promiselink.models.todo import Todo
         from promiselink.models.event import Event
+        from promiselink.models.todo import Todo
 
         event = Event(
             id=str(uuid.uuid4()), user_id=TEST_USER_ID, event_type="meeting",
@@ -2498,7 +2497,7 @@ class TestEmailSyncAPI:
             from_addr="sender@gmail.com",
             from_name="Sender",
             to_addrs=["user@gmail.com"],
-            date=datetime.now(timezone.utc),
+            date=datetime.now(UTC),
             body_text="Test body",
             body_html=None,
         )
@@ -2511,7 +2510,7 @@ class TestEmailSyncAPI:
                 return_value=MagicMock(
                     title="Test Subject",
                     raw_text="Test body",
-                    occurred_at=datetime.now(timezone.utc),
+                    occurred_at=datetime.now(UTC),
                     metadata={},
                 )
             )
@@ -2627,8 +2626,9 @@ class TestMainAppAdditional:
     @pytest.mark.asyncio
     async def test_internal_error_handler(self):
         """500 error handler returns structured error."""
-        from promiselink.main import internal_error_handler
         from fastapi import Request
+
+        from promiselink.main import internal_error_handler
 
         mock_request = MagicMock(spec=Request)
         exc = Exception("test error")
@@ -2643,7 +2643,8 @@ class TestMainAppAdditional:
     async def test_track_task(self):
         """_track_task adds task to pending set and removes on done."""
         import asyncio
-        from promiselink.main import _track_task, _pending_tasks
+
+        from promiselink.main import _pending_tasks, _track_task
 
         async def dummy():
             pass
@@ -2660,7 +2661,7 @@ class TestMainAppAdditional:
     @pytest.mark.asyncio
     async def test_signal_handler(self):
         """_signal_handler sets shutdown event."""
-        from promiselink.main import _signal_handler, _shutdown_event
+        from promiselink.main import _shutdown_event, _signal_handler
 
         _shutdown_event.clear()
         _signal_handler(15, None)
@@ -2702,8 +2703,8 @@ class TestTodoStateMachine:
     @pytest.mark.asyncio
     async def test_transition_pending_to_done(self, db_session):
         """Transition from pending to done sets completed_at."""
-        from promiselink.models.todo import Todo
         from promiselink.models.event import Event
+        from promiselink.models.todo import Todo
         from promiselink.services.todo_state_machine import TodoStateMachine
 
         event = Event(
@@ -2729,10 +2730,10 @@ class TestTodoStateMachine:
     @pytest.mark.asyncio
     async def test_transition_invalid(self, db_session):
         """Invalid transition raises InvalidTransitionError."""
-        from promiselink.models.todo import Todo
-        from promiselink.models.event import Event
-        from promiselink.services.todo_state_machine import TodoStateMachine
         from promiselink.core.exceptions import InvalidTransitionError
+        from promiselink.models.event import Event
+        from promiselink.models.todo import Todo
+        from promiselink.services.todo_state_machine import TodoStateMachine
 
         event = Event(
             id=str(uuid.uuid4()), user_id=TEST_USER_ID, event_type="meeting",
@@ -2756,8 +2757,8 @@ class TestTodoStateMachine:
     @pytest.mark.asyncio
     async def test_transition_to_snoozed_requires_until(self, db_session):
         """Transition to snoozed requires snoozed_until."""
-        from promiselink.models.todo import Todo
         from promiselink.models.event import Event
+        from promiselink.models.todo import Todo
         from promiselink.services.todo_state_machine import TodoStateMachine
 
         event = Event(
@@ -2843,12 +2844,13 @@ class TestRelationshipStageMachine:
     def test_suggest_transition_dormant(self):
         """Suggest DORMANT when no interaction for >90 days."""
         from datetime import timedelta
+
         from promiselink.services.relationship_stage import (
             RelationshipStage,
             RelationshipStageMachine,
         )
         sm = RelationshipStageMachine()
-        old_date = datetime.now(timezone.utc) - timedelta(days=100)
+        old_date = datetime.now(UTC) - timedelta(days=100)
         result = sm.suggest_transition(
             RelationshipStage.ACTIVE_COOPERATION,
             {"last_interaction_date": old_date},
@@ -2941,12 +2943,12 @@ class TestRelationshipStageMachine:
 
     def test_apply_transition_invalid_raises(self):
         """Invalid transition raises InvalidTransitionError."""
+        from promiselink.core.exceptions import InvalidTransitionError
         from promiselink.models.relationship_brief import RelationshipBrief
         from promiselink.services.relationship_stage import (
             RelationshipStage,
             RelationshipStageMachine,
         )
-        from promiselink.core.exceptions import InvalidTransitionError
         sm = RelationshipStageMachine()
         brief = RelationshipBrief(
             id=str(uuid.uuid4()), user_id=TEST_USER_ID,
@@ -2967,11 +2969,12 @@ class TestRelationshipStageMachine:
     def test_check_dormant_eligibility(self):
         """check_dormant_eligibility detects inactivity."""
         from datetime import timedelta
+
         from promiselink.services.relationship_stage import RelationshipStageMachine
         sm = RelationshipStageMachine()
-        old_date = datetime.now(timezone.utc) - timedelta(days=100)
+        old_date = datetime.now(UTC) - timedelta(days=100)
         assert sm.check_dormant_eligibility(old_date) is True
-        assert sm.check_dormant_eligibility(datetime.now(timezone.utc)) is False
+        assert sm.check_dormant_eligibility(datetime.now(UTC)) is False
         assert sm.check_dormant_eligibility(None) is False
 
 
@@ -2991,7 +2994,7 @@ class TestRelationshipBriefHelpers:
             "open_promises": {"my_promises": [{"title": "p1"}], "their_promises": []},
             "their_concerns": ["concern1"],
             "my_contributions": ["contrib1"],
-            "last_interaction": {"date": datetime.now(timezone.utc).isoformat()},
+            "last_interaction": {"date": datetime.now(UTC).isoformat()},
         }
         score = RelationshipBriefService._calculate_strength_score(data)
         assert 0 < score <= 100
@@ -3005,7 +3008,6 @@ class TestRelationshipBriefHelpers:
     def test_sync_open_promises(self):
         """_sync_open_promises categorizes promises correctly."""
         from promiselink.services.relationship_brief_service import RelationshipBriefService
-        from promiselink.models.todo import Todo
 
         todos = [
             MagicMock(todo_type="promise", title="My promise", status="pending",

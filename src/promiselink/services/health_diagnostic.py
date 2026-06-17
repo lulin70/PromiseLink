@@ -12,7 +12,7 @@ Source: brainstorm-ai-usecases #6 (Quick Win 3.50/2.25).
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import func, select
@@ -22,10 +22,9 @@ from promiselink.models.entity import Entity
 from promiselink.models.event import Event
 from promiselink.models.todo import Todo
 from promiselink.services.relationship_stage import (
-    RelationshipStage,
     STAGE_METADATA,
+    RelationshipStage,
 )
-
 
 # ── Health Score Constants ──
 

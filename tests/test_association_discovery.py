@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from promiselink.models.association import Association
 from promiselink.models.entity import Entity
 from promiselink.services.association_discovery import (
-    CONFIRM_THRESHOLD,
     VALID_ASSOCIATION_TYPES,
     AssociationDiscoveryEngine,
 )

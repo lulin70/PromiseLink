@@ -1,7 +1,6 @@
 """Tests for F-50 Voice API endpoints — session CRUD and user isolation."""
 
 import os
-import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest

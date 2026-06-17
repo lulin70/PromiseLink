@@ -6,14 +6,13 @@ Transitions with side effects (feedback, completed_at, snooze scheduling).
 """
 
 from datetime import UTC, datetime
-from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from promiselink.core.logging import get_logger
 from promiselink.core.exceptions import InvalidTransitionError
-from promiselink.models.todo import Todo, SnoozeSchedule
+from promiselink.core.logging import get_logger
+from promiselink.models.todo import SnoozeSchedule, Todo
 
 logger = get_logger("promiselink.todo_state_machine")
 
@@ -65,8 +64,8 @@ class TodoStateMachine:
         self,
         todo: Todo,
         new_status: str,
-        snoozed_until: Optional[datetime] = None,
-        feedback: Optional[str] = None,
+        snoozed_until: datetime | None = None,
+        feedback: str | None = None,
     ) -> Todo:
         """Execute a state transition with validation and side effects.
 

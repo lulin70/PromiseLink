@@ -10,12 +10,12 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from promiselink.services.entity_extractor import ExtractionResult
-from promiselink.services.llm_client import LLMClient
-from promiselink.services.memory_provider import MemoryProvider
 from promiselink.config import Settings
 from promiselink.models.entity import Entity
 from promiselink.models.todo import Todo
+from promiselink.services.entity_extractor import ExtractionResult
+from promiselink.services.llm_client import LLMClient
+from promiselink.services.memory_provider import MemoryProvider
 
 
 @dataclass

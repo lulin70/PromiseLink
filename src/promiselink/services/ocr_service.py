@@ -9,7 +9,7 @@ Fallback: if Vision API fails, return raw text extraction attempt.
 import asyncio
 import base64
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import httpx
 

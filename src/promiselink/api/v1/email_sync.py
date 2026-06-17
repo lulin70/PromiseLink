@@ -4,11 +4,9 @@ Implements PRD §5.17.2: POST /api/v1/email/sync
 Fetches unread emails from IMAP and creates Events in the pipeline.
 """
 
-import uuid
 from datetime import UTC, datetime
-from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 

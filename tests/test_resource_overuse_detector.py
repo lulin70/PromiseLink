@@ -11,7 +11,7 @@ Covers:
 """
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +19,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from promiselink.models.entity import Entity
 from promiselink.models.todo import Todo
 from promiselink.services.resource_overuse_detector import (
-    OVERUSE_THRESHOLD,
     ResourceOveruseDetector,
 )
 from tests.conftest import create_test_event, make_user_id
@@ -65,7 +64,7 @@ async def _create_request_todo(
         source_event_id=str(event.id),
         action_type=action_type,
         related_entity_id=related_entity_id,
-        created_at=created_at or datetime.now(timezone.utc),
+        created_at=created_at or datetime.now(UTC),
     )
     session.add(todo)
     await session.flush()
@@ -214,7 +213,7 @@ class TestWindowExpiry:
         user_id = make_user_id()
         entity = await _create_entity(db_session, user_id)
         # 3 requests 31 days ago — outside window
-        old_time = datetime.now(timezone.utc) - timedelta(days=31)
+        old_time = datetime.now(UTC) - timedelta(days=31)
         for _ in range(3):
             await _create_request_todo(
                 db_session, user_id, str(entity.id), created_at=old_time
@@ -230,7 +229,7 @@ class TestWindowExpiry:
         user_id = make_user_id()
         entity = await _create_entity(db_session, user_id)
         # 2 old requests (outside window) + 2 new requests (inside window)
-        old_time = datetime.now(timezone.utc) - timedelta(days=31)
+        old_time = datetime.now(UTC) - timedelta(days=31)
         await _create_request_todo(
             db_session, user_id, str(entity.id), created_at=old_time
         )

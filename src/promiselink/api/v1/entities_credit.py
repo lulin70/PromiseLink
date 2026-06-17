@@ -95,7 +95,7 @@ async def list_credit_scores(
         .group_by(Todo.related_entity_id)
         .having(func.count() >= min_interactions)
     )
-    entity_counts = dict((await session.execute(todo_count_q)).all())
+    entity_counts: dict[str, int] = dict((await session.execute(todo_count_q)).all())  # type: ignore[arg-type]
 
     if not entity_counts:
         return CreditScoreListResponse(items=[], total=0)

@@ -5,7 +5,7 @@ Covers: can_transition, suggest_transition, apply_transition,
 """
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -18,7 +18,6 @@ from promiselink.services.relationship_stage import (
     RelationshipStageMachine,
     StageTransitionResult,
 )
-
 
 # ── Helpers ──
 
@@ -219,7 +218,7 @@ class TestSuggestUnderstandingNeeds:
 class TestSuggestDormant:
     def test_over_90_days_suggests_dormant(self):
         sm = RelationshipStageMachine()
-        old_date = datetime.now(timezone.utc) - timedelta(days=95)
+        old_date = datetime.now(UTC) - timedelta(days=95)
         result = sm.suggest_transition(
             RelationshipStage.VALUE_RESPONSE,
             interaction_data={"last_interaction_date": old_date},
@@ -230,7 +229,7 @@ class TestSuggestDormant:
 
     def test_30_days_no_dormant_suggestion(self):
         sm = RelationshipStageMachine()
-        recent_date = datetime.now(timezone.utc) - timedelta(days=30)
+        recent_date = datetime.now(UTC) - timedelta(days=30)
         result = sm.suggest_transition(
             RelationshipStage.VALUE_RESPONSE,
             interaction_data={"last_interaction_date": recent_date},
@@ -477,17 +476,17 @@ class TestGetAllStages:
 class TestDormantEligibilityTrue:
     def test_91_days_ago_eligible(self):
         sm = RelationshipStageMachine()
-        old_date = datetime.now(timezone.utc) - timedelta(days=91)
+        old_date = datetime.now(UTC) - timedelta(days=91)
         assert sm.check_dormant_eligibility(old_date) is True
 
     def test_100_days_ago_eligible(self):
         sm = RelationshipStageMachine()
-        old_date = datetime.now(timezone.utc) - timedelta(days=100)
+        old_date = datetime.now(UTC) - timedelta(days=100)
         assert sm.check_dormant_eligibility(old_date) is True
 
     def test_exactly_threshold_plus_one(self):
         sm = RelationshipStageMachine()
-        old_date = datetime.now(timezone.utc) - timedelta(days=91)
+        old_date = datetime.now(UTC) - timedelta(days=91)
         assert sm.check_dormant_eligibility(old_date) is True
 
 
@@ -497,18 +496,18 @@ class TestDormantEligibilityTrue:
 class TestDormantEligibilityFalse:
     def test_30_days_ago_not_eligible(self):
         sm = RelationshipStageMachine()
-        recent = datetime.now(timezone.utc) - timedelta(days=30)
+        recent = datetime.now(UTC) - timedelta(days=30)
         assert sm.check_dormant_eligibility(recent) is False
 
     def test_90_days_ago_not_eligible(self):
         """Exactly 90 days should NOT be eligible (> 90, not >=)."""
         sm = RelationshipStageMachine()
-        boundary = datetime.now(timezone.utc) - timedelta(days=90)
+        boundary = datetime.now(UTC) - timedelta(days=90)
         assert sm.check_dormant_eligibility(boundary) is False
 
     def test_1_day_ago_not_eligible(self):
         sm = RelationshipStageMachine()
-        very_recent = datetime.now(timezone.utc) - timedelta(days=1)
+        very_recent = datetime.now(UTC) - timedelta(days=1)
         assert sm.check_dormant_eligibility(very_recent) is False
 
     def test_none_returns_false(self):

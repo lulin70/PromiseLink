@@ -1,6 +1,6 @@
 """FastAPI dependency injection for rate limiting and other shared concerns."""
 
-from fastapi import Depends, Request, status
+from fastapi import Depends, Request
 
 from promiselink.config import get_settings
 from promiselink.core.auth import get_optional_user_id

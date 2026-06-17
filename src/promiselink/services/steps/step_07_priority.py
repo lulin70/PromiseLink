@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 
@@ -24,6 +24,7 @@ class Step07_PriorityScoring(PipelineStep):
         from promiselink.services.priority_scorer import PriorityScorerV2
 
         event_id = context.event_id
+        assert context.result is not None
 
         _t85 = time.monotonic()
         try:
@@ -37,7 +38,7 @@ class Step07_PriorityScoring(PipelineStep):
                     try:
                         score_result = await scorer_v2.score_with_context(todo, score_session)
                         todo.dynamic_score = score_result.score
-                        todo.score_calculated_at = datetime.now(timezone.utc)
+                        todo.score_calculated_at = datetime.now(UTC)
                     except Exception as score_err:
                         logger.warning("pipeline_step8_5_score_failed",
                             todo_id=str(todo.id), error=str(score_err))

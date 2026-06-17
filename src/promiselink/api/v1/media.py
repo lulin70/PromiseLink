@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from promiselink.api.dependencies import rate_limit_llm_dependency
 from promiselink.config import get_settings
 from promiselink.core.auth import get_current_user_id
-from promiselink.core.exceptions import ValidationError, BusinessError
+from promiselink.core.exceptions import BusinessError, ValidationError
 from promiselink.core.logging import get_logger, new_request_id
 from promiselink.database import get_async_session
 from promiselink.models import Event

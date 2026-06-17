@@ -8,13 +8,13 @@ from sqlalchemy import JSON, CheckConstraint, ForeignKey, Index, String, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from promiselink.database import Base, IS_SQLITE, _uuid_default
+from promiselink.database import IS_SQLITE, Base, _uuid_default
 
 
 class Entity(Base):
     """
     Entity model representing extracted business entities.
-    
+
     Schema aligned with Technical Design v1.7 §3.1
     Supports 5 entity types: person, organization, topic, technology, project
     """
@@ -36,13 +36,13 @@ class Entity(Base):
     )
     entity_type: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
-    
+
     # Entity resolution fields
     canonical_name: Mapped[str] = mapped_column(String(200), nullable=False)
     aliases: Mapped[list[str] | None] = mapped_column(
         JSONB if not IS_SQLITE else JSON,
     )
-    
+
     # Properties (JSONB for PostgreSQL, JSON for SQLite)
     # Contains entity-specific attributes, e.g., for person:
     # {
@@ -55,7 +55,7 @@ class Entity(Base):
     properties: Mapped[dict[str, Any] | None] = mapped_column(
         JSONB if not IS_SQLITE else JSON,
     )
-    
+
     # Source tracking
     source_event_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True) if not IS_SQLITE else String(36),
@@ -64,7 +64,7 @@ class Entity(Base):
     )
     confidence: Mapped[float] = mapped_column(nullable=False, default=1.0)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="confirmed")
-    
+
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(nullable=False, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

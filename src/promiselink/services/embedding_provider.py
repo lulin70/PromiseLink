@@ -196,7 +196,7 @@ class EmbeddingProvider:
 
     async def _embed_local(self, text: str, cache_key: str) -> list[float]:
         """Embed text using local sentence-transformers model.
-        
+
         Lazy-loads moka-ai/m3e-base on first call.
         Falls back to simple hash-based pseudo-embedding if
         sentence-transformers is not installed.
@@ -216,8 +216,9 @@ class EmbeddingProvider:
         # Run encoding in thread pool (CPU-bound)
         import asyncio
         loop = asyncio.get_event_loop()
+        assert self._local_model is not None
         embedding = await loop.run_in_executor(
-            None, lambda: self._local_model.encode(text).tolist()
+            None, lambda: self._local_model.encode(text).tolist()  # type: ignore[union-attr]
         )
         self._cache[cache_key] = embedding
 
@@ -226,25 +227,25 @@ class EmbeddingProvider:
             text_len=len(text),
             dims=len(embedding),
         )
-        return embedding
+        return list(embedding)
 
     def _pseudo_embedding(self, text: str, cache_key: str) -> list[float]:
         """Generate deterministic pseudo-embedding for testing without ML models.
-        
+
         NOT suitable for production — only for testing when no embedding
         model is available. Uses hash-based normalization.
         """
         import hashlib
         import struct
-        
+
         # Generate deterministic bytes from text
-        h = hashlib.sha512(text.encode("utf-8")).digest()
+        hashlib.sha512(text.encode("utf-8")).digest()
         # Use LOCAL_EMBEDDING_DIMENSIONS (384) for consistency with local model
         dims = LOCAL_EMBEDDING_DIMENSIONS
         full_bytes = b""
         for i in range(4):  # 4 * 64 = 256 bytes, enough for 384 * 4 = 1536
             full_bytes += hashlib.sha512((text + str(i)).encode("utf-8")).digest()
-        
+
         # Convert to floats and normalize
         floats = []
         for i in range(dims):
@@ -254,14 +255,14 @@ class EmbeddingProvider:
                 floats.append(val)
             else:
                 floats.append(0.0)
-        
+
         # Normalize to unit vector
         norm = sum(x * x for x in floats) ** 0.5
         if norm > 0:
             embedding = [x / norm for x in floats]
         else:
             embedding = [0.0] * dims
-        
+
         self._cache[cache_key] = embedding
         logger.warning("pseudo_embedding_used", text_len=len(text))
         return embedding

@@ -9,16 +9,13 @@ Algorithm Design §2 + §3.5
 from __future__ import annotations
 
 import json
-import math
-from dataclasses import dataclass
-from datetime import datetime
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from promiselink.services.llm_client import LLMClient
     from promiselink.services.llm_provider import LLMProvider
 
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.core.logging import get_logger
@@ -77,15 +74,16 @@ class SensitivityFilter:
         if isinstance(resource, dict):
             sens = resource.get("sensitivity")
             if sens:
-                return sens
+                return str(sens)  # type: ignore[no-any-return]
         sens = props.get("resource_sensitivity")
         if sens:
-            return sens
+            return str(sens)  # type: ignore[no-any-return]
         return self.DEFAULT
 
     def batch_filter(self, persons: list[Entity]) -> tuple[list[Entity], list[Entity]]:
         """Filter persons into (matchable, filtered) lists."""
-        matchable, filtered = [], []
+        matchable: list[Entity] = []
+        filtered: list[Entity] = []
         for p in persons:
             (matchable if self.check(p) else filtered).append(p)
         return matchable, filtered
@@ -103,7 +101,7 @@ class PromiseFulfillmentEngine:
         self,
         session: AsyncSession,
         llm_client: LLMProvider | LLMClient | None = None,
-        config: Optional[dict] = None,
+        config: dict | None = None,
         stage: str = "poc",
     ):
         self.session = session
@@ -308,6 +306,8 @@ class PromiseFulfillmentEngine:
 
     async def _llm_semantic_judge(self, todo: Todo, person: Entity) -> float:
         """LLM semantic judgment (Phase2 only)."""
+        if self.llm is None:
+            return 0.5
         sanitized = self._sanitize_for_llm(todo, person)
         try:
             response = await self.llm.generate(

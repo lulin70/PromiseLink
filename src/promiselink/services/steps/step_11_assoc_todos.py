@@ -24,6 +24,7 @@ class Step11_AssociationTodos(PipelineStep):
 
         event_id = context.event_id
         user_id = context.user_id
+        assert context.result is not None
 
         _t7_5 = time.monotonic()
         try:

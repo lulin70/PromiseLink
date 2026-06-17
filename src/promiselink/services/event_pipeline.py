@@ -26,9 +26,10 @@ the public API (``PipelineResult``, ``process_event_with_short_transactions``)
 and re-exports the service classes so that existing test patches continue to work.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from promiselink.core.logging import get_logger
+from promiselink.services.association_discovery import AssociationDiscoveryEngine  # noqa: F401
 from promiselink.services.llm_client import LLMClient
 from promiselink.services.memory_provider import create_memory_provider
 from promiselink.services.steps import (
@@ -48,8 +49,9 @@ from promiselink.services.steps import (
 )
 from promiselink.services.steps.context import PipelineContext, PipelineResult
 from promiselink.services.title_generator import generate_event_title
-from promiselink.services.todo_generator import TodoGenerator
-from promiselink.services.association_discovery import AssociationDiscoveryEngine
+
+# Re-export for backward-compatible test patches (mock targets)
+from promiselink.services.todo_generator import TodoGenerator  # noqa: F401
 
 logger = get_logger("promiselink.pipeline")
 
@@ -111,7 +113,7 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
 
     result = PipelineResult(
         event_id=str(event_id),
-        started_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
     )
 
     # Build context shared across all steps
@@ -131,8 +133,9 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
     # Resolve user_id for per-user locking
     _resolved_user_id = ""
     try:
-        from promiselink.database import AsyncSessionLocal
         from sqlalchemy import select as _sel
+
+        from promiselink.database import AsyncSessionLocal
         from promiselink.models.event import Event as _Evt
 
         async with AsyncSessionLocal() as _sess:
@@ -169,9 +172,10 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
 
             # If pipeline was stopped early (critical step failure), finalize event status
             if ctx.should_stop and result.status not in ("failed", "skipped"):
+                from sqlalchemy import select as _select
+
                 from promiselink.database import AsyncSessionLocal
                 from promiselink.models.event import Event as _Event
-                from sqlalchemy import select as _select
 
                 # Determine if LLM failure → awaiting_retry (user can retry later)
                 # vs other failures → failed
@@ -183,7 +187,7 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
 
                 result.status = final_status
                 result.failed_steps = list(ctx.failed_steps)
-                result.completed_at = datetime.now(timezone.utc)
+                result.completed_at = datetime.now(UTC)
 
                 try:
                     async with AsyncSessionLocal() as session:
@@ -194,21 +198,22 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
                             event = db_result.scalar_one_or_none()
                             if event and event.status == "processing":
                                 event.status = final_status
-                                event.processed_at = datetime.now(timezone.utc)
+                                event.processed_at = datetime.now(UTC)
                                 if ctx.failed_steps:
                                     event.failed_steps = list(ctx.failed_steps)
                 except Exception as mark_err:
                     logger.error("pipeline_failed_to_mark_partial", event_id=str(event_id), error=str(mark_err))
 
         except Exception as e:
-            from promiselink.database import AsyncSessionLocal
             from sqlalchemy import select
+
+            from promiselink.database import AsyncSessionLocal
             from promiselink.models.event import Event as _Event
 
             logger.exception("pipeline_error", event_id=str(event_id), error=str(e))
             result.status = "failed"
             result.error = str(e)
-            result.completed_at = datetime.now(timezone.utc)
+            result.completed_at = datetime.now(UTC)
 
             # Try to mark event as failed
             try:
@@ -220,7 +225,7 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
                         event = db_result.scalar_one_or_none()
                         if event and event.status == "processing":
                             event.status = "failed"
-                            event.processed_at = datetime.now(timezone.utc)
+                            event.processed_at = datetime.now(UTC)
             except Exception as mark_failed_err:
                 logger.error("pipeline_failed_to_mark_failed", event_id=str(event_id), error=str(mark_failed_err))
 

@@ -213,7 +213,7 @@ class LLMClient:
         cached = await cache_service.get(cache_key)
         if cached:
             logger.debug("llm_cache_hit", key=cache_key)
-            return cached["content"]
+            return cached["content"]  # type: ignore[no-any-return]
 
         start_time = time.monotonic()
         last_error: Exception | None = None

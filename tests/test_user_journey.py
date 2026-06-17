@@ -19,23 +19,22 @@ with LLM calls mocked out. No external services required.
 """
 
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event as sa_event, select
+from sqlalchemy import event as sa_event
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from promiselink.core.auth import create_access_token, get_current_user_id
-from promiselink.core.rate_limiter import reset_rate_limits
+from promiselink.core.auth import get_current_user_id
 from promiselink.database import Base, get_async_session
 from promiselink.main import app
 from promiselink.models.association import Association
 from promiselink.models.entity import Entity
 from promiselink.models.event import Event
-from promiselink.models.relationship_brief import RelationshipBrief
 from promiselink.models.todo import Todo
 from promiselink.services.relationship_brief_service import RelationshipBriefService
 
@@ -358,7 +357,7 @@ class TestJourney1RecordInteraction:
         now_local = datetime.now(_CST)
         today_local = now_local.date()
         # Store as naive UTC (matching how the DB stores timestamps)
-        event_ts = now_local.astimezone(timezone.utc).replace(tzinfo=None)
+        event_ts = now_local.astimezone(UTC).replace(tzinfo=None)
         event = await insert_event(
             db_session,
             title="和张总见面",
@@ -591,7 +590,7 @@ class TestJourney2DailyReview:
         self, client: AsyncClient, db_session: AsyncSession
     ):
         """Step 5: Day-view shows today's events."""
-        today_ts = datetime.now(timezone.utc).replace(hour=10, minute=0, second=0, microsecond=0)
+        today_ts = datetime.now(UTC).replace(hour=10, minute=0, second=0, microsecond=0)
         event = await insert_event(
             db_session,
             title="今天的会议",
@@ -620,7 +619,7 @@ class TestJourney2DailyReview:
     ):
         """Complete Journey 2: Morning brief → todos → mark done → day-view."""
         # Setup: Create events and todos for today
-        today_ts = datetime.now(timezone.utc).replace(hour=9, minute=0, second=0, microsecond=0)
+        today_ts = datetime.now(UTC).replace(hour=9, minute=0, second=0, microsecond=0)
         event = await insert_event(
             db_session, title="晨会", timestamp=today_ts, event_type="meeting", status="completed"
         )

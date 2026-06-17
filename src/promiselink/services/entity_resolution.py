@@ -7,16 +7,16 @@ Thresholds: AUTO_MERGE ≥ 0.85, CONFIRM ≥ 0.70, CREATE < 0.70
 from __future__ import annotations
 
 import json
-from enum import Enum
 from dataclasses import dataclass, field
-from typing import Any, Optional, TYPE_CHECKING
 from datetime import UTC, datetime
+from enum import Enum
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from promiselink.services.llm_client import LLMClient
     from promiselink.services.llm_provider import LLMProvider
 
-from sqlalchemy import select, and_
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.core.logging import get_logger
@@ -36,7 +36,7 @@ class ResolutionAction(str, Enum):
 class ResolutionResult:
     """Result of entity resolution process."""
     action: ResolutionAction
-    target_entity: Optional[Entity] = None
+    target_entity: Entity | None = None
     confidence: float = 0.0
     matched_step: str = ""
     matched_fields: dict[str, Any] = field(default_factory=dict)
@@ -121,7 +121,7 @@ class EntityResolutionEngine:
         ]
 
         for step_name, step_fn in steps:
-            best_result: Optional[ResolutionResult] = None
+            best_result: ResolutionResult | None = None
 
             for candidate in candidates:
                 confidence, matched_fields = step_fn(new_entity_data, candidate)
@@ -397,7 +397,7 @@ class EntityResolutionEngine:
 
     def _step_alias(
         self, new: dict[str, Any], existing: Entity
-    ) -> tuple[float, dict[str, float]]:
+    ) -> tuple[float, dict[str, Any]]:
         """Step 2: Name in aliases list or Chinese honorific match.
 
         Extended with Chinese honorific matching:
@@ -442,7 +442,7 @@ class EntityResolutionEngine:
                 score = 0.82 + context_boost
                 fields = {
                     "name": 0.82,
-                    "surname_match": new_surname,
+                    "surname_match": new_surname,  # type: ignore[dict-item]
                     "company": 1.0 if company_match else 0.5,
                 }
                 return score, fields
@@ -455,7 +455,7 @@ class EntityResolutionEngine:
                     score = 0.85 if company_match else 0.80
                     fields = {
                         "name": 0.85,
-                        "surname_match": new_surname,
+                        "surname_match": new_surname,  # type: ignore[dict-item]
                         "alias": True,
                         "company": 1.0 if company_match else 0.5,
                     }

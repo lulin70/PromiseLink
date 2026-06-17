@@ -12,14 +12,12 @@ These tests use REAL local embedding model (no mock) and REAL SQLite file
 to catch integration bugs that mock-based tests cannot.
 """
 
-import os
 import sqlite3
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from promiselink.database import Base
@@ -31,7 +29,6 @@ from promiselink.services.embedding_provider import (
     EmbeddingProvider,
 )
 from promiselink.services.semantic_search import SemanticSearchEngine
-
 
 # ---------------------------------------------------------------------------
 # Fixtures — real SQLite file (not in-memory) for cross-connection access
@@ -249,7 +246,7 @@ async def test_priority_scorer_v2_with_real_db(real_db_session, user_id):
         todo_type="promise",
         action_type="my_promise",
         status="pending",
-        due_date=datetime.now(timezone.utc) + timedelta(days=3),
+        due_date=datetime.now(UTC) + timedelta(days=3),
     )
     real_db_session.add(todo)
     await real_db_session.commit()

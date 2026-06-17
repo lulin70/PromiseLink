@@ -1,7 +1,6 @@
 """Tests for WeChat Forward API endpoint (PRD §5.17)."""
 
 import os
-import uuid
 from unittest.mock import AsyncMock, patch
 
 import pytest

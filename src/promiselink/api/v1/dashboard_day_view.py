@@ -1,21 +1,21 @@
 """Dashboard Day View endpoint — F-49: 日视图 Dashboard API."""
 
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select, func, or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.core.auth import get_current_user_id
 from promiselink.core.logging import get_logger, new_request_id
 from promiselink.core.natural_date import parse_natural_date
 from promiselink.database import get_async_session
-from promiselink.models.event import Event
-from promiselink.models.todo import Todo
 from promiselink.models.entity import Entity
+from promiselink.models.event import Event
 from promiselink.models.scheduled_event import ScheduledEvent
+from promiselink.models.todo import Todo
 
 logger = get_logger("promiselink.api.dashboard.day_view")
 router = APIRouter(tags=["Dashboard"])
@@ -122,8 +122,8 @@ async def get_day_view(
     day_start_local = datetime(target_date.year, target_date.month, target_date.day, 0, 0, 0, tzinfo=_CST)
     day_end_local = day_start_local + timedelta(days=1)
     # Convert to UTC for database comparison (timestamps stored as naive UTC in SQLite)
-    day_start = day_start_local.astimezone(timezone.utc).replace(tzinfo=None)
-    day_end = day_end_local.astimezone(timezone.utc).replace(tzinfo=None)
+    day_start = day_start_local.astimezone(UTC).replace(tzinfo=None)
+    day_end = day_end_local.astimezone(UTC).replace(tzinfo=None)
 
     event_result = await session.execute(
         select(Event)
@@ -154,7 +154,7 @@ async def get_day_view(
             .where(Todo.source_event_id.in_(event_ids))
             .group_by(Todo.source_event_id)
         )
-        todo_count_map = dict(todo_count_result.fetchall())
+        todo_count_map: dict[str, int] = dict(todo_count_result.fetchall())  # type: ignore[arg-type]
 
     # Build event items with entity names and todo counts
     event_items = []

@@ -239,7 +239,7 @@ class TestCSVImportValidation:
         assert resp.status_code == 400
 
     async def test_skip_rows_without_name(self, client: AsyncClient):
-        csv_data = "name,company\n,Acme Corp\n张三,Tech Inc\n".encode("utf-8")
+        csv_data = "name,company\n,Acme Corp\n张三,Tech Inc\n".encode()
         resp = await client.post(
             f"{API_PREFIX}/import/csv",
             files={"file": ("skip.csv", csv_data, "text/csv")},
@@ -250,7 +250,7 @@ class TestCSVImportValidation:
         assert data["created_entities"] == 1
 
     async def test_skip_empty_rows(self, client: AsyncClient):
-        csv_data = "name,company\n张三,Acme\n,\n李四,Tech\n".encode("utf-8")
+        csv_data = "name,company\n张三,Acme\n,\n李四,Tech\n".encode()
         resp = await client.post(
             f"{API_PREFIX}/import/csv",
             files={"file": ("empty_rows.csv", csv_data, "text/csv")},

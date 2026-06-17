@@ -14,7 +14,6 @@ from promiselink.core.rate_limiter import reset_rate_limits
 from promiselink.database import Base, get_async_session
 from promiselink.main import app
 
-
 # ── Constants ──
 
 TEST_USER_ID = "00000000-0000-0000-0000-000000000001"
@@ -177,8 +176,8 @@ async def test_privacy_data_summary_requires_auth(unauth_client):
 async def test_privacy_data_summary_returns_counts(client, db_session):
     """GET /privacy/data-summary returns correct counts of user data."""
     # Create some test data
-    from promiselink.models.event import Event
     from promiselink.models.entity import Entity
+    from promiselink.models.event import Event
     from promiselink.models.todo import Todo
 
     # Create events first (entities and todos reference events)
@@ -243,10 +242,8 @@ async def test_privacy_data_summary_returns_counts(client, db_session):
 )
 async def test_privacy_delete_user_data(client, db_session):
     """DELETE /privacy/user-data removes all user data."""
-    from promiselink.models.event import Event
     from promiselink.models.entity import Entity
-    from promiselink.models.todo import Todo
-    from promiselink.models.association import Association
+    from promiselink.models.event import Event
 
     # Create test data
     event_ids = []
@@ -280,7 +277,7 @@ async def test_privacy_delete_user_data(client, db_session):
     await db_session.commit()
 
     # Verify data exists before deletion
-    from sqlalchemy import select, func
+    from sqlalchemy import func, select
 
     count_before = (
         await db_session.execute(

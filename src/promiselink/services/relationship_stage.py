@@ -10,8 +10,8 @@ Phase 1+: heuristic suggestions + LLM-assisted transitions.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from promiselink.models.relationship_brief import RelationshipBrief
 
 from promiselink.core.exceptions import InvalidTransitionError
-
 
 # ── Stage Enumeration ──
 
@@ -382,10 +381,10 @@ class RelationshipStageMachine:
         if last_interaction_date is None:
             return False
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         # Ensure comparison in UTC
         if last_interaction_date.tzinfo is None:
-            last_interaction_date = last_interaction_date.replace(tzinfo=timezone.utc)
+            last_interaction_date = last_interaction_date.replace(tzinfo=UTC)
 
         delta = now - last_interaction_date
         return delta.days > self.DORMANT_THRESHOLD_DAYS

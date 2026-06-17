@@ -1,6 +1,6 @@
 """Dashboard Relationship Health & Care Reminders — F-G1: 关系健康诊断 + F-G3: 关怀提醒."""
 
-from datetime import date, datetime
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel

@@ -20,7 +20,7 @@ All notable changes to PromiseLink will be documented in this file.
 ### Changed
 - **E2E测试改进**: 测试框架增强，覆盖更多用户场景
 - **文档重命名**: 12个EventLink命名文件统一重命名为PromiseLink
-- **测试数量**: 1314测试通过, 60个测试文件, 22个路由模块, 72个API端点
+- **测试数量**: 1210测试通过, 60个测试文件, 29个路由文件, 62个API端点
 - **安装命令**: `pip install -r requirements.txt` → `pip install -e '.[dev]'`
 
 ## [0.5.1] - 2026-06-14

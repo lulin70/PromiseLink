@@ -1,28 +1,26 @@
 """Tests for NLG Service — covers all public functions in nlg_service.py."""
 
-from datetime import datetime, timezone, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock
 
-import pytest
 import pytest_asyncio
 from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from promiselink.database import Base
-from promiselink.models.event import Event
-from promiselink.models.todo import Todo
-from promiselink.models.relationship_brief import RelationshipBrief
 from promiselink.models.entity import Entity
+from promiselink.models.event import Event
+from promiselink.models.relationship_brief import RelationshipBrief
+from promiselink.models.todo import Todo
 from promiselink.services.nlg_service import (
     _clean_concern,
-    generate_nlu_response,
-    _response_schedule_query,
+    _response_action_suggestion,
     _response_promise_tracker,
     _response_relationship_status,
-    _response_action_suggestion,
+    _response_schedule_query,
+    generate_nlu_response,
 )
 from promiselink.services.nlu_intent_classifier import VoiceIntent
-
 
 # ── Constants ──
 

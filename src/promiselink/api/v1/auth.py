@@ -55,7 +55,7 @@ class WeChatLoginResponse(BaseModel):
 @router.post("/auth/wechat/login", response_model=WeChatLoginResponse)
 async def wechat_login(request: WeChatLoginRequest, session: AsyncSession = Depends(get_async_session)):
     """微信小程序登录：用code换取openid，创建/查找用户，返回JWT。"""
-    from promiselink.core.wechat import wechat_oauth, WeChatOAuthError
+    from promiselink.core.wechat import WeChatOAuthError, wechat_oauth
 
     try:
         wx_data = await wechat_oauth.code_to_session(request.code)

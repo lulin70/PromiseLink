@@ -5,13 +5,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from promiselink.services.llm_client import LLMClient
 from promiselink.services.nlu_intent_classifier import (
     NLUIntentClassifier,
-    NLUResult,
     VoiceIntent,
 )
-from promiselink.services.llm_client import LLMClient
-
 
 # ── Helpers ──
 

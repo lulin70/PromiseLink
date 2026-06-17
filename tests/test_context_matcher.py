@@ -1,7 +1,7 @@
 """Tests for ContextMatcher — F-56 Event-driven context matching."""
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -84,7 +84,7 @@ class TestComputeContextScore:
     async def test_upcoming_meeting_boosts_score(self, db_session):
         """An upcoming meeting linked to the todo's entity should boost score."""
         user_id = make_user_id()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Create a meeting event with created_at in the near future (2h from now)
         meeting_event = Event(
@@ -138,7 +138,7 @@ class TestComputeContextScore:
     async def test_distant_event_low_score(self, db_session):
         """An event far in the future should yield a low context score."""
         user_id = make_user_id()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Create a meeting event 20h from now
         meeting_event = Event(
@@ -190,7 +190,7 @@ class TestComputeContextScore:
     async def test_non_meeting_event_ignored(self, db_session):
         """Events that are not meeting or call type should be ignored."""
         user_id = make_user_id()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Create a card_save event in the near future — should be ignored
         card_event = Event(
@@ -240,7 +240,7 @@ class TestComputeContextScore:
     async def test_context_score_range(self, db_session):
         """Context score should always be in [0.0, 1.0] range."""
         user_id = make_user_id()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Test with an event very close (near 0 hours) → score near 1.0
         meeting_event = Event(
@@ -289,7 +289,7 @@ class TestComputeContextScore:
     async def test_call_event_also_matched(self, db_session):
         """Call events should also be matched (not just meetings)."""
         user_id = make_user_id()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Create a call event
         call_event = Event(
@@ -345,7 +345,7 @@ class TestGetUpcomingContext:
     async def test_get_upcoming_context(self, db_session):
         """Verify get_upcoming_context returns sorted upcoming events with entities."""
         user_id = make_user_id()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Create two upcoming meeting events
         meeting1 = Event(

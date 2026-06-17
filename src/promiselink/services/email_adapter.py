@@ -14,7 +14,7 @@ Design:
 import email
 import imaplib
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.header import decode_header
 from email.utils import parseaddr, parsedate_to_datetime
 from typing import Any
@@ -137,7 +137,7 @@ def parse_email_message(raw_message: bytes) -> EmailMessage:
     try:
         date = parsedate_to_datetime(date_str)
     except (ValueError, TypeError):
-        date = datetime.now(timezone.utc)
+        date = datetime.now(UTC)
 
     # Body
     body_text = _extract_body_text(msg)

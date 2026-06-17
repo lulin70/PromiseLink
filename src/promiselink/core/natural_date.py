@@ -3,7 +3,6 @@
 import re
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Optional
 
 
 @dataclass
@@ -158,7 +157,7 @@ def _parse_week_expression(text: str, ref: date) -> NaturalDateResult | None:
             # Calculate Monday of the target week
             monday = ref - timedelta(days=today_weekday) + timedelta(weeks=offset)
             sunday = monday + timedelta(days=6)
-            weekday_name = _WEEKDAY_NAMES_CN[today_weekday]
+            _WEEKDAY_NAMES_CN[today_weekday]
             if offset == 0:
                 label = f"本周 ({monday.strftime('%m/%d')} ~ {sunday.strftime('%m/%d')})"
             elif offset > 0:

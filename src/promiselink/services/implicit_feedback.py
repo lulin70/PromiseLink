@@ -6,9 +6,8 @@ PoC scope: Record completed_rank only; weight adjustment deferred to Phase 1.
 Design reference: Algorithm_Design_v1.md v2.5 §2.11
 """
 
-from datetime import datetime, timezone
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 
 from promiselink.core.logging import get_logger
 from promiselink.models.todo import Todo

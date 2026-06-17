@@ -1,7 +1,5 @@
 """Tests for Media API endpoints — ASR, TTS, OCR, OCR-Event."""
 
-import io
-import json
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
 

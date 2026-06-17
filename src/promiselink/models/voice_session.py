@@ -5,7 +5,8 @@ Supports NLU intent classification, multi-turn dialogue, and daily analytics agg
 """
 
 import uuid
-from datetime import date as date_type, datetime
+from datetime import date as date_type
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
@@ -15,13 +16,15 @@ from sqlalchemy import (
     Index,
     String,
     Text,
-    event as sa_event,
     func,
+)
+from sqlalchemy import (
+    event as sa_event,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from promiselink.database import Base, IS_SQLITE, _uuid_default
+from promiselink.database import IS_SQLITE, Base, _uuid_default
 
 
 class VoiceSession(Base):

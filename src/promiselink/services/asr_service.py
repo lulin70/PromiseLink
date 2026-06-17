@@ -168,8 +168,8 @@ class ASRService:
         self, audio_bytes: bytes, filename: str
     ) -> ASRResult:
         """Transcribe using local whisper installation (fallback)."""
-        import tempfile
         import os
+        import tempfile
 
         try:
             import whisper  # type: ignore[import-untyped]

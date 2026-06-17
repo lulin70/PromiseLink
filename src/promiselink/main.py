@@ -11,9 +11,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from promiselink.api.v1 import associations, auth, dashboard, demand_input, entities, events, export, health, promises, reminders, relationship_briefs, scheduled_events, todos
+from promiselink.api.v1 import (
+    associations,
+    auth,
+    dashboard,
+    demand_input,
+    entities,
+    events,
+    export,
+    health,
+    promises,
+    relationship_briefs,
+    reminders,
+    scheduled_events,
+    todos,
+)
 from promiselink.config import get_settings
-from promiselink.core.exceptions import BusinessError, PromiseLinkError, LLMError
+from promiselink.core.exceptions import BusinessError, LLMError, PromiseLinkError
 from promiselink.database import close_db, init_db
 
 settings = get_settings()
@@ -36,11 +50,11 @@ async def _scheduled_event_maintenance():
 
     while not _shutdown_event.is_set():
         try:
-            from promiselink.database import AsyncSessionLocal
             from promiselink.api.v1.scheduled_events import (
-                mark_overdue_scheduled_events,
                 cleanup_cancelled_scheduled_events,
+                mark_overdue_scheduled_events,
             )
+            from promiselink.database import AsyncSessionLocal
 
             async with AsyncSessionLocal() as session:
                 overdue_count = await mark_overdue_scheduled_events(session)
@@ -60,7 +74,7 @@ async def _scheduled_event_maintenance():
         try:
             await asyncio.wait_for(_shutdown_event.wait(), timeout=300)
             break  # Shutdown requested
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pass  # Normal: continue loop
 
 
@@ -307,7 +321,15 @@ app.include_router(scheduled_events.router, prefix=settings.api_prefix, tags=["S
 
 # Pro-only routes (only registered when app_edition == "pro")
 if settings.app_edition == "pro":
-    from promiselink.api.v1 import voice, voice_query, media, email_sync, wechat_forward, import_csv, privacy
+    from promiselink.api.v1 import (
+        email_sync,
+        import_csv,
+        media,
+        privacy,
+        voice,
+        voice_query,
+        wechat_forward,
+    )
     app.include_router(voice.router, prefix=settings.api_prefix, tags=["Voice"])
     app.include_router(voice_query.router, prefix=settings.api_prefix, tags=["VoiceQuery"])
     app.include_router(media.router, prefix=settings.api_prefix, tags=["Media"])
@@ -330,7 +352,7 @@ if STATIC_DIR:
     app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
 else:
     import sys
-    print(f"[PromiseLink] WARNING: Frontend static files not found. Run 'cd frontend && npm run build:h5'", file=sys.stderr)
+    print("[PromiseLink] WARNING: Frontend static files not found. Run 'cd frontend && npm run build:h5'", file=sys.stderr)
 
 
 if __name__ == "__main__":

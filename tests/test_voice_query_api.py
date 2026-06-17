@@ -29,7 +29,6 @@ pytestmark = pytest.mark.skipif(
     reason="Voice Query API is a Pro-only feature",
 )
 
-from promiselink.models.association import Association
 from promiselink.models.entity import Entity
 from promiselink.models.event import Event
 from promiselink.models.relationship_brief import RelationshipBrief
@@ -41,7 +40,6 @@ from promiselink.services.voice_query_service import (
     query_relationship,
     query_schedule,
 )
-
 
 # ── Constants ──
 

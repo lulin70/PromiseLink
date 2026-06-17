@@ -28,14 +28,14 @@ router = APIRouter(dependencies=[Depends(rate_limit_dependency)])
 # Request/Response schemas
 class EventCreateRequest(BaseModel):
     """Request schema for creating an event."""
-    
+
     event_type: str = Field(..., description="Event type: card_save, meeting, call, manual")
     source: str = Field(..., description="Data source identifier")
     title: str = Field(default="未命名", max_length=200, description="Event title (auto-generated from raw_text if omitted)")
     timestamp: datetime | None = Field(default=None, description="Event timestamp")
     raw_text: str | None = Field(default=None, description="Raw text content (max 500KB)")
     metadata: dict[str, Any] | None = Field(default=None, description="Additional metadata")
-    
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -116,19 +116,19 @@ async def create_event(
 ):
     """
     Create a new event from external source and trigger processing pipeline.
-    
+
     This is the primary input endpoint for PromiseLink.
     Accepts events from:
     - Card scan (IAMHERE integration)
     - Meeting transcripts
     - Call records
     - Manual input
-    
+
     The event is created immediately and the processing pipeline runs
     asynchronously in the background.
     """
     new_request_id()
-    
+
     # Validate event type
     valid_types = Event.VALID_TYPES
     if request.event_type not in valid_types:
@@ -136,14 +136,14 @@ async def create_event(
             f"Invalid event_type. Must be one of: {', '.join(valid_types)}",
             details={"event_type": request.event_type, "valid_types": valid_types},
         )
-    
+
     # Validate raw_text size (500KB max)
     if request.raw_text and len(request.raw_text.encode('utf-8')) > 512000:
         raise ValidationError(
             "raw_text exceeds 500KB limit",
             details={"size_bytes": len(request.raw_text.encode('utf-8')), "max_bytes": 512000},
         )
-    
+
     # Create event
     event = Event(
         user_id=user_id,
@@ -155,11 +155,11 @@ async def create_event(
         metadata_=request.metadata,
         status="pending",
     )
-    
+
     session.add(event)
     await session.commit()
     await session.refresh(event)
-    
+
     logger.info(
         "event_created",
         event_id=str(event.id),
@@ -170,8 +170,8 @@ async def create_event(
     background_tasks.add_task(process_event_background, event_id=event.id)
 
     return EventCreateResponse(
-        id=event.id,
-        user_id=event.user_id,
+        id=str(event.id),
+        user_id=str(event.user_id),
         event_type=event.event_type,
         source=event.source,
         title=event.title,
@@ -281,8 +281,8 @@ async def batch_create_events(
             background_tasks.add_task(process_event_background, event_id=event.id)
 
             created.append(EventCreateResponse(
-                id=event.id,
-                user_id=event.user_id,
+                id=str(event.id),
+                user_id=str(event.user_id),
                 event_type=event.event_type,
                 source=event.source,
                 title=event.title,
@@ -400,8 +400,8 @@ async def upload_event_file(
     background_tasks.add_task(process_event_background, event_id=event.id)
 
     return EventCreateResponse(
-        id=event.id,
-        user_id=event.user_id,
+        id=str(event.id),
+        user_id=str(event.user_id),
         event_type=event.event_type,
         source=event.source,
         title=event.title,
@@ -427,7 +427,7 @@ async def list_events(
 ):
     """
     List events with optional filtering.
-    
+
     Query parameters:
     - event_type: Filter by event type
     - status: Filter by processing status
@@ -436,7 +436,7 @@ async def list_events(
     - offset: Pagination offset (default: 0)
     """
     query = select(Event).where(Event.user_id == user_id)
-    
+
     if event_type:
         query = query.where(Event.event_type == event_type)
     if status:
@@ -444,7 +444,7 @@ async def list_events(
     if search:
         escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         query = query.where(Event.title.ilike(f"%{escaped}%", escape="\\") | Event.raw_text.ilike(f"%{escaped}%", escape="\\"))
-    
+
     # Count total
     count_query = select(func.count()).select_from(Event).where(Event.user_id == user_id)
     if event_type:
@@ -455,7 +455,7 @@ async def list_events(
         escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         count_query = count_query.where(Event.title.ilike(f"%{escaped}%", escape="\\") | Event.raw_text.ilike(f"%{escaped}%", escape="\\"))
     total = (await session.execute(count_query)).scalar() or 0
-    
+
     # Fetch paginated
     # TODO(P3): For large datasets, consider cursor-based pagination (e.g., based on
     # created_at + id) instead of offset-based pagination to avoid performance
@@ -545,7 +545,7 @@ async def delete_event(
 ):
     """
     Delete an event.
-    
+
     Note: This will cascade delete related entities if configured.
     """
     result = await session.execute(
@@ -555,7 +555,7 @@ async def delete_event(
         )
     )
     event = result.scalar_one_or_none()
-    
+
     if not event:
         raise NotFoundError("Event not found")
 

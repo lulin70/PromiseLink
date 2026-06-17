@@ -7,7 +7,7 @@ Tests cover:
 - create_memory_provider: factory function
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -16,12 +16,9 @@ from promiselink.services.memory_provider import (
     CarryMemProvider,
     FileStoreProvider,
     MemoryEntry,
-    MemoryProvider,
     NullMemoryProvider,
-    SearchResult,
     create_memory_provider,
 )
-
 
 # ── Fixtures ──
 

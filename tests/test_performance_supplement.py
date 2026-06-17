@@ -9,7 +9,6 @@ Heavy tests marked with @pytest.mark.slow.
 """
 
 import asyncio
-import io
 import os
 import time
 import uuid
@@ -18,11 +17,12 @@ from unittest.mock import AsyncMock, patch
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import event as sa_event, select
+from sqlalchemy import event as sa_event
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from promiselink.core.auth import create_access_token, get_current_user_id
-from promiselink.core.rate_limiter import InMemorySlidingWindow, check_rate_limit, reset_rate_limits
+from promiselink.core.auth import get_current_user_id
+from promiselink.core.rate_limiter import InMemorySlidingWindow, reset_rate_limits
 from promiselink.database import Base, get_async_session
 from promiselink.main import app
 from promiselink.models.association import Association
@@ -222,8 +222,8 @@ class TestLLMDegradation:
 
         Mock LLM failure, verify EmbeddingProvider falls back to local/pseudo embedding.
         """
-        from promiselink.services.embedding_provider import EmbeddingProvider
         from promiselink.config import get_settings
+        from promiselink.services.embedding_provider import EmbeddingProvider
 
         settings = get_settings()
         settings.embedding_provider = "api"  # Use API mode so _client is created
@@ -247,9 +247,9 @@ class TestLLMDegradation:
 
         Mock rate limit response, verify LLMClient retries with backoff.
         """
-        from promiselink.services.llm_client import LLMClient
-        from promiselink.core.exceptions import LLMRateLimitError
         from promiselink.config import get_settings
+        from promiselink.core.exceptions import LLMRateLimitError
+        from promiselink.services.llm_client import LLMClient
 
         settings = get_settings()
         settings.llm_max_retries = 3
@@ -293,8 +293,8 @@ class TestLLMDegradation:
 
         Test full degradation chain: API fails → local model unavailable → pseudo embedding.
         """
-        from promiselink.services.embedding_provider import EmbeddingProvider
         from promiselink.config import get_settings
+        from promiselink.services.embedding_provider import EmbeddingProvider
 
         settings = get_settings()
         settings.embedding_provider = "api"  # Use API mode so _client is created

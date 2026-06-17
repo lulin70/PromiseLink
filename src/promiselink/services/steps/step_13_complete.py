@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 
@@ -22,6 +22,7 @@ class Step13_CompleteEvent(PipelineStep):
         from promiselink.database import AsyncSessionLocal
 
         event_id = context.event_id
+        assert context.result is not None
 
         # Determine final status based on step failures
         if context.failed_steps:
@@ -44,7 +45,7 @@ class Step13_CompleteEvent(PipelineStep):
                 event = db_result.scalar_one_or_none()
                 if event:
                     event.status = final_status
-                    event.processed_at = datetime.now(timezone.utc)
+                    event.processed_at = datetime.now(UTC)
                     if context.failed_steps:
                         event.failed_steps = list(context.failed_steps)
                     # Fallback: if title is still default, extract from raw_text
@@ -59,7 +60,7 @@ class Step13_CompleteEvent(PipelineStep):
                             )
 
         context.result.status = result_status
-        context.result.completed_at = datetime.now(timezone.utc)
+        context.result.completed_at = datetime.now(UTC)
         context.result.failed_steps = list(context.failed_steps)
 
         logger.info(

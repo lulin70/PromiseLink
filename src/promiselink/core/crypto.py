@@ -7,6 +7,7 @@ The encryption key is derived from settings.secret_key using PBKDF2.
 import base64
 import hashlib
 import os
+
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from promiselink.config import get_settings

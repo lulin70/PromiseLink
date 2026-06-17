@@ -8,6 +8,7 @@ Endpoints:
 """
 
 import uuid
+from collections.abc import Callable
 
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -17,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from promiselink.api.dependencies import rate_limit_dependency
 from promiselink.api.v1.schemas import PaginatedResponse
 from promiselink.core.auth import get_current_user_id
-from promiselink.core.exceptions import NotFoundError, ValidationError, ConflictError
+from promiselink.core.exceptions import ConflictError, NotFoundError, ValidationError
 from promiselink.core.logging import get_logger, new_request_id
 from promiselink.database import get_async_session
 from promiselink.models.entity import Entity
@@ -25,7 +26,7 @@ from promiselink.models.relationship_brief import RelationshipBrief
 from promiselink.services.relationship_brief_service import (
     RelationshipBriefService,
 )
-from promiselink.services.relationship_stage import RelationshipStage, STAGE_METADATA
+from promiselink.services.relationship_stage import STAGE_METADATA, RelationshipStage
 
 logger = get_logger("promiselink.api.relationship_briefs")
 router = APIRouter(dependencies=[Depends(rate_limit_dependency)])
@@ -133,7 +134,7 @@ def _summarize_module(key: str, data: dict) -> str:
     if not _module_has_meaningful_data(key, data):
         return "暂无数据"
 
-    summaries: dict[str, str] = {
+    summaries: dict[str, Callable[[dict], str]] = {
         "basic_info": lambda d: f"姓名: {d.get('basic_info', {}).get('name', '未知')}",
         "relationship_stage": lambda d: STAGE_METADATA.get(
             RelationshipStage(d.get("relationship_stage", "new_connection")),

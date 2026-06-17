@@ -7,12 +7,10 @@ Tests cover:
 """
 
 import uuid
-from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from promiselink.database import Base
@@ -20,7 +18,6 @@ from promiselink.models.entity import Entity
 from promiselink.models.event import Event
 from promiselink.models.todo import Todo
 from promiselink.services.entity_extractor import (
-    EntityExtractor,
     ExtractedPerson,
     ExtractionResult,
 )
@@ -28,10 +25,7 @@ from promiselink.services.event_pipeline import (
     PipelineResult,
     process_event_with_short_transactions,
 )
-from promiselink.services.llm_client import LLMClient
-from promiselink.services.todo_generator import TodoGenerator
 from tests.conftest import make_user_id
-
 
 # ── Fixtures ──
 

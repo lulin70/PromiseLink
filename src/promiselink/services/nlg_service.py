@@ -14,9 +14,8 @@ F-E2 additions:
   - gentle_nudge: Generate a gentle reminder message for overdue their_promise
 """
 
-import json
 import re
-from datetime import date, datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession

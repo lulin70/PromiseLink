@@ -9,7 +9,7 @@ Simplified 3-dimension scoring (per PRD risk mitigation):
   3. Resource signal (25%): pending their_promises + cooperation signals
 """
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -130,7 +130,6 @@ async def scan_dormant_contacts(
     # Step 2: Get last interaction per entity via source_event_id + todos
     # Event model has no entity_id or related_entity_ids field
     # Use: Entity.source_event_id → Event, and Todo.related_entity_id → latest todo
-    from promiselink.models.event import Event
     stmt = select(Event).where(Event.user_id == user_id)
     result = await session.execute(stmt)
     all_events = list(result.scalars().all())
@@ -151,7 +150,7 @@ async def scan_dormant_contacts(
         .where(Todo.user_id == user_id, Todo.related_entity_id.in_(entity_ids))
         .group_by(Todo.related_entity_id)
     )
-    todo_counts = dict((await session.execute(todo_count_q)).all())
+    todo_counts: dict[str, int] = dict((await session.execute(todo_count_q)).all())  # type: ignore[arg-type]
 
     # Count pending their_promises per entity
     promise_q = (
@@ -240,7 +239,7 @@ async def scan_dormant_contacts(
         reason_parts = []
         if total_todos >= 5:
             reason_parts.append(f"曾深度互动({total_todos}次)")
-        elif total_tools := total_todos > 0:
+        elif total_todos > 0:
             reason_parts.append(f"有{total_todos}次互动记录")
         if pending_promises > 0:
             reason_parts.append(f"对方有{pending_promises}条未兑现承诺")
