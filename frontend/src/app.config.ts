@@ -9,8 +9,8 @@ export default defineAppConfig({
     'pages/login/index',
   ],
   tabBar: {
-    color: '#999999',
-    selectedColor: '#1890ff',
+    color: '#8a8a8a',
+    selectedColor: '#7B9EA8',
     backgroundColor: '#ffffff',
     borderStyle: 'white',
     list: [
@@ -48,7 +48,7 @@ export default defineAppConfig({
   },
   window: {
     backgroundTextStyle: 'light',
-    navigationBarBackgroundColor: '#1890ff',
+    navigationBarBackgroundColor: '#7B9EA8',
     navigationBarTitleText: 'PromiseLink 基础版',
     navigationBarTextStyle: 'white',
   },

@@ -55,6 +55,11 @@ class CacheService:
         # OrderedDict for LRU-like eviction; stores (value, expire_at) tuples
         self._memory_cache: OrderedDict[str, tuple[Any, float]] = OrderedDict()
 
+    @property
+    def _redis(self) -> Any:
+        """Redis client if available (for health check)."""
+        return _redis_client
+
     async def get(self, key: str) -> Any | None:
         """Get cached value by key."""
         redis = await get_redis()

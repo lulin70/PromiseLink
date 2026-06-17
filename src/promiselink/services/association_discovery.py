@@ -26,7 +26,7 @@ Cold types (computed on read):
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -246,7 +246,7 @@ class AssociationDiscoveryEngine:
                         if type_key in existing_pairs:
                             # Update existing association if confidence changed
                             await self._maybe_update_association(
-                                pair_key, r, user_id
+                                cast(tuple[str, str], pair_key), r, user_id
                             )
                             continue
                         assoc = self._create_association(
@@ -629,7 +629,7 @@ class AssociationDiscoveryEngine:
                         },
                     )
                     results.append(assoc)
-                    existing_pair_keys.add(pair_key)
+                    existing_pair_keys.add(cast(tuple[str, str], pair_key))
 
         # Same company: group entities by company
         company_map: dict[str, list[Entity]] = {}

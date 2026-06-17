@@ -168,13 +168,13 @@ async def delete_user_data(
     voice_result = await session.execute(
         delete(VoiceSession).where(VoiceSession.user_id == user_id)
     )
-    voice_sessions_deleted = voice_result.rowcount
+    voice_sessions_deleted = voice_result.rowcount  # type: ignore[attr-defined]
 
     # 4. Entities (references events via source_event_id)
     entities_result = await session.execute(
         delete(Entity).where(Entity.user_id == user_id)
     )
-    entities_deleted = entities_result.rowcount
+    entities_deleted = entities_result.rowcount  # type: ignore[attr-defined]
 
     # 5. Events (standalone)
     events_result = await session.execute(

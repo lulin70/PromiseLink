@@ -2,7 +2,7 @@
 
 import asyncio
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager
 
 from sqlalchemy import create_engine, event
@@ -79,7 +79,7 @@ sync_engine = get_sync_engine()
 SyncSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_engine)
 
 
-def get_sync_session() -> Session:
+def get_sync_session() -> Generator[Session, None, None]:
     """Get synchronous database session."""
     session = SyncSessionLocal()
     try:

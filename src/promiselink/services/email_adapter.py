@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.header import decode_header
 from email.utils import parseaddr, parsedate_to_datetime
-from typing import Any
+from typing import Any, cast
 
 from promiselink.core.logging import get_logger
 from promiselink.services.data_source_adapter import DataSourceAdapter, RawEvent
@@ -64,14 +64,14 @@ def _extract_body_text(msg: email.message.Message) -> str:
                 payload = part.get_payload(decode=True)
                 if payload:
                     charset = part.get_content_charset() or "utf-8"
-                    return payload.decode(charset, errors="replace")
+                    return cast(bytes, payload).decode(charset, errors="replace")
     else:
         content_type = msg.get_content_type()
         if content_type == "text/plain":
             payload = msg.get_payload(decode=True)
             if payload:
                 charset = msg.get_content_charset() or "utf-8"
-                return payload.decode(charset, errors="replace")
+                return cast(bytes, payload).decode(charset, errors="replace")
     return ""
 
 
@@ -85,7 +85,7 @@ def _extract_body_html(msg: email.message.Message) -> str | None:
                 payload = part.get_payload(decode=True)
                 if payload:
                     charset = part.get_content_charset() or "utf-8"
-                    return payload.decode(charset, errors="replace")
+                    return cast(bytes, payload).decode(charset, errors="replace")
     return None
 
 
@@ -260,8 +260,8 @@ class EmailAdapter(DataSourceAdapter):
                     continue
 
                 # data[0] is a tuple: (b'1 (RFC822 {size}', raw_bytes)
-                raw_message = data[0][1]
-                email_msg = parse_email_message(raw_message)
+                raw_message = cast(tuple[bytes, bytes], data[0])[1]
+                email_msg = parse_email_message(cast(bytes, raw_message))
                 messages.append(email_msg)
             except Exception as exc:
                 logger.warning(
@@ -365,7 +365,9 @@ class EmailAdapter(DataSourceAdapter):
             if not all([imap_host, email_addr, password]):
                 logger.warning("email_adapter_no_config", reason="missing_connection_params")
                 return []
-            connected = await self.connect(imap_host, email_addr, password)
+            connected = await self.connect(
+                cast(str, imap_host), cast(str, email_addr), cast(str, password)
+            )
             if not connected:
                 return []
 

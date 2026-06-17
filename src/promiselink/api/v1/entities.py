@@ -110,7 +110,7 @@ async def list_entities(
         if entity.properties:
             entity.properties = decrypt_pii_in_properties(entity.properties)
 
-    return PaginatedResponse(items=entities, total=total, limit=min(limit, 500), offset=offset)
+    return PaginatedResponse(items=list(entities), total=total, limit=min(limit, 500), offset=offset)
 
 
 # ── F-E3: Dormant Contacts Endpoint (MUST be before /{entity_id} to avoid route conflict) ──

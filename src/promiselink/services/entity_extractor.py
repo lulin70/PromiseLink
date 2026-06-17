@@ -9,7 +9,7 @@ Template mapping:
 """
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -154,7 +154,7 @@ class EntityExtractor:
         # Step 4-5: Resolve and persist each person
         persisted_entities: list[Entity] = []
         # Event-level context (topics/keywords) shared across all persons in this extraction
-        event_topics = [e.get("topic") for e in result.events if e.get("topic")]
+        event_topics: list[str] = [e.get("topic") for e in result.events if e.get("topic")]  # type: ignore[misc]
         event_keywords = result.keywords or []
 
         for person in result.persons:
@@ -530,9 +530,9 @@ class EntityExtractor:
         # Validate properties against EntityProperties schema (graceful degradation)
         try:
             EntityProperties(
-                basic=properties.get("basic"),
-                concern=properties.get("concern"),
-                capability=properties.get("capability"),
+                basic=cast(Any, properties.get("basic")),
+                concern=cast(Any, properties.get("concern")),
+                capability=cast(Any, properties.get("capability")),
             )
         except Exception as validation_err:
             from promiselink.config import get_settings

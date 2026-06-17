@@ -6,6 +6,7 @@ Uses structlog for JSON structured output with request_id propagation.
 
 import uuid
 from contextvars import ContextVar
+from typing import Any
 
 import structlog
 
@@ -23,7 +24,7 @@ def configure_logging(log_level: str = "INFO", json_output: bool = True) -> None
     """
     import logging
 
-    processors = [
+    processors: list[Any] = [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,
         structlog.stdlib.PositionalArgumentsFormatter(),

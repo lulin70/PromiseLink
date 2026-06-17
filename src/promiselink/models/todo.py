@@ -206,7 +206,7 @@ class SnoozeSchedule(Base):
             index=True,
         )
     else:
-        recover_at: Mapped[str] = mapped_column(
+        recover_at: Mapped[str] = mapped_column(  # type: ignore[no-redef]
             String(50),  # ISO format string for SQLite
             nullable=False,
             index=True,

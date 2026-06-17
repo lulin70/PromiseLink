@@ -44,6 +44,9 @@ class DataSourceAdapter(ABC):
     The pipeline itself never changes — only new adapters are added.
     """
 
+    def __init__(self, config: dict[str, Any] | None = None) -> None:
+        self.config = config or {}
+
     @abstractmethod
     async def fetch_new_events(self, since: datetime | None = None) -> list[RawEvent]:
         """Fetch new events from the external source.

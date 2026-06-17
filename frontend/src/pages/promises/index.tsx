@@ -20,9 +20,9 @@ const STATUS_FILTERS = [
 ]
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: '#faad14',
-  fulfilled: '#52c41a',
-  overdue: '#ff4d4f',
+  pending: '#C4C0A0',
+  fulfilled: '#A0C4A8',
+  overdue: '#C4A7A0',
   broken: '#8c8c8c',
 }
 

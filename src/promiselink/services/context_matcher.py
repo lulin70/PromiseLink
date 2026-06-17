@@ -168,10 +168,10 @@ class ContextMatcher:
                 hours_until = (evt_time - now).total_seconds() / 3600
 
                 # Find associated entities
-                result = await session.execute(
+                entity_result = await session.execute(
                     select(Entity).where(Entity.source_event_id == str(e.id))
                 )
-                entities: list[Entity] = list(result.scalars().all())
+                entities: list[Entity] = list(entity_result.scalars().all())
 
                 upcoming.append({
                     "event_id": str(e.id),

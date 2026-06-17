@@ -43,8 +43,10 @@ jobs:
         run: ruff check src/ tests/
 
       - name: Run type checking
-        # Temporary: mypy is non-blocking until existing type errors are resolved
-        run: python3 -m mypy src/promiselink --ignore-missing-imports || true
+        run: python3 -m mypy src/promiselink --ignore-missing-imports
+
+      - name: Run security audit
+        run: pip-audit --desc --ignore-vuln GHSA-xxxx
 
       - name: Run tests
         env:
@@ -54,7 +56,7 @@ jobs:
           SECRET_KEY: "ci-test-secret-key-min-32-chars-long"
           REDIS_ENABLED: "false"
         run: |
-          pytest tests/ -v --cov=src/promiselink --cov-report=xml --cov-report=term-missing
+          pytest tests/ -v --cov=src/promiselink --cov-report=xml --cov-report=term-missing --cov-fail-under=60
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4

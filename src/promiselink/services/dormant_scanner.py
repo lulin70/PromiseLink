@@ -163,7 +163,7 @@ async def scan_dormant_contacts(
         )
         .group_by(Todo.related_entity_id)
     )
-    promise_counts = dict((await session.execute(promise_q)).all())
+    promise_counts: dict[str, int] = dict((await session.execute(promise_q)).all())  # type: ignore[arg-type]
 
     # Step 4: Score each entity
     for entity in entities:
@@ -215,7 +215,7 @@ async def scan_dormant_contacts(
         # Dimension 2: Time decay (35%)
         # 60 days = full points, linear decay after
         if dormant_days <= 60:
-            decay_score = 100
+            decay_score: float = 100
         elif dormant_days <= 180:
             decay_score = 100 - ((dormant_days - 60) / 120) * 50  # 100→50 over 60-180 days
         else:

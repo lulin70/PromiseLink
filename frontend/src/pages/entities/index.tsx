@@ -232,7 +232,7 @@ export default function EntitiesPage() {
         content: '确认删除此人脉？相关待办和关联也会被删除',
         confirmText: '删除',
         cancelText: '取消',
-        confirmColor: '#ff4d4f',
+        confirmColor: '#C4A7A0',
       })
       if (!res.confirm) return
       await deleteEntity(detail.id)

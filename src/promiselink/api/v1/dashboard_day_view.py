@@ -154,7 +154,7 @@ async def get_day_view(
             .where(Todo.source_event_id.in_(event_ids))
             .group_by(Todo.source_event_id)
         )
-        todo_count_map: dict[str, int] = dict(todo_count_result.fetchall())  # type: ignore[arg-type]
+        todo_count_map = dict(todo_count_result.fetchall())  # type: ignore[arg-type]
 
     # Build event items with entity names and todo counts
     event_items = []
@@ -252,7 +252,7 @@ async def get_day_view(
             is_overdue = due_date_only < today_for_overdue
 
         due_date_only = (
-            td.due_date.date() if isinstance(td.due_date, datetime) else td.due_date
+            td.due_date.date() if isinstance(td.due_date, datetime) else td.due_date  # type: ignore[assignment]
         )
 
         todo_items.append(

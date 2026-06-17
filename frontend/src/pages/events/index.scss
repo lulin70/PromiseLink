@@ -4,7 +4,7 @@
   padding-bottom: 120px;
 
   .header {
-    background: #1890ff;
+    background: #7B9EA8;
     padding: 40px 30px 30px;
     color: #fff;
     display: flex;
@@ -51,7 +51,7 @@
 
       &.active {
         background: #e6f7ff;
-        color: #1890ff;
+        color: #7B9EA8;
         font-weight: 500;
       }
     }
@@ -91,7 +91,7 @@
     padding: 60px 30px;
 
     .error-text {
-      color: #ff4d4f;
+      color: #C4A7A0;
       font-size: 26px;
     }
   }
@@ -138,7 +138,7 @@
 
       .event-time {
         font-size: 24px;
-        color: #1890ff;
+        color: #7B9EA8;
         font-weight: 500;
       }
     }
@@ -174,12 +174,12 @@
 
         &.status-completed {
           background: #f6ffed;
-          Text { color: #52c41a; }
+          Text { color: #A0C4A8; }
         }
 
         &.status-pending {
           background: #e6f7ff;
-          Text { color: #1890ff; }
+          Text { color: #7B9EA8; }
         }
 
         &.status-processing {
@@ -189,7 +189,7 @@
 
         &.status-failed {
           background: #fff2f0;
-          Text { color: #ff4d4f; }
+          Text { color: #C4A7A0; }
         }
       }
 
@@ -216,7 +216,7 @@
 
         .entity-link {
           font-size: 22px;
-          color: #1890ff;
+          color: #7B9EA8;
           text-decoration: underline;
           cursor: pointer;
           background: #e6f7ff;
@@ -377,7 +377,7 @@
         }
 
         .pending-confirm-status {
-          color: #1890ff;
+          color: #7B9EA8;
           font-weight: 500;
         }
 
@@ -388,7 +388,7 @@
         }
 
         .done-btn {
-          color: #52c41a;
+          color: #A0C4A8;
           background: #f6ffed;
           border: 1px solid #b7eb8f;
         }
