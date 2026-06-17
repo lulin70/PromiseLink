@@ -1,8 +1,12 @@
 # PromiseLink - AI驱动的个人商务关系经营助手
 
-> **项目状态**: PoC 验收通过 | 基础版打包中 | 1210+ 测试全通过 | 67% 覆盖率
+> **Slogan**: 让每一次连接，都更有价值
+>
+> **项目状态**: PoC 验收通过 | 基础版 ready | 1210+ 测试全通过 | 67% 覆盖率
 >
 > **定位**: 先成就关系，再促成合作 — 利他切入的个人商务关系经营系统
+>
+> **License**: AGPL v3 — 商业使用需遵守许可证条款
 
 ## 快速启动
 
@@ -12,14 +16,16 @@ pip install -e '.[dev]'
 
 # 2. 配置环境变量
 cp .env.basic.example .env
-# 编辑 .env 填入 MOKA_AI_API_KEY (Moka AI) 或 OPENAI_API_KEY
+# 编辑 .env 填入 LLM_API_KEY（Moka AI / OpenAI / Anthropic 任选其一）
 
-# 3. 启动应用
-export PYTHONPATH="${PYTHONPATH}:$(pwd)/src"
-python -m uvicorn promiselink.main:app --reload --port 8000
+# 3. 启动应用（本地直接运行，无需Docker）
+python -m uvicorn promiselink.main:app --host 0.0.0.0 --port 8000
+# 或使用一键启动脚本
+bash scripts/start.sh
 
-# 4. 访问API文档
-open http://localhost:8000/docs
+# 4. 访问
+# API 文档：http://localhost:8000/docs
+# 前端界面：http://localhost:8000
 ```
 
 ## 项目结构
@@ -27,14 +33,14 @@ open http://localhost:8000/docs
 ```
 PromiseLink/
 ├── src/promiselink/              # 应用源码
-│   ├── models/                 # 数据模型（8个模型文件，11个模型类）
+│   ├── models/                 # 数据模型（9个模型文件，11个模型类）
 │   │   ├── entity.py           # 人物实体
 │   │   ├── event.py            # 互动事件
 │   │   ├── todo.py             # 行动提醒（6类）
 │   │   ├── association.py      # 关联发现
 │   │   ├── relationship_brief.py  # 关系简报
 │   │   └── voice_session.py    # 语音会话
-│   ├── api/v1/                 # REST API（19个路由）
+│   ├── api/v1/                 # REST API（29个路由文件）
 │   │   ├── health.py           # 健康检查
 │   │   ├── events.py           # 事件CRUD + Pipeline触发
 │   │   ├── entities.py         # 实体管理
@@ -72,7 +78,8 @@ PromiseLink/
 ├── docs/                       # 文档体系
 ├── tests/                      # 测试（60个文件 / 1210用例）
 ├── data/                       # SQLite数据存储
-└── docker-compose.yml          # Docker配置
+├── scripts/                    # 一键安装/启动脚本 + E2E测试
+└── frontend/                   # Taro H5 前端
 ```
 
 ## 核心能力
@@ -108,7 +115,8 @@ PromiseLink/
 - [PRD v5.2](docs/spec/PRD_v1.md) - 产品需求文档
 - [技术设计 v3.2](docs/architecture/PromiseLink_技术设计_v1.md) - 完整技术方案
 - [项目状态](docs/PROJECT_STATUS.md) - 11阶段生命周期跟踪（55%完成）
-- [Setup指南](docs/deliverables/README_SETUP.md) - 详细安装和启动说明
+- [QUICKSTART](QUICKSTART.md) - 快速开始指南（含配置参考和FAQ）
+- [Setup指南](docs/deliverables/README_SETUP.md) - 安装说明（指向QUICKSTART）
 
 ### 详细设计文档
 - [数据库设计 v3.0](docs/design/Database_Design_v1.md)
@@ -128,20 +136,17 @@ PromiseLink/
 - [x] PRD v5.2（关系经营核心闭环 + 向量化语义能力）
 - [x] 技术设计 v3.2（Insight Engine + DataSourceAdapter + 向量语义）
 - [x] P0核心算法全部实现（实体归一/承诺履行/状态机/关联发现/动态评分）
-- [x] FastAPI完整实现（22个路由模块 / 72个API端点）
+- [x] FastAPI完整实现（29个路由文件 / 62个API端点）
 - [x] 38个服务模块（Pipeline/NLG/SemanticSearch/MemoryProvider等）
 - [x] 9个模型文件，11个模型类（entity/event/todo/association/relationship_brief/voice_session等）
 - [x] DataSourceAdapter抽象层（手动/语音/微信/CSV/邮件）
 - [x] CarryMem协议解耦（NullMemoryProvider优雅降级）
 - [x] 加密体系（HMAC-SHA256 + 字段级加密 + 行级安全）
-- [x] 60个测试文件 / **1314测试用例** / **73%覆盖率**
-- [x] Docker + CI/CD + Alembic 就绪
+- [x] 60个测试文件 / **1210测试用例** / **67%覆盖率**
+- [x] CI/CD + Alembic 就绪
 - [x] PoC Demo 4/4场景通过
-
-### ⏳ 基础版打包中
-- [ ] Docker打包 + 一键安装脚本
-- [ ] Taro H5前端打包发布
-- [ ] 本地E2E验证
+- [x] 一键安装/启动脚本（本地直接运行，无需Docker）
+- [x] Taro H5前端打包发布
 
 ### 🔴 未启动
 - [ ] 专业版: 网关中继开发（SQLite+relay gateway）
@@ -154,11 +159,11 @@ PromiseLink/
 | **框架** | FastAPI 0.109+ (Python 3.11+) |
 | **数据库** | SQLite (基础版+专业版长期方案) / PostgreSQL 15 (定制版) |
 | **ORM** | SQLAlchemy 2.0+ (async) |
-| **LLM** | Moka AI (Claude Sonnet 4) / OpenAI兼容 |
+| **LLM** | Moka AI (Claude Sonnet 4.6) / OpenAI (GPT-5.5) / Anthropic |
 | **向量** | sqlite-vec (基础版+专业版) / pgvector (定制版) |
 | **缓存** | Redis (定制版) |
 | **算法** | NetworkX + RapidFuzz + numpy |
-| **部署** | Docker + Docker Compose |
+| **部署** | 基础版: 本地直接运行（无需Docker） / 专业版: Docker + 网关中继 / 定制版: Docker Compose + K8s |
 
 ## 验证安装
 
@@ -198,6 +203,16 @@ curl "http://localhost:8000/api/v1/entities/search?q=技术合作"
 | 产品层级 | 基础版(本地免费) / 专业版(网关中继) / 定制版(团队) |
 | 总体进度 | **85%** |
 
+## 产品版本
+
+| 版本 | 定位 | 价格 | 部署方式 |
+|------|------|------|----------|
+| **基础版** | 本地免费，纯文本交互 | 免费 | 本地直接运行（无需Docker） |
+| **专业版** | 网关中继，微信小程序随时访问 | ¥29/月（早鸟价） / ¥49/月（常规价） | 本地Docker + 云中继网关 |
+| **定制版** | 销售团队协作，多租户 | 按需定制 | 云端Docker Compose + K8s |
+
+> 基础版为纯文本交互，不包含语音功能和图片扫描功能。专业版依赖云端服务凭证。
+
 ## 团队
 
 - **负责人**: 林总（CarryMem团队）
@@ -205,4 +220,4 @@ curl "http://localhost:8000/api/v1/entities/search?q=技术合作"
 
 ## License
 
-AGPL-3.0
+AGPL-3.0 — 详见 [LICENSE](LICENSE) 文件
