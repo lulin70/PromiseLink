@@ -19,7 +19,7 @@ async def user_journey():
 
         # Step 2: 登录
         print("\nStep 2: 登录")
-        r = await c.post(f"{BASE}/auth/login", json={"user_id": "demo-user", "poc_secret": "promiselink2024"})
+        r = await c.post(f"{BASE}/auth/login", json={"user_id": "demo-user", "poc_secret": "promiselink2026"})
         assert r.status_code == 200, f"登录失败: {r.status_code} {r.text}"
         token = r.json()["access_token"]
         headers = {"Authorization": f"Bearer {token}"}

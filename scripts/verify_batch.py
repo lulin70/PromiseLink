@@ -14,7 +14,7 @@ def api_call(path, token):
 
 def main():
     # Login
-    data = json.dumps({"user_id": "00000000-0000-0000-0000-000000000099", "poc_secret": os.environ.get("POC_SECRET", "promiselink2024")}).encode()
+    data = json.dumps({"user_id": "00000000-0000-0000-0000-000000000099", "poc_secret": os.environ.get("POC_SECRET", "promiselink2026")}).encode()
     req = urllib.request.Request(f"{BASE}/auth/login", data=data, headers={"Content-Type": "application/json", "X-Forwarded-For": "10.0.0.99"})
     resp = urllib.request.urlopen(req, timeout=10)
     token = json.loads(resp.read())["access_token"]

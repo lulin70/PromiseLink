@@ -62,7 +62,7 @@ async def main():
                     print(f"  Input: type={input_type}, placeholder={placeholder}, value='{value}'")
                     
                     if "secret" in placeholder.lower() or "密码" in placeholder or input_type == "password":
-                        await inp.fill("promiselink2024")
+                        await inp.fill("promiselink2026")
                         print(f"  ✓ Filled password field")
                     elif "user" in placeholder.lower() or "id" in placeholder.lower():
                         if not value:

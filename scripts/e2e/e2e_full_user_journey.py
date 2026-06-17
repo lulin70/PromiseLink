@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 # ── 配置 ───────────────────────────────────────────────
 BASE = "http://localhost:8002/api/v1"
 TIMEOUT = 60.0
-POC_SECRET = "promiselink2024"
+POC_SECRET = "promiselink2026"
 USER_ID = "e2e_user_journey"
 
 # ── 6份用户场景录入内容 ─────────────────────────────────

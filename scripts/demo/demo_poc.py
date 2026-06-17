@@ -6,7 +6,7 @@ PromiseLink PoC Demo - 模拟许总的真实使用场景
 import httpx, uuid, time, json, os
 
 BASE = "http://localhost:8001/api/v1"
-SECRET = os.environ.get("POC_SECRET", "promiselink2024")
+SECRET = os.environ.get("POC_SECRET", "promiselink2026")
 
 def demo():
     with httpx.Client(timeout=30) as c:

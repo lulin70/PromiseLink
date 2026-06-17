@@ -35,7 +35,7 @@ def main():
         sys.exit(1)
 
     # 2. Login
-    status, data = api("POST", "/auth/login", {"user_id": USER_ID, "poc_secret": "promiselink2024"})
+    status, data = api("POST", "/auth/login", {"user_id": USER_ID, "poc_secret": "promiselink2026"})
     ok = status == 200 and "access_token" in data
     token = data.get("access_token", "") if ok else ""
     results.append(("Login", ok, f"status={status}"))

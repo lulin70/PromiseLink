@@ -264,7 +264,7 @@ async def seed():
         # Login
         r = await c.post(f"{BASE_URL}/auth/login", json={
             "user_id": "poc-user",
-            "poc_secret": "promiselink2024",
+            "poc_secret": "promiselink2026",
         })
         if r.status_code != 200:
             print(f"  登录失败: {r.status_code} {r.text}")

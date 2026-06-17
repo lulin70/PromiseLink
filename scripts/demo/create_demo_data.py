@@ -6,7 +6,7 @@ BASE = "http://localhost:8002/api/v1"
 c = httpx.Client(timeout=60)
 
 # Login as poc-user
-r = c.post(f"{BASE}/auth/login", json={"poc_secret": "promiselink2024", "user_id": "poc-user"})
+r = c.post(f"{BASE}/auth/login", json={"poc_secret": "promiselink2026", "user_id": "poc-user"})
 token = r.json()["access_token"]
 h = {"Authorization": f"Bearer {token}"}
 print(f"Logged in as poc-user")

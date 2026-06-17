@@ -12,7 +12,7 @@ import httpx
 import os
 
 BASE_URL = "http://localhost:8001/api/v1"
-POC_SECRET = os.environ.get("POC_SECRET", "promiselink2024")
+POC_SECRET = os.environ.get("POC_SECRET", "promiselink2026")
 USER_ID = str(uuid.uuid4())
 
 async def get_token(client: httpx.AsyncClient) -> str:

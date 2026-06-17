@@ -28,7 +28,7 @@ def main():
     print("\n[1] Login with PoC secret...")
     status, data = api("POST", "/auth/login", {
         "user_id": "00000000-0000-0000-0000-0000000042",
-        "poc_secret": os.environ.get("POC_SECRET", "promiselink2024")
+        "poc_secret": os.environ.get("POC_SECRET", "promiselink2026")
     })
     assert status == 200, f"Login failed: {status} {data}"
     token = data["access_token"]
