@@ -9,9 +9,9 @@
 
 import json
 import sys
-import urllib.request
-import urllib.error
 import time
+import urllib.error
+import urllib.request
 
 BASE_URL = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000"
 API = f"{BASE_URL}/api/v1"
@@ -165,7 +165,7 @@ else:
 if todo_id:
     status, data = api_call("PATCH", f"/todos/{todo_id}", body={"status": "in_progress"})
     if status == 200:
-        log_ok(f"Todo 状态更新成功")
+        log_ok("Todo 状态更新成功")
     else:
         log_fail(f"Todo 状态更新失败: {status}")
 
@@ -205,6 +205,7 @@ print("\n📋 阶段 6：搜索与导出")
 
 # 步骤 12: 搜索事件
 import urllib.parse
+
 search_url = f"/events?search={urllib.parse.quote('合作')}"
 status, data = api_call("GET", search_url)
 if status == 200:
@@ -230,7 +231,7 @@ else:
 # 步骤 14: 关系简报
 status, data = api_call("GET", "/relationship-briefs")
 if status == 200:
-    log_ok(f"关系简报查询成功")
+    log_ok("关系简报查询成功")
 else:
     log_fail(f"关系简报查询失败: {status}")
 

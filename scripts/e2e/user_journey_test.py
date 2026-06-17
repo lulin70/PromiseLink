@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """PromiseLink 用户旅程模拟测试"""
-import httpx, asyncio, json, sys
+import asyncio
+import json
+import sys
+
+import httpx
 
 BASE = "http://localhost:8002/api/v1"
 
@@ -23,7 +27,7 @@ async def user_journey():
         assert r.status_code == 200, f"登录失败: {r.status_code} {r.text}"
         token = r.json()["access_token"]
         headers = {"Authorization": f"Bearer {token}"}
-        print(f"   登录成功")
+        print("   登录成功")
 
         # Step 3: 录入交流记录
         print("\nStep 3: 录入交流记录")
@@ -90,7 +94,7 @@ async def user_journey():
         data_form = {"event_type": "meeting"}
         r = await c.post(f"{BASE}/events/upload", headers=headers, files=files, data=data_form)
         assert r.status_code in [200, 201], f"文件上传失败: {r.status_code} {r.text}"
-        print(f"   文件上传成功")
+        print("   文件上传成功")
 
         # Step 10: 查看关联
         print("\nStep 10: 查看关联")

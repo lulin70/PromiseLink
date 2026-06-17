@@ -13,7 +13,6 @@ Verifies:
 
 import asyncio
 import json
-import os
 import sys
 import uuid
 from datetime import datetime
@@ -30,7 +29,7 @@ load_dotenv(project_root / ".env")
 
 from promiselink.config import Settings, get_settings
 from promiselink.core.logging import configure_logging, get_logger
-from promiselink.database import AsyncSessionLocal, Base, async_engine, init_db, close_db
+from promiselink.database import AsyncSessionLocal, close_db, init_db
 from promiselink.models.event import Event
 from promiselink.services.entity_extractor import EntityExtractor
 from promiselink.services.entity_resolution import EntityResolutionEngine
@@ -366,7 +365,7 @@ async def main():
     print("=" * 60)
 
     settings = get_settings()
-    print(f"\nLLM配置:")
+    print("\nLLM配置:")
     print(f"  Provider: {settings.llm_provider}")
     print(f"  Base URL: {settings.llm_base_url}")
     print(f"  Model: {settings.llm_model}")

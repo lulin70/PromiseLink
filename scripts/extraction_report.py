@@ -4,12 +4,12 @@ PromiseLink 提取结果详细报告
 逐个Event提交，等待Pipeline完成，展示每个Event提取的实体/关联/Todo
 用于排查"李总"实体提取丢失问题
 """
-import httpx
-import uuid
-import time
-import json
-import sys
 import os
+import sys
+import time
+import uuid
+
+import httpx
 
 BASE = "http://localhost:8001/api/v1"
 SECRET = os.environ.get("POC_SECRET", "promiselink2026")
@@ -142,7 +142,7 @@ def format_association(a):
         topics = evidence.get("shared_topics", [])
         detail = f"同领域: {', '.join(topics[:3]) if topics else '?'}"
     elif atype == "supply_demand":
-        detail = f"供需匹配"
+        detail = "供需匹配"
     return f"    [{atype}] {src}... → {tgt}... {detail}"
 
 
@@ -189,11 +189,11 @@ def main():
             print(f"  创建成功 event_id={event_id[:8]}... status={event.get('status', '?')}")
 
             # 等待Pipeline处理
-            print(f"  等待Pipeline处理...")
+            print("  等待Pipeline处理...")
             result_event = wait_for_pipeline(client, headers, event_id, max_wait=90)
 
             if result_event is None:
-                print(f"  [ERROR] Pipeline超时未完成!")
+                print("  [ERROR] Pipeline超时未完成!")
                 continue
 
             status = result_event.get("status", "?")
@@ -241,7 +241,7 @@ def main():
 
         # 最终汇总
         print(f"\n{'=' * 70}")
-        print(f"  最终汇总")
+        print("  最终汇总")
         print(f"{'=' * 70}")
 
         # 全部实体

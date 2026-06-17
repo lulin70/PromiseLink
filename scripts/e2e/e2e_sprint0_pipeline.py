@@ -38,6 +38,7 @@ TEST_EVENT_RAW = """今天下午和盛恒资本的李总、王明一起开了投
 async def run_e2e_validation():
     """Run full pipeline E2E with real LLM."""
     from uuid import uuid4
+
     from promiselink.database import AsyncSessionLocal, init_db
     from promiselink.models.event import Event
     from promiselink.services.event_pipeline import process_event_with_short_transactions
@@ -93,7 +94,7 @@ async def run_e2e_validation():
 
     # Timing breakdown
     if result.step_timings:
-        print(f"\n  ── TIMING BREAKDOWN ──")
+        print("\n  ── TIMING BREAKDOWN ──")
         step_labels = {
             "step0_input_scope": "Step 0 (input_scope)",
             "step3_extraction": "Step 3 (extraction)",
@@ -131,7 +132,7 @@ async def run_e2e_validation():
                 print(f"         evidence: \"{evidence}...\"")
 
     # 5. Verify Step 0: InputScope was classified
-    print(f"\n  ── Step 0: InputScope Classification ──")
+    print("\n  ── Step 0: InputScope Classification ──")
     async with AsyncSessionLocal() as session:
         from sqlalchemy import select
         evt = (await session.execute(select(Event).where(Event.id == event_id))).scalar_one()
@@ -139,7 +140,7 @@ async def run_e2e_validation():
         print(f"    input_scope_conf:  {evt.input_scope_confidence}")
 
     # 6. Verify Step 8: RelationshipBriefs were created/updated
-    print(f"\n  ── Step 8: Relationship Brief Update ──")
+    print("\n  ── Step 8: Relationship Brief Update ──")
     try:
         from promiselink.models.relationship_brief import RelationshipBrief
         briefs = (await session.execute(

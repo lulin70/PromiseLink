@@ -24,12 +24,11 @@ Prerequisites:
 import asyncio
 import json
 import logging
-import os
 import re
 import sys
 import time
+from datetime import UTC, date, datetime, timedelta, timezone
 from pathlib import Path
-from datetime import date, datetime, timezone, timedelta
 
 # ── Strip ANSI color codes when output is piped to file ──
 if not sys.stdout.isatty():
@@ -51,6 +50,7 @@ for _logger_name in ("promiselink", "promiselink.nlu", "promiselink.pipeline",
     logging.getLogger(_logger_name).setLevel(logging.CRITICAL)
 # Redirect structlog to stderr so it doesn't pollute stdout (demo output)
 import structlog as _structlog
+
 _structlog.configure(
     processors=[
         _structlog.stdlib.add_log_level,
@@ -184,9 +184,9 @@ async def demo_pipeline() -> dict:
     这是PromiseLink的核心能力 — 从一段自由文本的会议记录，
     自动提取人物、识别承诺、生成待办、更新关系推进卡。
     """
-    from uuid import uuid4
     # Suppress config warnings during import
     import io as _io
+    from uuid import uuid4
     _saved = sys.stdout
     sys.stdout = _io.StringIO()
     from promiselink.database import AsyncSessionLocal, init_db
@@ -534,7 +534,7 @@ async def demo_pipeline() -> dict:
                 print(f"    · {name_a} ↔ {name_b} [{types_str}, 置信度{conf_str}]{best_detail}")
 
             if not associations and not cold_findings:
-                print(f"    (暂无 — 可能需要更多事件积累)")
+                print("    (暂无 — 可能需要更多事件积累)")
 
             # ── 基于关联的行动建议 ──
             action_suggestions = []
@@ -562,7 +562,7 @@ async def demo_pipeline() -> dict:
                         )
 
             if action_suggestions:
-                print(f"\n  基于关联的行动建议:")
+                print("\n  基于关联的行动建议:")
                 for s in action_suggestions[:3]:
                     print(f"    {s}")
 
@@ -578,13 +578,12 @@ async def demo_pipeline() -> dict:
             # Filter: only show association-generated todos (those with 引荐/对接/安排/约 in title)
             assoc_todos = [t for t in assoc_todos if any(kw in t.title for kw in ("引荐", "对接", "安排", "约"))]
             if assoc_todos:
-                print(f"\n  关联发现自动生成的待办:")
+                print("\n  关联发现自动生成的待办:")
                 for t in assoc_todos:
                     type_cn = {"cooperation_signal": "合作信号", "help": "帮助", "followup": "跟进", "care": "关注"}.get(t.todo_type, t.todo_type)
                     print(f"    · [{type_cn}] {t.title}")
 
     except Exception as ex:
-        import traceback
         print(f"\n  关联发现检查: 异常({ex})")
 
     # Brief跨事件聚合检查
@@ -596,7 +595,7 @@ async def demo_pipeline() -> dict:
                 .order_by(RelationshipBrief.last_updated_at.desc())
             )).scalars().all()
             if briefs2:
-                print(f"\n  关系推进卡 (跨事件聚合后):")
+                print("\n  关系推进卡 (跨事件聚合后):")
                 for b in briefs2:
                     data = b.brief_data or {}
                     name = data.get("basic_info", {}).get("name", "未知")
@@ -677,7 +676,6 @@ async def demo_nlu() -> dict:
 
     # 预加载场景1产生的数据（用于构造真实回答）
     user_id = "demo-user-xu"
-    today = date.today()
 
     async def _build_response(intent_value: str, slots: dict | None) -> str:
         """根据NLU识别结果 + 真实DB数据，构造系统回答（调用系统NLG服务）."""
@@ -789,9 +787,10 @@ async def demo_brief() -> dict:
     回答许总的典型问题: "张总到哪步了？"
     展示12模块结构化数据和关系强度评分.
     """
+    from sqlalchemy import select
+
     from promiselink.database import AsyncSessionLocal
     from promiselink.models.relationship_brief import RelationshipBrief
-    from sqlalchemy import select
 
     header("场景3: 关系推进卡 — \"李总到哪步了？\"")
 
@@ -878,7 +877,7 @@ async def demo_brief() -> dict:
             my_p = promises.get("my_promises", [])
             their_p = promises.get("their_promises", [])
             if my_p or their_p:
-                print(f"    开放承诺:")
+                print("    开放承诺:")
                 for p in my_p[:3]:
                     print(f"      我承诺: {clean_title(p.get('title', ''), 40)}")
                 for p in their_p[:3]:
@@ -919,7 +918,7 @@ async def demo_brief() -> dict:
             # 下一步建议
             actions = data.get("next_actions", [])
             if actions:
-                print(f"    下一步建议:")
+                print("    下一步建议:")
                 priority_cn = {"high": "高", "medium": "中", "low": "低", "1": "高", "2": "中", "3": "低", "4": "低", "5": "低"}
                 for a in actions:
                     p = str(a.get("priority", "?"))
@@ -959,11 +958,12 @@ async def demo_dashboard() -> dict:
 
     支持中英文自然语言日期: 今天/明天/后天/本周/下周/ISO格式
     """
+    from sqlalchemy import func, select
+
     from promiselink.core.natural_date import parse_natural_date
     from promiselink.database import AsyncSessionLocal
     from promiselink.models.event import Event
     from promiselink.models.todo import Todo
-    from sqlalchemy import select, func
 
     header("场景4: 日视图Dashboard — \"我今天的安排\"")
 
@@ -1005,7 +1005,7 @@ async def demo_dashboard() -> dict:
     today = date.today()
 
     async with AsyncSessionLocal() as session:
-        day_start = datetime(today.year, today.month, today.day, 0, 0, 0, tzinfo=timezone.utc)
+        day_start = datetime(today.year, today.month, today.day, 0, 0, 0, tzinfo=UTC)
         day_end = day_start.replace(hour=23, minute=59, second=59)
 
         # Events
@@ -1073,7 +1073,7 @@ async def demo_dashboard() -> dict:
                     status_tag = "待处理" if td.status == "pending" else "已完成"
                     print(f"    · [{status_tag}] {td.title[:50]}")
             else:
-                print(f"  待办: (暂无)")
+                print("  待办: (暂无)")
     else:
         print(f"\n  {DIM}今日暂无事件{RESET}")
 
@@ -1096,7 +1096,7 @@ async def demo_dashboard() -> dict:
         summary_parts.append(f"待处理{pending}条")
     print(f"\n  汇总: {', '.join(summary_parts)}")
 
-    ok(f"日视图正常展示")
+    ok("日视图正常展示")
     print(f"\n  {BOLD}场景4结论: 通过{RESET}")
     return {"scenario": "dashboard", "pass": True, "events": len(events),
             "todos": len(todos), "date_parse": parse_ok}
@@ -1207,15 +1207,15 @@ async def main() -> None:
 
     # 产品定位回顾
     print(f"\n  {BOLD}产品定位回顾:{RESET}")
-    print(f"  PromiseLink = AI驱动的个人商务关系经营助手")
-    print(f"  核心循环: 互动→关注→承诺→帮助→反馈 (利他优先)")
-    print(f"  Slogan: \"让每一次连接，都更有价值\"")
+    print("  PromiseLink = AI驱动的个人商务关系经营助手")
+    print("  核心循环: 互动→关注→承诺→帮助→反馈 (利他优先)")
+    print("  Slogan: \"让每一次连接，都更有价值\"")
 
     print(f"\n  {BOLD}许总价值点:{RESET}")
-    print(f"  1. 语音交互 — 开车时也能管理关系 (F-50 NLU已实现)")
-    print(f"  2. 承诺追踪 — 再也不忘记答应别人的事 (F-45 Promise双向)")
-    print(f"  3. 关系推进 — 清楚知道每个人到哪步了 (F-47 Brief+F-48 Stage)")
-    print(f"  4. 日程一览 — 自然语言查今日安排 (F-49 Dashboard)")
+    print("  1. 语音交互 — 开车时也能管理关系 (F-50 NLU已实现)")
+    print("  2. 承诺追踪 — 再也不忘记答应别人的事 (F-45 Promise双向)")
+    print("  3. 关系推进 — 清楚知道每个人到哪步了 (F-47 Brief+F-48 Stage)")
+    print("  4. 日程一览 — 自然语言查今日安排 (F-49 Dashboard)")
 
     sys.exit(0 if passed_scenarios == total_scenarios else 1)
 

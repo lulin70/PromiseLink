@@ -434,7 +434,7 @@ async def show_final_summary(client: httpx.AsyncClient):
     if virtual_entities:
         _print(f"  ⚠️ 虚拟角色误识别: {[e['name'] for e in virtual_entities]}")
     else:
-        _print(f"  验证: 无虚拟角色误识别（正确）")
+        _print("  验证: 无虚拟角色误识别（正确）")
 
 
 async def main():

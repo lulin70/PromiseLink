@@ -280,10 +280,33 @@ async def promiselink_error_handler(request: Request, exc: PromiseLinkError):
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc):
     """Handle request validation errors with standard error format."""
+    # Sanitize errors: convert bytes to str to avoid JSON serialization TypeError
+    safe_errors = []
+    for err in exc.errors():
+        safe_err = {}
+        for k, v in err.items():
+            if isinstance(v, bytes):
+                safe_err[k] = v.decode("utf-8", errors="replace")
+            elif isinstance(v, (list, dict)):
+                safe_err[k] = _sanitize_bytes_recursive(v)
+            else:
+                safe_err[k] = v
+        safe_errors.append(safe_err)
     return JSONResponse(
         status_code=422,
-        content={"error": {"code": "VALIDATION_ERROR", "message": str(exc), "details": exc.errors()}},
+        content={"error": {"code": "VALIDATION_ERROR", "message": str(exc), "details": safe_errors}},
     )
+
+
+def _sanitize_bytes_recursive(obj):
+    """Recursively convert bytes to str in nested structures."""
+    if isinstance(obj, bytes):
+        return obj.decode("utf-8", errors="replace")
+    if isinstance(obj, list):
+        return [_sanitize_bytes_recursive(i) for i in obj]
+    if isinstance(obj, dict):
+        return {k: _sanitize_bytes_recursive(v) for k, v in obj.items()}
+    return obj
 
 
 @app.exception_handler(404)

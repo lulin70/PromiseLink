@@ -15,7 +15,6 @@ Usage:
 import asyncio
 import json
 import sys
-import time
 from pathlib import Path
 
 import httpx
@@ -68,7 +67,7 @@ def _divider(title: str, width: int = 70):
 def _sub(label: str, width: int = 70):
     """Print a subsection label."""
     print(f"\n  ┌─ {label} {'─' * (width - len(label) - 6)}")
-    print(f"  │")
+    print("  │")
 
 
 def _item(key: str, value: str, indent: int = 2):
@@ -112,11 +111,11 @@ async def screen1_raw_data(
     client: httpx.AsyncClient, event_type: str, raw_text: str, title: str
 ) -> str | None:
     """Screen 1: Show the raw data the user input."""
-    _divider(f"Screen 1: 原始数据 — 用户输入了什么")
+    _divider("Screen 1: 原始数据 — 用户输入了什么")
 
     print(f"\n  事件类型: {event_type}")
     print(f"  事件标题: {title}")
-    print(f"\n  原始文本:")
+    print("\n  原始文本:")
     for line in raw_text.split("\n"):
         print(f"    {line}")
 
@@ -134,7 +133,7 @@ async def screen1_raw_data(
             data = resp.json()
             event_id = data["id"]
             print(f"\n  ✅ 事件已创建 (id={event_id[:8]}...)")
-            print(f"  ⏳ 管线处理中...")
+            print("  ⏳ 管线处理中...")
             return event_id
         else:
             print(f"\n  ❌ 创建失败: {resp.status_code} {resp.text[:200]}")
@@ -157,10 +156,10 @@ async def screen2_entity_extraction(
         return []
 
     if event.get("status") == "failed":
-        print(f"  ❌ 管线处理失败")
+        print("  ❌ 管线处理失败")
         return []
 
-    print(f"  ✅ 管线处理完成")
+    print("  ✅ 管线处理完成")
 
     # Fetch entities
     try:
@@ -184,7 +183,7 @@ async def screen2_entity_extraction(
         resource = props.get("resource", {}) or {}
         concern = props.get("concern", []) or []
 
-        print(f"  │")
+        print("  │")
         print(f"  │  👤 {p['name']}")
         if basic.get("title") or basic.get("company"):
             print(f"  │     职位: {basic.get('title', '未知')} @ {basic.get('company', '未知')}")
@@ -213,7 +212,7 @@ async def screen2_entity_extraction(
         for o in others:
             print(f"  │  🏢 {o['name']} ({o['entity_type']})")
 
-    print(f"  │")
+    print("  │")
     print(f"  └{'─' * 66}")
 
     return entities
@@ -300,9 +299,9 @@ async def screen3_collision_discovery(
                 found = True
 
         if not found:
-            print(f"  │  (暂无碰撞发现，数据量较少)")
+            print("  │  (暂无碰撞发现，数据量较少)")
 
-    print(f"  │")
+    print("  │")
     print(f"  └{'─' * 66}")
 
     return associations
@@ -361,7 +360,7 @@ async def screen4_todo_output(
             if reason:
                 print(f"  │     原因: {reason[:80]}")
 
-    print(f"  │")
+    print("  │")
     print(f"  └{'─' * 66}")
 
     # Summary
@@ -373,7 +372,7 @@ async def screen4_todo_output(
         label, _ = type_labels.get(tt, (tt, ""))
         print(f"  │    {label}: {count}条")
 
-    print(f"  │")
+    print("  │")
     print(f"  └{'─' * 66}")
 
     return todos

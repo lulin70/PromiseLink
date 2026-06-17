@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Test batch events API."""
-import urllib.request, json, sys, os
+import json
+import os
+import sys
+import urllib.request
 
 BASE = "http://localhost:8000/api/v1"
 
@@ -14,7 +17,7 @@ def main():
     try:
         resp = urllib.request.urlopen(req, timeout=10)
         token = json.loads(resp.read())["access_token"]
-        print(f"Login OK")
+        print("Login OK")
     except Exception as e:
         print(f"Login failed: {e}")
         sys.exit(1)

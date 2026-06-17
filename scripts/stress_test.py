@@ -12,11 +12,11 @@ Strategy:
 - Inter-test cooldown: 10s to let pipelines drain
 """
 import asyncio
+import os
 import time
 import uuid
-import statistics
+
 import httpx
-import os
 
 BASE = "http://localhost:8001/api/v1"
 SECRET = os.environ.get("POC_SECRET", "promiselink2026")
