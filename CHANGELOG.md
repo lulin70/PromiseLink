@@ -2,6 +2,31 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [0.5.4] - 2026-06-17
+
+### Added — 基础版内部灰度发布
+- **UI响应式断点**: app.scss添加768px/1024px两档断点，桌面端内容区max-width 750px/900px居中
+- **E2E测试扩充**: scripts/e2e/e2e_user_journey_extended.py，42个测试用例，8大场景(新用户/多事件/人脉/承诺/日程/仪表盘/导出/边界)
+- **安全测试套件**: tests/test_security_comprehensive.py，50个测试用例，7大维度(SQL注入/XSS/路径遍历/JWT/越权/输入验证/速率限制)
+- **性能测试套件**: tests/test_performance_baseline.py，17个测试用例，4大维度(API响应/数据库/并发/内存)
+- **开源治理文件**: SECURITY.md(安全策略+漏洞报告), .github/cla-assistant.json + .github/CLA.md(贡献者许可协议)
+- **DMCA模板**: docs/legal/DMCA_TAKEDOWN_TEMPLATE.md，含6个平台联系方式
+- **CI/CD加固**: mypy改为阻断, 添加pip-audit安全扫描, 添加--cov-fail-under=60覆盖率阈值
+
+### Fixed
+- **BUG-001**: validation_exception_handler在form-encoded数据时bytes序列化崩溃，添加_sanitize_bytes_recursive递归清理
+- **mypy 38错误清零**: 19个文件修复(cast类型断言11处+type:ignore 9处+类型标注5处+list()包装2处)
+- **CacheService._redis运行时AttributeError**: 添加_redis属性返回_redis_client
+- **git history内部路径泄露**: git filter-repo重写67个commit，167处/Users/lin/→相对路径
+- **ruff 218错误清零**: 自动修复214处+手动修复5处(F841未使用变量+E722 bare except)
+
+### Changed
+- **UI莫兰迪色系统一**: app.scss/app.config.ts+11个页面文件，Ant Design蓝→莫兰迪雾蓝灰(#7B9EA8)
+- **测试数量**: 1319测试通过(1210单元+42 E2E+50安全+17性能), 63个测试文件
+- **成熟度评分**: 80→92/100 (架构84/安全90/测试92/PM87/开发92/DevOps81/UI84)
+- **CONTRIBUTING.md更新**: 添加CLA签署流程说明
+- **PROJECT_STATUS.md更新**: 成熟度92/100，内部灰度就绪
+
 ## [0.5.3] - 2026-06-17
 
 ### Added — 开源前阻断项修复+基础版提升
