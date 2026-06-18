@@ -712,3 +712,98 @@ def test_license_key_format_invalid():
         LicenseService._validate_license_key_format("INVALID")
     with pytest.raises(InvalidLicenseKeyFormat):
         LicenseService._validate_license_key_format("PL-PRO-abc")
+
+
+# ── JTI server-side tracking tests (I8) ──────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_activate_tracks_jti_in_redis(
+    db_session, redis_client, private_key_pem, public_key_pem, bound_license
+):
+    """I8: activation writes the access jti to the jwt_active Redis set."""
+    from gateway.services.license_service import _ACTIVE_JWT_PREFIX
+
+    service = _make_service(db_session, redis_client, private_key_pem, public_key_pem)
+
+    result = await service.activate_license(
+        jwt_user_id=bound_license.user_id,
+        license_key=bound_license.license_key,
+        device_fingerprint=bound_license.device_fingerprint,
+    )
+
+    # Decode the access token to get its jti
+    payload = pyjwt.decode(result.access_token, options={"verify_signature": False})
+
+    # The jti should be in the Redis active set
+    key = f"{_ACTIVE_JWT_PREFIX}{bound_license.license_key}"
+    members = await redis_client.smembers(key)
+    member_strs = {m.decode() if isinstance(m, bytes) else m for m in members}
+    assert payload["jti"] in member_strs
+
+
+@pytest.mark.asyncio
+async def test_refresh_updates_active_jti_set(
+    db_session, redis_client, private_key_pem, public_key_pem, bound_license
+):
+    """I8: refresh removes old jti and adds new jti to the active set."""
+    from gateway.services.license_service import _ACTIVE_JWT_PREFIX
+
+    service = _make_service(db_session, redis_client, private_key_pem, public_key_pem)
+
+    result = await service.activate_license(
+        jwt_user_id=bound_license.user_id,
+        license_key=bound_license.license_key,
+        device_fingerprint=bound_license.device_fingerprint,
+    )
+    old_payload = pyjwt.decode(result.access_token, options={"verify_signature": False})
+
+    # Refresh to get a new token
+    new_access, _ = await service.refresh_relay_token(result.access_token)
+    new_payload = pyjwt.decode(new_access, options={"verify_signature": False})
+
+    key = f"{_ACTIVE_JWT_PREFIX}{bound_license.license_key}"
+    members = await redis_client.smembers(key)
+    member_strs = {m.decode() if isinstance(m, bytes) else m for m in members}
+
+    # Old jti should be removed from the active set
+    assert old_payload["jti"] not in member_strs
+    # New jti should be in the active set
+    assert new_payload["jti"] in member_strs
+
+
+@pytest.mark.asyncio
+async def test_revoke_finds_jtis_from_redis_without_explicit_list(
+    db_session, redis_client, private_key_pem, public_key_pem, bound_license
+):
+    """I8: revoke_license discovers active jtis from Redis (no active_jtis param)."""
+    from gateway.services.license_service import _ACTIVE_JWT_PREFIX, _BLACKLIST_PREFIX
+
+    service = _make_service(db_session, redis_client, private_key_pem, public_key_pem)
+
+    result = await service.activate_license(
+        jwt_user_id=bound_license.user_id,
+        license_key=bound_license.license_key,
+        device_fingerprint=bound_license.device_fingerprint,
+    )
+    payload = pyjwt.decode(result.access_token, options={"verify_signature": False})
+
+    # Revoke WITHOUT passing active_jtis — should find them from Redis
+    await service.revoke_license(
+        user_id=bound_license.user_id,
+        reason="user_refund",
+        # active_jtis intentionally omitted — I8 server-side lookup
+    )
+
+    # The jti should be blacklisted
+    exists = await redis_client.exists(f"{_BLACKLIST_PREFIX}{payload['jti']}")
+    assert exists
+
+    # The active set should be cleared
+    key = f"{_ACTIVE_JWT_PREFIX}{bound_license.license_key}"
+    members = await redis_client.smembers(key)
+    assert len(members) == 0
+
+    # Verification should fail with JWTRevoked
+    with pytest.raises(JWTRevoked):
+        await service.verify_relay_token(result.access_token)

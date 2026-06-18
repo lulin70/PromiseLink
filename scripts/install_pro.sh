@@ -235,14 +235,8 @@ except Exception:
     print('UNKNOWN_ERROR')
     sys.exit(1)
 " 2>/dev/null; then
-        print_warn "无法连接到网关 ($gateway)"
-        echo -ne "${COLOR_STEP}  是否跳过在线验证继续安装？(y/N): ${COLOR_RESET}"
-        read -r skip_verify </dev/tty
-        if [[ "$skip_verify" =~ ^[Yy]$ ]]; then
-            print_info "跳过在线验证，稍后可在启动时验证。"
-            return 0
-        fi
-        return 1
+        print_error "无法连接到网关 ($gateway)"
+        die "许可证验证失败，安装终止。请检查网络连接后重试。"
     fi
 
     # 调用网关激活接口验证许可证密钥
@@ -293,7 +287,7 @@ except Exception as e:
     print('ERROR:' + str(e)[:100])
     sys.exit(1)
 " 2>/dev/null; then
-        return 1
+        die "许可证验证失败，安装终止。请检查网络连接或许可证密钥后重试。"
     fi
     return 0
 }

@@ -38,6 +38,27 @@ class BillingService:
         """Set the license store reference (shared with LicenseService)."""
         self._licenses = licenses
 
+    # ── Public query methods (for admin API — avoid private attr access) ──
+
+    def get_all_licenses(self) -> list[License]:
+        """Return all licenses in the store."""
+        return list(self._licenses.values())
+
+    def get_license(self, license_key: str) -> License | None:
+        """Return a single license by key, or None if not found."""
+        return self._licenses.get(license_key)
+
+    def get_usage_records(self, license_key: str | None = None) -> list[UsageRecord]:
+        """Return usage records, optionally filtered by license key.
+
+        Args:
+            license_key: If provided, return only records for this license.
+                If None, return all records.
+        """
+        if license_key is None:
+            return list(self._usage_records)
+        return [r for r in self._usage_records if r.license_key == license_key]
+
     def check_quota(self, user_id: str, license_key: str, request_type: str = "llm") -> str:
         """Check if the user has remaining quota for the request type.
 
@@ -121,6 +142,7 @@ class BillingService:
             cost_cny=cost_cny,
             status_code=status_code,
             success=success,
+            created_at=datetime.now(UTC),
         )
         self._usage_records.append(record)
 

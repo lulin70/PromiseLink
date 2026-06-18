@@ -48,7 +48,7 @@
 | # | 改进项 | 来源 | 优先级 |
 |---|--------|------|--------|
 | I1 | PRD与架构文档定价不一致(¥29/49 vs "待定") | PM | 高 |
-| I2 | 仓库名命名不统一(PromiseLink-Standard vs PromiseLink) | 架构 | 高 |
+| I2 | 仓库名命名不统一(基础版曾用名 vs PromiseLink) | 架构 | 高 |
 | I3 | correctEvent后无自动跳转详情页 | 开发+UI | 高 |
 | I4 | install_pro.sh在线验证失败允许跳过(安全风险) | DevOps | 高 |
 | I5 | admin.py直接访问billing私有属性 | 安全 | 中 |

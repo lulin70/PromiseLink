@@ -204,10 +204,11 @@ class TestLLMRelayStream:
             url = str(request.url)
             if "moka.test" in url:
                 return httpx.Response(500, json={"error": "Moka error"})
-            content = "\n".join(openai_stream)
+            # openai_stream is a list of bytes lines; join into a single body
+            content = b"".join(openai_stream)
             return httpx.Response(
                 200,
-                content=content.encode(),
+                content=content,
                 headers={"content-type": "text/event-stream"},
             )
 

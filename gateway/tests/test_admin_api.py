@@ -1,7 +1,7 @@
 """Tests for the admin monitoring API endpoints.
 
 Tests cover:
-- Admin authentication (missing key / wrong key / correct key)
+- Admin two-factor authentication (API key + JWT / token endpoint)
 - Usage summary endpoint
 - User usage list (pagination + sorting)
 - Single user usage detail
@@ -11,9 +11,11 @@ Tests cover:
 
 from __future__ import annotations
 
+import time
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
+import jwt as pyjwt
 import pytest
 from fastapi.testclient import TestClient
 
@@ -23,12 +25,18 @@ from gateway.services.billing_service import BillingService
 
 # ── Test constants ──
 
-TEST_ADMIN_KEY = "dev-gateway-admin-key"
+# Must match settings.admin_api_key default
+TEST_ADMIN_API_KEY = "dev-admin-api-key-min-32-chars-padding!!"
+TEST_ADMIN_PASSPHRASE = "dev-admin-passphrase"
 WRONG_ADMIN_KEY = "wrong-admin-key-xxx"
 
 LICENSE_KEY_A = "PL-PRO-AAAA-0001-USER"
 LICENSE_KEY_B = "PL-PRO-BBBB-0002-USER"
 LICENSE_KEY_C = "PL-PRO-CCCC-0003-USER"
+
+# Admin JWT constants (must match middleware/auth.py)
+_ADMIN_JWT_ISSUER = "promiselink-gateway-admin"
+_ADMIN_JWT_AUDIENCE = "promiselink-admin-client"
 
 
 # ── Helpers ──
@@ -174,35 +182,68 @@ def admin_client(admin_billing_service, admin_license_store, jwt_handler, test_s
         yield client
 
 
+def _make_admin_jwt(test_settings) -> str:
+    """Create a valid admin JWT for testing (matches POST /api/v1/admin/token)."""
+    now = int(time.time())
+    payload = {
+        "admin_id": test_settings.admin_id,
+        "role": "admin",
+        "iat": now,
+        "exp": now + test_settings.admin_jwt_ttl,
+        "iss": _ADMIN_JWT_ISSUER,
+        "aud": _ADMIN_JWT_AUDIENCE,
+    }
+    return pyjwt.encode(payload, test_settings.admin_jwt_secret, algorithm="HS256")
+
+
 @pytest.fixture
-def admin_headers() -> dict:
-    """Return headers with a valid admin key."""
-    return {"X-Admin-Key": TEST_ADMIN_KEY}
+def admin_headers(test_settings) -> dict:
+    """Return headers with a valid admin API key and admin JWT (two-factor)."""
+    return {
+        "X-Admin-API-Key": TEST_ADMIN_API_KEY,
+        "Authorization": f"Bearer {_make_admin_jwt(test_settings)}",
+    }
 
 
 # ── Authentication Tests ──
 
 
 class TestAdminAuth:
-    """Tests for admin authentication."""
+    """Tests for admin two-factor authentication."""
 
-    def test_missing_admin_key(self, admin_client: TestClient):
-        """Request without X-Admin-Key header → 401."""
-        resp = admin_client.get("/api/v1/admin/usage/summary")
-        assert resp.status_code == 401
-        assert resp.json()["error"]["code"] == "API_KEY_INVALID"
-
-    def test_wrong_admin_key(self, admin_client: TestClient):
-        """Request with wrong X-Admin-Key → 401."""
+    def test_missing_admin_api_key(self, admin_client: TestClient, test_settings):
+        """Request without X-Admin-API-Key header → 401."""
+        # Only send the JWT, no API key
         resp = admin_client.get(
             "/api/v1/admin/usage/summary",
-            headers={"X-Admin-Key": WRONG_ADMIN_KEY},
+            headers={"Authorization": f"Bearer {_make_admin_jwt(test_settings)}"},
         )
         assert resp.status_code == 401
         assert resp.json()["error"]["code"] == "API_KEY_INVALID"
 
-    def test_correct_admin_key(self, admin_client: TestClient, admin_headers):
-        """Request with correct X-Admin-Key → 200."""
+    def test_wrong_admin_api_key(self, admin_client: TestClient, test_settings):
+        """Request with wrong X-Admin-API-Key → 401."""
+        resp = admin_client.get(
+            "/api/v1/admin/usage/summary",
+            headers={
+                "X-Admin-API-Key": WRONG_ADMIN_KEY,
+                "Authorization": f"Bearer {_make_admin_jwt(test_settings)}",
+            },
+        )
+        assert resp.status_code == 401
+        assert resp.json()["error"]["code"] == "API_KEY_INVALID"
+
+    def test_missing_admin_jwt(self, admin_client: TestClient):
+        """Request with API key but no JWT → 401."""
+        resp = admin_client.get(
+            "/api/v1/admin/usage/summary",
+            headers={"X-Admin-API-Key": TEST_ADMIN_API_KEY},
+        )
+        assert resp.status_code == 401
+        assert resp.json()["error"]["code"] == "JWT_MISSING"
+
+    def test_correct_two_factor(self, admin_client: TestClient, admin_headers):
+        """Request with correct API key + JWT → 200."""
         resp = admin_client.get(
             "/api/v1/admin/usage/summary",
             headers=admin_headers,
@@ -210,6 +251,60 @@ class TestAdminAuth:
         assert resp.status_code == 200
         data = resp.json()
         assert data["success"] is True
+
+    def test_token_endpoint_success(self, admin_client: TestClient):
+        """POST /api/v1/admin/token with correct key + passphrase → 200 + JWT."""
+        resp = admin_client.post(
+            "/api/v1/admin/token",
+            headers={"X-Admin-API-Key": TEST_ADMIN_API_KEY},
+            json={"passphrase": TEST_ADMIN_PASSPHRASE},
+        )
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        assert "access_token" in data
+        assert data["token_type"] == "Bearer"
+        assert data["expires_in"] > 0
+
+    def test_token_endpoint_wrong_passphrase(self, admin_client: TestClient):
+        """POST /api/v1/admin/token with wrong passphrase → 403."""
+        resp = admin_client.post(
+            "/api/v1/admin/token",
+            headers={"X-Admin-API-Key": TEST_ADMIN_API_KEY},
+            json={"passphrase": "wrong-passphrase"},
+        )
+        assert resp.status_code == 403
+        assert resp.json()["error"]["code"] == "PERMISSION_DENIED"
+
+    def test_token_endpoint_missing_api_key(self, admin_client: TestClient):
+        """POST /api/v1/admin/token without API key → 401."""
+        resp = admin_client.post(
+            "/api/v1/admin/token",
+            json={"passphrase": TEST_ADMIN_PASSPHRASE},
+        )
+        assert resp.status_code == 401
+        assert resp.json()["error"]["code"] == "API_KEY_INVALID"
+
+    def test_token_endpoint_then_use_jwt(self, admin_client: TestClient):
+        """Full flow: get token from endpoint, then use it for admin API."""
+        # Step 1: Get admin JWT
+        resp = admin_client.post(
+            "/api/v1/admin/token",
+            headers={"X-Admin-API-Key": TEST_ADMIN_API_KEY},
+            json={"passphrase": TEST_ADMIN_PASSPHRASE},
+        )
+        assert resp.status_code == 200
+        token = resp.json()["data"]["access_token"]
+
+        # Step 2: Use the JWT for an admin endpoint
+        resp = admin_client.get(
+            "/api/v1/admin/usage/summary",
+            headers={
+                "X-Admin-API-Key": TEST_ADMIN_API_KEY,
+                "Authorization": f"Bearer {token}",
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
 
 
 # ── Usage Summary Tests ──

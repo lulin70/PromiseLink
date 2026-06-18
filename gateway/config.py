@@ -68,10 +68,11 @@ class Settings(BaseSettings):
     admin_passphrase: str = Field(default="dev-admin-passphrase")
     admin_jwt_ttl: int = Field(default=1800)
 
-    # ── Admin monitoring key (X-Admin-Key header) ──
+    # ── Admin monitoring key (deprecated — use admin_api_key + X-Admin-API-Key) ──
     gateway_admin_key: str = Field(
         default="dev-gateway-admin-key",
-        description="Admin key for monitoring API endpoints (X-Admin-Key header)",
+        description="Deprecated: admin monitoring key (X-Admin-Key header). "
+                    "Admin API now uses admin_api_key with X-Admin-API-Key header + admin JWT.",
     )
 
     # ── Database ──
@@ -84,6 +85,15 @@ class Settings(BaseSettings):
 
     # ── Redis ──
     redis_url: str = Field(default="redis://localhost:6379/0")
+    redis_maxmemory_policy: str = Field(
+        default="volatile-lru",
+        description=(
+            "Redis maxmemory-policy. Use 'volatile-lru' (default) so that "
+            "only keys with TTL (e.g. jwt_blacklist) can be evicted — "
+            "never persistent data. 'allkeys-lru' is unsafe because it "
+            "can evict the JWT blacklist, allowing revoked tokens to pass."
+        ),
+    )
 
     # ── Client API Key (X-API-Key header) ──
     api_key: str = Field(default="pl_gateway_client_dev_key")

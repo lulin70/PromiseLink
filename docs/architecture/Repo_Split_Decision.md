@@ -1,6 +1,6 @@
 # PromiseLink 仓库分开决策 (Repo Split Decision)
 
-> **版本**: v1.0
+> **版本**: v1.2
 > **日期**: 2026-06-18
 > **决策状态**: 已批准 (Approved)
 > **决策依据**: `docs/external/for_team/PromiseLink_代码安全规范_2026-06-17.md`
@@ -130,9 +130,59 @@
     └── pro-config/      (专业配置: APP_EDITION=pro, relay 启用)
 ```
 
-**依赖管理方式**（二选一，Phase 1 推荐 git submodule）：
+**依赖管理方式**：
 - **git submodule**：专业版 repo 通过 submodule 引用基础版 repo 的特定 tag，构建时拉取
 - **pip 包**：基础版发布到 PyPI/GitHub Packages，专业版 `pip install promiselink==<version>`
+
+### 3.4 预构建 Docker 镜像策略（用户一键安装）
+
+> **核心原则**：两个 repo 是开发者和 CI 的事，不是用户的事。用户一键安装只看到一个 Docker 镜像。
+
+**问题**：如果让用户手动 clone 两个 repo 再组装（clone 基础版 → 配 git submodule → 授权 GitHub 访问私有 repo → docker build），体验极差，且普通用户没有 GitHub 私有 repo 访问权限。
+
+**方案**：在 CI（GitHub Actions）中预构建包含"基础版核心 + 专业版叠加"的完整 Docker 镜像，推送到私有容器 Registry（ghcr.io），用户只需 pull 镜像 + 提供 License Key。
+
+```
+用户视角的安装流程:
+  (1) 拿到 License Key
+  (2) docker login ghcr.io -u <username> -p <license_token>
+  (3) docker compose -f docker-compose.pro.yml up
+
+CI 构建流程 (在 PromiseLink-Pro 私有 repo 的 GitHub Actions 中执行):
+  (1) git submodule update --init        # 拉基础版核心
+  (2) 将 pro-services/ pro-api/ pro-config/ 合并到镜像
+  (3) docker build -t ghcr.io/lulin70/promiselink-pro:latest
+  (4) docker push ghcr.io/lulin70/promiselink-pro:latest
+```
+
+**用户拿到的 `docker-compose.pro.yml`**（极简，单个镜像）：
+
+```yaml
+services:
+  promiselink-pro:
+    image: ghcr.io/lulin70/promiselink-pro:latest
+    environment:
+      - LICENSE_KEY=${LICENSE_KEY}
+      - TZ=Asia/Shanghai
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data    # 业务数据始终在本地
+    restart: unless-stopped
+```
+
+**三个安装场景的 repo 涉及量（用户视角）**：
+
+| 用户类型 | 安装命令 | 用户接触的 repo 数 | 需要 GitHub 授权 |
+|----------|---------|-------------------|-----------------|
+| 基础版 | `git clone` → `docker compose up` | 1 个（公开） | 无需 |
+| 专业版 Docker | `docker login ghcr.io` → `docker compose up` | 0 个 | 无需（License Key 验证） |
+| 专业版开发者 | `git clone pro-repo` → `git submodule update` | 2 个（公开+私有） | 需要（私有 repo 访问） |
+
+**镜像仓库访问控制**：
+- `ghcr.io/lulin70/promiselink-pro` 为 **private** 容器镜像
+- 用户通过 License Key 换取临时 pull token（有效期 24h），而非直接授予 GitHub 权限
+- License 过期后 pull token 自动失效，已下载的镜像仍可本地运行（业务数据不受影响）
 
 ---
 
@@ -217,6 +267,7 @@
 | 4 | 公开 repo 基础版测试全绿（移除专业版测试） | `pytest` 通过 |
 | 5 | 专业版 repo 配置 git submodule 引用基础版 repo | submodule 可拉取 |
 | 6 | 专业版本地 Docker 构建验证（基础核心 + 专业叠加） | docker-compose up 成功 |
+| 7 | 配置 CI 预构建 Docker 镜像 + 推送 ghcr.io（§3.4） | 镜像可 pull 且正常运行 |
 
 **涉及文件清单**（从公开 repo 迁出）：
 - 服务：`asr_service.py`, `tts_service.py`, `ocr_service.py`, `nlu_intent_classifier.py`, `nlg_service.py`, `voice_query_service.py`, `email_adapter.py`, `wechat_forward_adapter.py`
@@ -225,13 +276,45 @@
 
 ### 5.3 Phase 3：小程序整合
 
-**目标**：将微信小程序代码整合到专业版 repo。
+**目标**：将微信小程序代码整合到专业版 repo，消除独立的 `PromiseLink-miniapp` 仓库。
+
+**合并决策说明（v1.2补充）**：
+
+原 `lulin70/PromiseLink-miniapp` 独立仓库存在以下问题，决定合并到 `PromiseLink-Pro/miniapp/` 目录：
+
+| 问题 | 影响 | 合并后解决方式 |
+|------|------|---------------|
+| 小程序与网关强耦合（API地址/认证/中继协议） | 分仓库导致接口变更需跨repo协调 | 同repo内同步修改，CI统一验证 |
+| 小程序为专业版专属（基础版用H5） | 独立仓库误导社区认为可独立使用 | 物理归入专业版repo，明确专业版属性 |
+| 三仓库（Standard/Pro/miniapp）维护成本高 | 版本对齐困难，release流程复杂 | 收敛为双仓库（PromiseLink + PromiseLink-Pro） |
+| 小程序代码含专业版商业逻辑 | 独立公开repo有泄露风险 | 随Pro repo私有化 |
+
+**合并步骤**：
 
 | 步骤 | 操作 | 验证方法 |
 |------|------|----------|
 | 1 | 将 `lulin70/PromiseLink-miniapp` 迁移/整合到 `PromiseLink-Pro/miniapp/` | 小程序可编译 |
 | 2 | 更新小程序的 API 地址指向专业版网关 | 网络请求正常 |
 | 3 | 原 miniapp repo 归档或设为私有 | repo 不可公开访问 |
+| 4 | 更新 `PromiseLink-Pro/miniapp/` 的 CI 配置，接入专业版流水线 | CI 可运行 |
+| 5 | 清理原 miniapp repo 的 git history（如有敏感配置） | `git log` 无敏感信息 |
+
+**合并后的目录结构**：
+
+```
+PromiseLink-Pro/                # 专业版仓库（私有）
+├── gateway/                    # 云端AI网关
+├── miniapp/                    # 微信小程序（原 PromiseLink-miniapp 合并至此）
+│   ├── src/                    # 小程序源码
+│   ├── project.config.json     # 微信开发者工具配置
+│   ├── package.json            # 依赖管理
+│   └── README.md               # 小程序开发说明
+├── pro-services/               # 专业版服务模块
+├── pro-api/                    # 专业版API路由
+└── deploy/                     # 部署编排
+```
+
+**对基础版的影响**：无。基础版使用 Taro H5 前端（`PromiseLink/frontend/`），与小程序代码完全独立，不共享样式/组件/布局（见 PRD §1.5.7 UI布局策略）。
 
 ### 5.4 迁移时间线
 
@@ -240,6 +323,28 @@
 | Phase 1 | gateway/ 迁移 + history 清理 | 1-2 天 | 🔴 立即执行 |
 | Phase 2 | 专业版服务/路由迁移 | 3-5 天 | 🟡 公开发布前完成 |
 | Phase 3 | 小程序整合 | 1-2 天 | 🟢 专业版发布前完成 |
+
+### 5.5 miniapp 仓库独立决策（v1.2 更新）
+
+> **本节为 v1.2 新增决策，取代 §5.3 Phase 3 的"小程序合并到 PromiseLink-Pro"方案。**
+
+**决策**：`PromiseLink-miniapp` 保留独立仓库，不合并到 `PromiseLink-Pro/miniapp/`。
+
+**决策原因**：
+
+1. **独立构建与部署流程**：微信小程序需要独立的构建工具链（微信开发者工具）、独立的审核发布流程（微信小程序平台审核）和独立的版本管理，与后端代码的构建部署流程完全不同。
+2. **基础版与专业版共用**：小程序并非专业版专属，基础版和专业版都可能使用小程序入口。若将小程序并入专业版私有仓库，基础版（公开仓库）用户将无法使用小程序，限制了基础版的可访问性。
+3. **独立 CI/CD**：小程序的 CI/CD 流程（编译、预览、上传、审核）与后端服务差异显著，独立仓库便于配置专属的小程序发布流水线。
+
+**最终仓库结构**：
+
+| 仓库 | 可见性 | 用途 |
+|------|--------|------|
+| `PromiseLink` | 🌐 公开（AGPL v3） | 基础版全部代码 |
+| `PromiseLink-Pro` | 🔒 私有（商业许可） | 专业版网关 + 专业版特有代码 |
+| `PromiseLink-miniapp` | 🔒 私有（商业许可） | 微信小程序（独立构建与部署） |
+
+**对 §5.3 Phase 3 的影响**：§5.3 的合并步骤不再执行。`PromiseLink-miniapp` 保持独立仓库，通过 API 契约与 `PromiseLink`（基础版）和 `PromiseLink-Pro`（专业版网关）解耦协作。
 
 ---
 
@@ -285,14 +390,101 @@
 | 8 | relay_client 可连接网关 | 集成测试 | WSS 连接建立成功 |
 | 9 | 私有 repo 可见性为 private | GitHub repo 设置 | 可见性 = private |
 | 10 | 公开 repo LICENSE 为 AGPL v3 | `cat LICENSE` | AGPL v3 全文 |
+| 11 | CI 预构建镜像推送到 ghcr.io | `docker pull ghcr.io/lulin70/promiselink-pro:latest` | 镜像可拉取 |
+| 12 | 专业版用户一键安装可用 | `docker compose -f docker-compose.pro.yml up` | 服务正常启动，无需 clone 任何 repo |
 
 ---
 
-## 7. 决策记录
+## 7. 法律合规分析（AGPL v3 传染边界）
+
+> **背景**：基础版采用 AGPL v3 开源，专业版为商业闭源。需明确 AGPL v3 的"传染性"（copyleft）边界，确保专业版商业模式合法合规。本节为技术团队初步评估，正式发布前需由法律顾问出具书面意见。
+
+### 7.1 AGPL v3 传染性基本规则
+
+AGPL v3（GNU Affero General Public License v3）的核心传染规则：
+
+| 触发条件 | 是否传染 | 说明 |
+|----------|----------|------|
+| 修改 AGPL v3 源码并分发 | ✅ 传染 | 修改后的代码必须以 AGPL v3 开源 |
+| 修改 AGPL v3 源码并通过网络提供服务 | ✅ 传染 | AGPL v3 独有的"网络交互"条款，即使不分发也触发 |
+| 静态链接 AGPL v3 代码 | ✅ 传染 | 静态链接构成"衍生作品" |
+| 动态链接 AGPL v3 代码 | ⚠️ 争议 | FSF 认为传染，部分法律观点认为不传染，保守起见视为传染 |
+| 独立进程通过管道/命令行调用 AGPL v3 程序 | ❌ 不传染 | 独立程序间通信不构成"衍生作品" |
+| 通过网络 API 调用 AGPL v3 服务 | ❌ 不传染 | 网络通信不构成"链接" |
+| 仅运行未修改的 AGPL v3 程序 | ❌ 不传染 | 未修改+未分发，不触发 copyleft |
+
+### 7.2 PromiseLink 各集成场景的传染性分析
+
+| 集成场景 | 技术方式 | 是否触发 AGPL v3 传染 | 分析依据 |
+|----------|----------|----------------------|----------|
+| **专业版通过 pip install promiselink 安装基础版核心** | Python 包依赖，import 调用 | ⚠️ 需进一步分析 | Python import 是否构成"链接"存在法律争议。FSF 倾向于认为 import 构成衍生作品，但若专业版**不修改**基础版源码、仅作为库调用，且基础版以独立进程运行（如通过 subprocess 或 HTTP），则不传染 |
+| **专业版通过 git submodule 引用基础版** | 源码级引用，编译时包含 | ✅ 触发传染 | submodule 将基础版源码纳入专业版构建，构成"衍生作品"，专业版必须开源 |
+| **专业版通过 HTTP API 调用基础版（独立进程）** | 网络通信，两进程独立 | ❌ 不传染 | 独立进程间通过 HTTP 通信，不构成"链接"，类似 Apache/nginx 与 GPL 模块的边界 |
+| **relay_client 通过 WSS 调用网关** | 网络通信 | ❌ 不传染 | relay_client（基础版公开子包）与网关（专业版私有）通过 WebSocket 通信，独立进程，不传染 |
+| **WebView 嵌入基础版 H5 页面** | 浏览器嵌入 | ⚠️ 需法律确认 | WebView 加载 H5 类似浏览器访问网页，理论上不传染。但若 H5 与小程序原生代码深度交互（JS Bridge），可能被视为"链接"。需法律确认是否适用 MPL 2.0 或 AGPL v3 例外条款 |
+
+### 7.3 推荐方案：pip install + 独立进程通信
+
+**推荐的专业版依赖基础版核心的方式**：
+
+```
+✅ 推荐：pip install promiselink
+   ├── 专业版不修改基础版源码
+   ├── 基础版作为 Python 库被 import 调用
+   ├── 专业版叠加层（pro-services/pro-api）为独立代码
+   └── 商业风险：中等（Python import 的传染性存在争议）
+
+❌ 不推荐：git submodule
+   ├── 专业版构建时包含基础版完整源码
+   ├── 构成"衍生作品"，触发 AGPL v3 copyleft
+   └── 专业版必须开源，商业模式失效
+
+✅ 最安全：HTTP API 独立进程
+   ├── 基础版作为独立服务运行（FastAPI 进程）
+   ├── 专业版通过 HTTP 调用基础版 API
+   ├── 两进程独立，不构成"链接"
+   └── 商业风险：低（但增加进程间通信开销）
+```
+
+**当前架构决策**（§3.3 专业版本地部署的代码组合）：
+- 采用 `pip install promiselink` 方式引入基础版核心
+- 专业版叠加层（pro-services/pro-api）为独立代码，不修改基础版源码
+- 若法律审查认为 Python import 仍触发传染，降级为 HTTP API 独立进程方案
+
+### 7.4 各组件 License 边界汇总
+
+| 组件 | 所在仓库 | License | 传染风险 |
+|------|----------|---------|----------|
+| 基础版核心（管线/实体/Todo/Promise/关联） | PromiseLink（公开） | AGPL v3 | 源头 |
+| relay_client（网关中继客户端） | PromiseLink（公开） | AGPL v3 | 随基础版开源，专业版可使用 |
+| 网关（gateway/） | PromiseLink-Pro（私有） | 商业许可 | ❌ 不传染（独立进程，HTTP/WSS 通信） |
+| 微信小程序（miniapp/） | PromiseLink-Pro（私有） | 商业许可 | ⚠️ WebView 嵌入基础版 H5 需法律确认 |
+| 专业版服务（pro-services/） | PromiseLink-Pro（私有） | 商业许可 | ⚠️ 若 import 基础版，需法律确认 |
+| promiselink-contracts（协议层） | 公开 | MIT | ❌ 不传染（MIT 允许闭源使用） |
+| promiselink-utils（工具层） | 公开 | MIT | ❌ 不传染（MIT 允许闭源使用） |
+
+### 7.5 风险缓解措施
+
+1. **基础版核心不修改原则**：专业版通过 pip 安装基础版，**不修改任何基础版源码**。如需定制行为，通过配置项/插件机制/子类继承实现，而非直接修改源文件。
+2. **共享协议层用 MIT**：`promiselink-contracts` 和 `promiselink-utils` 采用 MIT License，专业版可自由使用不触发传染。
+3. **WebView 嵌入方案备选**：若法律审查认为 WebView 嵌入 AGPL v3 H5 触发传染，备选方案为：① 基础版 H5 改用 MPL 2.0（弱 copyleft，文件级隔离）② 专业版小程序自建查询页面，不嵌入基础版 H5。
+4. **法律审查清单**：正式发布前完成以下法律审查：
+   - [ ] Python import AGPL v3 包是否构成"衍生作品"（针对 pip install 方案）
+   - [ ] WebView 嵌入 AGPL v3 H5 是否触发传染（针对小程序 WebView 方案）
+   - [ ] AGPL v3 §13"网络交互"条款对专业版云端部署的适用性
+   - [ ] 商业 License 与 AGPL v3 的兼容性声明
+
+### 7.6 免责声明
+
+> ⚠️ **本节分析为技术团队基于对 AGPL v3 的理解所做的初步评估，不构成法律意见。** AGPL v3 的传染性边界在法律实践中存在争议，特别是 Python import、动态链接、WebView 嵌入等场景的判定因司法管辖区而异。**正式发布前，必须由具备开源协议经验的执业律师出具书面法律意见。** 本团队不对本节分析的准确性承担法律责任。
+
+---
+
+## 8. 决策记录
 
 | 维度 | 内容 |
 |------|------|
-| **决策** | 基础版和专业版分 repo：PromiseLink（公开 AGPL v3）+ PromiseLink-Pro（私有商业许可） |
+| **决策** | 基础版、专业版、小程序分 repo：PromiseLink（公开 AGPL v3）+ PromiseLink-Pro（私有商业许可）+ PromiseLink-miniapp（私有商业许可，独立构建部署） |
 | **决策日期** | 2026-06-18 |
 | **决策依据** | 《PromiseLink 代码安全规范》铁律：不用 monorepo + .gitignore 隔离公开和私有代码 |
 | **替代方案** | ① monorepo + .gitignore（否决：违反铁律）② 同代码库 + 配置区分（否决：专业版代码仍泄露）③ 双 repo + API 桥接（采用） |
@@ -302,16 +494,16 @@
 
 ---
 
-## 8. 附录
+## 9. 附录
 
-### 8.1 相关文档
+### 9.1 相关文档
 
 - `docs/external/for_team/PromiseLink_代码安全规范_2026-06-17.md` — 代码安全规范（决策依据）
 - `docs/architecture/edition_architecture.md` — 版本架构（已更新仓库策略章节）
 - `docs/architecture/Pro_Edition_Architecture.md` — 专业版架构（已更新部署架构）
 - `docs/planning/Pro_Edition_Implementation_Plan.md` — 专业版实现计划
 
-### 8.2 git filter-repo 清理命令参考
+### 9.2 git filter-repo 清理命令参考
 
 ```bash
 # 安装 git-filter-repo

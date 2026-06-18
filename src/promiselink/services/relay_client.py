@@ -380,41 +380,52 @@ class RelayClient:
     ) -> Any:
         """Yield SSE events from the streaming LLM relay endpoint.
 
-        Automatically refreshes the token on 401 and retries once.
+        Pre-checks token validity via ``_ensure_token`` (refreshes when
+        expiry is within ``_TOKEN_REFRESH_MARGIN`` seconds). On HTTP 401,
+        refreshes the token and rebuilds the stream connection once
+        (no infinite retry).
         """
         await self._ensure_token()
         client = await self._get_client()
 
         async def event_stream() -> Any:
-            async with client.stream(
-                "POST",
-                url,
-                json=payload,
-                headers={**self._auth_headers(), "Content-Type": "application/json"},
-                timeout=httpx.Timeout(self.timeout, connect=10.0),
-            ) as response:
-                if response.status_code == 401:
-                    await self.refresh_token()
-                    # Caller should retry; yield an error event
-                    yield {"event": "error", "data": {"code": "RELAY_AUTH_REFRESHED"}}
-                    return
-                if response.status_code >= 400:
-                    body = await response.aread()
-                    yield {
-                        "event": "error",
-                        "data": {
-                            "code": "RELAY_ERROR",
-                            "status": response.status_code,
-                            "body": body.decode("utf-8", errors="replace")[:500],
-                        },
-                    }
-                    return
-                async for line in response.aiter_lines():
-                    if line.startswith("data:"):
-                        try:
-                            yield {"event": "token", "data": json.loads(line[5:].strip())}
-                        except json.JSONDecodeError:
-                            continue
+            retried = False
+            while True:
+                async with client.stream(
+                    "POST",
+                    url,
+                    json=payload,
+                    headers={**self._auth_headers(), "Content-Type": "application/json"},
+                    timeout=httpx.Timeout(self.timeout, connect=10.0),
+                ) as response:
+                    if response.status_code == 401 and not retried:
+                        # I6: refresh token then rebuild the stream connection (retry at most once)
+                        logger.warning("relay_stream_401_refreshing", url=url)
+                        await self.refresh_token()
+                        retried = True
+                        continue  # exit current async with and re-issue the stream request
+                    if response.status_code == 401:
+                        # Still 401 after retry — give up to avoid infinite retry
+                        yield {"event": "error", "data": {"code": "RELAY_AUTH_REFRESHED"}}
+                        return
+                    if response.status_code >= 400:
+                        body = await response.aread()
+                        yield {
+                            "event": "error",
+                            "data": {
+                                "code": "RELAY_ERROR",
+                                "status": response.status_code,
+                                "body": body.decode("utf-8", errors="replace")[:500],
+                            },
+                        }
+                        return
+                    async for line in response.aiter_lines():
+                        if line.startswith("data:"):
+                            try:
+                                yield {"event": "token", "data": json.loads(line[5:].strip())}
+                            except json.JSONDecodeError:
+                                continue
+                    return  # streaming finished, exit the loop
 
         return event_stream()
 
@@ -776,7 +787,14 @@ class RelayClient:
                     code="RELAY_PARSE_ERROR",
                 ) from exc
 
-        raise last_error  # type: ignore[misc]
+        if last_error is not None:
+            raise last_error
+        # Loop exited via `continue` after a 401 refresh on the final attempt:
+        # we refreshed the token but had no remaining retry to use it.
+        raise RelayAuthError(
+            message="Relay auth failed: token refreshed but no retries remaining",
+            details={"status_code": 401},
+        )
 
     async def _post_multipart_with_auth(
         self,

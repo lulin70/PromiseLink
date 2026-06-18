@@ -29,7 +29,7 @@ import json
 import re
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import redis.asyncio as redis_asyncio
@@ -65,6 +65,7 @@ _DEVICE_FP_RE = re.compile(r"^sha256:[a-f0-9]{64}$")
 
 # CRL Redis key prefix and refresh leeway (tech design §6.3, §3.7)
 _BLACKLIST_PREFIX = "jwt_blacklist:"
+_ACTIVE_JWT_PREFIX = "jwt_active:"  # Set of active jti per license_key
 _REFRESH_LEEWAY_SECONDS = 300  # 5 minutes grace for refresh
 
 
@@ -248,6 +249,8 @@ class LicenseService:
         await self._db.flush()
 
         # Step 7: sign tokens
+        access_jti = str(uuid.uuid4())
+        refresh_jti = str(uuid.uuid4())
         access_token = sign_token(
             user_id=jwt_user_id,
             license_key=license_key,
@@ -258,6 +261,7 @@ class LicenseService:
             issuer=self._issuer,
             audience=self._audience,
             token_type="access",
+            jti=access_jti,
         )
         refresh_token = sign_token(
             user_id=jwt_user_id,
@@ -269,7 +273,12 @@ class LicenseService:
             issuer=self._issuer,
             audience=self._audience,
             token_type="refresh",
+            jti=refresh_jti,
         )
+
+        # Track active JTIs server-side (I8: enables revoke to find all tokens)
+        await self._track_jti(license_key, access_jti, self._access_ttl)
+        await self._track_jti(license_key, refresh_jti, self._refresh_ttl)
 
         # Step 8: audit log
         await self._audit(
@@ -405,6 +414,8 @@ class LicenseService:
         await self._check_license_status(license_row)
 
         # Issue new tokens
+        new_access_jti = str(uuid.uuid4())
+        new_refresh_jti = str(uuid.uuid4())
         new_access = sign_token(
             user_id=payload.user_id,
             license_key=payload.license_key,
@@ -415,6 +426,7 @@ class LicenseService:
             issuer=self._issuer,
             audience=self._audience,
             token_type="access",
+            jti=new_access_jti,
         )
         new_refresh = sign_token(
             user_id=payload.user_id,
@@ -426,7 +438,13 @@ class LicenseService:
             issuer=self._issuer,
             audience=self._audience,
             token_type="refresh",
+            jti=new_refresh_jti,
         )
+
+        # Track new JTIs and untrack old JTI (I8)
+        await self._track_jti(payload.license_key, new_access_jti, self._access_ttl)
+        await self._track_jti(payload.license_key, new_refresh_jti, self._refresh_ttl)
+        await self._untrack_jti(payload.license_key, payload.jti)
 
         # Revoke old token (CRL TTL = remaining lifetime, min 1s)
         remaining = max(payload.exp - int(datetime.now(UTC).timestamp()), 1)
@@ -487,17 +505,26 @@ class LicenseService:
         await self._db.flush()
 
         # Step 2: blacklist all active JTIs
-        if active_jtis:
-            for jti in active_jtis:
-                # TTL = access token TTL (worst case remaining lifetime)
-                await self._blacklist_jti(jti, self._access_ttl)
+        # Collect JTIs from Redis (I8) + any explicitly passed in
+        all_jtis: set[str] = set(active_jtis or [])
+        for lic in licenses:
+            redis_jtis = await self._get_active_jtis(lic.license_key)
+            all_jtis.update(redis_jtis)
+
+        for jti in all_jtis:
+            # TTL = access token TTL (worst case remaining lifetime)
+            await self._blacklist_jti(jti, self._access_ttl)
+
+        # Clear the active JTI sets for all revoked licenses
+        for lic in licenses:
+            await self._clear_active_jtis(lic.license_key)
 
         # Step 3: audit log
         await self._audit(
             user_id=user_id,
             action="license_revoke",
             resource_id=license_key or ",".join(l.license_key for l in licenses),
-            metadata={"reason": reason, "blacklisted_jtis": len(active_jtis or [])},
+            metadata={"reason": reason, "blacklisted_jtis": len(all_jtis)},
         )
         await self._db.commit()
 
@@ -559,6 +586,40 @@ class LicenseService:
         key = f"{_BLACKLIST_PREFIX}{jti}"
         await self._redis.set(key, "revoked", ex=ttl_seconds)
 
+    async def _track_jti(self, license_key: str, jti: str, ttl_seconds: int) -> None:
+        """Track an active JWT ``jti`` for a license in Redis (I8).
+
+        Stores the jti in a Redis Set ``jwt_active:{license_key}`` so that
+        :meth:`revoke_license` can discover all active tokens without
+        relying on the caller to pass them in.
+        """
+        key = f"{_ACTIVE_JWT_PREFIX}{license_key}"
+        await self._redis.sadd(key, jti)
+        # Refresh the key TTL to the longest possible token lifetime
+        await self._redis.expire(key, ttl_seconds)
+
+    async def _untrack_jti(self, license_key: str, jti: str) -> None:
+        """Remove a jti from the active set (e.g. after refresh)."""
+        key = f"{_ACTIVE_JWT_PREFIX}{license_key}"
+        await self._redis.srem(key, jti)
+
+    async def _get_active_jtis(self, license_key: str) -> list[str]:
+        """Return all active jtis for a license from Redis."""
+        key = f"{_ACTIVE_JWT_PREFIX}{license_key}"
+        members = await self._redis.smembers(key)
+        result: list[str] = []
+        for m in members:
+            if isinstance(m, bytes):
+                result.append(m.decode())
+            else:
+                result.append(m)
+        return result
+
+    async def _clear_active_jtis(self, license_key: str) -> None:
+        """Delete the active jti set for a license (after revocation)."""
+        key = f"{_ACTIVE_JWT_PREFIX}{license_key}"
+        await self._redis.delete(key)
+
     async def _audit(
         self,
         *,
@@ -577,3 +638,70 @@ class LicenseService:
             metadata_json=json.dumps(metadata or {}),
         )
         self._db.add(log)
+
+
+# ── Test helpers ────────────────────────────────────────────────────
+
+
+def create_test_license(
+    *,
+    license_key: str,
+    user_id: str | None = None,
+    device_fingerprint: str | None = None,
+    status: str = "active",
+    plan_type: str = "pro",
+    quota_limit_tokens: int = 500000,
+    quota_limit_asr: int = 200,
+    quota_limit_tts: int = 200,
+    quota_limit_ocr: int = 100,
+    quota_used_tokens: int = 0,
+    quota_used_asr: int = 0,
+    quota_used_tts: int = 0,
+    quota_used_ocr: int = 0,
+    expires_in_days: int = 365,
+) -> License:
+    """Build a License ORM row with test defaults.
+
+    This is a factory function for tests that need to create a License
+    object without going through the full activation flow.
+
+    Args:
+        license_key: License key string.
+        user_id: Optional bound user ID.
+        device_fingerprint: Optional bound device fingerprint.
+        status: License status (default ``active``).
+        plan_type: Plan type (default ``pro``).
+        quota_limit_tokens: Monthly token quota.
+        quota_limit_asr: Monthly ASR call quota.
+        quota_limit_tts: Monthly TTS call quota.
+        quota_limit_ocr: Monthly OCR call quota.
+        quota_used_tokens: Current token usage.
+        quota_used_asr: Current ASR usage.
+        quota_used_tts: Current TTS usage.
+        quota_used_ocr: Current OCR usage.
+        expires_in_days: Days until expiry.
+
+    Returns:
+        A :class:`License` ORM object (not yet persisted).
+    """
+    now = datetime.now(UTC)
+    return License(
+        license_key=license_key,
+        user_id=user_id,
+        plan_type=plan_type,
+        quota_limit_tokens=quota_limit_tokens,
+        quota_limit_asr=quota_limit_asr,
+        quota_limit_tts=quota_limit_tts,
+        quota_limit_ocr=quota_limit_ocr,
+        quota_used_tokens=quota_used_tokens,
+        quota_used_asr=quota_used_asr,
+        quota_used_tts=quota_used_tts,
+        quota_used_ocr=quota_used_ocr,
+        quota_reset_at=now,
+        status=status,
+        started_at=now,
+        expires_at=now + timedelta(days=expires_in_days),
+        device_fingerprint=device_fingerprint,
+        device_bound_at=now if device_fingerprint else None,
+        max_devices=1,
+    )

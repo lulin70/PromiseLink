@@ -65,7 +65,7 @@ async def activate_license(
 
     result = await service.activate_license(
         license_key=body.license_key,
-        user_id=user_id,
+        jwt_user_id=user_id,
         device_fingerprint=body.device_fingerprint,
     )
 

@@ -154,6 +154,10 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    # Security: use volatile-lru so only keys with TTL can be evicted.
+    # allkeys-lru is unsafe — it can evict jwt_blacklist entries, allowing
+    # revoked JWTs to pass authentication.
+    command: redis-server --maxmemory-policy volatile-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s

@@ -271,26 +271,26 @@ async def bound_license(db_session: AsyncSession) -> License:
 TEST_USER_ID = "u_test_user_001"
 TEST_LICENSE_KEY = "PL-PRO-TEST-KEY-001"
 TEST_DEVICE_FP = "sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
-TEST_API_KEY = "gw_test_api_key_001"
+TEST_API_KEY = "pl_gateway_client_dev_key"
 
 
 # ── Helper functions for relay/API tests ────────────────────────────
 
 
 def make_llm_response(
-    *,
     content: str = "Hello from LLM",
-    model: str = "moka/claude-sonnet-4-6",
     prompt_tokens: int = 10,
     completion_tokens: int = 20,
+    *,
+    model: str = "moka/claude-sonnet-4-6",
 ) -> dict:
     """Build a mock OpenAI-compatible LLM response dict.
 
     Args:
         content: The response content text.
-        model: The model name.
         prompt_tokens: Number of input tokens.
         completion_tokens: Number of output tokens.
+        model: The model name.
 
     Returns:
         A dict matching the OpenAI chat completion response format.
@@ -316,14 +316,18 @@ def make_llm_response(
 
 
 def make_llm_stream_lines(
-    *,
     tokens: list[str] | None = None,
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    *,
     model: str = "moka/claude-sonnet-4-6",
 ) -> list[bytes]:
     """Build mock SSE stream lines for a streaming LLM response.
 
     Args:
         tokens: List of token strings to stream. Defaults to ["Hello", " world"].
+        prompt_tokens: Number of input tokens (included in final usage chunk).
+        completion_tokens: Number of output tokens (included in final usage chunk).
         model: The model name.
 
     Returns:
@@ -331,6 +335,8 @@ def make_llm_stream_lines(
     """
     if tokens is None:
         tokens = ["Hello", " world"]
+    import json as _json
+
     lines: list[bytes] = []
     for i, tok in enumerate(tokens):
         chunk = {
@@ -346,46 +352,79 @@ def make_llm_stream_lines(
                 }
             ],
         }
-        lines.append(f"data: {__import__('json').dumps(chunk)}\n\n".encode())
+        lines.append(f"data: {_json.dumps(chunk)}\n\n".encode())
+    # Final chunk with usage data (OpenAI sends usage when stream_options.include_usage=True)
+    if prompt_tokens or completion_tokens:
+        usage_chunk = {
+            "id": "chatcmpl-test-stream",
+            "object": "chat.completion.chunk",
+            "created": 1700000000,
+            "model": model,
+            "choices": [],
+            "usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
+            },
+        }
+        lines.append(f"data: {_json.dumps(usage_chunk)}\n\n".encode())
     lines.append(b"data: [DONE]\n\n")
     return lines
 
 
 def make_mock_client(
+    handler=None,
     *,
     status_code: int = 200,
     json_data: dict | None = None,
+    content_data: bytes | None = None,
     content: bytes | None = None,
     stream_lines: list[bytes] | None = None,
-) -> httpx.MockTransport:
-    """Create a mock httpx transport for testing relay service.
+) -> httpx.AsyncClient:
+    """Create a mock httpx AsyncClient for testing relay service.
+
+    Wraps an :class:`httpx.MockTransport` in an :class:`httpx.AsyncClient`
+    so the returned client has ``.post()``, ``.stream()``, etc. methods
+    that the relay service expects.
 
     Args:
+        handler: Optional callable ``(httpx.Request) -> httpx.Response``. If
+            provided, it is used directly and the other arguments are ignored.
         status_code: HTTP status code to return.
         json_data: JSON body to return (mutually exclusive with content/stream).
-        content: Raw bytes to return.
+        content_data: Alias for ``content`` — raw bytes to return.
+        content: Raw bytes to return (alias for ``content_data``).
         stream_lines: List of bytes lines for streaming response.
 
     Returns:
-        An httpx.MockTransport instance.
+        An :class:`httpx.AsyncClient` with a mock transport.
     """
     import httpx
 
-    def handler(request: httpx.Request) -> httpx.Response:
-        if stream_lines is not None:
+    # content_data is an alias for content
+    raw_content = content_data if content_data is not None else content
+
+    if handler is None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            if stream_lines is not None:
+                # Join stream lines into a single bytes body. httpx.Response
+                # expects a bytes body (not a list) for the async client to
+                # stream correctly via aiter_lines().
+                body = b"".join(stream_lines)
+                return httpx.Response(
+                    status_code=status_code,
+                    content=body,
+                    headers={"content-type": "text/event-stream"},
+                )
+            if raw_content is not None:
+                return httpx.Response(status_code=status_code, content=raw_content)
             return httpx.Response(
                 status_code=status_code,
-                stream=stream_lines,
-                headers={"content-type": "text/event-stream"},
+                json=json_data or make_llm_response(),
             )
-        if content is not None:
-            return httpx.Response(status_code=status_code, content=content)
-        return httpx.Response(
-            status_code=status_code,
-            json=json_data or make_llm_response(),
-        )
 
-    return httpx.MockTransport(handler)
+    transport = httpx.MockTransport(handler)
+    return httpx.AsyncClient(transport=transport)
 
 
 # ── API test fixtures (app_client, auth_headers, etc.) ─────────────
@@ -408,13 +447,39 @@ def jwt_handler(test_settings):
 
 
 @pytest.fixture
-def license_store():
-    """Return an in-memory license store for API tests."""
-    from gateway.services.license_service import LicenseService
+def license_store(jwt_handler, test_settings):
+    """Return an in-memory license store for API tests.
 
-    store = LicenseService.__new__(LicenseService)
-    store._licenses: dict[str, dict] = {}
-    store._activations: dict[str, str] = {}  # user_id -> license_key
+    This is an :class:`InMemoryLicenseService` that is also subscriptable
+    (delegates ``__getitem__``/``__setitem__`` to ``_licenses``) so tests
+    can do ``license_store[KEY]`` to access licenses directly.
+
+    The store is pre-populated with a test license under
+    :data:`TEST_LICENSE_KEY` bound to :data:`TEST_USER_ID` and
+    :data:`TEST_DEVICE_FP`.
+    """
+    from gateway.services.license_service import create_test_license
+    from gateway.tests._helpers import InMemoryLicenseService
+
+    class _SubscriptableLicenseService(InMemoryLicenseService):
+        """InMemoryLicenseService with dict-like subscript access."""
+
+        def __getitem__(self, key: str):
+            return self._licenses[key]
+
+        def __setitem__(self, key: str, value) -> None:
+            self._licenses[key] = value
+
+        def __contains__(self, key: object) -> bool:
+            return key in self._licenses
+
+    store = _SubscriptableLicenseService(jwt_handler=jwt_handler, licenses={})
+    # Pre-populate a test license bound to TEST_USER_ID/TEST_DEVICE_FP
+    store[TEST_LICENSE_KEY] = create_test_license(
+        license_key=TEST_LICENSE_KEY,
+        user_id=TEST_USER_ID,
+        device_fingerprint=TEST_DEVICE_FP,
+    )
     return store
 
 
@@ -423,7 +488,7 @@ def auth_headers(jwt_handler, test_settings) -> dict:
     """Return headers with a valid API key and relay JWT."""
     token = jwt_handler.create_access_token(
         user_id=TEST_USER_ID,
-        license_id="lic_test_001",
+        license_key=TEST_LICENSE_KEY,
         plan_type="pro",
         device_fingerprint=TEST_DEVICE_FP,
     )
@@ -438,23 +503,39 @@ def valid_token(jwt_handler, test_settings) -> str:
     """Return a valid relay JWT token string."""
     return jwt_handler.create_access_token(
         user_id=TEST_USER_ID,
-        license_id="lic_test_001",
+        license_key=TEST_LICENSE_KEY,
         plan_type="pro",
         device_fingerprint=TEST_DEVICE_FP,
     )
 
 
 @pytest.fixture
-def app_client(jwt_handler, license_store, test_settings):
-    """Create a FastAPI TestClient with mocked dependencies."""
+def app_client(
+    jwt_handler,
+    license_store,
+    billing_service,
+    api_key_pool,
+    relay_service,
+    test_settings,
+):
+    """Create a FastAPI TestClient with all mocked dependencies injected.
+
+    All service instances (license_store, billing_service, api_key_pool,
+    relay_service) are shared between the test and the app so that test
+    modifications (e.g. ``relay_service._http_client = mock``) affect the
+    app's behavior.
+    """
     from fastapi.testclient import TestClient
 
     from gateway.main import create_app
 
     app = create_app(
+        settings=test_settings,
         jwt_handler=jwt_handler,
         license_service=license_store,
-        settings=test_settings,
+        billing_service=billing_service,
+        api_key_pool=api_key_pool,
+        relay_service=relay_service,
     )
     with TestClient(app) as client:
         yield client
@@ -464,35 +545,58 @@ def app_client(jwt_handler, license_store, test_settings):
 
 
 @pytest.fixture
-def api_key_pool():
-    """Return an in-memory API Key pool for relay tests."""
-    from gateway.services.api_key_pool_manager import APIKeyPoolManager
+def api_key_pool(test_settings):
+    """Return an API Key pool with test keys for relay tests.
 
-    pool = APIKeyPoolManager.__new__(APIKeyPoolManager)
-    pool._keys: dict[str, dict] = {}
-    pool._rpm: dict[str, int] = {}
+    Uses the real :class:`APIKeyPool` (sync) with two test keys:
+    ``key-moka-1`` (moka_ai provider) and ``key-openai-1`` (openai provider).
+    The base URLs point to ``moka.test`` and ``openai.test`` so tests can
+    distinguish providers by URL.
+    """
+    from gateway.services.api_key_pool import APIKeyPool, KeyInfo
+
+    pool = APIKeyPool(settings=test_settings)
+    pool.add_key(KeyInfo(
+        key_id="key-moka-1",
+        provider="moka_ai",
+        api_key="sk-moka-test-key",
+        base_url="https://moka.test/v1",
+    ))
+    pool.add_key(KeyInfo(
+        key_id="key-openai-1",
+        provider="openai",
+        api_key="sk-openai-test-key",
+        base_url="https://openai.test/v1",
+    ))
     return pool
 
 
 @pytest.fixture
-def billing_service():
-    """Return an in-memory billing service for relay tests."""
-    from gateway.services.usage_service import UsageService
+def billing_service(test_settings, license_store):
+    """Return a real BillingService sharing the license_store.
 
-    svc = UsageService.__new__(UsageService)
-    svc._records: list[dict] = []
+    The billing service's ``_licenses`` dict is set to the
+    :class:`InMemoryLicenseService` instance (which acts as a dict via
+    subscript delegation to its internal ``_licenses``).
+    """
+    from gateway.services.billing_service import BillingService
+
+    svc = BillingService(settings=test_settings, licenses=license_store._licenses)
     return svc
 
 
 @pytest.fixture
-def relay_service(api_key_pool, billing_service, license_store, test_settings):
-    """Return a RelayService instance with mocked dependencies."""
+def relay_service(api_key_pool, billing_service, test_settings):
+    """Return a RelayService with mocked dependencies.
+
+    The ``_http_client`` is left as ``None`` so individual tests can
+    inject an ``httpx.MockTransport`` via ``relay_service._http_client = ...``.
+    """
     from gateway.services.relay_service import RelayService
 
-    svc = RelayService.__new__(RelayService)
-    svc._api_key_pool = api_key_pool
-    svc._billing = billing_service
-    svc._license_service = license_store
-    svc._settings = test_settings
-    svc._http_client = None
-    return svc
+    return RelayService(
+        api_key_pool=api_key_pool,
+        billing_service=billing_service,
+        http_client=None,
+        settings=test_settings,
+    )

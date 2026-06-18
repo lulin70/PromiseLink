@@ -1017,6 +1017,100 @@ Content-Length: 28640
 |------|-----------|----------|
 | 503 | GATEWAY_UNHEALTHY | 关键组件不可用 |
 
+### 4.4 中继业务接口示例：录入纠偏 API（v1.2补充）
+
+> **背景**：基础版已实现 `POST /api/v1/events/{event_id}/correct`（见 `src/promiselink/api/v1/events.py`），用于用户对AI解析结果进行人脉/待办/承诺三类纠偏。专业版小程序通过网关 WSS 中继调用此基础版业务接口（§8.1 路由判断：`/api/v1/business/*` → RelayRouter → 本地Docker）。本节定义该接口的契约，供专业版前端（小程序）与基础版后端共同遵守。
+
+**端点**：`POST /api/v1/events/{event_id}/correct`（经网关中继，小程序请求路径为 `/api/v1/pro/business/events/{event_id}/correct`）
+
+**认证**：JWT（用户登录态），`event_id` 必须属于当前 `user_id`
+
+**请求体**：
+
+```json
+{
+  "corrected_entities": [
+    {
+      "extracted_entity_id": "uuid",
+      "action": "select_existing|create_new|ignore",
+      "selected_entity_id": "uuid",
+      "new_name": "string",
+      "new_company": "string",
+      "new_title": "string"
+    }
+  ],
+  "corrected_todos": [
+    {
+      "id": "uuid|null",
+      "action": "edit|delete|add",
+      "title": "string",
+      "description": "string",
+      "due_date": "datetime",
+      "priority": 1,
+      "related_entity_id": "uuid"
+    }
+  ],
+  "corrected_promises": [
+    {
+      "id": "uuid",
+      "action": "confirm|ignore|modify",
+      "content": "string",
+      "due_date": "datetime",
+      "promise_type": "personal|business"
+    }
+  ]
+}
+```
+
+**响应体**（200 OK）：
+
+```json
+{
+  "event_id": "uuid",
+  "entities_updated": 0,
+  "entities_created": 0,
+  "entities_ignored": 0,
+  "todos_created": 0,
+  "todos_deleted": 0,
+  "todos_updated": 0,
+  "promises_confirmed": 0,
+  "promises_ignored": 0,
+  "promises_modified": 0
+}
+```
+
+**字段语义**：
+
+| 类别 | action 枚举 | 行为 |
+|------|-------------|------|
+| 人脉纠偏 | `select_existing` | 合并到已有实体，相关Todo的 related_entity_id 重指向 |
+| 人脉纠偏 | `create_new` | 更新提取实体的 name/company/title，标记 confirmed |
+| 人脉纠偏 | `ignore` | 标记 deleted，不参与后续匹配 |
+| 待办纠偏 | `edit` | 修改 title/description/due_date/priority/related_entity_id |
+| 待办纠偏 | `delete` | 物理删除该待办 |
+| 待办纠偏 | `add` | 新增待办（todo_type=followup，source_event_id=当前事件） |
+| 承诺纠偏 | `confirm` | confirmation_status=confirmed，进入履约跟踪 |
+| 承诺纠偏 | `ignore` | confirmation_status=rejected，status=dismissed |
+| 承诺纠偏 | `modify` | 修改 content/due_date/promise_type 并确认 |
+
+**网关中继行为**：
+- 网关不解析请求体，仅作为 WSS 中继转发至本地 Docker
+- 响应原路返回，网关不缓存
+- 超时 30s（与§8.3 中继超时配置一致）
+- 本地 Docker 离线时返回 503 `LOCAL_SERVICE_DISCONNECTED`
+
+**错误码**：
+
+| HTTP | error.code | 触发条件 |
+|------|-----------|----------|
+| 401 | JWT_INVALID | JWT无效（网关侧拦截） |
+| 404 | EVENT_NOT_FOUND | event_id 不存在或不属于当前用户（基础版侧） |
+| 400 | VALIDATION_ERROR | 请求体字段校验失败（基础版侧） |
+| 503 | LOCAL_SERVICE_DISCONNECTED | 本地Docker未连接（网关侧） |
+| 504 | UPSTREAM_TIMEOUT | 中继超时30s（网关侧） |
+
+**幂等性与原子性**：整个纠偏操作在基础版单个数据库事务中完成，任一子项失败则整体回滚。详见 PRD §5.18.6 录入纠偏API契约。
+
 ---
 
 ## 5. API Key池管理算法

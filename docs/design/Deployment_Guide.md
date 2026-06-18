@@ -683,7 +683,7 @@ docker run -d \
   promiselink:latest
 
 # Taro H5编译
-cd PromiseLink-miniapp && npm run build:h5
+cd PromiseLink/frontend && npm run build:h5
 ```
 
 #### 2.10.4 专业版安装命令
@@ -700,7 +700,9 @@ docker run -d \
   promiselink:latest
 
 # Taro H5编译（专业版也支持H5访问）
-cd PromiseLink-miniapp && npm run build:h5
+cd PromiseLink/frontend && npm run build:h5
+# 微信小程序编译（专业版小程序，位于 PromiseLink-Pro/miniapp/）
+# cd PromiseLink-Pro/miniapp && npm run build:weapp
 ```
 
 #### 2.10.5 版本切换

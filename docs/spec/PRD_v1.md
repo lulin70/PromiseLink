@@ -5,7 +5,8 @@
 > **状态**: v5.3 双版本UI布局策略+录入纠偏+功能重点调整+详情页跳转+一键安装
 > **负责人**: CarryMem 团队
 > **变更说明**: v5.0: 新增F-67关系推进卡前端对接+F-68 Promise兑现状态追踪+F-69智能跟进提醒，增强F-45兑现闭环+F-50语音管家快捷指令，明确不做关系信用分/企业版团队协作(除非定制版)，基于brainstorm Top5用例+WorkBuddy关系推进卡补充+推广文承诺验证+DevSquad 7角色CONDITIONAL_PASS门禁
-> **v5.3变更说明**: ①新增§1.5.7 UI布局策略（基础版电脑宽屏三栏+专业版微信小程序手机竖屏单栏，两版UI完全独立）②新增§5.18录入事件画面设计与解析纠偏（大文本框+分区展示+人脉/关系/待办/承诺四类纠偏+确认提交）③新增§3.0.2功能重点与优先级（会后纪要→待办提醒→承诺跟进核心三件套，按生命周期推进，其他为辅助）④新增§5.8.4详情页跳转设计（事件/人脉/待办/承诺四类详情页互相跳转）⑤更新§1.5.3专业版一键安装流程（下载小程序→微信授权→输入邀请码→激活→使用，无需API Key配置）+桥接监控（网关记录Token/次数/费用）+降级策略⑥更新§1.5.6 repo分开策略（基础版公开仓库PromiseLink-Standard+专业版私有仓库PromiseLink-Pro）
+> **v5.3变更说明**: ①新增§1.5.7 UI布局策略（基础版电脑宽屏三栏+专业版微信小程序手机竖屏单栏，两版UI完全独立）②新增§5.18录入事件画面设计与解析纠偏（大文本框+分区展示+人脉/关系/待办/承诺四类纠偏+确认提交）③新增§3.0.2功能重点与优先级（会后纪要→待办提醒→承诺跟进核心三件套，按生命周期推进，其他为辅助）④新增§5.8.4详情页跳转设计（事件/人脉/待办/承诺四类详情页互相跳转）⑤更新§1.5.3专业版一键安装流程（下载小程序→微信授权→输入邀请码→激活→使用，无需API Key配置）+桥接监控（网关记录Token/次数/费用）+降级策略⑥更新§1.5.6 repo分开策略（基础版公开仓库PromiseLink+专业版私有仓库PromiseLink-Pro）
+> **v5.4变更说明**: ①B8 补充§5.3 Promise数据模型定义（逻辑视图，复用todos表）②B9 补充§5.18.6录入纠偏API契约（POST /events/{event_id}/correct）③I1 定价统一为¥29/月(早鸟)/¥49/月(常规)，消除"待定"和"PoC验证后定价"④I2 仓库名统一为PromiseLink(基础版)+PromiseLink-Pro(专业版)，基础版仓库统一命名为PromiseLink，miniapp合并到PromiseLink-Pro/miniapp/⑤I9 Repo_Split_Decision.md补充§7 AGPL v3法律合规分析⑥I10 edition_architecture.md补充§6 UI架构⑦I11 §1.5.3新增7天免费试用机制⑧I12 §1.5.3b新增网关宕机补偿机制
 
 ***
 
@@ -197,7 +198,7 @@ PromiseLink 是 **AI驱动的个人商务关系经营助手——先成就关系
 | **数据位置** | 家里 | 家里（中继不过夜） | 按需 |
 | **安装难度** | Docker一键 | Docker一键 + 自动连网关 | 我方部署 |
 | **离线可用** | ✅ 局域网内可用 | ❌ 需网关在线 | ❌ |
-| **定价** | 免费 | 付费（PoC验证后定价） | 定制报价 |
+| **定价** | 免费 | ¥29/月(早鸟价) / ¥49/月(常规价) | 定制报价 |
 | **核心Slogan** | "数据从不出家门" | "关系助手，随身携带" | "按你的方式来" |
 
 **为什么这个分层更好**：
@@ -316,6 +317,70 @@ Docker如何"知道"用户买了专业版：
 - 有效期30天，过期需联系客服重新发放
 - 支持批量生成（推广渠道/活动场景）
 
+#### 1.5.3c 7天免费试用机制（v5.4新增）
+
+> **设计目标**：降低用户决策门槛，允许用户先体验专业版AI能力再决定付费。试用无需付费，但需注册（微信授权）以绑定身份与用量。
+
+**试用规则**：
+
+| 维度 | 规则 |
+|------|------|
+| **试用时长** | 7天（自首次授权登录起算，自然日） |
+| **付费要求** | 无需付费，无需绑定支付方式 |
+| **注册要求** | 必须微信授权登录（获取 openid 作为 user_id） |
+| **AI调用限制** | 每日 100 次 AI 调用（含实体抽取/待办生成/承诺识别/查询） |
+| **Token额度** | 每日 50K Token（与体验版月额度对齐，按日刷新） |
+| **功能范围** | 全部专业版功能（语音/媒体/邮件/微信转发/隐私数据管理） |
+| **数据存储** | 试用数据存储在用户本地 Docker（与正式版一致） |
+| **试用次数** | 每个微信账号仅限1次，不可重复试用 |
+
+**试用流程**：
+```
+步骤1: 微信扫码打开小程序 → 授权登录
+  系统 → 创建用户档案，标记 trial_status = "active", trial_started_at = now()
+  系统 → 显示"7天免费试用开始"引导页
+
+步骤2: 试用期内使用
+  系统 → 每日0点重置 AI调用次数（100次/日）和 Token额度（50K/日）
+  系统 → 每次AI调用前校验当日剩余额度
+  系统 → 余额不足时返回降级结果（规则引擎）+ 提示"明日刷新或升级套餐"
+
+步骤3: 试用到期前24h提醒
+  系统 → 小程序首页显示"试用还剩1天，升级¥29/月早鸟价继续使用"
+  系统 → 推送服务通知（微信模板消息）
+
+步骤4: 试用到期
+  系统 → 标记 trial_status = "expired"
+  系统 → 专业版功能不可用，降级为基础版模式（本地H5访问）
+  系统 → 小程序首页显示"试用已结束，升级专业版继续使用AI能力"
+  系统 → 引导按钮"立即升级 ¥29/月(早鸟价)"
+
+步骤5: 升级付费
+  用户 → 点击"立即升级" → 跳转付费页（¥29/月早鸟价）
+  系统 → 付费成功后标记 user_edition = "pro", trial_status = "converted"
+  系统 → 恢复全部专业版功能，按标准版（早鸟）额度计费
+```
+
+**试用额度与正式版对比**：
+
+| 套餐 | 月费 | AI调用限制 | Token额度 | 功能范围 |
+|------|------|-----------|-----------|----------|
+| **试用版（7天）** | 免费 | 100次/日 | 50K Token/日 | 全部专业版功能 |
+| 体验版 | 免费 | 不限（规则引擎） | 50K Token/月 | 基础版功能 |
+| 标准版（早鸟） | ¥29/月 | 不限 | 500K Token/月 | 全部专业版功能 |
+| 标准版（常规） | ¥49/月 | 不限 | 1000K Token/月 | 全部专业版功能 |
+
+**防滥用机制**：
+- 每个微信账号（openid）仅限1次试用，不可重复
+- 每个设备（device_id）仅限1次试用，防止多账号滥用
+- 试用期内不可导出数据（防止白嫖数据后卸载）
+- 试用期内 AI 调用频率限制：≤10次/分钟
+
+**试用数据保留**：
+- 试用到期后，用户数据保留30天（本地 Docker 不删除）
+- 30天内升级付费，数据无缝衔接
+- 30天未升级，本地数据由用户自行决定是否清理（不自动删除）
+
 #### 1.5.3b 桥接监控与用量计费（v5.3新增）
 
 > **设计目标**：网关作为"桥接层"，记录每个用户的AI用量（Token/次数/费用），支撑计费、限流、成本分析。
@@ -344,13 +409,16 @@ Docker如何"知道"用户买了专业版：
                                               网关更新用户额度（套餐内扣减）
 ```
 
-**计费套餐（PoC验证后定价，草案）**：
+**计费套餐**：
 
 | 套餐 | 月费 | Token额度 | 超额处理 |
 |------|------|-----------|----------|
+| 试用版（7天） | 免费 | 50K Token/日（按日刷新） | 超额降级为规则引擎（无LLM），次日刷新 |
 | 体验版 | 免费 | 50K Token/月 | 超额降级为规则引擎（无LLM） |
-| 标准版 | 待定 | 500K Token/月 | 超额按量计费或暂停 |
-| 不限量版 | 待定 | 不限 | 公平使用限制（防滥用） |
+| 标准版（早鸟） | ¥29/月 | 500K Token/月 | 超额按量计费或暂停 |
+| 标准版（常规） | ¥49/月 | 1000K Token/月 | 超额按量计费或暂停 |
+
+> **试用版说明**：试用版为7天限时套餐，每个微信账号仅限1次，详见 §1.5.3c。试用到期后自动降级为体验版（基础版功能）。
 
 **降级策略**：
 
@@ -367,6 +435,50 @@ Docker如何"知道"用户买了专业版：
 - 24小时Token消耗趋势 / 成本趋势
 - 错误率 / 平均延迟
 - 各套餐用户分布 / 续费率
+
+**网关宕机补偿机制（v5.4新增 I12）**：
+
+> **设计目标**：网关作为专业版 AI 能力的唯一通道，其可用性直接影响用户体验。当网关宕机时，需自动降级保证基础可用性，并按比例补偿用户订阅时长，维护用户信任。
+
+**降级策略（网关不可达时）**：
+
+| 降级层级 | 触发条件 | 行为 | 用户感知 |
+|----------|----------|------|----------|
+| L1: 本地 LLM 降级 | 网关不可达 + 用户配置了本地 LLM（如 Ollama） | relay_client 自动切换到本地 LLM 模式，使用本地模型处理请求 | "已切换到本地 AI 模式（性能可能降低）" |
+| L2: 规则引擎降级 | 网关不可达 + 无本地 LLM | 事件管线跳过 LLM 步骤，使用规则引擎提取（正则匹配 + 关键词识别） | "AI 服务暂不可用，已使用简化处理" |
+| L3: 仅存储降级 | 网关不可达 + 规则引擎也无法处理 | 仅存储原始文本，标记 `pipeline_status='awaiting_retry'`，等待网关恢复后重试 | "事件已保存，AI 处理将在服务恢复后进行" |
+
+**自动重连机制**：
+- relay_client 每 30 秒探测网关健康端点 `/api/v1/pro/health`
+- 连续 3 次探测成功后自动恢复中继模式
+- 恢复后自动重试 `awaiting_retry` 状态的事件（按创建时间顺序）
+- 重连后推送通知："AI 服务已恢复，正在处理积压事件"
+
+**本地用量记录与同步**：
+- 宕机期间的使用量记录在本地 SQLite（`usage_record` 表，标记 `synced=false`）
+- 网关恢复后，relay_client 批量上传本地用量记录到网关
+- 网关收到后更新用户额度，标记 `synced=true`
+- 同步失败时保留本地记录，下次重试（不丢失用量数据）
+
+**订阅时长补偿规则**：
+
+| 宕机时长 | 补偿措施 | 触发方式 |
+|----------|----------|----------|
+| < 4 小时 | 不补偿（在 SLA 容忍范围内） | — |
+| 4 小时 ~ 24 小时 | 订阅有效期延长 1 天 | admin 监控自动触发 |
+| > 24 小时 | 订阅有效期延长 7 天 + 邮件通知 | admin 监控自动触发 |
+| 月度 SLA < 99.5% | 当月订阅费用减半（退款 50%） | 月末结算时自动计算 |
+
+**SLA 计算方式**：
+- 月度可用性 = (月总分钟数 - 宕机分钟数) / 月总分钟数 × 100%
+- 宕机定义：网关健康端点连续 3 次探测失败（≥ 90 秒不可达）
+- 仅计入非计划内停机（计划维护提前 24 小时通知，不计入）
+
+**admin 监控与自动触发**：
+- admin 后台实时监控网关状态，记录每次宕机的开始/结束时间
+- 宕机恢复后自动计算补偿，更新受影响用户的 `expires_at`
+- 补偿记录写入 `audit_log`，包含：用户 ID、补偿天数、宕机时段
+- 月末自动生成 SLA 报告，若 < 99.5% 自动触发费用减半
 
 #### 1.5.4 SQLite长期方案与定制版迁移路径
 
@@ -432,7 +544,7 @@ Docker如何"知道"用户买了专业版：
 
 > **决策**：基础版采用Open Core模式开源，闭源专业版增值服务。开源的是"你本地能跑的所有东西"，闭源的是"让你随时随地用的所有东西"。
 
-**开源范围（PromiseLink-Standard）**：
+**开源范围（PromiseLink）**：
 - ✅ 13步事件处理管线
 - ✅ 实体提取 + 归一
 - ✅ 所有记忆类型
@@ -457,7 +569,7 @@ Docker如何"知道"用户买了专业版：
 
 **开源节奏**：
 - M1-M2（上线期）：基础版Docker先私有分发，打磨部署体验
-- M3-M4（优化期）：开源PromiseLink-Standard，同步发Product Hunt/Hacker News
+- M3-M4（优化期）：开源PromiseLink，同步发Product Hunt/Hacker News
 - 配合"数据从不出家门"叙事做传播
 
 **为什么开源基础版是对的**：
@@ -473,7 +585,7 @@ Docker如何"知道"用户买了专业版：
 
 | 仓库 | 可见性 | 内容 | License | 目标用户 |
 |------|--------|------|---------|----------|
-| `PromiseLink-Standard` | 🌐 公开 | 基础版全部代码（管线+实体+Todo+Promise+关联+Docker+H5+适配器） | AGPL v3 | 技术用户/自托管/开源社区 |
+| `PromiseLink` | 🌐 公开 | 基础版全部代码（管线+实体+Todo+Promise+关联+Docker+H5+适配器） | AGPL v3 | 技术用户/自托管/开源社区 |
 | `PromiseLink-Pro` | 🔒 私有 | 专业版增量代码（网关+小程序+语音云端+图谱融合+一键安装+计费） | 商业License | 付费用户/许总们 |
 
 **为什么物理分开而非单仓库多分支**：
@@ -496,16 +608,16 @@ Docker如何"知道"用户买了专业版：
 
 ```
 GitHub组织: promiselink
-├── promiselink-standard (🌐 公开, AGPL v3)
+├── promiselink (🌐 公开, AGPL v3) — 基础版仓库
 │   ├── src/promiselink/       # 基础版后端
 │   ├── frontend/              # Taro H5 前端
 │   ├── docker/                # Docker部署
 │   ├── adapters/              # Obsidian/飞书/企微适配器
 │   └── README.md              # 开源说明 + 快速开始
 │
-├── promiselink-pro (🔒 私有, 商业License)
+├── promiselink-pro (🔒 私有, 商业License) — 专业版仓库
 │   ├── gateway/               # 中继网关
-│   ├── miniprogram/           # 微信小程序
+│   ├── miniapp/               # 微信小程序（原 PromiseLink-miniapp 已合并到此目录）
 │   ├── voice/                 # 语音云端模型
 │   ├── installer/             # 一键安装包
 │   ├── billing/               # 计费系统
@@ -522,12 +634,12 @@ GitHub组织: promiselink
 ```
 
 **同步机制**：
-- Standard仓库的Bug修复，通过cherry-pick同步到Pro仓库（如有对应代码）
-- Pro仓库的新功能不下推到Standard（保持基础版精简）
+- 基础版仓库（PromiseLink）的Bug修复，通过cherry-pick同步到Pro仓库（如有对应代码）
+- Pro仓库的新功能不下推到基础版（保持基础版精简）
 - contracts/utils仓库变更触发两个仓库的CI依赖检查
 
 **开源治理**：
-- Standard仓库接受社区PR（需CLA签署，见.github/CLA.md）
+- 基础版仓库接受社区PR（需CLA签署，见.github/CLA.md）
 - 维护者来自CarryMem团队 + 社区贡献者
 - 版本发布节奏：每月1次minor release，季度1次major release
 - Pro仓库仅CarryMem团队可提交，按客户需求迭代
@@ -638,7 +750,7 @@ GitHub组织: promiselink
 | 路由 | Taro Router (H5模式) | Taro Router (小程序模式) |
 | 存储 | localStorage | wx.setStorageSync |
 | 网络 | fetch / axios | Taro.request |
-| 仓库 | promiselink-standard/frontend | promiselink-pro/miniprogram |
+| 仓库 | promiselink/frontend | promiselink-pro/miniapp |
 
 ***
 
@@ -1327,7 +1439,7 @@ context_score = max(0, 1 - hours_until_meeting / 24)
 | **AI调用** | 用户自带Key | 用户自带Key | 网关代理DeepSeek | 定制模型 |
 | **推送通知** | ❌ | ❌ | ✅ | ✅ |
 | **离线可用** | ✅ | ✅ | ❌(需网关) | ❌ |
-| **定价** | 免费 | 免费 | 付费(PoC验证后定价) | 定制报价 |
+| **定价** | 免费 | 免费 | ¥29/月(早鸟价) / ¥49/月(常规价) | 定制报价 |
 
 **PoC退出条件**（全部满足才发布基础版）：
 1. ✅ LLM实体抽取准确率≥90%（100条样本）
@@ -2064,6 +2176,34 @@ IAMHERE名片JSON ──→  Event标准化管道 ──→  实体归一引擎 
 | created\_at          | ISO 8601 | 是  | 创建时间                                                |
 | updated\_at          | ISO 8601 | 是  | 更新时间（状态变更时更新）                                       |
 | completed\_at        | ISO 8601 | 否  | 完成时间                                                |
+
+#### Promise（承诺）
+
+> **语义**：Promise 是特殊的 Todo——`todo_type='promise'` 且 `action_type` 为 `my_promise`/`their_promise` 的 Todo。本表为承诺履约跟踪的逻辑视图，物理上复用 `todos` 表字段（`action_type`/`promisor_id`/`beneficiary_id`/`confirmation_status`/`evidence_quote`/`fulfillment_status`/`fulfilled_at`），不单独建表。§5.18.4 确认提交流程中的"写入Promise"即写入一条 `todo_type='promise'` 的 Todo 记录。
+
+| 字段                   | 类型       | 必填 | 说明                                                  |
+| -------------------- | -------- | -- | --------------------------------------------------- |
+| id                   | UUID v4  | 是  | 唯一标识（与 Todo.id 同主键）                                  |
+| user\_id             | UUID     | 是  | 用户ID（数据隔离）                                          |
+| source\_event\_id    | UUID     | 否  | 来源事件ID，外键→Event（系统提取的承诺必填）                          |
+| related\_entity\_id  | UUID     | 否  | 关联人脉ID，外键→Entity（受益人/对方）                            |
+| promise\_type        | enum     | 是  | my\_promise / their\_promise — 承诺方向（我答应 / 对方答应，对应 Todo.action\_type） |
+| content              | text     | 是  | 承诺内容（对应 Todo.title）                                  |
+| due\_date            | ISO 8601 | 否  | 截止日期（对应 Todo.due\_date）                              |
+| status               | enum     | 是  | pending / fulfilled / broken / dismissed — 承诺状态（broken 映射 Todo.fulfillment\_status='broken'） |
+| confirmation\_status | enum     | 否  | pending / confirmed / rejected — 用户确认状态（对应 Todo.confirmation\_status） |
+| action\_type         | string   | 否  | AI识别的动作类型：my\_promise（我答应）/ their\_promise（对方答应）（对应 Todo.action\_type） |
+| evidence\_quote      | text     | 否  | 原文引用（对应 Todo.evidence\_quote）                        |
+| fulfilled\_at        | ISO 8601 | 否  | 兑现时间（对应 Todo.fulfilled\_at）                          |
+| created\_at          | ISO 8601 | 是  | 创建时间                                                |
+| updated\_at          | ISO 8601 | 是  | 更新时间                                                |
+
+**Promise 与 Todo 的关系**：
+
+- **物理存储**：Promise 不单独建表，复用 `todos` 表。当 `todos.todo_type='promise'` 时，该记录即一条承诺。
+- **履约跟踪字段**：复用 Todo 的 `action_type`（承诺方向）、`promisor_id`（承诺人）、`beneficiary_id`（受益人）、`confirmation_status`（确认状态）、`evidence_quote`（原文引用）、`fulfillment_status`（履约状态：pending/fulfilled/overdue/broken）、`fulfilled_at`（兑现时间）。
+- **状态映射**：Promise 的 `status` 是 Todo.status 的语义子集——`pending`（待兑现）→ Todo.status='pending'；`fulfilled`（已兑现）→ Todo.status='done' + `fulfillment_status='fulfilled'`；`broken`（已违约）→ `fulfillment_status='broken'`；`dismissed`（已忽略）→ Todo.status='dismissed'。
+- **详见**：§5.18.4 确认提交流程、F-45 Promise双向动作模型、F-68 Promise兑现状态追踪。
 
 ***
 
@@ -3246,6 +3386,120 @@ AI推断关系 → 展示推断结果 + 置信度
 - Phase 1：构建纠偏数据集，fine-tune解析模型
 - Phase 2：在线学习，实时优化解析准确率
 
+#### 5.18.6 录入纠偏API契约（v5.4新增）
+
+> **设计目标**：将§5.18.3 四类纠偏功能（人脉/待办/承诺）固化为统一API契约，前端纠偏界面提交后由后端原子化应用，避免"草稿态"与"已入库态"不一致。代码已实现 `POST /api/v1/events/{event_id}/correct`（见 `src/promiselink/api/v1/events.py`），本节为补全的API契约定义。
+
+**端点**：`POST /api/v1/events/{event_id}/correct`
+
+**认证**：JWT（用户登录态），`event_id` 必须属于当前 `user_id`
+
+**请求体**：
+
+```json
+{
+  "corrected_entities": [
+    {
+      "extracted_entity_id": "uuid",
+      "action": "select_existing|create_new|ignore",
+      "selected_entity_id": "uuid",
+      "new_name": "string",
+      "new_company": "string",
+      "new_title": "string"
+    }
+  ],
+  "corrected_todos": [
+    {
+      "id": "uuid|null",
+      "action": "edit|delete|add",
+      "title": "string",
+      "description": "string",
+      "due_date": "datetime",
+      "priority": 1,
+      "related_entity_id": "uuid"
+    }
+  ],
+  "corrected_promises": [
+    {
+      "id": "uuid",
+      "action": "confirm|ignore|modify",
+      "content": "string",
+      "due_date": "datetime",
+      "promise_type": "personal|business"
+    }
+  ]
+}
+```
+
+**字段说明**：
+
+| 类别 | 字段 | 必填 | 说明 |
+|------|------|------|------|
+| 人脉纠偏 | extracted_entity_id | 是 | AI解析阶段提取的实体ID |
+| 人脉纠偏 | action | 是 | `select_existing`（合并到已有实体）/ `create_new`（更新提取实体信息）/ `ignore`（忽略，标记 deleted） |
+| 人脉纠偏 | selected_entity_id | select_existing时必填 | 用户选择的已有实体ID，相关Todo的 related_entity_id 重指向此ID |
+| 人脉纠偏 | new_name/new_company/new_title | create_new时按需 | 用户补充的实体信息 |
+| 待办纠偏 | id | edit/delete必填，add为null | 已有待办ID；add 时为 null 表示新增 |
+| 待办纠偏 | action | 是 | `edit`（修改）/ `delete`（删除）/ `add`（新增） |
+| 待办纠偏 | title | 是 | 待办标题 |
+| 待办纠偏 | priority | 否 | 1-5，默认3 |
+| 待办纠偏 | related_entity_id | 否 | 关联人脉ID |
+| 承诺纠偏 | id | 是 | 已有承诺（todo_type='promise' 的 Todo）ID |
+| 承诺纠偏 | action | 是 | `confirm`（确认，confirmation_status=confirmed）/ `ignore`（忽略，confirmation_status=rejected + status=dismissed）/ `modify`（修改内容/截止/类型并确认） |
+| 承诺纠偏 | promise_type | modify时可选 | `personal` / `business`（映射到 action_type） |
+
+**响应体**（200 OK）：
+
+```json
+{
+  "event_id": "uuid",
+  "entities_updated": 0,
+  "entities_created": 0,
+  "entities_ignored": 0,
+  "todos_created": 0,
+  "todos_deleted": 0,
+  "todos_updated": 0,
+  "promises_confirmed": 0,
+  "promises_ignored": 0,
+  "promises_modified": 0
+}
+```
+
+**响应字段说明**：
+
+| 字段 | 说明 |
+|------|------|
+| event_id | 本次纠偏对应的事件ID |
+| entities_updated | 人脉纠偏中 select_existing 成功的数量 |
+| entities_created | 人脉纠偏中 create_new 成功的数量 |
+| entities_ignored | 人脉纠偏中 ignore 成功的数量 |
+| todos_created | 待办纠偏中 add 新增的数量 |
+| todos_deleted | 待办纠偏中 delete 删除的数量 |
+| todos_updated | 待办纠偏中 edit 修改的数量 |
+| promises_confirmed | 承诺纠偏中 confirm 的数量 |
+| promises_ignored | 承诺纠偏中 ignore 的数量 |
+| promises_modified | 承诺纠偏中 modify 的数量 |
+
+**错误码**：
+
+| HTTP | 错误码 | 触发条件 |
+|------|--------|----------|
+| 401 | UNAUTHORIZED | 未携带JWT或JWT无效 |
+| 404 | EVENT_NOT_FOUND | event_id 不存在或不属于当前用户 |
+| 400 | VALIDATION_ERROR | 请求体字段校验失败（如 action 不在枚举内） |
+| 404 | ENTITY_NOT_FOUND | extracted_entity_id / selected_entity_id / todo.id 不存在 |
+| 403 | OWNERSHIP_VIOLATION | 纠偏目标不属于当前 user_id |
+
+**幂等性与原子性**：
+- 整个纠偏操作在单个数据库事务中完成，任一子项失败则整体回滚
+- 重复提交相同纠偏请求：已 confirmed 的承诺再次 confirm 视为幂等成功（计数仍+1）；已 deleted 的待办再次 delete 返回 0 计数不报错
+- 纠偏完成后，事件状态从 `awaiting_correction`（如有）流转为 `corrected`，触发审计日志 `event_corrected`
+
+**与§5.18.4 确认提交流程的关系**：
+- §5.18.4 描述的是用户在录入画面点击"✅确认提交"后的整体流程（写入Event/Entity/Association/Todo/Promise五类数据）
+- 本API契约针对的是"已解析事件"的二次纠偏——事件已入库，用户事后修改解析结果
+- 两种场景共用同一套纠偏语义（人脉三动作/待办三动作/承诺三动作），但调用时机不同
+
 ---
 
 ## 6. 约束与假设
@@ -3627,8 +3881,9 @@ AI推断关系 → 展示推断结果 + 置信度
 | v4.6 | 2026-06-06 | Phase 1动态优先级四维演进详细设计：①§1.7.5扩展Phase 1四维模型完整设计②新增维度3依赖性：全图谱路径分析算法（有向依赖图+阻塞链检测+3跳间接依赖+dependency_score=Σ(1/depth)×blocked_weight）③新增维度4场景匹配：Event表驱动算法（未来24h meeting/call扫描+Entity匹配+context_score=max(0,1-hours/24)）④权重配置从PoC(0.4/0.6/0/0)演进为Phase1(0.3/0.35/0.2/0.15)⑤新增F-55依赖性全图谱路径分析⑥新增F-56场景匹配Event表驱动 |
 | v4.7 | 2026-06-06 | Phase 1向量化功能设计：①新增§1.7.7向量化语义能力②新增F-57语义搜索（embedding向量化Entity/Event，支持自然语言查询）③新增F-58关联发现增强（embedding余弦相似度补充结构化匹配，混合得分0.7×structured+0.3×semantic）④技术选型：text-embedding-3-small（Moka AI API，API模式768维/本地降级384维，兼容OpenAI SDK）+sqlite-vec扩展（零额外依赖）⑤向量化对象：Entity(concern+capability+basic)+Event(raw_text摘要)⑥性能目标：embedding<500ms/条，语义搜索<200ms(100条以内)⑦Phase 2迁移路径：sqlite-vec→pgvector | CarryMem团队 |
 | v4.3 | 2026-06-04 | 7角色Review融合+许总PoC反馈修订版：**A组（P0阻塞修复）**：①F-45新增evidence_quote PII脱敏策略（BLK-1：sanitize_llm_input清洗/API返回脱敏/不参与搜索索引/crypto.py加密引用）②F-44新增input_scope服务端校验规则（BLK-2：仅接受auto/InputClassifier强制覆盖/hint参考/400错误码）③F-45 action_type枚举从5种统一为6种（BLK-3：my_promise/their_promise/my_followup/mutual_action/system_reminder/unclear）+Todo模型新增evidence_event_id外键字段（Arch意见C2）。**B组（许总PoC反馈）**：④新增F-49日视图（今日议程）作为首页子模块⑤F-04关联发现引擎增加"主题互通"用户视角语言+D3.js Phase 1 Plus计划⑥产品愿景增加"终身关系经营智能体"长期愿景（CarryMem 7种记忆类型支撑）+数据导出提前到Phase 1⑦F-10/F-41语音交互增加许总确认为刚需注释+Mock TTS端点。**C组（7角色Review意见采纳）**：⑧PM意见C1：PoC退出条件增加测试方法学表（100条脱敏数据/PM+Arch双签/Sprint 2窗口）⑨Tester意见C3：F-47增加回归测试策略标注（2正向+1异常用例/E2E场景/Sprint阻塞）⑩DevOps意见C4：新增§4.5运维监控指标（6项P0指标含延迟/分布/覆盖率）⑪UI意见C5：F-47推进卡12模块展示优先级（P0首屏/P1展开/P2详情页） | CarryMem团队 |
-| v5.2 | 2026-06-11 | 专业版AI路径一致性+基础版Open Core开源策略：①§1.5.3专业版AI调用路径更新为三种场景（纯基础版离线/专业版浏览器云端AI/专业版小程序云端AI），确保专业用户无论访问方式均走云端AI，体验一致②§1.5.3新增专业版身份验证流程（JWT+网关验证+隐私声明）③新增§1.5.6基础版开源策略（Open Core）：开源PromiseLink-Standard（13步管线+实体提取+记忆+Todo+Promise+关联发现+Docker+H5+适配器），闭源PromiseLink Pro（网关+小程序+语音云端+图谱融合+定制版），License选AGPL v3，开源节奏M1-M2私有分发→M3-M4开源+Product Hunt/Hacker News | PromiseLink团队 |
-| v5.3 | 2026-06-18 | 用户7项新需求融合修订版：**①Repo分开**：新增§1.5.6a Repo分开策略（基础版公开仓库PromiseLink-Standard AGPL v3 + 专业版私有仓库PromiseLink-Pro商业License，物理分开而非单仓库多分支，共享协议层promiselink-contracts+工具层promiselink-utils MIT License）。**②UI布局策略**：新增§1.5.7 UI布局策略（基础版电脑宽屏三栏布局min-width 1024px左侧导航200px+中间内容自适应+右侧详情360px；专业版微信小程序手机竖屏375px单栏滚动；两版UI完全独立不共享样式/组件库/布局逻辑，仅共享API+数据模型+业务逻辑）。**③录入事件画面+解析纠偏**：新增§5.18录入事件画面设计与解析纠偏（5子节：录入画面布局基础版宽屏+专业版竖屏/解析结果分区显示人脉关系待办承诺四类/四类纠偏功能人脉多候选选择+关系AI推断可改+待办编辑删除添加+承诺确认忽略修改/确认提交流程校验+摘要+写入数据库/纠偏数据反馈闭环）。**④功能重点调整**：新增§3.0.2功能重点与优先级（核心三件套按生命周期推进：会后纪要→待办提醒→承诺跟进，P0最高优先级占研发资源70%；人脉管理/日程/仪表盘等辅助功能P1-P2占25%；按生命周期推进设计含义：录入即解析/待办即提醒/承诺即跟踪/推进即闭环）。**⑤详情页跳转**：新增§5.8.4详情页跳转设计（事件/人脉/待办/承诺四类详情页互相跳转形成关系网络导航，每类详情页展示3类关联+跳转入口，跳转逻辑navigateTo+navigateBack，最大跳转深度5层，基础版右侧详情区切换vs专业版跳转新页面）。**⑥专业版一键安装+桥接监控**：新增§1.5.3a专业版一键安装流程（5步：下载小程序→微信授权→输入邀请码→激活本地Docker→开始使用，无需API Key配置，邀请码6位一码一用户有效期30天）+§1.5.3b桥接监控与用量计费（8项监控指标request_count/token_input/token_output/token_total/estimated_cost/relay_latency_p95/error_count/active_days，3档计费套餐，5种降级策略，运营监控看板）。**⑦按生命周期推进**：融入§3.0.2功能重点，关系生命周期见面→记录→提醒→兑现→推进驱动核心三件套设计 | PromiseLink团队 |
+| v5.2 | 2026-06-11 | 专业版AI路径一致性+基础版Open Core开源策略：①§1.5.3专业版AI调用路径更新为三种场景（纯基础版离线/专业版浏览器云端AI/专业版小程序云端AI），确保专业用户无论访问方式均走云端AI，体验一致②§1.5.3新增专业版身份验证流程（JWT+网关验证+隐私声明）③新增§1.5.6基础版开源策略（Open Core）：开源PromiseLink（13步管线+实体提取+记忆+Todo+Promise+关联发现+Docker+H5+适配器），闭源PromiseLink Pro（网关+小程序+语音云端+图谱融合+定制版），License选AGPL v3，开源节奏M1-M2私有分发→M3-M4开源+Product Hunt/Hacker News | PromiseLink团队 |
+| v5.3 | 2026-06-18 | 用户7项新需求融合修订版：**①Repo分开**：新增§1.5.6a Repo分开策略（基础版公开仓库PromiseLink AGPL v3 + 专业版私有仓库PromiseLink-Pro商业License，物理分开而非单仓库多分支，共享协议层promiselink-contracts+工具层promiselink-utils MIT License）。**②UI布局策略**：新增§1.5.7 UI布局策略（基础版电脑宽屏三栏布局min-width 1024px左侧导航200px+中间内容自适应+右侧详情360px；专业版微信小程序手机竖屏375px单栏滚动；两版UI完全独立不共享样式/组件库/布局逻辑，仅共享API+数据模型+业务逻辑）。**③录入事件画面+解析纠偏**：新增§5.18录入事件画面设计与解析纠偏（5子节：录入画面布局基础版宽屏+专业版竖屏/解析结果分区显示人脉关系待办承诺四类/四类纠偏功能人脉多候选选择+关系AI推断可改+待办编辑删除添加+承诺确认忽略修改/确认提交流程校验+摘要+写入数据库/纠偏数据反馈闭环）。**④功能重点调整**：新增§3.0.2功能重点与优先级（核心三件套按生命周期推进：会后纪要→待办提醒→承诺跟进，P0最高优先级占研发资源70%；人脉管理/日程/仪表盘等辅助功能P1-P2占25%；按生命周期推进设计含义：录入即解析/待办即提醒/承诺即跟踪/推进即闭环）。**⑤详情页跳转**：新增§5.8.4详情页跳转设计（事件/人脉/待办/承诺四类详情页互相跳转形成关系网络导航，每类详情页展示3类关联+跳转入口，跳转逻辑navigateTo+navigateBack，最大跳转深度5层，基础版右侧详情区切换vs专业版跳转新页面）。**⑥专业版一键安装+桥接监控**：新增§1.5.3a专业版一键安装流程（5步：下载小程序→微信授权→输入邀请码→激活本地Docker→开始使用，无需API Key配置，邀请码6位一码一用户有效期30天）+§1.5.3b桥接监控与用量计费（8项监控指标request_count/token_input/token_output/token_total/estimated_cost/relay_latency_p95/error_count/active_days，3档计费套餐，5种降级策略，运营监控看板）。**⑦按生命周期推进**：融入§3.0.2功能重点，关系生命周期见面→记录→提醒→兑现→推进驱动核心三件套设计 | PromiseLink团队 |
+| v5.4 | 2026-06-18 | 文档一致性修订版（8项）：**①B8** §5.3补充Promise数据模型定义（逻辑视图复用todos表，说明Promise与Todo关系）**②B9** §5.18.6补充录入纠偏API契约（POST /events/{event_id}/correct，人脉/待办/承诺三类纠偏）+Pro_Edition_Tech_Design_Phase0.md §4.4补充中继业务接口示例**③I1** 定价统一为¥29/月(早鸟价)/¥49/月(常规价)，消除所有"待定"和"PoC验证后定价"**④I2** 仓库名统一为PromiseLink(基础版)+PromiseLink-Pro(专业版)，基础版仓库统一命名为PromiseLink，PromiseLink-miniapp合并到PromiseLink-Pro/miniapp/目录**⑤I9** Repo_Split_Decision.md补充§7 AGPL v3法律合规分析（pip安装不传染/submodule传染/推荐pip方案/免责声明）**⑥I10** edition_architecture.md补充§6 UI架构（基础版宽屏H5+专业版竖屏小程序，代码组织/构建流程/部署差异）**⑦I11** §1.5.3新增7天免费试用机制（无需付费需注册，每日100次AI调用，试用结束引导¥29/月早鸟价）**⑧I12** §1.5.3b新增网关宕机补偿机制（4h延1天/24h延7天+邮件/月度<99.5%减半，admin监控自动触发） | PromiseLink团队 |
 
 ### 7角色评审共识整合清单
 

@@ -45,6 +45,12 @@ page {
   box-sizing: border-box;
 }
 
+// ── Mobile (<768px): hide sidebar and detail (single-column) ──
+.pl-sidebar,
+.pl-detail {
+  display: none;
+}
+
 // ── Tablet (768px–1023px): keep existing centered single-column behavior ──
 @media screen and (min-width: 768px) and (max-width: 1023px) {
   page {
@@ -62,6 +68,11 @@ page {
   .page-input {
     max-width: 750px;
     margin: 0 auto;
+  }
+
+  // Hide detail column on tablet (two-column max: sidebar is JS-gated, detail hidden)
+  .pl-detail {
+    display: none;
   }
 }
 
@@ -92,7 +103,7 @@ page {
     background-color: var(--pl-bg-gray);
   }
 
-  // ── App-level flex layout: sidebar + content ──
+  // ── App-level flex layout: sidebar + content + detail ──
   .pl-app {
     display: flex;
     min-height: 100vh;
@@ -103,6 +114,74 @@ page {
     flex: 1;
     min-width: 0;
     overflow-x: hidden;
+  }
+
+  // ── Right detail column (third column on desktop) ──
+  .pl-detail {
+    width: var(--pl-detail-width);
+    flex-shrink: 0;
+    background: var(--pl-bg-white);
+    border-left: 1px solid var(--pl-border);
+    overflow-y: auto;
+    padding: 16px;
+    display: block;
+  }
+
+  // Detail column content (summary rows)
+  .pl-detail-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .pl-detail-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--pl-text);
+    line-height: 1.4;
+    word-break: break-word;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--pl-border);
+  }
+
+  .pl-detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 13px;
+  }
+
+  .pl-detail-label {
+    color: var(--pl-text-secondary);
+    flex-shrink: 0;
+  }
+
+  .pl-detail-value {
+    color: var(--pl-text);
+    text-align: right;
+    word-break: break-word;
+  }
+
+  // Detail column empty state
+  .pl-detail-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 48px 16px;
+    color: var(--pl-text-secondary);
+
+    .pl-detail-empty-icon {
+      font-size: 32px;
+      line-height: 1;
+    }
+
+    .pl-detail-empty-text {
+      font-size: 13px;
+      text-align: center;
+    }
   }
 
   // Pages: remove mobile tabbar padding, use full height

@@ -1,69 +1,60 @@
 """Admin monitoring API endpoints.
 
 Endpoints:
+- POST /api/v1/admin/token — Obtain an admin JWT (requires X-Admin-API-Key + passphrase)
 - GET /api/v1/admin/usage/summary — Global usage overview
 - GET /api/v1/admin/usage/users — Paginated user usage list
 - GET /api/v1/admin/usage/users/{license_key} — Single user usage detail
 - GET /api/v1/admin/usage/export — Export usage as CSV
 - GET /api/v1/admin/health — Gateway health (provider key pool status)
 
-Authentication: X-Admin-Key header (read from GATEWAY_ADMIN_KEY env var).
+Authentication: Two-factor (X-Admin-API-Key header + admin JWT Bearer token).
+The admin JWT is obtained via POST /api/v1/admin/token by presenting the
+admin API key and the admin passphrase.
 """
 
 from __future__ import annotations
 
 import csv
-import hmac
 import io
+import time
 from datetime import UTC, datetime
 from typing import Any
 
+import jwt as pyjwt
 from fastapi import APIRouter, Depends, Query, Request, Security
 from fastapi.responses import StreamingResponse
 from fastapi.security import APIKeyHeader
+from pydantic import BaseModel, Field
 
 from gateway.config import Settings, get_settings
-from gateway.core.exceptions import APIKeyInvalidError, LicenseNotFound
+from gateway.core.exceptions import APIKeyInvalidError, LicenseNotFound, PermissionDeniedError
+from gateway.middleware.auth import _constant_time_compare, verify_admin
 from gateway.models.tables import License, UsageRecord
 from gateway.schemas.errors import UnifiedResponse
 from gateway.services.billing_service import BillingService
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
-# Security scheme for OpenAPI docs
-admin_key_header = APIKeyHeader(name="X-Admin-Key", auto_error=False)
+# Security scheme for OpenAPI docs (used by the token endpoint)
+_admin_api_key_header = APIKeyHeader(name="X-Admin-API-Key", auto_error=False)
 
 # Traffic-light thresholds (must match usage_service.py)
 _YELLOW_THRESHOLD = 0.80
 _RED_THRESHOLD = 1.00
 
-
-# ── Auth dependency ─────────────────────────────────────────────────
-
-
-def _constant_time_compare(a: str, b: str) -> bool:
-    """Compare two strings in constant time to prevent timing attacks."""
-    return hmac.compare_digest(a.encode(), b.encode())
+# Admin JWT constants (must match middleware/auth.py verify_admin)
+_ADMIN_JWT_ISSUER = "promiselink-gateway-admin"
+_ADMIN_JWT_AUDIENCE = "promiselink-admin-client"
 
 
-async def verify_admin_key(
-    request: Request,
-    admin_key: str | None = Security(admin_key_header),
-) -> str:
-    """Verify the X-Admin-Key header.
+# ── Request models ─────────────────────────────────────────────────
 
-    Reads the expected key from ``settings.gateway_admin_key`` (env var
-    ``GATEWAY_ADMIN_KEY``).
 
-    Raises:
-        APIKeyInvalidError: If the admin key is missing or invalid.
-    """
-    settings: Settings = getattr(request.app.state, "settings", None) or get_settings()
-    if not admin_key:
-        raise APIKeyInvalidError("X-Admin-Key header is missing")
-    if not _constant_time_compare(admin_key, settings.gateway_admin_key):
-        raise APIKeyInvalidError("Invalid admin key")
-    return admin_key
+class AdminTokenRequest(BaseModel):
+    """Request body for POST /api/v1/admin/token."""
+
+    passphrase: str = Field(..., description="Admin passphrase (second factor)")
 
 
 # ── Service accessors ───────────────────────────────────────────────
@@ -75,6 +66,59 @@ def get_billing_service(request: Request) -> BillingService:
     if service is None:
         raise RuntimeError("BillingService not initialized")
     return service
+
+
+# ── Admin token endpoint (B1: two-factor auth) ──────────────────────
+
+
+@router.post("/token")
+async def admin_token(
+    request: Request,
+    body: AdminTokenRequest,
+    admin_api_key: str | None = Security(_admin_api_key_header),
+) -> UnifiedResponse[dict[str, Any]]:
+    """Obtain an admin JWT by presenting the admin API key + passphrase.
+
+    This is the first step of the two-factor admin authentication flow:
+    1. POST /api/v1/admin/token with X-Admin-API-Key + passphrase → admin JWT
+    2. Use the admin JWT (Bearer) + X-Admin-API-Key for all other admin endpoints
+
+    Factor 1: X-Admin-API-Key header (something you have)
+    Factor 2: admin passphrase in the request body (something you know)
+    """
+    settings: Settings = getattr(request.app.state, "settings", None) or get_settings()
+
+    # Factor 1: Admin API Key
+    if not admin_api_key:
+        raise APIKeyInvalidError("X-Admin-API-Key header is missing")
+    if not _constant_time_compare(admin_api_key, settings.admin_api_key):
+        raise APIKeyInvalidError("Invalid admin API key")
+
+    # Factor 2: Admin passphrase
+    if not _constant_time_compare(body.passphrase, settings.admin_passphrase):
+        raise PermissionDeniedError("Invalid admin passphrase")
+
+    # Issue admin JWT (HS256, signed with admin_jwt_secret)
+    now = int(time.time())
+    payload = {
+        "admin_id": settings.admin_id,
+        "role": "admin",
+        "iat": now,
+        "exp": now + settings.admin_jwt_ttl,
+        "iss": _ADMIN_JWT_ISSUER,
+        "aud": _ADMIN_JWT_AUDIENCE,
+    }
+    token = pyjwt.encode(payload, settings.admin_jwt_secret, algorithm="HS256")
+
+    return UnifiedResponse(
+        request_id=getattr(request.state, "request_id", ""),
+        success=True,
+        data={
+            "access_token": token,
+            "token_type": "Bearer",
+            "expires_in": settings.admin_jwt_ttl,
+        },
+    )
 
 
 # ── Helpers ─────────────────────────────────────────────────────────
@@ -135,7 +179,7 @@ def _build_user_usage_row(lic: License, records: list[UsageRecord]) -> dict[str,
 @router.get("/usage/summary")
 async def usage_summary(
     request: Request,
-    _admin_key: str = Depends(verify_admin_key),
+    _admin: dict = Depends(verify_admin),
 ) -> UnifiedResponse[dict[str, Any]]:
     """Global usage overview.
 
@@ -143,8 +187,8 @@ async def usage_summary(
     this month's calls, and per-service call counts.
     """
     billing = get_billing_service(request)
-    licenses: list[License] = list(billing._licenses.values())
-    records: list[UsageRecord] = billing._usage_records
+    licenses: list[License] = billing.get_all_licenses()
+    records: list[UsageRecord] = billing.get_usage_records()
 
     total_users = len(licenses)
     active_users = sum(1 for lic in licenses if lic.status == "active")
@@ -199,12 +243,12 @@ async def usage_users(
         description="Sort field: total_calls|llm|asr|tts|ocr|tokens_used",
     ),
     order: str = Query(default="desc", description="Sort order: asc|desc"),
-    _admin_key: str = Depends(verify_admin_key),
+    _admin: dict = Depends(verify_admin),
 ) -> UnifiedResponse[dict[str, Any]]:
     """Paginated user usage list, sortable by call volume."""
     billing = get_billing_service(request)
-    licenses: list[License] = list(billing._licenses.values())
-    records: list[UsageRecord] = billing._usage_records
+    licenses: list[License] = billing.get_all_licenses()
+    records: list[UsageRecord] = billing.get_usage_records()
 
     # Build per-user rows
     rows: list[dict[str, Any]] = []
@@ -249,20 +293,18 @@ async def usage_users(
 async def usage_user_detail(
     request: Request,
     license_key: str,
-    _admin_key: str = Depends(verify_admin_key),
+    _admin: dict = Depends(verify_admin),
 ) -> UnifiedResponse[dict[str, Any]]:
     """Single user usage detail by license key."""
     billing = get_billing_service(request)
-    lic: License | None = billing._licenses.get(license_key)
+    lic: License | None = billing.get_license(license_key)
     if lic is None:
         raise LicenseNotFound(
             message=f"License not found: {license_key}",
             details={"license_key": license_key},
         )
 
-    user_records: list[UsageRecord] = [
-        r for r in billing._usage_records if r.license_key == license_key
-    ]
+    user_records: list[UsageRecord] = billing.get_usage_records(license_key)
     row = _build_user_usage_row(lic, user_records)
 
     # Add recent records (last 50)
@@ -295,12 +337,12 @@ async def usage_user_detail(
 @router.get("/usage/export")
 async def usage_export(
     request: Request,
-    _admin_key: str = Depends(verify_admin_key),
+    _admin: dict = Depends(verify_admin),
 ) -> StreamingResponse:
     """Export all user usage as a CSV file."""
     billing = get_billing_service(request)
-    licenses: list[License] = list(billing._licenses.values())
-    records: list[UsageRecord] = billing._usage_records
+    licenses: list[License] = billing.get_all_licenses()
+    records: list[UsageRecord] = billing.get_usage_records()
 
     rows: list[dict[str, Any]] = []
     for lic in licenses:
@@ -342,7 +384,7 @@ async def usage_export(
 @router.get("/health")
 async def admin_health(
     request: Request,
-    _admin_key: str = Depends(verify_admin_key),
+    _admin: dict = Depends(verify_admin),
 ) -> UnifiedResponse[dict[str, Any]]:
     """Gateway health status — provider key pool status."""
     settings = getattr(request.app.state, "settings", None) or get_settings()
@@ -352,9 +394,10 @@ async def admin_health(
     # Key pool status
     if key_pool is not None:
         pool_status = key_pool.get_status()
+        all_keys = key_pool.get_all_keys()
         providers = {}
         # Group keys by provider
-        for key_id, key_info in key_pool._keys.items():
+        for key_info in all_keys:
             provider = key_info.provider
             if provider not in providers:
                 providers[provider] = {
@@ -373,9 +416,7 @@ async def admin_health(
                 providers[provider]["rate_limited"] += 1
         # Compute average health per provider
         for provider, info in providers.items():
-            provider_keys = [
-                k for k in key_pool._keys.values() if k.provider == provider
-            ]
+            provider_keys = [k for k in all_keys if k.provider == provider]
             if provider_keys:
                 info["avg_health"] = round(
                     sum(k.health_score for k in provider_keys) / len(provider_keys), 2

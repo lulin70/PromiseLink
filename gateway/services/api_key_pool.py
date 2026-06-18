@@ -199,6 +199,10 @@ class APIKeyPool:
             "circuit_open_count": self.circuit_open_count,
         }
 
+    def get_all_keys(self) -> list[KeyInfo]:
+        """Return all keys in the pool (for admin health endpoint)."""
+        return list(self._keys.values())
+
 
 def create_default_key_pool(settings: Settings | None = None) -> APIKeyPool:
     """Create a default key pool from settings (for dev/testing)."""
