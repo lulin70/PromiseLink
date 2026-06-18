@@ -68,6 +68,12 @@ class Settings(BaseSettings):
     admin_passphrase: str = Field(default="dev-admin-passphrase")
     admin_jwt_ttl: int = Field(default=1800)
 
+    # ── Admin monitoring key (X-Admin-Key header) ──
+    gateway_admin_key: str = Field(
+        default="dev-gateway-admin-key",
+        description="Admin key for monitoring API endpoints (X-Admin-Key header)",
+    )
+
     # ── Database ──
     database_url: str = Field(
         default="sqlite+aiosqlite:///:memory:",

@@ -1,0 +1,465 @@
+// Morandi color palette
+$morandi-teal: #7B9EA8;
+$morandi-teal-dark: #5B838F;
+$morandi-rose: #C4A7A0;
+$morandi-sage: #A8B5A0;
+$morandi-clay: #B8A090;
+$morandi-mist: #D4D9D4;
+$morandi-bg: #f5f5f5;
+$morandi-text: #4A4A4A;
+$morandi-text-light: #8A8A8A;
+$morandi-border: #E0E0E0;
+
+// Traffic light colors (Morandi-toned)
+$light-green: #8FA68E;
+$light-yellow: #C4B56C;
+$light-red: #B87E7E;
+
+.page-admin-usage {
+  min-height: 100vh;
+  background-color: $morandi-bg;
+  padding-bottom: 40px;
+
+  // ── Admin Login ──
+  .admin-login-card {
+    margin: 120px 40px;
+    background: #fff;
+    border-radius: 24px;
+    padding: 60px 40px;
+    box-shadow: 0 4px 24px rgba(123, 158, 168, 0.15);
+    text-align: center;
+  }
+
+  .admin-login-title {
+    font-size: 40px;
+    font-weight: bold;
+    color: $morandi-teal;
+    display: block;
+  }
+
+  .admin-login-subtitle {
+    font-size: 26px;
+    color: $morandi-text-light;
+    display: block;
+    margin-top: 12px;
+    margin-bottom: 48px;
+  }
+
+  .form-group {
+    margin-bottom: 32px;
+    text-align: left;
+  }
+
+  .admin-input {
+    width: 100%;
+    height: 80px;
+    border: 2px solid $morandi-border;
+    border-radius: 12px;
+    padding: 0 20px;
+    font-size: 28px;
+    box-sizing: border-box;
+    background: #FAFAFA;
+  }
+
+  .admin-login-btn {
+    width: 100%;
+    height: 88px;
+    background: $morandi-teal;
+    color: #fff;
+    font-size: 32px;
+    border-radius: 12px;
+    border: none;
+    margin-top: 16px;
+  }
+
+  // ── Header ──
+  .admin-header {
+    background: linear-gradient(135deg, $morandi-teal 0%, $morandi-teal-dark 100%);
+    padding: 40px 30px 24px;
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    .admin-header-left {
+      flex: 1;
+    }
+
+    .admin-header-title {
+      font-size: 36px;
+      font-weight: bold;
+      display: block;
+    }
+
+    .admin-header-sub {
+      font-size: 22px;
+      opacity: 0.85;
+      margin-top: 6px;
+      display: block;
+    }
+
+    .admin-header-right {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .refresh-btn, .logout-btn {
+      font-size: 24px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+    }
+  }
+
+  // ── Content ──
+  .admin-content {
+    height: calc(100vh - 160px);
+  }
+
+  // ── Error Banner ──
+  .error-banner {
+    margin: 20px 24px;
+    padding: 20px 24px;
+    background: rgba(184, 126, 126, 0.15);
+    border: 1px solid $light-red;
+    border-radius: 12px;
+    color: $light-red;
+    font-size: 26px;
+    text-align: center;
+  }
+
+  // ── Summary Section ──
+  .summary-section {
+    padding: 20px 24px 0;
+  }
+
+  .summary-cards {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+
+    .summary-card {
+      flex: 1;
+      min-width: 140px;
+      background: #fff;
+      border-radius: 16px;
+      padding: 28px 16px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(123, 158, 168, 0.08);
+
+      .card-number {
+        font-size: 44px;
+        font-weight: bold;
+        color: $morandi-teal;
+        display: block;
+
+        &.accent {
+          color: $morandi-rose;
+        }
+      }
+
+      .card-label {
+        font-size: 22px;
+        color: $morandi-text-light;
+        margin-top: 8px;
+        display: block;
+      }
+    }
+  }
+
+  // ── Service Breakdown ──
+  .service-breakdown {
+    margin-top: 20px;
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(123, 158, 168, 0.08);
+
+    .breakdown-title {
+      font-size: 28px;
+      font-weight: bold;
+      color: $morandi-text;
+      display: block;
+      margin-bottom: 16px;
+    }
+
+    .breakdown-items {
+      display: flex;
+      justify-content: space-around;
+    }
+
+    .breakdown-item {
+      text-align: center;
+
+      .breakdown-label {
+        font-size: 24px;
+        color: $morandi-text-light;
+        display: block;
+      }
+
+      .breakdown-value {
+        font-size: 36px;
+        font-weight: bold;
+        color: $morandi-sage;
+        display: block;
+        margin-top: 4px;
+      }
+    }
+  }
+
+  // ── Health Section ──
+  .health-section {
+    padding: 24px 24px 0;
+
+    .section-title {
+      font-size: 30px;
+      font-weight: bold;
+      color: $morandi-text;
+      margin-bottom: 16px;
+      display: block;
+    }
+  }
+
+  .health-cards {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+
+    .health-card {
+      flex: 1;
+      min-width: 120px;
+      background: #fff;
+      border-radius: 16px;
+      padding: 24px 16px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(123, 158, 168, 0.08);
+      border-top: 4px solid $morandi-mist;
+
+      &.health-healthy {
+        border-top-color: $light-green;
+      }
+      &.health-degraded, &.health-unhealthy {
+        border-top-color: $light-red;
+      }
+      &.health-not_configured {
+        border-top-color: $morandi-mist;
+      }
+
+      .health-card-label {
+        font-size: 24px;
+        color: $morandi-text-light;
+        display: block;
+      }
+
+      .health-card-value {
+        font-size: 32px;
+        font-weight: bold;
+        color: $morandi-text;
+        display: block;
+        margin-top: 6px;
+      }
+
+      .health-card-status {
+        font-size: 22px;
+        color: $morandi-sage;
+        display: block;
+        margin-top: 4px;
+      }
+    }
+  }
+
+  .providers-list {
+    margin-top: 16px;
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px 24px;
+    box-shadow: 0 2px 8px rgba(123, 158, 168, 0.08);
+
+    .provider-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid $morandi-border;
+
+      &:last-child {
+        border-bottom: none;
+      }
+
+      .provider-name {
+        font-size: 26px;
+        font-weight: bold;
+        color: $morandi-teal;
+        min-width: 140px;
+      }
+
+      .provider-info {
+        flex: 1;
+        font-size: 24px;
+        color: $morandi-text-light;
+      }
+
+      .provider-warning {
+        font-size: 22px;
+        color: $light-red;
+        padding: 4px 12px;
+        background: rgba(184, 126, 126, 0.15);
+        border-radius: 6px;
+      }
+    }
+  }
+
+  // ── Table Section ──
+  .table-section {
+    padding: 24px 24px 0;
+
+    .table-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+
+      .section-title {
+        font-size: 30px;
+        font-weight: bold;
+        color: $morandi-text;
+      }
+
+      .export-btn {
+        font-size: 24px;
+        color: #fff;
+        background: $morandi-teal;
+        padding: 10px 20px;
+        border-radius: 8px;
+      }
+    }
+  }
+
+  // ── Usage Table ──
+  .usage-table {
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(123, 158, 168, 0.08);
+  }
+
+  .table-row {
+    display: flex;
+    align-items: center;
+    padding: 16px 12px;
+    border-bottom: 1px solid $morandi-border;
+    font-size: 22px;
+    color: $morandi-text;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &.table-row-header {
+      background: rgba(123, 158, 168, 0.1);
+      font-weight: bold;
+      font-size: 20px;
+      color: $morandi-teal-dark;
+    }
+
+    &.row-alt {
+      background: rgba(212, 217, 212, 0.15);
+    }
+  }
+
+  .col-key {
+    flex: 2;
+    font-size: 20px;
+    word-break: break-all;
+    padding-right: 8px;
+  }
+
+  .col-user {
+    flex: 1;
+    font-size: 20px;
+    padding-right: 8px;
+  }
+
+  .col-num {
+    flex: 0.8;
+    text-align: center;
+
+    &.sortable {
+      cursor: pointer;
+    }
+  }
+
+  .col-light {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+  }
+
+  .table-empty {
+    padding: 60px 0;
+    text-align: center;
+    color: $morandi-text-light;
+    font-size: 26px;
+  }
+
+  // ── Traffic Light ──
+  .traffic-light {
+    padding: 6px 16px;
+    border-radius: 20px;
+    text-align: center;
+
+    .light-text {
+      font-size: 20px;
+      color: #fff;
+    }
+
+    &.light-green {
+      background: $light-green;
+    }
+
+    &.light-yellow {
+      background: $light-yellow;
+    }
+
+    &.light-red {
+      background: $light-red;
+    }
+  }
+
+  // ── Pagination ──
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 24px 0;
+    gap: 24px;
+
+    .page-btn {
+      font-size: 26px;
+      color: $morandi-teal;
+      padding: 10px 24px;
+      border: 1px solid $morandi-teal;
+      border-radius: 8px;
+      background: #fff;
+
+      &.disabled {
+        color: $morandi-mist;
+        border-color: $morandi-mist;
+      }
+    }
+
+    .page-info {
+      font-size: 26px;
+      color: $morandi-text;
+    }
+  }
+
+  // ── Loading ──
+  .loading-state {
+    text-align: center;
+    padding: 80px 0;
+    font-size: 28px;
+    color: $morandi-text-light;
+  }
+}

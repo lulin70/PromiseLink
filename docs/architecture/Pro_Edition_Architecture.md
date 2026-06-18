@@ -1,7 +1,7 @@
 # PromiseLink 专业版架构设计 (Pro Edition Architecture)
 
-> **版本**: v1.0
-> **日期**: 2026-06-17
+> **版本**: v1.1
+> **日期**: 2026-06-18
 > **对应PRD**: v5.2
 > **对应技术设计**: v3.2 (§8.7 网关中继架构)
 > **基础版版本**: v0.5.4 (成熟度 92/100)
@@ -40,7 +40,7 @@
 
 ### 1.2 核心价值主张
 
-**"关系助手，随身携带"** — 专业版的核心价值是让非技术用户零配置享受AI能力：
+**"让每一次连接，都更有价值"** — 专业版的核心价值是让非技术用户零配置享受AI能力：
 
 1. **零配置AI** — 用户不需要申请/配置任何API Key，网关统一提供DeepSeek/Moka AI能力
 2. **多模态输入** — 语音录入、名片扫描、邮件同步、微信转发、CSV批量导入
@@ -1289,6 +1289,8 @@ services:
 | 用户PC离线 | 网关返回503给小程序 | 提示"本地服务未连接" |
 | 用户额度用尽 | 网关拒绝AI调用 | 提示"本月AI额度已用完" |
 
+> **📊 可扩展性分析**: 关于承载上限（300-500付费用户）、扩容触发信号、LLM成本模型与四阶段扩容路线的详细分析，见 `Pro_Edition_Tech_Design_Phase0.md` §12.7。网关无状态设计已为水平扩展预留路径，加备机无需改代码。
+
 ---
 
 ## 8. 配置项汇总
@@ -1430,19 +1432,30 @@ PRIVACY_MASK_DISPLAY=true
 
 | 模块 | 文件路径(计划) | 说明 |
 |------|----------------|------|
-| relay_client | `src/promiselink/services/relay_client.py` | 网关中继客户端(嵌入式Task) |
-| 网关服务 | `gateway/` (独立项目) | 云端AI网关 |
-| 网关中继路由 | `gateway/relay_router.py` | WebSocket连接管理+请求转发 |
-| 网关AI代理 | `gateway/ai_proxy.py` | LLM/ASR/TTS/OCR代理 |
-| 网关Key池 | `gateway/api_key_pool.py` | API Key轮询+限流+熔断 |
-| 网关许可验证 | `gateway/license_service.py` | PRO_LICENSE_KEY验证 |
-| 网关计费 | `gateway/billing_service.py` | Token计数+用量限制 |
-| 网关数据模型 | `gateway/models.py` | User/License/Usage模型 |
+| relay_client | `src/promiselink/services/relay_client.py` (公开 repo) | 网关中继客户端(嵌入式Task)，随基础版开源 |
+| 网关服务 | `PromiseLink-Pro/gateway/` (私有 repo) | 云端AI网关，从公开 repo 迁入 |
+| 网关中继路由 | `PromiseLink-Pro/gateway/services/relay_service.py` | WebSocket连接管理+请求转发 |
+| 网关AI代理 | `PromiseLink-Pro/gateway/services/` (ai_proxy) | LLM/ASR/TTS/OCR代理 |
+| 网关Key池 | `PromiseLink-Pro/gateway/services/api_key_pool_manager.py` | API Key轮询+限流+熔断 |
+| 网关许可验证 | `PromiseLink-Pro/gateway/services/license_service.py` | PRO_LICENSE_KEY验证 |
+| 网关计费 | `PromiseLink-Pro/gateway/services/billing_service.py` | Token计数+用量限制 |
+| 网关数据模型 | `PromiseLink-Pro/gateway/models/` | User/License/Usage模型 |
+| 专业版服务 | `PromiseLink-Pro/pro-services/` (私有 repo) | ASR/TTS/OCR/NLG/邮件/微信转发 |
+| 专业版路由 | `PromiseLink-Pro/pro-api/` (私有 repo) | voice/media/email/wechat/csv/privacy |
+| 微信小程序 | `PromiseLink-Pro/miniapp/` (私有 repo) | 原生语音/TTS/名片扫描/WebView |
 
 ### 10.3 参考文档
 
+- `docs/architecture/Repo_Split_Decision.md` — 仓库分开决策（双 repo + API 桥接）
 - `docs/architecture/PromiseLink_技术设计_v1.md` §8.7 — 网关中继架构协议层设计
-- `docs/architecture/edition_architecture.md` — 基础版/专业版版本对比和安全模型
+- `docs/architecture/edition_architecture.md` — 基础版/专业版版本对比和安全模型（含仓库策略章节）
 - `docs/spec/PRD_v1.md` §1.5 — 三层产品分层架构
 - `docs/基础版与专业版开发计划_v1.0.md` — 高层开发计划
 - `docs/planning/Pro_Edition_Implementation_Plan.md` — 分阶段详细实现计划(姊妹篇)
+
+### 10.4 变更记录
+
+| 版本 | 日期 | 变更内容 |
+|------|------|----------|
+| v1.0 | 2026-06-17 | 初始版本，专业版架构设计权威文档 |
+| v1.1 | 2026-06-18 | Slogan更新为「让每一次连接，都更有价值」；§7.4新增可扩展性分析引用 |

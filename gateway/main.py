@@ -17,6 +17,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from gateway.api.v1.admin import router as admin_router
 from gateway.api.v1.health import router as health_router
 from gateway.api.v1.license import router as license_router
 from gateway.api.v1.relay import router as relay_router
@@ -126,6 +127,7 @@ def create_app(
     app.include_router(license_router)
     app.include_router(usage_router)
     app.include_router(relay_router)
+    app.include_router(admin_router)
 
     # ── Exception handlers ──
 
@@ -169,5 +171,10 @@ def create_app(
     return app
 
 
-# Default app instance for uvicorn
-app = create_app()
+# Default app instance for uvicorn.
+# Guarded so the module can be imported in tests where LicenseService
+# dependencies (DB session, Redis, RSA keys) are not yet available.
+try:
+    app = create_app()
+except Exception:  # pragma: no cover
+    app = None  # type: ignore[assignment]
