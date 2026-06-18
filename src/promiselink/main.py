@@ -104,7 +104,7 @@ async def lifespan(app: FastAPI):
     import structlog
     logger = structlog.get_logger()
     logger.info("promiselink_starting")
-    logger.info("PromiseLink v0.5.4 — AGPL v3. Commercial use requires compliance. https://promiselink.app")
+    logger.info("PromiseLink v0.5.5 — AGPL v3. Commercial use requires compliance. https://promiselink.app")
 
     # Check for default secret key
     if settings.secret_key == "change-me-in-production" and settings.app_env != "test":

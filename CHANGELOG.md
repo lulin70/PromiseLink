@@ -2,6 +2,25 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [0.5.5] - 2026-06-18
+
+### Added — 宽屏UI+录入纠偏+详情页跳转+专业版一键安装+桥接监控
+- **基础版宽屏UI三栏布局**: ≥1024px左导航200px+中内容flex:1+右详情360px, 莫兰迪色系CSS变量, DesktopSidebar组件+useIsDesktop hook
+- **录入事件画面整理+解析纠偏**: POST /events/{id}/correct端点, 前端4区Tab纠偏(人脉/待办/承诺), 人脉多候选选择, 40测试通过
+- **详情页互相跳转**: 4个详情页(事件/人脉/待办/承诺)+4个Link组件+navigation服务, 事件↔人脉↔待办↔承诺互相navigateTo
+- **RelayClient服务**: HTTP中继客户端连接云端AI网关, 支持LLM/ASR/TTS/OCR, 自动JWT令牌刷新, 优雅降级+指数退避重试
+- **专业版一键安装脚本**: scripts/install_pro.sh, 非技术人员可用, 只需输入许可证密钥, 无需apiKey, 自动完成环境检查→依赖安装→前端构建→数据库迁移→relay配置
+- **专业版启动脚本**: scripts/start_pro.sh, 启动前检查许可证密钥和网关连接
+- **桥接监控仪表盘**: gateway/api/v1/admin.py(5端点: 用量概览/用户列表/用户详情/CSV导出/健康检查), 前端监控页面(概览卡片+用户表格+流量灯+30秒自动刷新), 19测试通过
+- **Repo分开决策文档**: docs/architecture/Repo_Split_Decision.md, 基础版(公开AGPL v3)+专业版(私有商业许可)双repo+API桥接
+- **PRD v5.3**: 新增706行覆盖7项需求(repo分开/宽屏UI/录入纠偏/功能重点/详情页跳转/一键安装/桥接监控)
+
+### Changed
+- **后端扩展**: EventEntityDetail/EventAssociationRef schema, get_event填充related_entities/related_todos, TodoResponse新增action_type/fulfillment_status/confirmation_status/evidence_quote
+- **gateway/main.py**: 注册admin路由+修复模块导入
+- **gateway/config.py**: 添加gateway_admin_key设置
+- **测试数量**: 1293 passed, 109 skipped (新增40纠偏测试+19 admin API测试)
+
 ## [0.5.4] - 2026-06-17
 
 ### Added — 基础版内部灰度发布
