@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { View, Text, ScrollView, Input } from '@tarojs/components'
 import { getPromises, getPromiseStats, login as apiLogin, PromiseItem, PromiseStatsResponse, getPendingConfirmations, getNudgeDraft, updatePromiseStatus, confirmTodo } from '../../services/api'
 import { isLoggedIn, setToken, setUserId, saveLoginCredentials } from '../../services/auth'
-import { navigateToEntity, navigateToEvent } from '../../services/navigation'
+import { navigateToEntity, navigateToEvent, navigateToPromiseDetail } from '../../services/navigation'
 import Taro from '@tarojs/taro'
 import './index.scss'
 
@@ -281,7 +281,15 @@ export default function PromisesPage() {
               </Text>
             </View>
             {promise.description && (
-              <Text className='promise-desc'>{promise.description}</Text>
+              <Text
+                className='promise-desc'
+                onClick={(e) => {
+                  e.stopPropagation()
+                  navigateToPromiseDetail(promise.todo_id)
+                }}
+              >
+                {promise.description}
+              </Text>
             )}
             {promise.entity_id && promise.entity_name && (
               <View className='promise-entity-row'>

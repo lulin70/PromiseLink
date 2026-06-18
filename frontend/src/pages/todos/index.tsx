@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { View, Text, ScrollView, Input } from '@tarojs/components'
 import { getTodos, updateTodoStatus, dismissTodo, deleteTodo, login as apiLogin, TodoResponse } from '../../services/api'
 import { isLoggedIn, setToken, setUserId, saveLoginCredentials } from '../../services/auth'
-import { navigateToEntity, navigateToEvent } from '../../services/navigation'
+import { navigateToEntity, navigateToEvent, navigateToTodoDetail } from '../../services/navigation'
 import Taro from '@tarojs/taro'
 import './index.scss'
 
@@ -222,7 +222,15 @@ export default function TodosPage() {
                     <Text className='type-badge-text'>{TYPE_TABS.find(t => t.value === todo.todo_type)?.label || todo.todo_type}</Text>
                   </View>
                 </View>
-                <Text className='todo-title'>{todo.title}</Text>
+                <Text
+                  className='todo-title'
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    navigateToTodoDetail(todo.id)
+                  }}
+                >
+                  {todo.title}
+                </Text>
                 {todo.description && (
                   <Text className='todo-desc'>{todo.description}</Text>
                 )}

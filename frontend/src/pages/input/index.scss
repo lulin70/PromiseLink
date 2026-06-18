@@ -565,4 +565,573 @@
       }
     }
   }
+
+  // ── 事件类型网格 (顶部) ──
+  .event-type-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+
+    .event-type-btn {
+      padding: 16px 0;
+      text-align: center;
+      background: #f5f5f5;
+      border-radius: 10px;
+      font-size: 26px;
+      color: #666;
+      transition: all 0.2s;
+
+      &.active {
+        background: #7B9EA8;
+        color: #fff;
+        font-weight: 500;
+      }
+    }
+  }
+
+  // ── 底部参与者+时间 ──
+  .bottom-section {
+    .bottom-row {
+      display: flex;
+      gap: 20px;
+
+      .bottom-field {
+        flex: 1;
+
+        .field-label {
+          font-size: 24px;
+          color: #999;
+          margin-bottom: 8px;
+          display: block;
+        }
+
+        .field-input {
+          width: 100%;
+          height: 64px;
+          font-size: 26px;
+          border: 2px solid #e8e8e8;
+          border-radius: 8px;
+          padding: 8px 12px;
+          box-sizing: border-box;
+        }
+      }
+    }
+  }
+
+  // ── 4区解析结果 ──
+  .parsed-zones {
+    margin-top: 20px;
+
+    .zone-tabs {
+      display: flex;
+      gap: 0;
+      background: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 20px;
+
+      .zone-tab {
+        flex: 1;
+        text-align: center;
+        padding: 18px 0;
+        font-size: 26px;
+        color: #666;
+        background: #f5f5f5;
+        transition: all 0.2s;
+
+        &.active {
+          background: #7B9EA8;
+          color: #fff;
+          font-weight: 500;
+        }
+      }
+    }
+
+    .zone-content {
+      background: #fff;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .zone-header {
+      margin-bottom: 20px;
+
+      .zone-title {
+        font-size: 30px;
+        font-weight: bold;
+        color: #333;
+        display: block;
+      }
+
+      .zone-hint {
+        font-size: 22px;
+        color: #999;
+        margin-top: 4px;
+        display: block;
+      }
+    }
+
+    .zone-empty {
+      text-align: center;
+      padding: 40px 0;
+      color: #ccc;
+      font-size: 26px;
+    }
+  }
+
+  // ── 人脉纠偏卡片 ──
+  .entity-card {
+    background: #fafafa;
+    border: 1px solid #e8e8e8;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+
+    .entity-info {
+      .entity-name {
+        font-size: 28px;
+        font-weight: 500;
+        color: #333;
+        display: block;
+      }
+
+      .entity-meta {
+        font-size: 24px;
+        color: #666;
+        margin-top: 4px;
+        display: block;
+      }
+
+      .entity-confidence {
+        font-size: 20px;
+        color: #C4C0A0;
+        margin-top: 4px;
+        display: block;
+      }
+    }
+
+    .entity-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+    }
+  }
+
+  // ── 候选列表 ──
+  .candidate-list {
+    margin-top: 16px;
+    background: #fff;
+    border-radius: 8px;
+    padding: 12px;
+
+    .candidate-title {
+      font-size: 24px;
+      color: #7B9EA8;
+      font-weight: 500;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .candidate-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+      margin-bottom: 8px;
+
+      &.selected {
+        border-color: #7B9EA8;
+        background: #f0f5f7;
+      }
+
+      .candidate-info {
+        flex: 1;
+
+        .candidate-name {
+          font-size: 26px;
+          color: #333;
+          display: block;
+        }
+
+        .candidate-meta {
+          font-size: 22px;
+          color: #999;
+          display: block;
+        }
+      }
+
+      .check-mark {
+        font-size: 28px;
+        color: #7B9EA8;
+        font-weight: bold;
+      }
+    }
+  }
+
+  // ── 新建实体表单 ──
+  .new-entity-form {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  // ── 通用表单输入 ──
+  .form-input {
+    width: 100%;
+    height: 64px;
+    font-size: 26px;
+    border: 2px solid #e8e8e8;
+    border-radius: 8px;
+    padding: 8px 12px;
+    box-sizing: border-box;
+  }
+
+  // ── 纠偏按钮 ──
+  .corr-btn {
+    height: 56px;
+    font-size: 24px;
+    border-radius: 8px;
+    border: none;
+    padding: 0 16px;
+    line-height: 56px;
+  }
+
+  .corr-btn-primary {
+    background: #7B9EA8;
+    color: #fff;
+  }
+
+  .corr-btn-secondary {
+    background: #e6f7ff;
+    color: #7B9EA8;
+    border: 1px solid #91d5ff;
+  }
+
+  .corr-btn-ignore {
+    background: #fff1f0;
+    color: #C4A7A0;
+    border: 1px solid #ffa39e;
+  }
+
+  .corr-btn-link {
+    background: transparent;
+    color: #7B9EA8;
+    font-size: 22px;
+    height: 48px;
+    line-height: 48px;
+    padding: 0 8px;
+  }
+
+  // ── 纠偏状态标记 ──
+  .corr-status {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 12px;
+
+    .status-badge {
+      font-size: 22px;
+      padding: 4px 12px;
+      border-radius: 4px;
+    }
+
+    .status-merged {
+      background: #e6f7ff;
+      color: #7B9EA8;
+    }
+
+    .status-new {
+      background: #f6ffed;
+      color: #A0C4A8;
+    }
+
+    .status-ignored {
+      background: #fff1f0;
+      color: #C4A7A0;
+    }
+  }
+
+  // ── 关系卡片 ──
+  .assoc-card {
+    background: #fafafa;
+    border: 1px solid #e8e8e8;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 12px;
+
+    .assoc-flow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+
+      .assoc-name {
+        font-size: 26px;
+        font-weight: 500;
+        color: #333;
+      }
+
+      .assoc-arrow {
+        font-size: 22px;
+        color: #999;
+      }
+
+      .assoc-type {
+        font-size: 22px;
+        color: #8B7EA8;
+        background: #f0ebf5;
+        padding: 2px 10px;
+        border-radius: 4px;
+      }
+    }
+
+    .assoc-strength {
+      font-size: 22px;
+      color: #999;
+      margin-top: 8px;
+      display: block;
+    }
+  }
+
+  // ── 待办纠偏卡片 ──
+  .todo-card {
+    background: #fafafa;
+    border: 1px solid #e8e8e8;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    &.deleted {
+      opacity: 0.5;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+
+      .todo-deleted-text {
+        font-size: 26px;
+        color: #999;
+        text-decoration: line-through;
+      }
+    }
+
+    &.new-todo {
+      border: 2px dashed #7B9EA8;
+      background: #f0f5f7;
+    }
+
+    .todo-title-input {
+      font-weight: 500;
+    }
+
+    .todo-fields {
+      display: flex;
+      gap: 20px;
+
+      .todo-field {
+        flex: 1;
+
+        .field-label {
+          font-size: 22px;
+          color: #999;
+          margin-bottom: 6px;
+          display: block;
+        }
+      }
+    }
+
+    .todo-actions {
+      display: flex;
+      gap: 12px;
+    }
+  }
+
+  .add-btn {
+    width: 100%;
+    height: 72px;
+    background: #fff;
+    color: #7B9EA8;
+    font-size: 28px;
+    border: 2px dashed #7B9EA8;
+    border-radius: 12px;
+    margin-top: 8px;
+  }
+
+  // ── 承诺纠偏卡片 ──
+  .promise-card {
+    background: #fffbeb;
+    border: 1px solid #ffd666;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+
+    .promise-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .promise-badge {
+      padding: 4px 16px;
+      border-radius: 6px;
+      font-size: 20px;
+
+      &.mine {
+        background: #7B9EA8;
+        color: #fff;
+      }
+
+      &.their {
+        background: #8B7EA8;
+        color: #fff;
+      }
+    }
+
+    .promise-title {
+      font-size: 28px;
+      color: #333;
+      line-height: 1.5;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .promise-evidence {
+      font-size: 22px;
+      color: #8c8c8c;
+      font-style: italic;
+      display: block;
+      margin-bottom: 12px;
+    }
+
+    .promise-edit-form {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .promise-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 12px;
+    }
+  }
+
+  // ── 确认并保存按钮 ──
+  .correct-submit-btn {
+    width: 100%;
+    height: 88px;
+    background: #A0C4A8;
+    color: #fff;
+    font-size: 32px;
+    border-radius: 12px;
+    border: none;
+    margin-top: 12px;
+  }
+
+  // ── 纠偏完成提示 ──
+  .corrected-banner {
+    background: #f6ffed;
+    border: 2px solid #b7eb8f;
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    margin-bottom: 20px;
+
+    .corrected-text {
+      font-size: 28px;
+      color: #A0C4A8;
+      font-weight: 500;
+    }
+  }
+}
+
+// ── Desktop overrides (≥1024px) ──
+@media screen and (min-width: 1024px) {
+  .page-input {
+    padding-bottom: 24px;
+
+    .header {
+      padding: 16px 24px;
+      .header-back { width: 32px; height: 32px; margin-right: 8px; .back-arrow { font-size: 18px; } }
+      .header-title { font-size: 18px; }
+    }
+
+    // Center the form on desktop with max-width
+    .content {
+      padding: 20px 24px;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    .form-section { border-radius: 8px; padding: 16px; margin-bottom: 12px; .section-label { font-size: 14px; margin-bottom: 10px; } }
+
+    .mode-toggle { border-radius: 8px; margin-bottom: 12px; .mode-btn { padding: 10px 0; font-size: 14px; } }
+    .input-tab-toggle { border-radius: 8px; margin-bottom: 12px; .input-tab { padding: 10px 0; font-size: 14px; } }
+
+    .demand-result-card { border-radius: 8px; padding: 16px; margin-top: 12px; .demand-result-title { font-size: 15px; margin-bottom: 10px; } .demand-result-row { padding: 6px 0; .demand-result-label { font-size: 12px; } .demand-result-value { font-size: 13px; } } }
+
+    .file-upload-area { min-height: 140px; border-radius: 8px; border-width: 1px; .file-hint { .file-hint-icon { font-size: 28px; margin-bottom: 8px; } .file-hint-text { font-size: 14px; margin-bottom: 4px; } .file-hint-ext { font-size: 11px; } } .file-selected { .file-icon { font-size: 24px; margin-bottom: 6px; } .file-name { font-size: 13px; } } }
+
+    .upload-loading { padding: 16px 0; margin-bottom: 12px; .upload-loading-text { font-size: 14px; } }
+
+    .picker-value { padding: 10px 0; font-size: 14px; .picker-arrow { font-size: 11px; } }
+
+    .text-input { min-height: 160px; font-size: 14px; line-height: 1.6; border-width: 1px; border-radius: 8px; padding: 12px; }
+
+    .char-count { font-size: 11px; margin-top: 4px; }
+
+    .success-msg { border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; border-width: 1px; Text { font-size: 13px; } }
+    .error-msg { border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; border-width: 1px; Text { font-size: 13px; } }
+
+    .submit-btn { height: 44px; font-size: 16px; border-radius: 8px; margin-top: 8px; }
+
+    .tips { margin-top: 20px; padding: 16px; border-radius: 8px; .tips-title { font-size: 13px; margin-bottom: 8px; } .tips-item { font-size: 12px; line-height: 1.6; } }
+
+    .result-card { border-radius: 8px; padding: 20px; margin-bottom: 12px; .result-header { margin-bottom: 16px; .result-icon { font-size: 24px; margin-right: 12px; } .result-info { .result-title { font-size: 16px; } .result-event-type { font-size: 12px; margin-top: 2px; } } } .extraction-results { border-radius: 8px; padding: 14px; .result-row { padding: 8px 0; .result-label { font-size: 13px; } .result-value { font-size: 13px; } } } .polling-indicator { padding: 16px 0; .polling-text { font-size: 14px; } } .degradation-card { border-radius: 8px; padding: 16px; margin: 12px 0; border-width: 1px; .degradation-title { font-size: 15px; margin-bottom: 8px; } .degradation-desc { font-size: 13px; margin-bottom: 12px; } .degradation-actions { gap: 12px; .degradation-btn { height: 40px; font-size: 13px; border-radius: 8px; } } } }
+
+    .result-actions { gap: 12px; .reset-btn { height: 44px; font-size: 15px; border-radius: 8px; border-width: 1px; } .view-todos-btn { height: 44px; font-size: 15px; border-radius: 8px; } .view-events-btn { height: 44px; font-size: 15px; border-radius: 8px; border-width: 1px; } }
+
+    .confirmation-section { margin-top: 16px; .confirmation-title { font-size: 14px; margin-bottom: 10px; } }
+
+    .confirmation-card { border-radius: 8px; padding: 14px; margin-bottom: 8px; border-width: 1px; .conf-card-header { gap: 8px; margin-bottom: 8px; } .conf-action-badge { padding: 2px 10px; border-radius: 4px; font-size: 10px; } .conf-auto-tag { font-size: 10px; padding: 1px 6px; border-radius: 3px; } .conf-desc { font-size: 14px; margin-bottom: 4px; } .conf-evidence { font-size: 11px; margin-bottom: 4px; } .conf-due { font-size: 11px; margin-bottom: 8px; } .conf-edit-area { margin-bottom: 8px; .conf-edit-input { height: 36px; font-size: 13px; border-width: 1px; border-radius: 6px; padding: 4px 8px; } } .conf-actions { gap: 8px; .conf-btn { height: 36px; font-size: 12px; border-radius: 6px; } } }
+
+    .event-type-grid { gap: 8px; .event-type-btn { padding: 10px 0; border-radius: 6px; font-size: 13px; } }
+
+    .bottom-section { .bottom-row { gap: 12px; .bottom-field { .field-label { font-size: 12px; margin-bottom: 4px; } .field-input { height: 36px; font-size: 13px; border-width: 1px; border-radius: 6px; padding: 4px 8px; } } } }
+
+    .parsed-zones { margin-top: 12px; .zone-tabs { border-radius: 8px; margin-bottom: 12px; .zone-tab { padding: 10px 0; font-size: 13px; } } .zone-content { border-radius: 8px; padding: 16px; margin-bottom: 12px; } .zone-header { margin-bottom: 12px; .zone-title { font-size: 15px; } .zone-hint { font-size: 11px; margin-top: 2px; } } .zone-empty { padding: 24px 0; font-size: 13px; } }
+
+    .entity-card { border-radius: 8px; padding: 14px; margin-bottom: 8px; border-width: 1px; .entity-info { .entity-name { font-size: 14px; } .entity-meta { font-size: 12px; margin-top: 2px; } .entity-confidence { font-size: 10px; margin-top: 2px; } } .entity-actions { gap: 8px; margin-top: 10px; } }
+
+    .candidate-list { border-radius: 6px; padding: 8px; .candidate-title { font-size: 12px; margin-bottom: 6px; } .candidate-item { padding: 8px; border-radius: 6px; margin-bottom: 6px; border-width: 1px; .candidate-info { .candidate-name { font-size: 13px; } .candidate-meta { font-size: 11px; } } .check-mark { font-size: 14px; } } }
+
+    .new-entity-form { margin-top: 10px; gap: 8px; }
+
+    .form-input { height: 36px; font-size: 13px; border-width: 1px; border-radius: 6px; padding: 4px 8px; }
+
+    .corr-btn { height: 36px; font-size: 12px; border-radius: 6px; padding: 0 12px; line-height: 36px; }
+    .corr-btn-link { font-size: 11px; height: 32px; line-height: 32px; padding: 0 8px; }
+
+    .corr-status { gap: 8px; margin-top: 8px; .status-badge { font-size: 11px; padding: 2px 8px; border-radius: 3px; } }
+
+    .assoc-card { border-radius: 8px; padding: 14px; margin-bottom: 8px; border-width: 1px; .assoc-flow { gap: 6px; .assoc-name { font-size: 13px; } .assoc-arrow { font-size: 11px; } .assoc-type { font-size: 11px; padding: 1px 6px; border-radius: 3px; } } .assoc-strength { font-size: 11px; margin-top: 6px; } }
+
+    .todo-card { border-radius: 8px; padding: 14px; margin-bottom: 8px; border-width: 1px; gap: 8px; &.deleted { .todo-deleted-text { font-size: 13px; } } &.new-todo { border-width: 1px; } .todo-fields { gap: 12px; .todo-field { .field-label { font-size: 11px; margin-bottom: 4px; } } } .todo-actions { gap: 8px; } }
+
+    .add-btn { height: 40px; font-size: 14px; border-radius: 8px; border-width: 1px; margin-top: 6px; }
+
+    .promise-card { border-radius: 8px; padding: 14px; margin-bottom: 8px; border-width: 1px; .promise-header { gap: 8px; margin-bottom: 8px; } .promise-badge { padding: 2px 10px; border-radius: 4px; font-size: 10px; } .promise-title { font-size: 14px; margin-bottom: 4px; } .promise-evidence { font-size: 11px; margin-bottom: 8px; } .promise-edit-form { margin-top: 8px; gap: 8px; } .promise-actions { gap: 8px; margin-top: 8px; } }
+
+    .correct-submit-btn { height: 44px; font-size: 16px; border-radius: 8px; margin-top: 8px; }
+
+    .corrected-banner { border-radius: 8px; padding: 16px; margin-bottom: 12px; border-width: 1px; .corrected-text { font-size: 14px; } }
+  }
 }

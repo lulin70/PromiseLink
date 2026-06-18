@@ -13,7 +13,7 @@ Covers the test cases from the Phase 0 test plan §2.2:
 from __future__ import annotations
 
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt as pyjwt
 import pytest
@@ -29,20 +29,18 @@ from gateway.core.exceptions import (
     LicenseAlreadyActivated,
     LicenseCancelled,
     LicenseExpired,
-    LicenseInactive,
     LicenseNotFound,
     LicenseSuspended,
 )
 from gateway.core.jwt_handler import (
-    ALGORITHM,
     DEFAULT_ACCESS_TOKEN_TTL,
     sign_token,
     verify_token,
 )
-from gateway.models.tables import AuditLog, License
+from gateway.models.tables import AuditLog
 from gateway.services.license_service import (
-    LicenseService,
     _BLACKLIST_PREFIX,
+    LicenseService,
 )
 from gateway.tests.conftest import (
     make_device_fingerprint,
@@ -207,7 +205,7 @@ async def test_activate_license_auto_expired(
     db_session, redis_client, private_key_pem, public_key_pem, active_license
 ):
     """UT-LIC-008: expires_at < NOW but status still active → auto-expire → 410."""
-    active_license.expires_at = datetime.now(timezone.utc) - timedelta(days=1)
+    active_license.expires_at = datetime.now(UTC) - timedelta(days=1)
     await db_session.commit()
 
     service = _make_service(db_session, redis_client, private_key_pem, public_key_pem)
@@ -355,7 +353,6 @@ def test_jwt_unique_jti(private_key_pem):
         )
         for _ in range(10)
     ]
-    jtis = [pyjwt.get_unverified_header(t) for t in tokens]
     # Decode payloads to get jti
     payloads = [pyjwt.decode(t, options={"verify_signature": False}) for t in tokens]
     jti_set = {p["jti"] for p in payloads}
@@ -562,7 +559,6 @@ async def test_refresh_expired_within_leeway(
     service = _make_service(db_session, redis_client, private_key_pem, public_key_pem)
 
     # Sign a token that expired 2 minutes ago (within 5-min leeway)
-    now = int(time.time())
     expired_token = sign_token(
         user_id=bound_license.user_id,
         license_key=bound_license.license_key,

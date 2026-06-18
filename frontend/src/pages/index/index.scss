@@ -594,3 +594,158 @@
     }
   }
 }
+
+// ── Desktop overrides (≥1024px) ──
+@media screen and (min-width: 1024px) {
+  .page-index {
+    padding-bottom: 24px;
+
+    // Inline login
+    .page-login-inline {
+      padding: 20px;
+      .login-card { padding: 32px 28px; border-radius: 12px; max-width: 420px; margin: 0 auto; }
+      .login-title { font-size: 24px; }
+      .login-subtitle { font-size: 13px; margin-bottom: 24px; }
+      .form-group {
+        margin-bottom: 16px;
+        .label { font-size: 13px; margin-bottom: 6px; }
+        .input { height: 40px; border-radius: 6px; padding: 0 12px; font-size: 14px; border-width: 1px; }
+      }
+      .error-text { font-size: 12px; margin-bottom: 8px; }
+      .login-btn { height: 44px; border-radius: 6px; .login-btn-text { font-size: 16px; } }
+    }
+
+    .header {
+      padding: 16px 24px;
+      .header-title { font-size: 20px; }
+      .header-date { font-size: 13px; margin-top: 4px; }
+    }
+
+    .loading, .error { padding: 30px 0; font-size: 14px; }
+    .error-container { padding: 30px 24px; .error-text { font-size: 13px; } }
+
+    .content { height: calc(100vh - 80px); }
+
+    .summary-cards {
+      padding: 16px 24px 0;
+      gap: 12px;
+      .card {
+        border-radius: 8px;
+        padding: 14px 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        .card-number { font-size: 22px; }
+        .card-label { font-size: 11px; margin-top: 4px; }
+      }
+    }
+
+    .section {
+      padding: 16px 24px 0;
+      .section-title { font-size: 15px; margin-bottom: 10px; }
+    }
+
+    .quick-input {
+      border-radius: 8px;
+      padding: 14px 16px;
+      border-width: 1px;
+      .quick-input-placeholder { font-size: 14px; }
+    }
+
+    .export-btn {
+      border-radius: 8px;
+      padding: 12px;
+      .export-btn-text { font-size: 14px; }
+    }
+
+    .event-item {
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      .event-left { width: 56px; .event-time { font-size: 12px; } }
+      .event-right {
+        .event-title { font-size: 14px; }
+        .event-entities { font-size: 12px; margin-top: 3px; }
+        .event-todo-count { font-size: 11px; }
+      }
+    }
+
+    .todo-item {
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      &.overdue { border-left-width: 3px; }
+      .todo-info {
+        .todo-title { font-size: 14px; }
+        .todo-person { font-size: 12px; margin-top: 3px; }
+      }
+      .todo-meta {
+        gap: 8px;
+        .todo-due { font-size: 11px; }
+        .todo-overdue-badge { font-size: 10px; padding: 2px 8px; border-radius: 4px; }
+      }
+    }
+
+    .empty { padding: 24px 0; font-size: 13px; }
+
+    // FAB: reposition for desktop (no tabbar)
+    .fab-btn {
+      right: 24px;
+      bottom: 24px;
+      width: 48px;
+      height: 48px;
+      box-shadow: 0 2px 8px rgba(123, 158, 168, 0.4);
+      .fab-icon { font-size: 26px; }
+    }
+
+    // Supply-Demand section
+    .sd-section { border-radius: 8px; padding: 16px; }
+    .sd-card {
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 8px;
+      border-left-width: 3px;
+      .sd-match-header { gap: 6px; margin-bottom: 6px; .sd-demander { font-size: 14px; } .sd-arrow { font-size: 11px; } .sd-supplier { font-size: 14px; } }
+      .sd-demand-text { font-size: 13px; margin-bottom: 4px; }
+      .sd-supply-text { font-size: 12px; margin-bottom: 4px; }
+      .sd-reason { font-size: 11px; }
+    }
+
+    // Health section
+    .health-section { border-radius: 8px; padding: 16px; }
+    .health-section {
+      .health-header {
+        margin-bottom: 8px;
+        .health-title { font-size: 15px; }
+        .health-badges { gap: 6px; .badge { font-size: 10px; padding: 2px 8px; border-radius: 5px; } }
+      }
+      .health-summary { font-size: 12px; margin-bottom: 10px; }
+      .health-list { gap: 8px; }
+      .health-card {
+        border-radius: 6px;
+        padding: 10px 12px;
+        border-left-width: 3px;
+        .health-card-top { margin-bottom: 4px; .health-name { font-size: 14px; } .health-score-badge { padding: 2px 10px; border-radius: 5px; .health-score-text { font-size: 12px; } } }
+        .health-stage { font-size: 11px; margin-bottom: 2px; }
+        .health-suggestion { font-size: 11px; }
+      }
+    }
+
+    // Care section
+    .care-section { border-radius: 8px; padding: 16px; }
+    .care-section {
+      .care-header { margin-bottom: 6px; .care-title { font-size: 15px; } .care-toggle { font-size: 11px; } }
+      .care-summary { font-size: 12px; margin-bottom: 10px; }
+      .care-list { gap: 8px; }
+      .care-card {
+        border-radius: 6px;
+        padding: 10px 12px;
+        border-left-width: 3px;
+        .care-card-top { gap: 8px; margin-bottom: 4px; .care-icon { font-size: 16px; } .care-info { .care-name { font-size: 13px; } .care-detail { font-size: 12px; } } }
+        .care-action { font-size: 11px; margin-top: 4px; }
+        .care-meta { font-size: 10px; margin-top: 2px; }
+      }
+      .care-subsection-label { font-size: 11px; margin-top: 6px; margin-bottom: 3px; }
+    }
+  }
+}

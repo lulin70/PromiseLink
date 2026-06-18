@@ -260,7 +260,7 @@ class JWTHandler:
         path = self.settings.jwt_private_key_path
         if not path:
             raise JWTInvalid("jwt_private_key_path not configured for RS256")
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             return f.read()
 
     def _load_public_key(self) -> str:
@@ -268,7 +268,7 @@ class JWTHandler:
         path = self.settings.jwt_public_key_path
         if not path:
             raise JWTInvalid("jwt_public_key_path not configured for RS256")
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             return f.read()
 
     def _get_signing_key(self) -> str:

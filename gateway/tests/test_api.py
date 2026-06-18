@@ -16,24 +16,18 @@ Also tests authentication failures and error handling.
 
 from __future__ import annotations
 
-import json
-from typing import Any
-
-import httpx
-import pytest
 from fastapi.testclient import TestClient
 
 from gateway.services.relay_service import RelayService
 from gateway.tests.conftest import (
-    make_llm_response,
-    make_llm_stream_lines,
-    make_mock_client,
     TEST_API_KEY,
     TEST_DEVICE_FP,
     TEST_LICENSE_KEY,
     TEST_USER_ID,
+    make_llm_response,
+    make_llm_stream_lines,
+    make_mock_client,
 )
-
 
 # ── Health Check Tests ──
 

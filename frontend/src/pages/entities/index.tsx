@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { View, Text, Input, ScrollView } from '@tarojs/components'
 import { getEntities, getEntityDetail, getEntityHistory, login as apiLogin, EntityResponse, EntityDetailResponse, EntityHistoryResponse, DormantContactItem, getDormantContacts, CreditScoreResponse, getCreditScore, StageInfoResponse, getStageInfo, dismissTodo, updateEntity, deleteEntity } from '../../services/api'
 import { isLoggedIn, setToken, setUserId, saveLoginCredentials } from '../../services/auth'
-import { NAV_EVENTS, navigateToEvent } from '../../services/navigation'
+import { NAV_EVENTS, navigateToEvent, navigateToEntityDetail } from '../../services/navigation'
 import Taro from '@tarojs/taro'
 import './index.scss'
 
@@ -371,6 +371,19 @@ export default function EntitiesPage() {
                   }}
                 >
                   🗑 删除此人脉
+                </Text>
+              </View>
+
+              {/* View full detail button */}
+              <View className='detail-row'>
+                <Text
+                  className='view-detail-btn'
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (detail) navigateToEntityDetail(detail.id)
+                  }}
+                >
+                  查看完整详情 ›
                 </Text>
               </View>
 

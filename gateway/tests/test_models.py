@@ -14,7 +14,7 @@ single connection is shared across sessions within one test.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -24,7 +24,6 @@ from sqlalchemy.pool import StaticPool
 
 from gateway.database import Base, configure_test_engine
 from gateway.models import ApiKeyPool, License, RelaySession, UsageRecord
-
 
 # ── Fixtures ────────────────────────────────────────────────────────
 
@@ -82,7 +81,7 @@ class TestLicenseModel:
             user_id="user-001",
             license_key="PL-PRO-A1B2-C3D4-E5F6",
             plan_type="pro",
-            expires_at=datetime.now(timezone.utc) + timedelta(days=365),
+            expires_at=datetime.now(UTC) + timedelta(days=365),
         )
         db_session.add(lic)
         await db_session.commit()
@@ -102,7 +101,7 @@ class TestLicenseModel:
             id="lic-002",
             user_id="user-002",
             license_key="PL-PRO-0000-0000-0001",
-            expires_at=datetime.now(timezone.utc) + timedelta(days=30),
+            expires_at=datetime.now(UTC) + timedelta(days=30),
         )
         db_session.add(lic)
         await db_session.commit()
@@ -123,7 +122,7 @@ class TestLicenseModel:
             id="lic-003",
             user_id="user-003",
             license_key="PL-PRO-0000-0000-0002",
-            expires_at=datetime.now(timezone.utc) + timedelta(days=30),
+            expires_at=datetime.now(UTC) + timedelta(days=30),
         )
         db_session.add(lic)
         await db_session.commit()
@@ -135,7 +134,7 @@ class TestLicenseModel:
         lic = License(
             id="x",
             license_key="PL-PRO-TEST",
-            expires_at=datetime.now(timezone.utc),
+            expires_at=datetime.now(UTC),
         )
         r = repr(lic)
         assert "License" in r
@@ -376,7 +375,7 @@ class TestRelaySessionModel:
             id="sess-003",
             user_id="user-003",
             jwt_jti="jti-future",
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
         )
         db_session.add(session)
         await db_session.commit()
@@ -389,7 +388,7 @@ class TestRelaySessionModel:
             id="sess-004",
             user_id="user-004",
             jwt_jti="jti-past",
-            expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
+            expires_at=datetime.now(UTC) - timedelta(hours=1),
         )
         db_session.add(session)
         await db_session.commit()
@@ -415,7 +414,7 @@ class TestRelaySessionModel:
             jwt_jti="jti-naive",
         )
         # Set a naive past datetime (1 hour ago, no tzinfo)
-        session.expires_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=1)
+        session.expires_at = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=1)
         assert session.is_expired is True
 
     async def test_repr(self):

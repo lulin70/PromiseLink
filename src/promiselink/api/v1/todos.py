@@ -42,6 +42,10 @@ class TodoResponse(BaseModel):
     source_event_title: str | None = None
     source_event_date: str | None = None
     created_at: datetime | None = None
+    action_type: str | None = None
+    fulfillment_status: str | None = None
+    confirmation_status: str | None = None
+    evidence_quote: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -248,7 +252,12 @@ async def get_todo(
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
 ):
-    """Get detailed information about a specific todo."""
+    """Get detailed information about a specific todo.
+
+    Enriches response with related_entity_name, source_event_title and
+    source_event_date so the frontend can render cross-navigation links
+    without extra round-trips.
+    """
     new_request_id()
 
     result = await session.execute(
@@ -262,7 +271,59 @@ async def get_todo(
     if not todo:
         raise NotFoundError("Todo not found")
 
-    return todo
+    # Enrich with related entity name
+    related_entity_name: str | None = None
+    if todo.related_entity_id:
+        from promiselink.models.entity import Entity
+        entity_result = await session.execute(
+            select(Entity.name).where(
+                Entity.id == str(todo.related_entity_id),
+                Entity.user_id == user_id,
+            )
+        )
+        related_entity_name = entity_result.scalar_one_or_none()
+
+    # Enrich with source event title and date
+    source_event_title: str | None = None
+    source_event_date: str | None = None
+    if todo.source_event_id:
+        from promiselink.models.event import Event
+        event_result = await session.execute(
+            select(Event.title, Event.created_at).where(
+                Event.id == str(todo.source_event_id),
+                Event.user_id == user_id,
+            )
+        )
+        row = event_result.first()
+        if row:
+            source_event_title = row[0]
+            source_event_date = row[1].strftime("%m-%d") if row[1] else None
+
+    return TodoDetailResponse(
+        id=todo.id,
+        user_id=todo.user_id,
+        todo_type=todo.todo_type,
+        title=todo.title,
+        description=todo.description,
+        related_entity_id=todo.related_entity_id,
+        related_entity_name=related_entity_name,
+        priority=todo.priority,
+        priority_override=todo.priority_override,
+        priority_source=todo.priority_source,
+        status=todo.status,
+        due_date=todo.due_date,
+        source_event_id=todo.source_event_id,
+        source_event_title=source_event_title,
+        source_event_date=source_event_date,
+        created_at=todo.created_at,
+        action_type=todo.action_type,
+        fulfillment_status=todo.fulfillment_status,
+        confirmation_status=todo.confirmation_status,
+        evidence_quote=todo.evidence_quote,
+        properties=todo.properties,
+        snoozed_until=getattr(todo, 'snoozed_until', None),
+        completed_at=todo.completed_at,
+    )
 
 
 @router.patch("/todos/{todo_id}", response_model=TodoResponse)

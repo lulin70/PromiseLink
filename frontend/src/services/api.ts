@@ -128,6 +128,31 @@ export interface EventTodoRef {
   todo_type: string
   title: string
   status: string
+  description?: string
+  due_date?: string
+  priority?: number
+  related_entity_id?: string
+  confirmation_status?: string
+  action_type?: string
+  evidence_quote?: string
+}
+
+export interface EventEntityDetail {
+  id: string
+  name: string
+  entity_type: string
+  company?: string
+  title?: string
+  status: string
+  confidence: number
+}
+
+export interface EventAssociationRef {
+  id: string
+  source_entity_name: string
+  target_entity_name: string
+  association_type: string
+  strength: number
 }
 
 export interface EventDetailResponse extends EventResponse {
@@ -136,6 +161,8 @@ export interface EventDetailResponse extends EventResponse {
   pipeline?: string | null
   processed_at?: string | null
   related_todos?: EventTodoRef[]
+  related_entities?: EventEntityDetail[]
+  related_associations?: EventAssociationRef[]
 }
 
 export interface PaginatedResponse<T> {
@@ -210,6 +237,62 @@ export async function acceptDegradedEvent(eventId: string): Promise<EventRespons
   return request<EventResponse>({
     method: 'POST',
     path: `/events/${eventId}/accept-degraded`,
+  })
+}
+
+// ── Event Correction (纠偏) ──
+
+export interface CorrectedEntityItem {
+  extracted_entity_id: string
+  action: 'select_existing' | 'create_new' | 'ignore'
+  selected_entity_id?: string
+  new_name?: string
+  new_company?: string
+  new_title?: string
+}
+
+export interface CorrectedTodoItem {
+  id?: string
+  title: string
+  description?: string
+  due_date?: string
+  priority: number
+  related_entity_id?: string
+  action: 'edit' | 'delete' | 'add'
+}
+
+export interface CorrectedPromiseItem {
+  id: string
+  content?: string
+  due_date?: string
+  promise_type?: 'my_promise' | 'their_promise'
+  action: 'confirm' | 'ignore' | 'modify'
+}
+
+export interface EventCorrectRequest {
+  corrected_entities: CorrectedEntityItem[]
+  corrected_todos: CorrectedTodoItem[]
+  corrected_promises: CorrectedPromiseItem[]
+}
+
+export interface EventCorrectResponse {
+  event_id: string
+  entities_updated: number
+  entities_created: number
+  entities_ignored: number
+  todos_updated: number
+  todos_deleted: number
+  todos_created: number
+  promises_confirmed: number
+  promises_ignored: number
+  promises_modified: number
+}
+
+export async function correctEvent(eventId: string, data: EventCorrectRequest): Promise<EventCorrectResponse> {
+  return request<EventCorrectResponse>({
+    method: 'POST',
+    path: `/events/${eventId}/correct`,
+    body: data,
   })
 }
 
@@ -312,6 +395,8 @@ export interface TodoDetailResponse extends TodoResponse {
   properties?: Record<string, unknown> | null
   snoozed_until?: string | null
   completed_at?: string | null
+  confirmation_status?: string
+  evidence_quote?: string
 }
 
 export async function getTodoDetail(todoId: string): Promise<TodoDetailResponse> {
@@ -319,6 +404,11 @@ export async function getTodoDetail(todoId: string): Promise<TodoDetailResponse>
     method: 'GET',
     path: `/todos/${todoId}`,
   })
+}
+
+// Promise detail (uses todo detail endpoint, since promises are todos with action_type)
+export async function getPromiseDetail(todoId: string): Promise<TodoDetailResponse> {
+  return getTodoDetail(todoId)
 }
 
 // ── Entities ──

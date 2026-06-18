@@ -172,6 +172,11 @@
         color: #333;
         font-weight: 500;
         display: block;
+        cursor: pointer;
+
+        &:active {
+          color: #7B9EA8;
+        }
       }
 
       .todo-desc {
@@ -280,5 +285,74 @@
     padding: 80px 0;
     color: #999;
     font-size: 28px;
+  }
+}
+
+// ── Desktop overrides (≥1024px) ──
+@media screen and (min-width: 1024px) {
+  .page-todos {
+    padding-bottom: 24px;
+
+    // Inline login
+    .page-login-inline {
+      padding: 20px;
+      .login-card { padding: 32px 28px; border-radius: 12px; max-width: 420px; margin: 0 auto; }
+      .login-title { font-size: 20px; }
+      .form-group { margin-bottom: 16px; .label { font-size: 13px; margin-bottom: 6px; } .input { height: 40px; border-radius: 6px; padding: 0 12px; font-size: 14px; border-width: 1px; } }
+      .error-text { font-size: 12px; }
+      .login-btn { height: 44px; border-radius: 6px; .login-btn-text { font-size: 16px; } }
+    }
+
+    .header { padding: 16px 24px; .header-title { font-size: 18px; } }
+
+    .tabs {
+      padding: 0 12px;
+      &.type-tabs { padding: 6px 12px; gap: 6px; .type-tab { padding: 6px 14px; border-radius: 12px; font-size: 12px; } }
+      .tab { padding: 12px 0; font-size: 13px; &.active::after { width: 32px; height: 2px; } }
+    }
+
+    .search-bar {
+      padding: 8px 24px;
+      .search-input { height: 36px; border-radius: 18px; padding: 0 16px; font-size: 13px; }
+    }
+
+    .loading, .error { padding: 30px 0; font-size: 14px; }
+
+    .todo-list {
+      height: calc(100vh - 240px);
+      padding: 12px 24px;
+    }
+
+    .todo-card {
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+
+      .todo-main {
+        .todo-header {
+          gap: 8px; margin-bottom: 8px;
+          .priority-badge { padding: 2px 10px; border-radius: 4px; .priority-text { font-size: 10px; } }
+          .type-badge { padding: 2px 10px; border-radius: 4px; .type-badge-text { font-size: 10px; } }
+        }
+        .todo-title { font-size: 14px; }
+        .todo-desc { font-size: 12px; margin-top: 4px; }
+        .todo-due { font-size: 11px; margin-top: 4px; }
+        .todo-entity-row { gap: 4px; margin-top: 4px; .todo-entity-label { font-size: 11px; } }
+        .entity-link { font-size: 12px; }
+        .source-event-link { font-size: 12px; }
+      }
+
+      .todo-actions {
+        margin-top: 10px; padding-top: 10px; gap: 8px;
+        .done-btn { border-radius: 6px; padding: 4px 14px; border-width: 1px; Text { font-size: 12px; } }
+        .delete-btn { border-radius: 6px; padding: 4px 14px; border-width: 1px; Text { font-size: 12px; } }
+        .dismiss-btn { border-radius: 6px; padding: 4px 14px; border-width: 1px; Text { font-size: 12px; } }
+        .done-label { font-size: 12px; }
+        .dismissed-label { font-size: 12px; }
+      }
+    }
+
+    .empty { padding: 40px 0; font-size: 14px; }
   }
 }

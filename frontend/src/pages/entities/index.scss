@@ -204,6 +204,21 @@
           }
         }
 
+        .view-detail-btn {
+          display: inline-block;
+          font-size: 26px;
+          color: #7B9EA8;
+          padding: 10px 24px;
+          border: 1px solid #7B9EA8;
+          border-radius: 8px;
+          cursor: pointer;
+          margin-top: 12px;
+
+          &:active {
+            background: #e6f0f0;
+          }
+        }
+
         .detail-edit-row {
           flex: 1;
           display: flex;
@@ -574,4 +589,149 @@
     }
   }
 }
+}
+
+// ── Desktop overrides (≥1024px) ──
+@media screen and (min-width: 1024px) {
+  .page-entities {
+    padding-bottom: 24px;
+
+    // Inline login
+    .page-login-inline {
+      padding: 20px;
+      .login-card { padding: 32px 28px; border-radius: 12px; max-width: 420px; margin: 0 auto; }
+      .login-title { font-size: 20px; }
+      .form-group { margin-bottom: 16px; .label { font-size: 13px; margin-bottom: 6px; } .input { height: 40px; border-radius: 6px; padding: 0 12px; font-size: 14px; border-width: 1px; } }
+      .error-text { font-size: 12px; }
+      .login-btn { height: 44px; border-radius: 6px; .login-btn-text { font-size: 16px; } }
+    }
+
+    .header { padding: 16px 24px; .header-title { font-size: 18px; } }
+
+    .search-bar {
+      padding: 8px 24px;
+      .search-input { height: 36px; border-radius: 18px; padding: 0 16px; font-size: 13px; }
+    }
+
+    .loading, .error { padding: 30px 0; font-size: 14px; }
+
+    // List: reserve space for right-column detail
+    .entity-list {
+      height: calc(100vh - 180px);
+      padding: 12px 24px;
+      padding-right: 380px;
+    }
+
+    .entity-card {
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      .entity-avatar { width: 40px; height: 40px; margin-right: 12px; .avatar-text { font-size: 16px; } }
+      .entity-info {
+        .entity-name { font-size: 14px; }
+        .entity-type { font-size: 11px; margin-top: 2px; }
+        .entity-company { font-size: 12px; margin-top: 2px; }
+      }
+      .entity-arrow { font-size: 18px; margin-left: 8px; }
+    }
+
+    .empty { padding: 40px 0; font-size: 14px; }
+
+    // Dormant entry
+    .dormant-entry {
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin: 8px 24px 12px;
+      gap: 8px;
+      .dormant-entry-icon { font-size: 16px; }
+      .dormant-entry-text { font-size: 14px; }
+      .dormant-entry-desc { font-size: 11px; }
+    }
+
+    // ── Detail modal → right-column panel ──
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: auto;
+      width: 360px;
+      background: transparent;
+      align-items: stretch;
+      z-index: 50;
+    }
+
+    .modal-content {
+      width: 100%;
+      max-height: 100vh;
+      border-radius: 0;
+      padding: 20px;
+      overflow-y: auto;
+      box-shadow: -2px 0 8px rgba(0,0,0,0.08);
+      border-left: 1px solid #e0ddd8;
+
+      .modal-header { margin-bottom: 16px; .modal-title { font-size: 18px; } .modal-close { font-size: 18px; padding: 4px; } }
+
+      .modal-body {
+        .detail-row {
+          padding: 8px 0;
+          .detail-label { width: 70px; font-size: 12px; }
+          .detail-value { font-size: 13px; }
+          .detail-value-editable { min-height: 20px; padding-bottom: 1px; }
+          .delete-entity-btn { font-size: 12px; padding: 6px 14px; border-radius: 6px; }
+          .detail-edit-row {
+            .detail-edit-input { height: 32px; border-radius: 6px; padding: 0 8px; font-size: 13px; }
+            .detail-edit-save { font-size: 12px; padding: 4px 10px; border-radius: 6px; }
+            .detail-edit-cancel { font-size: 12px; padding: 4px 8px; }
+          }
+        }
+        .detail-section {
+          margin-top: 12px; padding-top: 12px;
+          .section-title { font-size: 13px; margin-bottom: 8px; }
+        }
+        .related-item {
+          padding: 8px 0;
+          .related-item-title { font-size: 13px; }
+          .related-item-meta { font-size: 11px; }
+          .dismiss-btn { font-size: 11px; padding: 2px 8px; border-radius: 8px; }
+        }
+      }
+    }
+
+    // Credit score section (desktop)
+    .credit-score-section {
+      border-radius: 8px; padding: 14px; margin-top: 12px;
+      .credit-header { margin-bottom: 8px; .credit-label { font-size: 14px; } .credit-grade { padding: 2px 10px; border-radius: 6px; font-size: 13px; } }
+      .credit-score-bar { height: 8px; border-radius: 4px; margin-bottom: 6px; .credit-fill { border-radius: 4px; } }
+      .credit-number { font-size: 20px; margin-bottom: 8px; }
+      .credit-breakdown { gap: 4px; Text { font-size: 11px; } }
+    }
+
+    // Stage section (desktop)
+    .stage-section {
+      border-radius: 8px; padding: 14px; margin-top: 12px;
+      .stage-header { margin-bottom: 8px; .stage-label { font-size: 14px; } .stage-current-badge { padding: 2px 10px; border-radius: 6px; .stage-current-text { font-size: 12px; } } }
+      .stage-desc { font-size: 11px; margin-bottom: 8px; }
+      .stage-suggestion { border-radius: 6px; padding: 10px 12px; border-left-width: 3px; .suggestion-reason { font-size: 12px; margin-bottom: 4px; } .suggestion-hint { font-size: 11px; } }
+    }
+
+    // Dormant modal: center on desktop
+    .dormant-modal-overlay { padding: 20px; }
+    .dormant-modal-content {
+      border-radius: 12px; max-width: 500px; max-height: 85vh; padding: 20px;
+      .dormant-modal-header { margin-bottom: 14px; .dormant-modal-title { font-size: 16px; } .dormant-modal-close { font-size: 18px; } }
+      .dormant-summary { font-size: 13px; margin-bottom: 10px; }
+      .dormant-card {
+        border-radius: 6px; padding: 12px; margin-bottom: 8px; border-left-width: 3px;
+        .dormant-card-top { gap: 8px; margin-bottom: 6px; }
+        .dormant-avatar { width: 32px; height: 32px; border-radius: 16px; Text { font-size: 13px; } }
+        .dormant-info { .dormant-name { font-size: 14px; } .dormant-company { font-size: 11px; } }
+        .dormant-score { width: 32px; height: 32px; border-radius: 16px; Text { font-size: 12px; } }
+        .dormant-meta { Text { font-size: 11px; } }
+        .dormant-reason { font-size: 12px; margin-top: 6px; }
+        .dormant-icebreaker { border-radius: 6px; padding: 8px 10px; margin-top: 8px; .ice-label { font-size: 10px; } .ice-text { font-size: 12px; } }
+      }
+    }
+  }
 }

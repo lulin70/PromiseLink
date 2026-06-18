@@ -11,12 +11,10 @@ Endpoints:
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 
 from gateway.core.exceptions import ValidationError
 from gateway.middleware.auth import get_license_key, get_user_id, verify_relay_token
@@ -24,7 +22,6 @@ from gateway.schemas.errors import UnifiedResponse
 from gateway.schemas.relay import (
     ASRRelayResponse,
     LLMRelayRequest,
-    LLMRelayResponse,
     OCRRelayResponse,
     TTSRelayRequest,
 )

@@ -1,30 +1,52 @@
 // Global styles for PromiseLink — Morandi color palette
-page {
-  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
-  font-size: 28px;
-  color: #4a4a4a;
-  background-color: #f5f3f0;
-  box-sizing: border-box;
+
+// ── CSS Variables for theming (Morandi color palette) ──
+:root {
+  --pl-primary: #7B9EA8;
+  --pl-primary-light: #A8C0C8;
+  --pl-primary-dark: #5B838F;
+  --pl-danger: #C4A7A0;
+  --pl-success: #A0C4A8;
+  --pl-warning: #C4C0A0;
+  --pl-info: #B8C4C0;
+  --pl-text: #4a4a4a;
+  --pl-text-secondary: #8a8a8a;
+  --pl-border: #e0ddd8;
+  --pl-bg-white: #ffffff;
+  --pl-bg-gray: #f5f3f0;
+  --pl-sidebar-width: 200px;
+  --pl-detail-width: 360px;
+  --pl-font-base: 28px;
+  --pl-radius-card: 16px;
+  --pl-radius-item: 12px;
+  --pl-shadow-card: 0 1px 4px rgba(0, 0, 0, 0.04);
+  --pl-spacing-base: 24px;
 }
 
-// Morandi color palette
-$primary-color: #7B9EA8;      // 雾蓝灰
-$primary-light: #A8C0C8;      // 浅雾蓝
-$primary-dark: #5B838F;       // 深雾蓝
-$danger-color: #C4A7A0;       // 烟粉
-$success-color: #A0C4A8;      // 雾绿
-$warning-color: #C4C0A0;      // 雾金
-$info-color: #B8C4C0;         // 雾白
+// SCSS variables (kept for backward compatibility within this file)
+$primary-color: #7B9EA8;
+$primary-light: #A8C0C8;
+$primary-dark: #5B838F;
+$danger-color: #C4A7A0;
+$success-color: #A0C4A8;
+$warning-color: #C4C0A0;
+$info-color: #B8C4C0;
 $text-color: #4a4a4a;
 $text-secondary: #8a8a8a;
 $border-color: #e0ddd8;
 $bg-white: #ffffff;
 $bg-gray: #f5f3f0;
 
-// ── Responsive breakpoints (desktop adaptation) ──
-// Taro H5: rpx auto-converts to vw on mobile, but desktop needs max-width container
-@media screen and (min-width: 768px) {
-  // Tablet & desktop: constrain content width, center align
+page {
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
+  font-size: var(--pl-font-base);
+  color: var(--pl-text);
+  background-color: var(--pl-bg-gray);
+  box-sizing: border-box;
+}
+
+// ── Tablet (768px–1023px): keep existing centered single-column behavior ──
+@media screen and (min-width: 768px) and (max-width: 1023px) {
   page {
     max-width: 750px;
     margin: 0 auto;
@@ -32,7 +54,6 @@ $bg-gray: #f5f3f0;
     min-height: 100vh;
   }
 
-  // Scale up font sizes slightly for larger screens
   .page-index,
   .page-events,
   .page-entities,
@@ -44,18 +65,126 @@ $bg-gray: #f5f3f0;
   }
 }
 
+// ── Desktop (≥1024px): three-column layout ──
 @media screen and (min-width: 1024px) {
-  // Large desktop: wider container for better readability
-  page {
-    max-width: 900px;
+  :root {
+    --pl-font-base: 14px;
+    --pl-radius-card: 8px;
+    --pl-radius-item: 6px;
+    --pl-shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06);
+    --pl-spacing-base: 16px;
   }
 
+  // Hide Taro TabBar on desktop (multiple selectors for compatibility)
+  .taro-tabbar__tabbar,
+  .taro-tabbar__container,
+  .taro-tabbar,
+  taro-tabbar-core,
+  taro-tabbar {
+    display: none !important;
+  }
+
+  page {
+    max-width: none;
+    margin: 0;
+    box-shadow: none;
+    font-size: 14px;
+    background-color: var(--pl-bg-gray);
+  }
+
+  // ── App-level flex layout: sidebar + content ──
+  .pl-app {
+    display: flex;
+    min-height: 100vh;
+    background-color: var(--pl-bg-gray);
+  }
+
+  .pl-app-content {
+    flex: 1;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  // Pages: remove mobile tabbar padding, use full height
   .page-index,
   .page-events,
   .page-entities,
   .page-promises,
   .page-todos,
   .page-input {
-    max-width: 900px;
+    max-width: none;
+    margin: 0;
+    padding-bottom: 24px;
+    min-height: 100vh;
+  }
+
+  // ── Left sidebar (vertical navigation) ──
+  .pl-sidebar {
+    width: var(--pl-sidebar-width);
+    flex-shrink: 0;
+    background: var(--pl-bg-white);
+    border-right: 1px solid var(--pl-border);
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    z-index: 10;
+  }
+
+  .pl-sidebar-brand {
+    padding: 20px 16px;
+    border-bottom: 1px solid var(--pl-border);
+
+    .pl-brand-text {
+      font-size: 18px;
+      font-weight: bold;
+      color: var(--pl-primary);
+      display: block;
+    }
+  }
+
+  .pl-nav {
+    flex: 1;
+    padding: 12px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .pl-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+
+    .pl-nav-icon {
+      font-size: 18px;
+      line-height: 1;
+      width: 20px;
+      text-align: center;
+    }
+
+    .pl-nav-label {
+      font-size: 14px;
+      color: var(--pl-text);
+    }
+
+    &:hover {
+      background: var(--pl-bg-gray);
+    }
+
+    &.active {
+      background: var(--pl-primary);
+
+      .pl-nav-label,
+      .pl-nav-icon {
+        color: #fff;
+      }
+    }
   }
 }

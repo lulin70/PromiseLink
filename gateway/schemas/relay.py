@@ -5,7 +5,7 @@ Reference: Pro_Edition_Tech_Design_Phase0.md §4.3.4-§4.3.7, §8.2
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 
 class LLMMessage(BaseModel):

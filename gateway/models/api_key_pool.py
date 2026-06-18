@@ -8,7 +8,7 @@ Reference: Pro_Edition_Tech_Design_Phase0.md §3.3
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy import DateTime, Integer, Numeric, String, Text
@@ -19,7 +19,7 @@ from gateway.database import Base
 
 def _utcnow() -> datetime:
     """Return the current UTC time as a timezone-aware datetime."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class ApiKeyPool(Base):

@@ -5,7 +5,7 @@ Reference: Pro_Edition_Tech_Design_Phase0.md §7 Usage Billing Design
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from gateway.config import Settings, get_settings
@@ -135,7 +135,7 @@ class BillingService:
                 lic.quota_used_tts += 1
             elif request_type == "ocr":
                 lic.quota_used_ocr += 1
-            lic.updated_at = datetime.now(timezone.utc)
+            lic.updated_at = datetime.now(UTC)
 
         return record
 
@@ -144,12 +144,12 @@ class BillingService:
         lic = self._licenses.get(license_key)
         if lic is None:
             return {
-                "month": month or datetime.now(timezone.utc).strftime("%Y-%m"),
+                "month": month or datetime.now(UTC).strftime("%Y-%m"),
                 "traffic_light": "green",
                 "quota": {},
                 "cost_cny": 0.0,
                 "request_count": 0,
-                "reset_at": datetime.now(timezone.utc).isoformat(),
+                "reset_at": datetime.now(UTC).isoformat(),
                 "history": [],
             }
 
@@ -165,7 +165,7 @@ class BillingService:
         total_cost = sum(r.cost_cny for r in records)
 
         return {
-            "month": month or datetime.now(timezone.utc).strftime("%Y-%m"),
+            "month": month or datetime.now(UTC).strftime("%Y-%m"),
             "traffic_light": traffic_light,
             "quota": {
                 "tokens": {

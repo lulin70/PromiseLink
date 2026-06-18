@@ -29,7 +29,7 @@ import json
 import re
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import redis.asyncio as redis_asyncio
@@ -40,7 +40,6 @@ from gateway.core.exceptions import (
     DeviceFingerprintMismatch,
     InvalidDeviceFingerprint,
     InvalidLicenseKeyFormat,
-    JWTInvalid,
     JWTRevoked,
     LicenseAlreadyActivated,
     LicenseCancelled,
@@ -240,7 +239,7 @@ class LicenseService:
                 raise DeviceFingerprintMismatch()
 
         # Step 6: persist binding
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         license_row.user_id = jwt_user_id
         license_row.device_fingerprint = device_fingerprint
         license_row.device_bound_at = now
@@ -362,7 +361,7 @@ class LicenseService:
             plan_type=payload.plan_type,
             device_fingerprint=payload.device_fingerprint,
             jti=payload.jti,
-            expires_at=datetime.fromtimestamp(payload.exp, tz=timezone.utc),
+            expires_at=datetime.fromtimestamp(payload.exp, tz=UTC),
         )
 
     # ── Refresh (tech design §6.3) ──────────────────────────────────
@@ -430,7 +429,7 @@ class LicenseService:
         )
 
         # Revoke old token (CRL TTL = remaining lifetime, min 1s)
-        remaining = max(payload.exp - int(datetime.now(timezone.utc).timestamp()), 1)
+        remaining = max(payload.exp - int(datetime.now(UTC).timestamp()), 1)
         await self._blacklist_jti(payload.jti, remaining)
 
         await self._audit(
@@ -481,7 +480,7 @@ class LicenseService:
         if not licenses:
             raise LicenseNotFound()
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for lic in licenses:
             lic.status = "cancelled"
             lic.updated_at = now
@@ -530,11 +529,11 @@ class LicenseService:
         ``active``, it is auto-expired and the change is flushed so it
         persists even when the caller raises an exception.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         # SQLite stores datetimes as naive; normalize both to aware UTC.
         expires_at = license_row.expires_at
         if expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=timezone.utc)
+            expires_at = expires_at.replace(tzinfo=UTC)
         # Auto-expire if past expires_at
         if expires_at < now and license_row.status == "active":
             license_row.status = "expired"

@@ -1,0 +1,223 @@
+// Shared link card styles (莫兰迪色系)
+// Used by EntityLink, EventLink, TodoLink, PromiseLink
+
+.entity-link-card,
+.event-link-card,
+.todo-link-card,
+.promise-link-card {
+  display: flex;
+  align-items: center;
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: background 0.2s;
+  cursor: pointer;
+
+  &:active {
+    background: #f5f5f5;
+  }
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+// Common icon circle
+.entity-link-avatar,
+.event-link-icon,
+.todo-link-icon,
+.promise-link-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 20px;
+  flex-shrink: 0;
+}
+
+// Entity link specific
+.entity-link-avatar {
+  background: #e6f0f0;
+
+  .entity-link-avatar-text {
+    font-size: 28px;
+    color: #7B9EA8;
+    font-weight: bold;
+  }
+}
+
+.entity-link-info {
+  flex: 1;
+  min-width: 0;
+
+  .entity-link-name {
+    font-size: 28px;
+    color: #333;
+    font-weight: 500;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .entity-link-company {
+    font-size: 22px;
+    color: #999;
+    margin-top: 4px;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+// Event link specific
+.event-link-icon {
+  background: #f0ece6;
+
+  .event-link-icon-text {
+    font-size: 28px;
+  }
+}
+
+.event-link-info {
+  flex: 1;
+  min-width: 0;
+
+  .event-link-title {
+    font-size: 28px;
+    color: #333;
+    font-weight: 500;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .event-link-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 6px;
+
+    .event-link-type {
+      font-size: 22px;
+      color: #7B9EA8;
+      background: #e6f0f0;
+      padding: 2px 12px;
+      border-radius: 8px;
+    }
+
+    .event-link-date {
+      font-size: 22px;
+      color: #999;
+    }
+  }
+}
+
+// Todo link specific
+.todo-link-icon {
+  background: #f0f0e6;
+
+  .todo-link-icon-text {
+    font-size: 28px;
+    color: #8a8a6a;
+  }
+}
+
+.todo-link-info {
+  flex: 1;
+  min-width: 0;
+
+  .todo-link-title {
+    font-size: 28px;
+    color: #333;
+    font-weight: 500;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .todo-link-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 6px;
+
+    .todo-link-status {
+      font-size: 22px;
+      color: #999;
+    }
+
+    .todo-link-due {
+      font-size: 22px;
+      color: #C4A7A0;
+    }
+  }
+}
+
+// Promise link specific
+.promise-link-icon {
+  background: #e6f0e8;
+
+  .promise-link-icon-text {
+    font-size: 28px;
+  }
+}
+
+.promise-link-info {
+  flex: 1;
+  min-width: 0;
+
+  .promise-link-text {
+    font-size: 28px;
+    color: #333;
+    font-weight: 500;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .promise-link-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+
+    .promise-link-action {
+      font-size: 22px;
+      color: #7B9EA8;
+      background: #e6f0f0;
+      padding: 2px 12px;
+      border-radius: 8px;
+    }
+
+    .promise-link-status {
+      font-size: 22px;
+      font-weight: 500;
+    }
+
+    .promise-link-due {
+      font-size: 22px;
+      color: #C4A7A0;
+    }
+  }
+}
+
+// Common arrow
+.entity-link-arrow,
+.event-link-arrow,
+.todo-link-arrow,
+.promise-link-arrow {
+  font-size: 32px;
+  color: #ccc;
+  margin-left: 12px;
+  flex-shrink: 0;
+}

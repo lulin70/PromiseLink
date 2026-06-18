@@ -19,7 +19,7 @@ import hashlib
 import os
 import sys
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 # Ensure the PromiseLink project root is on sys.path so ``import gateway``
@@ -37,6 +37,7 @@ os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 _TEST_KEY = base64.b64encode(b"0123456789abcdef0123456789abcdef").decode("ascii")
 os.environ.setdefault("GATEWAY_ENCRYPTION_KEY", _TEST_KEY)
 
+import httpx  # noqa: E402
 import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402
 from sqlalchemy.ext.asyncio import (  # noqa: E402
@@ -48,7 +49,6 @@ from sqlalchemy.ext.asyncio import (  # noqa: E402
 from gateway.config import get_settings  # noqa: E402
 from gateway.core.jwt_handler import generate_rsa_keypair  # noqa: E402
 from gateway.models.tables import Base, License  # noqa: E402
-
 
 # ── Settings cache reset ────────────────────────────────────────────
 
@@ -209,7 +209,7 @@ def _make_license_row(
     expires_in_days: int = 365,
 ) -> License:
     """Build a License ORM object with sensible test defaults."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return License(
         license_key=license_key or make_license_key(),
         user_id=user_id,
@@ -357,7 +357,7 @@ def make_mock_client(
     json_data: dict | None = None,
     content: bytes | None = None,
     stream_lines: list[bytes] | None = None,
-) -> "httpx.MockTransport":
+) -> httpx.MockTransport:
     """Create a mock httpx transport for testing relay service.
 
     Args:

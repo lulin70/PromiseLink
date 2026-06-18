@@ -1,0 +1,29 @@
+@import '../events/detail.scss';
+
+// Entity detail specific styles
+.page-entity-detail {
+  .assoc-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 0;
+    border-bottom: 1px solid #f5f5f5;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    .assoc-name {
+      font-size: 28px;
+      color: #333;
+    }
+
+    .assoc-type {
+      font-size: 24px;
+      color: #999;
+      background: #f5f5f5;
+      padding: 4px 12px;
+      border-radius: 8px;
+    }
+  }
+}

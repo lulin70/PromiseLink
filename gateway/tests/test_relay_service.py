@@ -10,9 +10,6 @@ Tests cover:
 
 from __future__ import annotations
 
-import json
-from typing import Any
-
 import httpx
 import pytest
 
@@ -20,18 +17,16 @@ from gateway.core.exceptions import (
     NoAvailableKeyError,
     QuotaExceededError,
     UpstreamError,
-    UpstreamTimeoutError,
 )
 from gateway.schemas.relay import LLMMessage, LLMRelayRequest
 from gateway.services.relay_service import RelayService, format_sse_event
 from gateway.tests.conftest import (
+    TEST_LICENSE_KEY,
+    TEST_USER_ID,
     make_llm_response,
     make_llm_stream_lines,
     make_mock_client,
-    TEST_LICENSE_KEY,
-    TEST_USER_ID,
 )
-
 
 # ── LLM Non-Streaming Tests ──
 
@@ -203,7 +198,6 @@ class TestLLMRelayStream:
     @pytest.mark.asyncio
     async def test_llm_stream_provider_degradation(self, relay_service: RelayService):
         """Test streaming with provider degradation."""
-        moka_stream = make_llm_stream_lines(["Moka"], 10, 5)
         openai_stream = make_llm_stream_lines(["OpenAI", " fallback"], 10, 5)
 
         def handler(request: httpx.Request) -> httpx.Response:
@@ -455,7 +449,6 @@ class TestAPIKeyPoolIntegration:
 
         # Lower the health score first
         key = api_key_pool.get_key("key-moka-1")
-        original_score = key.health_score
         key.health_score = 0.5
 
         request = LLMRelayRequest(

@@ -17,6 +17,7 @@ from promiselink.core.file_utils import decode_content
 from promiselink.core.logging import get_logger, new_request_id
 from promiselink.database import get_async_session
 from promiselink.models import Entity, Event
+from promiselink.models.association import Association
 from promiselink.models.todo import Todo as _Todo
 from promiselink.services.entity_cleanup import delete_event_cascade
 from promiselink.services.event_processor import process_event_background
@@ -59,6 +60,28 @@ class EventEntityRef(BaseModel):
     name: str
 
 
+class EventEntityDetail(BaseModel):
+    """Detailed entity reference for event detail (纠偏用)."""
+
+    id: str
+    name: str
+    entity_type: str
+    company: str | None = None
+    title: str | None = None
+    status: str = "confirmed"
+    confidence: float = 1.0
+
+
+class EventAssociationRef(BaseModel):
+    """Lightweight association reference for event detail (关系区)."""
+
+    id: str
+    source_entity_name: str
+    target_entity_name: str
+    association_type: str
+    strength: float = 0.5
+
+
 class EventResponse(BaseModel):
     """Response schema for event data."""
 
@@ -77,10 +100,15 @@ class EventResponse(BaseModel):
 
 class EventTodoRef(BaseModel):
     """Lightweight todo reference for event detail."""
+
     id: str
     todo_type: str
     title: str
     status: str
+    description: str | None = None
+    due_date: datetime | None = None
+    priority: int = 3
+    related_entity_id: str | None = None
     confirmation_status: str | None = None
     action_type: str | None = None
     evidence_quote: str | None = None
@@ -95,6 +123,8 @@ class EventDetailResponse(EventResponse):
     processed_at: datetime | None
     failed_steps: list[str] | None = Field(default=None, description="Steps that failed during pipeline processing (set when status is failed)")
     related_todos: list[EventTodoRef] = Field(default_factory=list, description="Todos generated from this event")
+    related_entities: list[EventEntityDetail] = Field(default_factory=list, description="Entities extracted from this event (for 纠偏)")
+    related_associations: list[EventAssociationRef] = Field(default_factory=list, description="Associations discovered from this event (关系区)")
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
@@ -520,7 +550,8 @@ async def get_event(
     # Fetch related todos
     todo_result = await session.execute(
         select(
-            _Todo.id, _Todo.todo_type, _Todo.title, _Todo.status,
+            _Todo.id, _Todo.todo_type, _Todo.title, _Todo.status, _Todo.description,
+            _Todo.due_date, _Todo.priority, _Todo.related_entity_id,
             _Todo.confirmation_status, _Todo.action_type, _Todo.evidence_quote,
         )
         .where(_Todo.source_event_id == str(event_id))
@@ -529,12 +560,65 @@ async def get_event(
     related_todos = [
         EventTodoRef(
             id=str(tid), todo_type=ttype, title=ttitle, status=tstatus,
+            description=tdesc, due_date=tddate, priority=tprio,
+            related_entity_id=str(tent) if tent else None,
             confirmation_status=tconf, action_type=taction, evidence_quote=tevidence,
         )
-        for tid, ttype, ttitle, tstatus, tconf, taction, tevidence in todo_result.fetchall()
+        for tid, ttype, ttitle, tstatus, tdesc, tddate, tprio, tent, tconf, taction, tevidence in todo_result.fetchall()
     ]
 
-    return EventDetailResponse.model_validate(event, from_attributes=True).model_copy(update={"related_todos": related_todos})
+    # Fetch related entities (extracted from this event) with company/title for 纠偏
+    entity_result = await session.execute(
+        select(Entity).where(
+            Entity.source_event_id == str(event_id),
+            Entity.user_id == user_id,
+        ).order_by(Entity.created_at.asc())
+    )
+    related_entities: list[EventEntityDetail] = []
+    for ent in entity_result.scalars().all():
+        props = ent.properties or {}
+        basic = props.get("basic") if isinstance(props, dict) else None
+        company = basic.get("company") if isinstance(basic, dict) else None
+        title = basic.get("title") if isinstance(basic, dict) else None
+        related_entities.append(EventEntityDetail(
+            id=str(ent.id), name=ent.name, entity_type=ent.entity_type,
+            company=company, title=title, status=ent.status, confidence=ent.confidence,
+        ))
+
+    # Fetch related associations (discovered from this event) for 关系区
+    assoc_result = await session.execute(
+        select(
+            Association.id, Association.source_entity_id, Association.target_entity_id,
+            Association.association_type, Association.strength,
+        )
+        .where(Association.source_event_id == str(event_id))
+        .order_by(Association.strength.desc())
+    )
+    assoc_rows = assoc_result.fetchall()
+    # Build entity name lookup
+    assoc_entity_ids = {str(r[1]) for r in assoc_rows} | {str(r[2]) for r in assoc_rows}
+    assoc_entity_names: dict[str, str] = {}
+    if assoc_entity_ids:
+        name_result = await session.execute(
+            select(Entity.id, Entity.name).where(Entity.id.in_(list(assoc_entity_ids)))
+        )
+        assoc_entity_names = {str(eid): name for eid, name in name_result.all()}
+    related_associations = [
+        EventAssociationRef(
+            id=str(aid),
+            source_entity_name=assoc_entity_names.get(str(src_id), "未知"),
+            target_entity_name=assoc_entity_names.get(str(tgt_id), "未知"),
+            association_type=atype,
+            strength=astrength,
+        )
+        for aid, src_id, tgt_id, atype, astrength in assoc_rows
+    ]
+
+    return EventDetailResponse.model_validate(event, from_attributes=True).model_copy(update={
+        "related_todos": related_todos,
+        "related_entities": related_entities,
+        "related_associations": related_associations,
+    })
 
 
 @router.delete("/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -647,6 +731,231 @@ async def accept_degraded_event(
 
     await session.refresh(event)
     return event
+
+
+# ── Event Correction (纠偏) ──
+
+
+class CorrectedEntityItem(BaseModel):
+    """User-corrected entity mapping (人脉纠偏)."""
+
+    extracted_entity_id: str = Field(..., description="AI 提取的实体 ID")
+    action: str = Field(..., description="select_existing | create_new | ignore")
+    selected_entity_id: str | None = Field(default=None, description="选择已有实体 ID (select_existing)")
+    new_name: str | None = Field(default=None, description="新名称 (create_new)")
+    new_company: str | None = Field(default=None, description="新公司 (create_new)")
+    new_title: str | None = Field(default=None, description="新职位 (create_new)")
+
+
+class CorrectedTodoItem(BaseModel):
+    """User-corrected todo (待办纠偏)."""
+
+    id: str | None = Field(default=None, description="已有待办 ID，None 表示新增")
+    title: str
+    description: str | None = None
+    due_date: datetime | None = None
+    priority: int = Field(default=3, ge=1, le=5)
+    related_entity_id: str | None = None
+    action: str = Field(..., description="edit | delete | add")
+
+
+class CorrectedPromiseItem(BaseModel):
+    """User-corrected promise (承诺纠偏)."""
+
+    id: str = Field(..., description="已有承诺(待办) ID")
+    content: str | None = Field(default=None, description="修改后的内容")
+    due_date: datetime | None = Field(default=None, description="修改后的截止日期")
+    promise_type: str | None = Field(default=None, description="my_promise | their_promise")
+    action: str = Field(..., description="confirm | ignore | modify")
+
+
+class EventCorrectRequest(BaseModel):
+    """Request schema for event correction (纠偏提交)."""
+
+    corrected_entities: list[CorrectedEntityItem] = Field(default_factory=list)
+    corrected_todos: list[CorrectedTodoItem] = Field(default_factory=list)
+    corrected_promises: list[CorrectedPromiseItem] = Field(default_factory=list)
+
+
+class EventCorrectResponse(BaseModel):
+    """Response schema for event correction."""
+
+    event_id: str
+    entities_updated: int = 0
+    entities_created: int = 0
+    entities_ignored: int = 0
+    todos_updated: int = 0
+    todos_deleted: int = 0
+    todos_created: int = 0
+    promises_confirmed: int = 0
+    promises_ignored: int = 0
+    promises_modified: int = 0
+
+
+@router.post("/events/{event_id}/correct", response_model=EventCorrectResponse)
+async def correct_event(
+    event_id: uuid.UUID,
+    request: EventCorrectRequest,
+    session: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user_id),
+):
+    """Apply user corrections to parsed event results (解析后纠偏).
+
+    三类纠偏:
+    - 人脉: select_existing(合并到已有) / create_new(更新提取实体信息) / ignore(忽略)
+    - 待办: edit(修改) / delete(删除) / add(新增)
+    - 承诺: confirm(确认) / ignore(忽略) / modify(修改)
+    """
+    new_request_id()
+
+    # Verify event exists and belongs to user
+    event_result = await session.execute(
+        select(Event).where(
+            Event.id == str(event_id),
+            Event.user_id == user_id,
+        )
+    )
+    event = event_result.scalar_one_or_none()
+    if not event:
+        raise NotFoundError("Event not found")
+
+    resp = EventCorrectResponse(event_id=str(event_id))
+
+    # ── 人脉纠偏 ──
+    for ent_item in request.corrected_entities:
+        # Fetch the extracted entity
+        ent_result = await session.execute(
+            select(Entity).where(
+                Entity.id == ent_item.extracted_entity_id,
+                Entity.user_id == user_id,
+            )
+        )
+        extracted = ent_result.scalar_one_or_none()
+        if not extracted:
+            continue
+
+        if ent_item.action == "select_existing" and ent_item.selected_entity_id:
+            # Mark extracted entity as merged, re-point todos to selected entity
+            extracted.status = "merged"
+            # Update todos that referenced the extracted entity
+            todo_update_result = await session.execute(
+                select(_Todo).where(_Todo.related_entity_id == ent_item.extracted_entity_id)
+            )
+            for todo in todo_update_result.scalars().all():
+                todo.related_entity_id = ent_item.selected_entity_id  # type: ignore[assignment]
+            resp.entities_updated += 1
+
+        elif ent_item.action == "create_new":
+            # Update extracted entity with user-provided info
+            if ent_item.new_name:
+                extracted.name = ent_item.new_name
+                extracted.canonical_name = ent_item.new_name
+            if ent_item.new_company or ent_item.new_title:
+                props = dict(extracted.properties or {})  # type: ignore[arg-type]
+                basic = dict(props.get("basic") if isinstance(props.get("basic"), dict) else {})  # type: ignore[arg-type]
+                if ent_item.new_company:
+                    basic["company"] = ent_item.new_company
+                if ent_item.new_title:
+                    basic["title"] = ent_item.new_title
+                props["basic"] = basic
+                extracted.properties = props
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(extracted, "properties")
+            extracted.status = "confirmed"
+            resp.entities_created += 1
+
+        elif ent_item.action == "ignore":
+            extracted.status = "deleted"
+            resp.entities_ignored += 1
+
+    # ── 待办纠偏 ──
+    for todo_item in request.corrected_todos:
+        if todo_item.action == "add":
+            new_todo = _Todo(
+                user_id=user_id,
+                todo_type="followup",
+                title=todo_item.title,
+                description=todo_item.description,
+                due_date=todo_item.due_date,
+                priority=todo_item.priority,
+                related_entity_id=todo_item.related_entity_id,
+                source_event_id=str(event_id),
+                status="pending",
+            )
+            session.add(new_todo)
+            resp.todos_created += 1
+
+        elif todo_item.action == "delete" and todo_item.id:
+            del_result = await session.execute(
+                select(_Todo).where(
+                    _Todo.id == todo_item.id,
+                    _Todo.user_id == user_id,
+                )
+            )
+            todo_to_delete: _Todo | None = del_result.scalar_one_or_none()
+            if todo_to_delete:
+                await session.delete(todo_to_delete)
+                resp.todos_deleted += 1
+
+        elif todo_item.action == "edit" and todo_item.id:
+            edit_result = await session.execute(
+                select(_Todo).where(
+                    _Todo.id == todo_item.id,
+                    _Todo.user_id == user_id,
+                )
+            )
+            todo_to_edit: _Todo | None = edit_result.scalar_one_or_none()
+            if todo_to_edit:
+                todo_to_edit.title = todo_item.title
+                if todo_item.description is not None:
+                    todo_to_edit.description = todo_item.description
+                todo_to_edit.due_date = todo_item.due_date
+                todo_to_edit.priority = todo_item.priority
+                todo_to_edit.related_entity_id = todo_item.related_entity_id  # type: ignore[assignment]
+                resp.todos_updated += 1
+
+    # ── 承诺纠偏 ──
+    for prom_item in request.corrected_promises:
+        prom_result = await session.execute(
+            select(_Todo).where(
+                _Todo.id == prom_item.id,
+                _Todo.user_id == user_id,
+            )
+        )
+        promise: _Todo | None = prom_result.scalar_one_or_none()
+        if not promise:
+            continue
+
+        if prom_item.action == "confirm":
+            promise.confirmation_status = "confirmed"
+            resp.promises_confirmed += 1
+
+        elif prom_item.action == "ignore":
+            promise.confirmation_status = "rejected"
+            promise.status = "dismissed"
+            resp.promises_ignored += 1
+
+        elif prom_item.action == "modify":
+            if prom_item.content is not None:
+                promise.description = prom_item.content
+            if prom_item.due_date is not None:
+                promise.due_date = prom_item.due_date
+            if prom_item.promise_type is not None:
+                promise.action_type = prom_item.promise_type
+            promise.confirmation_status = "confirmed"
+            resp.promises_modified += 1
+
+    await session.commit()
+
+    logger.info(
+        "event_corrected",
+        event_id=str(event_id),
+        entities_updated=resp.entities_updated,
+        todos_created=resp.todos_created,
+        promises_confirmed=resp.promises_confirmed,
+    )
+
+    return resp
 
 
 # ── Helpers ──

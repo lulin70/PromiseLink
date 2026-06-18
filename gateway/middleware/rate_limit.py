@@ -15,7 +15,6 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from gateway.config import Settings, get_settings
-from gateway.core.exceptions import RateLimitExceededError
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):

@@ -10,7 +10,7 @@ Covers the test cases from the Phase 0 test plan §2.3:
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -500,7 +500,7 @@ async def test_monthly_reset_archives_previous_month(
     )
     service = _make_service(db_session, redis_client)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await service.reset_monthly_quota(now=now)
 
     # Compute expected previous month
@@ -581,7 +581,7 @@ async def test_monthly_reset_clears_redis_cache(
         status=200,
     )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if now.month == 1:
         prev_month = f"{now.year - 1}-12"
     else:

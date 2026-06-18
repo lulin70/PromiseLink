@@ -20,7 +20,8 @@ from __future__ import annotations
 import json
 import time
 import uuid
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
 import httpx
 
@@ -34,12 +35,9 @@ from gateway.core.exceptions import (
 from gateway.schemas.relay import (
     ASRRelayResponse,
     LLMRelayRequest,
-    LLMRelayResponse,
-    LLMBilling,
-    LLMUsage,
     OCRRelayResponse,
 )
-from gateway.services.api_key_pool import APIKeyPool, KeyInfo
+from gateway.services.api_key_pool import APIKeyPool
 from gateway.services.billing_service import BillingService
 
 
@@ -343,7 +341,7 @@ class RelayService:
                     "key_id": key.key_id,
                 }
 
-            except httpx.TimeoutException as e:
+            except httpx.TimeoutException:
                 self.api_key_pool.mark_timeout(key.key_id)
                 last_error = UpstreamTimeoutError(f"Provider {provider} timed out")
                 continue

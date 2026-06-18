@@ -22,13 +22,12 @@ from __future__ import annotations
 import asyncio
 import random
 from collections import Counter
-from typing import List
 
 import pytest
 
 from gateway.services.api_key_pool_manager import (
-    DELTA_429,
     DELTA_5XX,
+    DELTA_429,
     DELTA_PROBE_SUCCESS,
     DELTA_SUCCESS,
     HEALTH_SCORE_MAX,
@@ -39,7 +38,6 @@ from gateway.services.api_key_pool_manager import (
     KeyState,
     KeyStatus,
 )
-
 
 # ── Test helpers ────────────────────────────────────────────────────
 
@@ -71,7 +69,7 @@ class MockProbe:
     def __init__(self, default_result: bool = True) -> None:
         self._default: bool = default_result
         self._per_key: dict[str, bool] = {}
-        self.calls: List[str] = []
+        self.calls: list[str] = []
 
     async def __call__(self, key_id: str) -> bool:
         self.calls.append(key_id)
@@ -552,7 +550,7 @@ class TestConcurrencySafety:
         mgr = APIKeyPoolManager(keys=keys, rpm_limit=10_000)
 
         n = 600
-        results = await asyncio.gather(*[mgr.select_key("ds") for _ in range(n)])
+        await asyncio.gather(*[mgr.select_key("ds") for _ in range(n)])
         total = sum(k.total_requests for k in keys)
         assert total == n
         # Each key should get roughly 1/3 of requests

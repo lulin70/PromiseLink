@@ -3,9 +3,13 @@ export default defineAppConfig({
     'pages/index/index',
     'pages/input/index',
     'pages/events/index',
+    'pages/events/detail',
     'pages/todos/index',
+    'pages/todos/detail',
     'pages/entities/index',
+    'pages/entities/detail',
     'pages/promises/index',
+    'pages/promises/detail',
     'pages/login/index',
   ],
   tabBar: {

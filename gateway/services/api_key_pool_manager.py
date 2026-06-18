@@ -508,7 +508,6 @@ class APIKeyPoolManager:
 
     async def get_pool_status(self) -> list[dict[str, object]]:
         """Return a snapshot of every key's state (for /health endpoint)."""
-        now = self._clock_fn()
         async with self._lock:
             return [k.snapshot() for k in self._keys.values()]
 

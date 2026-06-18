@@ -8,9 +8,9 @@ Reference: Pro_Edition_Tech_Design_Phase0.md §3.2
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import BigInteger, DateTime, Integer, String, Text
+from sqlalchemy import BigInteger, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from gateway.database import Base
@@ -18,7 +18,7 @@ from gateway.database import Base
 
 def _utcnow() -> datetime:
     """Return the current UTC time as a timezone-aware datetime."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class License(Base):

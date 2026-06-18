@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import redis.asyncio as redis_asyncio
@@ -69,7 +69,7 @@ def _current_year_month(now: datetime | None = None) -> str:
     Returns:
         Year-month string, e.g. ``"2026-06"``.
     """
-    dt = now or datetime.now(timezone.utc)
+    dt = now or datetime.now(UTC)
     return dt.strftime("%Y-%m")
 
 
@@ -82,7 +82,7 @@ def _previous_year_month(now: datetime | None = None) -> str:
     Returns:
         Previous year-month string, e.g. ``"2026-05"`` for June input.
     """
-    dt = now or datetime.now(timezone.utc)
+    dt = now or datetime.now(UTC)
     if dt.month == 1:
         return f"{dt.year - 1}-12"
     return f"{dt.year}-{dt.month - 1:02d}"
@@ -394,7 +394,7 @@ class UsageService:
         Returns:
             Number of licenses whose counters were reset.
         """
-        ref = now or datetime.now(timezone.utc)
+        ref = now or datetime.now(UTC)
         prev_month = _previous_year_month(ref)
 
         result = await self._db.execute(select(License))
@@ -586,7 +586,7 @@ class UsageService:
         monthly.status = _compute_traffic_light(
             monthly.total_tokens, license_row.quota_limit_tokens
         )
-        monthly.last_updated_at = datetime.now(timezone.utc)
+        monthly.last_updated_at = datetime.now(UTC)
 
     async def _update_redis_cache(
         self, user_id: str, license_row: License

@@ -3,7 +3,7 @@ import { View, Text, ScrollView } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { getEvents, getEventDetail, retryEvent, updateTodoStatus, dismissTodo, deleteEvent, confirmTodo, getScheduledEvents, cancelScheduledEvent, createScheduledEvent, EventResponse, EventDetailResponse, ScheduledEventResponse } from '../../services/api'
 import { isLoggedIn } from '../../services/auth'
-import { navigateToEntity } from '../../services/navigation'
+import { navigateToEntity, navigateToEventDetail } from '../../services/navigation'
 import { NAV_EVENTS } from '../../services/navigation'
 import './index.scss'
 
@@ -474,6 +474,18 @@ export default function EventsPage() {
                     }}
                   >
                     🗑 删除此事件
+                  </Text>
+                </View>
+                {/* View full detail button */}
+                <View className='detail-row'>
+                  <Text
+                    className='view-detail-btn'
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      navigateToEventDetail(expandedDetail.id)
+                    }}
+                  >
+                    查看完整详情 ›
                   </Text>
                 </View>
                 {expandedDetail.related_todos && expandedDetail.related_todos.length > 0 && (

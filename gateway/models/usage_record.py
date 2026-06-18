@@ -9,7 +9,7 @@ Reference: Pro_Edition_Tech_Design_Phase0.md §3.4
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -41,7 +41,7 @@ class BigIntegerForSQLite(TypeDecorator):
 
 def _utcnow() -> datetime:
     """Return the current UTC time as a timezone-aware datetime."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class UsageRecord(Base):

@@ -8,7 +8,8 @@ PostgreSQL (production). JSONB columns fall back to JSON on SQLite.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
@@ -19,10 +20,8 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
-    func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from decimal import Decimal
 
 
 class Base(DeclarativeBase):
@@ -46,22 +45,22 @@ class License(Base):
     quota_used_tts: Mapped[int] = mapped_column(Integer, default=0)
     quota_used_ocr: Mapped[int] = mapped_column(Integer, default=0)
     quota_reset_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime, default=lambda: datetime.now(UTC)
     )
     status: Mapped[str] = mapped_column(String(16), default="active")
     started_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime, default=lambda: datetime.now(UTC)
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime)
     device_fingerprint: Mapped[str | None] = mapped_column(String(128), nullable=True)
     device_bound_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     max_devices: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime, default=lambda: datetime.now(UTC)
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        DateTime, default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
     )
 
 
@@ -84,11 +83,11 @@ class ApiKey(Base):
     circuit_opened_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     base_url: Mapped[str] = mapped_column(String(256))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime, default=lambda: datetime.now(UTC)
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        DateTime, default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
     )
 
 
@@ -117,7 +116,7 @@ class UsageRecord(Base):
     status_code: Mapped[int] = mapped_column(Integer, default=200)
     success: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime, default=lambda: datetime.now(UTC)
     )
 
 
@@ -140,7 +139,7 @@ class MonthlyUsage(Base):
     ocr_count: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(16), default="green")
     last_updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime, default=lambda: datetime.now(UTC)
     )
 
 
@@ -165,5 +164,5 @@ class AuditLog(Base):
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
     ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(timezone.utc)
+        DateTime, default=lambda: datetime.now(UTC)
     )

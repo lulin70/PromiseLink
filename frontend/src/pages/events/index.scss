@@ -305,6 +305,21 @@
         }
       }
 
+      .view-detail-btn {
+        display: inline-block;
+        font-size: 26px;
+        color: #7B9EA8;
+        padding: 10px 24px;
+        border: 1px solid #7B9EA8;
+        border-radius: 8px;
+        cursor: pointer;
+        margin-top: 12px;
+
+        &:active {
+          background: #e6f0f0;
+        }
+      }
+
       .related-todos {
         margin-top: 8px;
       }
@@ -622,5 +637,124 @@
     }
   }
 }
+}
+
+// ── Desktop overrides (≥1024px) ──
+@media screen and (min-width: 1024px) {
+  .page-events {
+    padding-bottom: 24px;
+
+    .header {
+      padding: 16px 24px;
+      .header-title { font-size: 18px; }
+      .header-action { width: 32px; height: 32px; border-radius: 50%; .add-icon { font-size: 20px; } }
+    }
+
+    .filter-tabs {
+      padding: 12px 24px;
+      gap: 8px;
+      .filter-tab { padding: 8px 0; border-radius: 6px; font-size: 13px; }
+    }
+
+    .search-bar {
+      padding: 8px 24px;
+      .search-input { height: 36px; border-radius: 18px; padding: 0 16px; font-size: 13px; }
+    }
+
+    .loading { padding: 30px 0; font-size: 14px; }
+    .error-container { padding: 30px 24px; .error-text { font-size: 13px; } }
+
+    // List area: reserve space for right-column detail panel
+    .event-list {
+      height: calc(100vh - 200px);
+      padding: 16px 24px;
+      padding-right: 380px;
+    }
+
+    .empty { padding: 40px 0; font-size: 14px; .empty-hint { font-size: 12px; margin-top: 6px; } }
+
+    .event-card {
+      border-radius: 8px;
+      margin-bottom: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+
+      &.expanded { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+      .event-card-main { padding: 12px 16px; }
+      .event-card-left { width: 70px; .event-time { font-size: 12px; } }
+      .event-card-right {
+        .event-title-row { gap: 8px; margin-bottom: 4px; }
+        .event-title { font-size: 14px; }
+        .event-status { font-size: 10px; padding: 2px 8px; border-radius: 4px; Text { font-size: 10px; } }
+        .event-meta {
+          gap: 8px;
+          .event-type-tag { font-size: 11px; padding: 1px 6px; border-radius: 3px; }
+          .entity-link { font-size: 11px; padding: 1px 6px; border-radius: 3px; }
+        }
+      }
+      .expand-arrow { font-size: 12px; margin-left: 8px; }
+
+      // Detail panel: position as fixed right-column on desktop
+      .event-detail {
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: 360px;
+        height: 100vh;
+        overflow-y: auto;
+        background: #fff;
+        border-left: 1px solid #e0ddd8;
+        box-shadow: -2px 0 8px rgba(0,0,0,0.08);
+        padding: 20px;
+        z-index: 50;
+        border-top: none;
+
+        .detail-row {
+          margin-bottom: 10px;
+          .detail-label { font-size: 11px; margin-bottom: 3px; }
+          .detail-value { font-size: 13px; }
+        }
+        .detail-section { margin-top: 10px; padding-top: 10px; }
+        .retry-btn { font-size: 11px; padding: 3px 10px; border-radius: 6px; }
+        .delete-event-btn { font-size: 12px; padding: 6px 14px; border-radius: 6px; margin-top: 8px; }
+        .related-todos { margin-top: 6px; }
+        .related-todo-item {
+          padding: 6px 0;
+          &.pending-confirm-item { padding: 8px; border-radius: 6px; margin-bottom: 6px; }
+          .related-todo-header { gap: 6px; }
+          .related-todo-title { font-size: 12px; }
+          .todo-action-tag { font-size: 9px; padding: 1px 5px; }
+          .evidence-quote { font-size: 10px; margin: 4px 0; }
+          .related-todo-status { font-size: 11px; }
+          .related-todo-btn { font-size: 10px; padding: 2px 8px; border-radius: 4px; }
+        }
+      }
+    }
+
+    // Scheduled card
+    .event-card.scheduled-card { border-left-width: 3px; }
+    .schedule-status { font-size: 10px; padding: 2px 8px; border-radius: 4px; Text { font-size: 10px; } }
+    .se-location { font-size: 11px; padding: 1px 6px; border-radius: 3px; }
+    .scheduled-actions {
+      gap: 8px; padding: 10px 16px;
+      .action-btn { padding: 6px 0; border-radius: 6px; font-size: 13px; Text { font-size: 13px; } }
+    }
+
+    .create-schedule-btn { border-radius: 8px; padding: 12px; margin-bottom: 8px; font-size: 14px; Text { font-size: 14px; } }
+
+    // Modal: center on desktop with max-width
+    .modal-overlay { padding: 20px; }
+    .modal-content {
+      border-radius: 12px;
+      max-width: 500px;
+      max-height: 85vh;
+      .modal-header { padding: 16px; .modal-title { font-size: 16px; } .modal-close { font-size: 18px; } }
+      .modal-body {
+        padding: 16px;
+        .form-group { margin-bottom: 12px; .form-label { font-size: 13px; margin-bottom: 4px; } .form-input { height: 36px; border-radius: 6px; padding: 0 12px; font-size: 13px; } }
+        .submit-schedule-btn { border-radius: 6px; padding: 10px; font-size: 14px; margin-top: 12px; Text { font-size: 14px; } }
+      }
+    }
+  }
 }
 

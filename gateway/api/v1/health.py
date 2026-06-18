@@ -8,7 +8,7 @@ Endpoint:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Request
 
@@ -79,7 +79,7 @@ async def health_check(request: Request) -> HealthResponse:
     return HealthResponse(
         status=overall,
         version=version,
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
         components=components,
         metrics={
             "active_ws_connections": 0,
