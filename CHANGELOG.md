@@ -2,6 +2,22 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [0.6.2] - 2026-06-19
+
+### Added — P1-P9批判性评审+三重点用户旅程测试增强
+- **7角色批判性评审报告**: 72/100→78/100(测试增强后), 发现4项阻断项(B1-B4)+10项改进项(I1-I10), 揭露上一轮ReReview报告数据不实(mypy 98错误非0/测试数虚报/评审对象错位)
+- **会后记录测试增强**: 31个测试覆盖9个缺口(email/wechat_forward事件类型/批量创建/retry/accept-degraded/500KB限制/级联删除/搜索过滤)
+- **待办生成测试增强**: 23个测试覆盖8个缺口(_rule_based_fallback/_is_duplicate_todo/help类型/call事件/PriorityScorerV2/会话截断/LLM异常处理/去重集成)
+- **承诺跟进测试增强**: 29个测试覆盖10个缺口(nudge-draft端点/their_promise生命周期/overdue/broken状态/安全约束/pending重置/fulfilled_at验证/草稿缓存/统计/双向承诺E2E)
+
+### Fixed — 发现的源代码Bug(报告未修改)
+- **overdue_notified_at字段从未被API设置**: PATCH /promises/{id}/fulfillment在overdue时未设置overdue_notified_at字段, 该字段始终为None
+
+### Test Results
+- pytest: 1260 passed, 45 skipped (+83新用户旅程测试)
+- 覆盖率: 69%(从68%提升)
+- 三重点测试覆盖维度: Happy Path 62% + Error 18% + Boundary 20%
+
 ## [0.6.1] - 2026-06-18
 
 ### Added — e2e真实用户场景测试+Pro文档迁移

@@ -416,7 +416,7 @@ class FileStoreProvider:
     async def health_check(self) -> bool:
         try:
             return self.entries_dir.exists() and self.entries_dir.is_dir()
-        except Exception as exc:
+        except OSError as exc:
             logger.warning("file_memory_health_check_failed", error=str(exc))
             return False
 
@@ -485,7 +485,7 @@ class CarryMemProvider:
         try:
             response = await client.post("/api/v1/notes", json=payload)
             response.raise_for_status()
-        except Exception as e:
+        except Exception as e:  # External API — keep broad catch for resilience
             logger.warning(
                 "carrymem_store_failed",
                 event_id=event_id,
