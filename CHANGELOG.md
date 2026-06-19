@@ -2,6 +2,21 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [0.6.1] - 2026-06-18
+
+### Added — e2e真实用户场景测试+Pro文档迁移
+- **6个真实用户场景e2e测试**: TC-W3-050~055共46个测试用例, 覆盖许总杀手场景/BD日常/投资人关联/创业者风险/首次4屏/承诺闭环, Happy Path 71.7%+Error 15.2%+Boundary 13.0%
+- **Pro文档迁移到PromiseLink-Pro repo**: 7个专业版文档(架构/安全/技术设计/测试计划/PRD/实现计划/评审报告)从公开repo迁移到私有repo
+
+### Changed — 三repo推送Git
+- PromiseLink: 推送到github.com:lulin70/PromiseLink.git (SSH)
+- PromiseLink-Pro: 推送到github.com:lulin70/PromiseLink-Pro.git (SSH, remote从HTTPS改为SSH)
+- PromiseLink-miniapp: 推送到github.com:lulin70/PromiseLink-miniapp.git (SSH, remote从HTTPS改为SSH)
+
+### Test Results
+- pytest: 1177 passed, 45 skipped (+46新e2e测试)
+- 覆盖率: 68%
+
 ## [0.6.0] - 2026-06-18
 
 ### Added — Phase 2专业版代码迁移+文件上传修复+内存泄漏修复+UI引导
