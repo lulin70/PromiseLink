@@ -78,12 +78,6 @@ async def _scheduled_event_maintenance():
             pass  # Normal: continue loop
 
 
-def _track_task(task: asyncio.Task):
-    """Track background tasks for graceful shutdown."""
-    _pending_tasks.add(task)
-    task.add_done_callback(_pending_tasks.discard)
-
-
 def _signal_handler(signum, frame):
     """Handle SIGTERM/SIGINT for graceful shutdown."""
     import structlog
@@ -104,7 +98,7 @@ async def lifespan(app: FastAPI):
     import structlog
     logger = structlog.get_logger()
     logger.info("promiselink_starting")
-    logger.info("PromiseLink v0.5.5 — AGPL v3. Commercial use requires compliance. https://promiselink.app")
+    logger.info("PromiseLink v0.6.0 — AGPL v3. Commercial use requires compliance. https://promiselink.app")
 
     # Check for default secret key
     if settings.secret_key == "change-me-in-production" and settings.app_env != "test":
@@ -160,6 +154,21 @@ async def lifespan(app: FastAPI):
     # Close shared LLM httpx client
     from promiselink.services.llm_client import close_shared_client
     await close_shared_client()
+
+    # Close shared embedding provider (releases AsyncOpenAI client)
+    from promiselink.services.embedding_provider import close_shared_provider
+    await close_shared_provider()
+
+    # Close shared semantic search engine (resets singleton)
+    from promiselink.services.semantic_search import close_shared_engine
+    await close_shared_engine()
+
+    # Close shared relay client if it was created (Pro edition)
+    try:
+        from promiselink.services.relay_client import close_relay_client
+        await close_relay_client()
+    except Exception as e:
+        logger.warning("relay_client_close_error", error=str(e))
 
     await close_db()
     logger.info("shutdown_complete")
@@ -342,24 +351,10 @@ app.include_router(promises.router, prefix=settings.api_prefix, tags=["Promises"
 app.include_router(reminders.router, prefix=settings.api_prefix, tags=["Reminders"])
 app.include_router(scheduled_events.router, prefix=settings.api_prefix, tags=["ScheduledEvents"])
 
-# Pro-only routes (only registered when app_edition == "pro")
-if settings.app_edition == "pro":
-    from promiselink.api.v1 import (
-        email_sync,
-        import_csv,
-        media,
-        privacy,
-        voice,
-        voice_query,
-        wechat_forward,
-    )
-    app.include_router(voice.router, prefix=settings.api_prefix, tags=["Voice"])
-    app.include_router(voice_query.router, prefix=settings.api_prefix, tags=["VoiceQuery"])
-    app.include_router(media.router, prefix=settings.api_prefix, tags=["Media"])
-    app.include_router(email_sync.router, prefix=settings.api_prefix, tags=["EmailSync"])
-    app.include_router(wechat_forward.router, prefix=settings.api_prefix, tags=["WeChatForward"])
-    app.include_router(import_csv.router, prefix=settings.api_prefix, tags=["ImportCSV"])
-    app.include_router(privacy.router, prefix=settings.api_prefix, tags=["Privacy"])
+# Pro-only routes (voice/media/email_sync/wechat_forward/import_csv/privacy)
+# have been migrated to the PromiseLink-Pro repository.
+# Basic edition no longer registers them via APP_EDITION switch.
+# See docs/architecture/Repo_Split_Decision.md §5.2 for details.
 
 
 # ── Static Files (H5 Frontend) ──

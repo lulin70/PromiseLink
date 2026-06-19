@@ -6,7 +6,9 @@ Uses text-embedding-3-small model (768 dimensions) via Moka AI.
 Design reference: PromiseLink_技术设计_v1.md v2.8 §4.12.1
 """
 
+import asyncio
 import hashlib
+from typing import Optional
 
 from openai import AsyncOpenAI
 
@@ -22,6 +24,42 @@ EMBEDDING_DIMENSIONS = 768
 # Local embedding model (same as CarryMem, already installed)
 LOCAL_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 LOCAL_EMBEDDING_DIMENSIONS = 384
+
+# ── Module-level singleton (avoids reloading sentence-transformers model) ──
+_shared_provider: Optional["EmbeddingProvider"] = None
+_provider_lock = asyncio.Lock()
+
+
+async def get_shared_provider(settings: Settings | None = None) -> "EmbeddingProvider":
+    """Get or create the module-level shared EmbeddingProvider.
+
+    Reuses a single provider (and its sentence-transformers model + cache)
+    across all pipeline executions, avoiding repeated model loads that
+    consume hundreds of MB of memory.
+
+    Args:
+        settings: Optional settings override (only used on first creation).
+
+    Returns:
+        The shared EmbeddingProvider instance.
+    """
+    global _shared_provider
+    if _shared_provider is None:
+        async with _provider_lock:
+            # Double-check after acquiring the lock
+            if _shared_provider is None:
+                _shared_provider = EmbeddingProvider(settings=settings)
+                logger.info("shared_embedding_provider_created")
+    return _shared_provider
+
+
+async def close_shared_provider() -> None:
+    """Close the shared EmbeddingProvider. Call on app shutdown."""
+    global _shared_provider
+    if _shared_provider is not None:
+        await _shared_provider.close()
+        _shared_provider = None
+        logger.info("shared_embedding_provider_closed")
 
 
 class EmbeddingProvider:
@@ -193,6 +231,20 @@ class EmbeddingProvider:
         self._cache.clear()
         self._cache_hits = 0
         self._cache_misses = 0
+
+    async def close(self) -> None:
+        """Close the underlying AsyncOpenAI client. Call on app shutdown.
+
+        Releases the HTTP connection pool held by the API client. The
+        local sentence-transformers model is left to garbage collection.
+        """
+        if self._client is not None:
+            try:
+                await self._client.close()
+            except Exception as e:
+                logger.warning("embedding_client_close_error", error=str(e))
+            finally:
+                self._client = None
 
     async def _embed_local(self, text: str, cache_key: str) -> list[float]:
         """Embed text using local sentence-transformers model.

@@ -79,9 +79,9 @@ class DataSourceAdapter(ABC):
         ...
 
 
-# EmailAdapter is now implemented in email_adapter.py
-# Import it here for registry and backward compatibility
-from promiselink.services.email_adapter import EmailAdapter  # noqa: F401 — re-exported
+# EmailAdapter is a Pro-only module (email_adapter.py).
+# It is registered lazily by the Pro edition via register_adapter().
+# Do NOT import it here to keep the basic edition self-contained.
 
 
 class WeChatAdapter(DataSourceAdapter):
@@ -158,9 +158,9 @@ class ManualAdapter(DataSourceAdapter):
 
 
 # ── Adapter Registry ──
+# Note: "email" adapter is registered by Pro edition via register_adapter().
 
 _ADAPTERS: dict[str, type[DataSourceAdapter]] = {
-    "email": EmailAdapter,
     "wechat": WeChatAdapter,
     "manual": ManualAdapter,
 }

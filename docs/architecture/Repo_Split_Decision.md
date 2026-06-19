@@ -259,20 +259,35 @@ services:
 
 **目标**：将专业版服务模块和 API 路由从公开 repo 移至私有 repo。
 
-| 步骤 | 操作 | 验证方法 |
-|------|------|----------|
-| 1 | 将专业版服务模块迁至 `PromiseLink-Pro/pro-services/` | 模块导入正常 |
-| 2 | 将专业版 API 路由迁至 `PromiseLink-Pro/pro-api/` | 路由注册正常 |
-| 3 | 公开 repo 移除上述模块，清理 git history | 公开 repo 无专业版代码 |
-| 4 | 公开 repo 基础版测试全绿（移除专业版测试） | `pytest` 通过 |
-| 5 | 专业版 repo 配置 git submodule 引用基础版 repo | submodule 可拉取 |
-| 6 | 专业版本地 Docker 构建验证（基础核心 + 专业叠加） | docker-compose up 成功 |
-| 7 | 配置 CI 预构建 Docker 镜像 + 推送 ghcr.io（§3.4） | 镜像可 pull 且正常运行 |
+**✅ 迁移完成状态（v0.6.0, 2026-06-18）**：
 
-**涉及文件清单**（从公开 repo 迁出）：
+| 步骤 | 操作 | 验证方法 | 状态 |
+|------|------|----------|------|
+| 1 | 将专业版服务模块迁至 `PromiseLink-Pro/pro-services/` | 模块导入正常 | ✅ 完成(8文件) |
+| 2 | 将专业版 API 路由迁至 `PromiseLink-Pro/pro-api/` | 路由注册正常 | ✅ 完成(7文件) |
+| 3 | 公开 repo 移除上述模块，清理 git history | 公开 repo 无专业版代码 | ✅ 文件删除完成, ⏳ git history清理待公开发布前执行 |
+| 4 | 公开 repo 基础版测试全绿（移除专业版测试） | `pytest` 通过 | ✅ 完成(1131 passed, 45 skipped) |
+| 5 | 专业版 repo 配置 git submodule 引用基础版 repo | submodule 可拉取 | ⏳ 待执行 |
+| 6 | 专业版本地 Docker 构建验证（基础核心 + 专业叠加） | docker-compose up 成功 | ⏳ 待执行 |
+| 7 | 配置 CI 预构建 Docker 镜像 + 推送 ghcr.io（§3.4） | 镜像可 pull 且正常运行 | ⏳ 待执行 |
+
+**已迁移文件清单**（从公开 repo 迁出，共27个文件 + gateway目录54文件 = 81文件）：
 - 服务：`asr_service.py`, `tts_service.py`, `ocr_service.py`, `nlu_intent_classifier.py`, `nlg_service.py`, `voice_query_service.py`, `email_adapter.py`, `wechat_forward_adapter.py`
 - 路由：`voice.py`, `voice_query.py`, `media.py`, `email_sync.py`, `wechat_forward.py`, `import_csv.py`, `privacy.py`
 - 测试：对应的 `test_voice_api.py`, `test_voice_query_api.py`, `test_media_api.py`, `test_email_adapter.py`, `test_wechat_forward_*.py`, `test_import_csv_api.py`, `test_nlu_intent_classifier.py`, `test_nlg_service.py`, `test_tts_service.py`
+- 模型：`voice_session.py` (VoiceSession/VoiceTurn/VoiceAnalytics)
+- 迁移：`538083639032_sprint_0_f_50_voice_sessions_turns_.py`
+- E2E测试：`test_pro_edition_e2e.py`, `test_pro_security.py`
+- gateway目录：完整54文件（api/core/middleware/models/schemas/services/tests）
+
+**基础版依赖处理**：
+- `nudge_generator.py` 新建：从`nlg_service.py`提取`generate_gentle_nudge`函数，保持`promises.py`催促功能自包含
+- `data_source_adapter.py`：移除`EmailAdapter`导入，Pro版通过`register_adapter()`懒加载
+- `main.py`：移除`APP_EDITION=='pro'`路由注册块
+- `models/__init__.py`：移除`VoiceSession`导入
+- `alembic迁移链`：`a1b2c3d4e5f6`的`down_revision`从`538083639032`改为`4ff9b21a03b0`
+
+**⚠️ git history清理**：步骤3的git history清理将在公开发布前使用`git filter-repo`执行，需通知所有协作者、备份repo、协作者重新clone。
 
 ### 5.3 Phase 3：小程序整合
 

@@ -22,7 +22,6 @@ from promiselink.models.association import Association
 from promiselink.models.entity import Entity
 from promiselink.models.event import Event
 from promiselink.models.todo import Todo
-from promiselink.services.email_adapter import EmailAdapter, EmailMessage
 from promiselink.services.embedding_provider import EmbeddingProvider
 from promiselink.services.memory_provider import (
     CarryMemProvider,
@@ -30,8 +29,10 @@ from promiselink.services.memory_provider import (
     create_memory_provider,
 )
 from promiselink.services.semantic_search import SemanticSearchEngine
-from promiselink.services.wechat_forward_adapter import WeChatForwardAdapter
 from tests.conftest import create_test_event, make_user_id
+
+# Note: EmailAdapter and WeChatForwardAdapter tests are in PromiseLink-Pro repo
+# (email_adapter.py and wechat_forward_adapter.py migrated to Pro).
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  17.1 Pipeline全链路集成测试
@@ -339,100 +340,12 @@ class TestPipelineFullChain:
 
 
 class TestDataAdapters:
-    """TC-INT-010 ~ TC-INT-012: 数据适配器集成测试."""
+    """TC-INT-010 ~ TC-INT-012: 数据适配器集成测试.
 
-    @pytest.mark.asyncio
-    async def test_tc_int_010_email_adapter_to_pipeline(self, db_session):
-        """TC-INT-010: EmailAdapter→Event创建→Pipeline处理端到端验证.
-
-        Use EmailAdapter to create an event from email data, verify it
-        flows through pipeline.
-        """
-        user_id = make_user_id()
-
-        # Create a sample email message
-        email_msg = EmailMessage(
-            message_id="<test123@example.com>",
-            subject="关于AI合作项目讨论",
-            from_addr="zhangsan@example.com",
-            from_name="张三",
-            to_addrs=["me@example.com"],
-            date=datetime.now(UTC),
-            body_text="你好，关于我们之前讨论的AI合作项目，我希望能进一步了解技术方案。期待你的回复。",
-            attachments=[],
-        )
-
-        # Use EmailAdapter to convert to RawEvent
-        adapter = EmailAdapter()
-        raw_event = adapter.parse_to_event(email_msg, user_id=user_id)
-
-        # Verify RawEvent structure
-        assert raw_event.source_type == "email"
-        assert raw_event.event_type == "email"
-        assert raw_event.title == "关于AI合作项目讨论"
-        assert "AI合作" in raw_event.raw_text
-        assert raw_event.metadata["from"] == "zhangsan@example.com"
-        assert raw_event.metadata["from_name"] == "张三"
-
-        # Convert RawEvent to Event (simulating pipeline ingestion)
-        event = Event(
-            id=str(uuid.uuid4()),
-            user_id=raw_event.user_id or user_id,
-            event_type=raw_event.event_type,
-            source=raw_event.source_type,
-            title=raw_event.title or "未命名",
-            raw_text=raw_event.raw_text,
-            status="pending",
-            metadata_=raw_event.metadata,
-        )
-        db_session.add(event)
-        await db_session.commit()
-
-        # Verify event was created with email source
-        result = await db_session.execute(select(Event).where(Event.id == event.id))
-        saved_event = result.scalar_one()
-        assert saved_event.source == "email"
-        assert saved_event.event_type == "email"
-        assert "AI合作" in saved_event.raw_text
-        assert saved_event.metadata_.get("from_name") == "张三"
-
-    @pytest.mark.asyncio
-    async def test_tc_int_011_wechat_forward_adapter_to_pipeline(self, db_session):
-        """TC-INT-011: WeChatForwardAdapter→Event创建→Pipeline处理端到端验证.
-
-        Use WeChatForwardAdapter to create event from WeChat forward data.
-        """
-        user_id = make_user_id()
-
-        # Sample WeChat forwarded message
-        wechat_text = """张三 10:30
-明天下午3点见面聊聊合作
-
-李四 10:32
-好的，我准备一下资料"""
-
-        # Use WeChatForwardAdapter to parse
-        adapter = WeChatForwardAdapter()
-        event = adapter.parse_forwarded_message(wechat_text, user_id=user_id)
-
-        # Verify parsed event
-        assert event.source == "wechat_forward"
-        assert event.event_type == "wechat_forward"
-        assert "张三" in event.title
-        assert event.raw_text == wechat_text
-        assert event.metadata_.get("speakers") == ["张三", "李四"]
-        assert event.metadata_.get("message_count") == 2
-
-        # Persist event to DB (simulating pipeline ingestion)
-        event.id = str(uuid.uuid4())
-        db_session.add(event)
-        await db_session.commit()
-
-        # Verify event was created
-        result = await db_session.execute(select(Event).where(Event.id == event.id))
-        saved_event = result.scalar_one()
-        assert saved_event.source == "wechat_forward"
-        assert saved_event.metadata_.get("speakers") == ["张三", "李四"]
+    Note: TC-INT-010 (EmailAdapter) and TC-INT-011 (WeChatForwardAdapter) have
+    been migrated to PromiseLink-Pro repo along with the adapter implementations.
+    Only TC-INT-012 (CSV import) remains in the basic edition.
+    """
 
     @pytest.mark.asyncio
     async def test_tc_int_012_csv_import_batch_entity_creation(self, db_session):

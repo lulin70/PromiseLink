@@ -246,7 +246,7 @@ async def get_nudge_draft(
     Never auto-sends; only generates a draft for user review.
     """
     from promiselink.config import get_settings
-    from promiselink.services.nlg_service import generate_gentle_nudge
+    from promiselink.services.nudge_generator import generate_gentle_nudge
 
     new_request_id()
 

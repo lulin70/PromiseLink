@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, type ChangeEvent } from 'react'
 import { View, Text, Textarea, Button, Picker, Input } from '@tarojs/components'
 import {
   createEvent, uploadEventFile, getEventDetail, getPendingConfirmations,
@@ -47,6 +47,7 @@ export default function InputPage() {
   const [error, setError] = useState('')
   const [result, setResult] = useState<EventCreateResponse | null>(null)
   const [polling, setPolling] = useState(false)
+  const [pollTimeout, setPollTimeout] = useState(false)
   const [eventDetail, setEventDetail] = useState<EventDetail | null>(null)
   // F-E1: Confirmation state
   const [pendingConfirmations, setPendingConfirmations] = useState<ConfirmationItem[]>([])
@@ -110,6 +111,11 @@ export default function InputPage() {
   // stale responses are discarded; mountedRef prevents setState after unmount.
   const pollRef = useRef(0)
   const mountedRef = useRef(true)
+  // P2: max polling attempts to avoid infinite polling (60 * 2s = 2 minutes)
+  const pollCountRef = useRef(0)
+  const MAX_POLL_ATTEMPTS = 60
+  // Native file input ref (Taro H5 does not support chooseMessageFile)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Poll for pipeline completion
   const pollEventDetail = useCallback(async (eventId: string) => {
@@ -165,7 +171,19 @@ export default function InputPage() {
   useEffect(() => {
     if (!polling || !result) return
 
+    // Reset poll counter and timeout state for a new polling session
+    pollCountRef.current = 0
+    setPollTimeout(false)
+
     const timer = setInterval(async () => {
+      // P2: stop polling after MAX_POLL_ATTEMPTS to avoid infinite loop
+      pollCountRef.current += 1
+      if (pollCountRef.current >= MAX_POLL_ATTEMPTS) {
+        clearInterval(timer)
+        setPolling(false)
+        setPollTimeout(true)
+        return
+      }
       const done = await pollEventDetail(result.id)
       if (done) {
         clearInterval(timer)
@@ -191,6 +209,7 @@ export default function InputPage() {
       setEventDetail(null)
       setParsedDetail(null)
       setCorrected(false)
+      setPollTimeout(false)
 
       if (isRecordMode && scheduledEventId) {
         const res = await recordScheduledEvent(scheduledEventId, {
@@ -228,22 +247,47 @@ export default function InputPage() {
     }
   }
 
-  async function handleFileUpload() {
-    try {
-      const chooseRes = await Taro.chooseMessageFile({
-        count: 1,
-        type: 'file',
-        extension: ['.txt', '.md'],
-      })
-      const file = chooseRes.tempFiles[0]
-      setSelectedFile(file.name)
+  function handleFileUpload() {
+    // Trigger native file input click (Taro H5 does not support chooseMessageFile)
+    fileInputRef.current?.click()
+  }
 
+  async function handleFileSelected(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Reset input value to allow selecting the same file again
+    if (fileInputRef.current) fileInputRef.current.value = ''
+
+    // Validate extension
+    const ext = file.name.toLowerCase().split('.').pop()
+    if (ext !== 'txt' && ext !== 'md') {
+      setError('仅支持 .txt 和 .md 格式文件')
+      return
+    }
+
+    // Validate size (1MB)
+    if (file.size > 1_048_576) {
+      setError('文件大小超过 1MB 限制')
+      return
+    }
+
+    if (file.size === 0) {
+      setError('文件不能为空')
+      return
+    }
+
+    try {
+      setSelectedFile(file.name)
       setLoading(true)
       setError('')
       setResult(null)
       setEventDetail(null)
+      setParsedDetail(null)
+      setCorrected(false)
+      setPollTimeout(false)
 
-      const res = await uploadEventFile(file as unknown as File, EVENT_TYPES[eventType].value)
+      const res = await uploadEventFile(file, EVENT_TYPES[eventType].value)
       setResult(res)
       setSelectedFile(null)
 
@@ -253,7 +297,6 @@ export default function InputPage() {
       }
     } catch (err) {
       setSelectedFile(null)
-      if (err instanceof Error && err.message.includes('cancel')) return
       setError(err instanceof Error ? err.message : '文件上传失败')
     } finally {
       setLoading(false)
@@ -489,6 +532,13 @@ export default function InputPage() {
             {inputMode === 'file' && (
               <View className='form-section'>
                 <Text className='section-label'>上传文件</Text>
+                <input
+                  ref={fileInputRef}
+                  type='file'
+                  accept='.txt,.md'
+                  style={{ display: 'none' }}
+                  onChange={handleFileSelected}
+                />
                 <View className='file-upload-area' onClick={handleFileUpload}>
                   {selectedFile ? (
                     <View className='file-selected'>
@@ -591,6 +641,13 @@ export default function InputPage() {
             {polling && (
               <View className='polling-indicator'>
                 <Text className='polling-text'>🔄 正在处理，请稍候...</Text>
+              </View>
+            )}
+
+            {/* P2: Polling timeout notice */}
+            {pollTimeout && !polling && (
+              <View className='polling-indicator'>
+                <Text className='polling-text'>⚠️ 处理时间较长，请稍后在列表中查看结果</Text>
               </View>
             )}
 

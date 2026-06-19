@@ -2640,23 +2640,12 @@ class TestMainAppAdditional:
         assert body["error"]["code"] == "INTERNAL_ERROR"
 
     @pytest.mark.asyncio
-    async def test_track_task(self):
-        """_track_task adds task to pending set and removes on done."""
-        import asyncio
+    async def test_pending_tasks_set_exists(self):
+        """_pending_tasks set exists for tracking background tasks."""
+        from promiselink.main import _pending_tasks
 
-        from promiselink.main import _pending_tasks, _track_task
-
-        async def dummy():
-            pass
-
-        task = asyncio.create_task(dummy())
-        _track_task(task)
-        assert task in _pending_tasks
-
-        # Wait for task to complete
-        await task
-        # The done callback should have removed it
-        assert task not in _pending_tasks
+        # _pending_tasks is a set used to track asyncio tasks for graceful shutdown.
+        assert isinstance(_pending_tasks, set)
 
     @pytest.mark.asyncio
     async def test_signal_handler(self):

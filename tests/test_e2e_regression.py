@@ -24,7 +24,6 @@ from promiselink.models.entity import Entity
 from promiselink.models.event import Event
 from promiselink.models.todo import Todo
 from promiselink.services.data_source_adapter import (
-    EmailAdapter,
     ManualAdapter,
     WeChatAdapter,
     get_adapter,
@@ -255,9 +254,6 @@ async def test_e2e_data_source_adapter_manual():
 @pytest.mark.asyncio
 async def test_e2e_data_source_adapter_registry():
     """E2E: Adapter registry returns correct adapters."""
-    email = get_adapter("email")
-    assert isinstance(email, EmailAdapter)
-
     wechat = get_adapter("wechat")
     assert isinstance(wechat, WeChatAdapter)
 

@@ -2,7 +2,11 @@ import { PropsWithChildren, useEffect, useState } from 'react'
 import { View, Text } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { getEventDetail } from './services/api'
+import { isLoggedIn } from './services/auth'
+import Guide from './components/Guide/Guide'
 import './app.scss'
+
+const GUIDE_STORAGE_KEY = 'guide_shown'
 
 // Desktop navigation items (mirrors tabBar config in app.config.ts)
 const NAV_ITEMS = [
@@ -166,6 +170,7 @@ function DesktopDetailBar() {
 
 function App({ children }: PropsWithChildren) {
   const isDesktop = useIsDesktop()
+  const [guideVisible, setGuideVisible] = useState(false)
 
   // Hide native TabBar on desktop, show on mobile
   useEffect(() => {
@@ -180,6 +185,51 @@ function App({ children }: PropsWithChildren) {
     }
   }, [isDesktop])
 
+  // Show first-time guide once logged in (token present) and not shown before.
+  // Token is written by child pages (login), so we poll until login is detected
+  // or until we find the guide was already completed.
+  useEffect(() => {
+    if (guideVisible) return
+
+    let active = true
+    let interval: ReturnType<typeof setInterval> | null = null
+
+    function shouldKeepPolling(): boolean {
+      if (!active) return false
+      let shown = false
+      try {
+        shown = !!Taro.getStorageSync(GUIDE_STORAGE_KEY)
+      } catch {
+        shown = false
+      }
+      if (shown) return false
+      if (isLoggedIn()) {
+        setGuideVisible(true)
+        return false
+      }
+      return true
+    }
+
+    if (!shouldKeepPolling()) {
+      return () => { active = false }
+    }
+
+    interval = setInterval(() => {
+      if (!shouldKeepPolling() && interval) {
+        clearInterval(interval)
+      }
+    }, 800)
+
+    return () => {
+      active = false
+      if (interval) clearInterval(interval)
+    }
+  }, [guideVisible])
+
+  function handleGuideClose() {
+    setGuideVisible(false)
+  }
+
   return (
     <View className={`pl-app ${isDesktop ? 'pl-desktop' : ''}`}>
       {isDesktop && <DesktopSidebar />}
@@ -187,6 +237,7 @@ function App({ children }: PropsWithChildren) {
         {children}
       </View>
       {isDesktop && <DesktopDetailBar />}
+      <Guide visible={guideVisible} onClose={handleGuideClose} />
     </View>
   )
 }

@@ -3,7 +3,6 @@
 from promiselink.services.association_discovery import AssociationDiscoveryEngine
 from promiselink.services.data_source_adapter import (
     DataSourceAdapter,
-    EmailAdapter,
     ManualAdapter,
     RawEvent,
     WeChatAdapter,
@@ -35,10 +34,12 @@ from promiselink.services.steps.context import PipelineResult
 from promiselink.services.todo_generator import GeneratedTodo, TodoGenerator
 from promiselink.services.todo_state_machine import TodoStateMachine
 
+# Note: EmailAdapter is Pro-only (email_adapter.py migrated to PromiseLink-Pro).
+# Pro edition registers it lazily via register_adapter().
+
 __all__ = [
     "AssociationDiscoveryEngine",
     "DataSourceAdapter",
-    "EmailAdapter",
     "ManualAdapter",
     "RawEvent",
     "WeChatAdapter",

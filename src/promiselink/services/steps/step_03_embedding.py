@@ -20,8 +20,8 @@ class Step03_SemanticEmbedding(PipelineStep):
 
     async def execute(self, context: PipelineContext) -> PipelineContext:
         from promiselink.database import AsyncSessionLocal
-        from promiselink.services.embedding_provider import EmbeddingProvider
-        from promiselink.services.semantic_search import SemanticSearchEngine
+        from promiselink.services.embedding_provider import get_shared_provider
+        from promiselink.services.semantic_search import get_shared_engine
 
         event_id = context.event_id
         entities = context.entities
@@ -29,8 +29,8 @@ class Step03_SemanticEmbedding(PipelineStep):
 
         _t55 = time.monotonic()
         try:
-            embedder = EmbeddingProvider()
-            search_engine = SemanticSearchEngine(provider=embedder)
+            embedder = await get_shared_provider()
+            search_engine = await get_shared_engine(provider=embedder)
 
             for entity in entities:
                 try:

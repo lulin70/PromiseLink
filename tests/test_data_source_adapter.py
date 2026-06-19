@@ -4,13 +4,14 @@ import pytest
 
 from promiselink.services.data_source_adapter import (
     DataSourceAdapter,
-    EmailAdapter,
     ManualAdapter,
     RawEvent,
     WeChatAdapter,
     get_adapter,
     register_adapter,
 )
+
+# Note: EmailAdapter tests are in PromiseLink-Pro repo (email_adapter.py migrated).
 
 
 class TestRawEvent:
@@ -87,30 +88,6 @@ class TestManualAdapter:
         assert result is True
 
 
-class TestEmailAdapter:
-    """Test EmailAdapter — now delegates to full implementation."""
-
-    @pytest.mark.asyncio
-    async def test_email_adapter_source_type(self):
-        """Verify EmailAdapter.source_type returns 'email'."""
-        adapter = EmailAdapter()
-        assert adapter.source_type == "email"
-
-    @pytest.mark.asyncio
-    async def test_email_adapter_fetch_returns_empty_when_not_connected(self):
-        """Verify EmailAdapter.fetch_new_events returns empty list when not connected."""
-        adapter = EmailAdapter()
-        events = await adapter.fetch_new_events()
-        assert events == []
-
-    @pytest.mark.asyncio
-    async def test_email_adapter_acknowledge_returns_false_when_not_connected(self):
-        """Verify EmailAdapter.acknowledge returns False when not connected."""
-        adapter = EmailAdapter()
-        result = await adapter.acknowledge("msg_123")
-        assert result is False
-
-
 class TestWeChatAdapter:
     """Test WeChatAdapter PoC skeleton."""
 
@@ -140,9 +117,6 @@ class TestAdapterRegistry:
 
     def test_get_adapter_returns_correct_type(self):
         """Verify get_adapter returns the correct adapter type."""
-        email = get_adapter("email")
-        assert isinstance(email, EmailAdapter)
-
         wechat = get_adapter("wechat")
         assert isinstance(wechat, WeChatAdapter)
 
@@ -151,9 +125,9 @@ class TestAdapterRegistry:
 
     def test_get_adapter_with_config(self):
         """Verify get_adapter passes config to adapter."""
-        config = {"imap_host": "imap.example.com"}
-        adapter = get_adapter("email", config=config)
-        assert isinstance(adapter, EmailAdapter)
+        config = {"foo": "bar"}
+        adapter = get_adapter("wechat", config=config)
+        assert isinstance(adapter, WeChatAdapter)
         assert adapter.config == config
 
     def test_get_adapter_unknown_type_raises(self):

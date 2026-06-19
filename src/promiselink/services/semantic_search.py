@@ -11,7 +11,7 @@ import sqlite3
 import struct
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Optional
 
 from promiselink.core.logging import get_logger
 from promiselink.services.embedding_provider import (
@@ -20,6 +20,50 @@ from promiselink.services.embedding_provider import (
 )
 
 logger = get_logger("promiselink.semantic_search")
+
+# ── Module-level singleton (reuses provider + sqlite-vec extension load) ──
+_shared_engine: Optional["SemanticSearchEngine"] = None
+_engine_lock = asyncio.Lock()
+
+
+async def get_shared_engine(provider: EmbeddingProvider | None = None) -> "SemanticSearchEngine":
+    """Get or create the module-level shared SemanticSearchEngine.
+
+    Reuses a single engine across all pipeline executions, avoiding
+    repeated sqlite-vec extension loads and table initialization.
+
+    Args:
+        provider: Optional EmbeddingProvider. If the engine already
+            exists, this is ignored. If creating a new engine and
+            provider is None, the shared EmbeddingProvider is used.
+
+    Returns:
+        The shared SemanticSearchEngine instance.
+    """
+    global _shared_engine
+    if _shared_engine is None:
+        async with _engine_lock:
+            # Double-check after acquiring the lock
+            if _shared_engine is None:
+                if provider is None:
+                    from promiselink.services.embedding_provider import get_shared_provider
+                    provider = await get_shared_provider()
+                _shared_engine = SemanticSearchEngine(provider=provider)
+                logger.info("shared_semantic_search_engine_created")
+    return _shared_engine
+
+
+async def close_shared_engine() -> None:
+    """Close the shared SemanticSearchEngine. Call on app shutdown.
+
+    The engine opens a fresh sqlite connection per operation (no
+    persistent connection to close), so this primarily resets the
+    singleton reference to allow garbage collection.
+    """
+    global _shared_engine
+    if _shared_engine is not None:
+        _shared_engine = None
+        logger.info("shared_semantic_search_engine_closed")
 
 
 @dataclass

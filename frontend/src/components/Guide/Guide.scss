@@ -1,0 +1,151 @@
+// First-time user guide overlay — Morandi color palette
+// 雾蓝灰主色 #7B9EA8 / 米白背景 #F5F0EB / 深灰标题 #3D4E56 / 中灰正文 #6B7C85
+
+.pl-guide-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.pl-guide-card {
+  background: #ffffff;
+  border-radius: 12px;
+  max-width: 480px;
+  width: 100%;
+  padding: 28px 28px 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.pl-guide-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+
+  .pl-guide-step-label {
+    font-size: 13px;
+    color: #9AA8AE;
+    letter-spacing: 0.5px;
+  }
+
+  .pl-guide-skip {
+    font-size: 13px;
+    color: #9AA8AE;
+    cursor: pointer;
+    padding: 4px 8px;
+
+    &:hover {
+      color: #6B7C85;
+    }
+  }
+}
+
+.pl-guide-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+
+  .pl-guide-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: #3D4E56;
+    line-height: 1.4;
+  }
+
+  .pl-guide-text {
+    font-size: 15px;
+    color: #6B7C85;
+    line-height: 1.7;
+  }
+
+  .pl-guide-hint {
+    font-size: 13px;
+    color: #8A9AA1;
+    line-height: 1.6;
+    background: #F5F0EB;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-top: 4px;
+  }
+}
+
+.pl-guide-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 24px;
+
+  .pl-guide-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #D8D2CB;
+    transition: all 0.2s;
+
+    &.active {
+      background: #7B9EA8;
+      width: 20px;
+      border-radius: 4px;
+    }
+  }
+}
+
+.pl-guide-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.pl-guide-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 96px;
+
+  .pl-guide-btn-text {
+    font-size: 14px;
+    font-weight: 500;
+  }
+}
+
+.pl-guide-btn-primary {
+  background: #7B9EA8;
+
+  .pl-guide-btn-text {
+    color: #ffffff;
+  }
+
+  &:hover {
+    background: #5B838F;
+  }
+}
+
+.pl-guide-btn-ghost {
+  background: transparent;
+  border: 1px solid #D8D2CB;
+
+  .pl-guide-btn-text {
+    color: #6B7C85;
+  }
+
+  &:hover {
+    background: #F5F0EB;
+  }
+}

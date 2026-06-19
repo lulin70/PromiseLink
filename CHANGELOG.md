@@ -2,6 +2,41 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [0.6.0] - 2026-06-18
+
+### Added — Phase 2专业版代码迁移+文件上传修复+内存泄漏修复+UI引导
+- **专业版代码迁移到PromiseLink-Pro repo**: 86个文件迁移(54 gateway + 8 pro-services + 7 pro-api + 10 pro-tests + 1 pro-migration + 4 根目录配置), 基础版repo不再包含专业版源码
+- **基础版UI首次使用引导**: 4步引导组件(欢迎/三栏布局/记录交流/AI解析), localStorage记录引导状态, 莫兰迪色系
+- **小程序首次使用引导**: 3步引导组件(欢迎/核心功能/开始记录), Taro Storage API跨端兼容
+- **nudge_generator.py**: 从nlg_service.py提取generate_gentle_nudge函数到基础版, 保持promises.py催促功能自包含
+
+### Changed — 专业版代码从基础版repo移除
+- **删除27个专业版文件**: 8个服务模块(asr/tts/ocr/nlu_intent/nlg/voice_query/email_adapter/wechat_forward_adapter) + 7个API路由(voice/voice_query/media/email_sync/wechat_forward/import_csv/privacy) + 10个测试 + voice_session模型 + voice_sessions迁移
+- **删除gateway/目录**: 54个文件完整迁移到PromiseLink-Pro/gateway/
+- **删除2个专业版E2E测试**: test_pro_edition_e2e.py + test_pro_security.py (依赖gateway模块)
+- **main.py**: 移除APP_EDITION=='pro'路由注册块, 移除_track_task死代码
+- **models/__init__.py**: 移除VoiceSession/VoiceTurn/VoiceAnalytics导入
+- **services/__init__.py**: 移除EmailAdapter导入和导出
+- **data_source_adapter.py**: 移除EmailAdapter导入和注册, Pro版通过register_adapter()懒加载
+- **alembic迁移链**: a1b2c3d4e5f6的down_revision从538083639032改为4ff9b21a03b0(跳过voice_sessions)
+- **promises.py**: generate_gentle_nudge导入从nlg_service改为nudge_generator
+- **test_data_source_adapter.py / test_e2e_regression.py / test_integration_supplement.py / test_coverage_boost.py**: 移除对已迁移专业版模块的引用
+
+### Fixed — 文件上传bug + 内存泄漏 + 性能问题
+- **文件上传H5兼容性修复**: Taro.chooseMessageFile在H5端永久不支持(permanentlyNotSupport), 改用浏览器原生<input type="file">, 修复用户点击上传后报错的问题
+- **EmbeddingProvider单例化(P0)**: 每次pipeline重新创建EmbeddingProvider导致sentence-transformers模型重复加载(数百MB内存), 改为模块级单例+get_shared_provider()+close_shared_provider()
+- **SemanticSearchEngine单例化(P0)**: 同样改为模块级单例, 复用sqlite-vec扩展加载和表初始化
+- **RelayClient关闭(P2)**: 添加close_relay_client()函数, 在main.py lifespan shutdown中调用
+- **EmbeddingProvider的AsyncOpenAI客户端关闭(P1)**: 添加close()方法
+- **前端polling轮询限制(P2)**: 添加MAX_POLL_ATTEMPTS=60(2分钟超时), 避免无限轮询
+- **step_03_embedding.py**: 使用get_shared_provider()/get_shared_engine()替代直接new
+
+### Test Results
+- ruff check: All checks passed
+- mypy: Success, no issues found in 102 source files
+- pytest: 1131 passed, 45 skipped (移除了专业版测试, 基础版测试全通过)
+- npm build:h5: webpack compiled with 7 warnings (无error)
+
 ## [0.5.5] - 2026-06-18
 
 ### Added — 宽屏UI+录入纠偏+详情页跳转+专业版一键安装+桥接监控

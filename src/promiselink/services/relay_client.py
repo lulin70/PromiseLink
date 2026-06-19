@@ -937,3 +937,58 @@ def create_relay_client_from_settings(
         timeout=getattr(settings, "llm_timeout", 60),
         max_retries=getattr(settings, "llm_max_retries", 3),
     )
+
+
+# ── Module-level singleton management ──────────────────────────────
+
+_shared_client: RelayClient | None = None
+_client_lock = asyncio.Lock()
+
+
+async def get_shared_relay_client(settings: Any = None) -> RelayClient:
+    """Get or create the module-level shared RelayClient.
+
+    Reuses a single RelayClient (and its httpx connection pool) across
+    the application lifecycle. The client is lazily created from
+    settings on first access.
+
+    Args:
+        settings: Optional settings object. Only used on first creation;
+            subsequent calls ignore this argument. If None on first
+            creation, application settings are loaded.
+
+    Returns:
+        The shared RelayClient instance.
+
+    Raises:
+        ValueError: If relay is not configured (no gateway URL or
+            license key) on first creation.
+    """
+    global _shared_client
+    if _shared_client is None:
+        async with _client_lock:
+            # Double-check after acquiring the lock
+            if _shared_client is None:
+                if settings is None:
+                    from promiselink.config import get_settings
+                    settings = get_settings()
+                _shared_client = create_relay_client_from_settings(settings)
+                logger.info("shared_relay_client_created")
+    return _shared_client
+
+
+async def close_relay_client() -> None:
+    """Close the shared RelayClient. Call on app shutdown.
+
+    Closes the underlying httpx connection pool and resets the
+    singleton. Safe to call even if no client was created.
+    """
+    global _shared_client
+    if _shared_client is not None:
+        try:
+            await _shared_client.close()
+        except Exception as e:
+            logger.warning("relay_client_close_error", error=str(e))
+        finally:
+            _shared_client = None
+            logger.info("shared_relay_client_closed")

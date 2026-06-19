@@ -8,7 +8,9 @@ from promiselink.models.reminder import ReminderLog, ReminderPreference
 from promiselink.models.scheduled_event import ScheduledEvent
 from promiselink.models.score_audit_log import ScoreAuditLog
 from promiselink.models.todo import SnoozeSchedule, Todo
-from promiselink.models.voice_session import VoiceAnalytics, VoiceSession, VoiceTurn
+
+# VoiceSession/VoiceTurn/VoiceAnalytics models are Pro-only
+# (see docs/architecture/Repo_Split_Decision.md §5.2).
 
 __all__ = [
     "Event",
@@ -21,7 +23,4 @@ __all__ = [
     "ReminderLog",
     "ScheduledEvent",
     "ScoreAuditLog",
-    "VoiceSession",
-    "VoiceTurn",
-    "VoiceAnalytics",
 ]
