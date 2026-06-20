@@ -1,14 +1,15 @@
 # PromiseLink 产品需求文档 (PRD)
 
-> **版本**: v5.6
+> **版本**: v5.7
 > **日期**: 2026-06-20
-> **状态**: v5.6 录入纠偏增强（内联纠偏+Undo+承诺添加，§5.18升至8小节）
+> **状态**: v5.7 仓库策略修订（三仓库独立：PromiseLink + PromiseLink-Pro + PromiseLink-miniapp）
 > **负责人**: CarryMem 团队
 > **变更说明**: v5.0: 新增F-67关系推进卡前端对接+F-68 Promise兑现状态追踪+F-69智能跟进提醒，增强F-45兑现闭环+F-50语音管家快捷指令，明确不做关系信用分/企业版团队协作(除非定制版)，基于brainstorm Top5用例+WorkBuddy关系推进卡补充+推广文承诺验证+DevSquad 7角色CONDITIONAL_PASS门禁
 > **v5.3变更说明**: ①新增§1.5.7 UI布局策略（基础版电脑宽屏三栏+专业版微信小程序手机竖屏单栏，两版UI完全独立）②新增§5.18录入事件画面设计与解析纠偏（大文本框+分区展示+人脉/关系/待办/承诺四类纠偏+确认提交）③新增§3.0.2功能重点与优先级（会后纪要→待办提醒→承诺跟进核心三件套，按生命周期推进，其他为辅助）④新增§5.8.4详情页跳转设计（事件/人脉/待办/承诺四类详情页互相跳转）⑤更新§1.5.3专业版一键安装流程（下载小程序→微信授权→输入邀请码→激活→使用，无需API Key配置）+桥接监控（网关记录Token/次数/费用）+降级策略⑥更新§1.5.6 repo分开策略（基础版公开仓库PromiseLink+专业版私有仓库PromiseLink-Pro）
 > **v5.4变更说明**: ①B8 补充§5.3 Promise数据模型定义（逻辑视图，复用todos表）②B9 补充§5.18.6录入纠偏API契约（POST /events/{event_id}/correct）③I1 定价统一为¥29/月(早鸟)/¥49/月(常规)，消除"待定"和"PoC验证后定价"④I2 仓库名统一为PromiseLink(基础版)+PromiseLink-Pro(专业版)，基础版仓库统一命名为PromiseLink，miniapp合并到PromiseLink-Pro/miniapp/⑤I9 Repo_Split_Decision.md补充§7 AGPL v3法律合规分析⑥I10 edition_architecture.md补充§6 UI架构⑦I11 §1.5.3新增7天免费试用机制⑧I12 §1.5.3b新增网关宕机补偿机制
 > **v5.5变更说明**: ①新增§1.8 MVP策略决策（打法B确认：专业版早鸟¥29/月MVP，语音录入为核心入口，三个场景闭环）②更新§3.0.2明确打法B=MVP范围（会后记录+待办提醒+承诺跟进，语音录入P0）③更新F-10语音录入优先级为P0（MVP核心，非Phase 1扩展）④排除功能清单：care/risk/cooperation_signal三种Todo移入Phase 2，MVP仅保留promise/followup两种）
 > **v5.6变更说明**: ①§5.18.2解析结果展示增强：承诺区新增[+添加承诺]按钮+内联纠偏视觉提示（下划线可点击）②新增§5.18.3纠偏5：承诺添加（+添加承诺纠偏）③新增§5.18.7内联纠偏交互设计（点击文本直接纠偏，替代弹表单）④新增§5.18.8全局撤销Undo设计（每步纠偏支持撤销，含小程序适配）⑤更新§5.18.6录入纠偏API契约：corrected_promises支持add动作
+> **v5.7变更说明**: §1.5.6a更新为三仓库独立策略（PromiseLink基础版公开AGPL v3 + PromiseLink-Pro专业版私有商业License + PromiseLink-miniapp小程序私有商业License），撤销v5.4中"PromiseLink-miniapp合并到PromiseLink-Pro/miniapp/目录"的决策，小程序代码独立仓库维护。同步更新Deployment_Guide.md小程序编译路径
 
 ***
 
@@ -628,14 +629,15 @@ Docker如何"知道"用户买了专业版：
 
 #### 1.5.6a Repo分开策略（v5.3新增）
 
-> **决策**：基础版与专业版代码仓库物理分离，两个独立GitHub仓库，不共享代码库。基础版公开开源，专业版私有闭源。
+> **决策**：基础版、专业版、微信小程序代码仓库物理分离，三个独立GitHub仓库，不共享代码库。基础版公开开源，专业版与小程序私有闭源。
 
 **仓库划分**：
 
 | 仓库 | 可见性 | 内容 | License | 目标用户 |
 |------|--------|------|---------|----------|
 | `PromiseLink` | 🌐 公开 | 基础版全部代码（管线+实体+Todo+Promise+关联+Docker+H5+适配器） | AGPL v3 | 技术用户/自托管/开源社区 |
-| `PromiseLink-Pro` | 🔒 私有 | 专业版增量代码（网关+小程序+语音云端+图谱融合+一键安装+计费） | 商业License | 付费用户/许总们 |
+| `PromiseLink-Pro` | 🔒 私有 | 专业版增量代码（网关+语音云端+图谱融合+一键安装+计费） | 商业License | 付费用户/许总们 |
+| `PromiseLink-miniapp` | 🔒 私有 | 微信小程序（Taro 手机竖屏版，独立 UI） | 商业License | 专业版小程序用户 |
 
 **为什么物理分开而非单仓库多分支**：
 
@@ -666,11 +668,15 @@ GitHub组织: promiselink
 │
 ├── promiselink-pro (🔒 私有, 商业License) — 专业版仓库
 │   ├── gateway/               # 中继网关
-│   ├── miniapp/               # 微信小程序（原 PromiseLink-miniapp 已合并到此目录）
 │   ├── voice/                 # 语音云端模型
 │   ├── installer/             # 一键安装包
 │   ├── billing/               # 计费系统
 │   └── README.md              # 内部文档
+│
+├── promiselink-miniapp (🔒 私有, 商业License) — 微信小程序独立仓库
+│   ├── src/                   # Taro 小程序源码（手机竖屏版）
+│   ├── docs/design/screens/   # 手机版设计稿
+│   └── README_DEV.md          # 开发指南
 │
 ├── promiselink-contracts (🌐 公开, MIT)
 │   ├── schemas/               # API Schema (Pydantic/JSON Schema)
@@ -4144,6 +4150,7 @@ AI推断关系 → 展示推断结果 + 置信度
 | v5.2 | 2026-06-11 | 专业版AI路径一致性+基础版Open Core开源策略：①§1.5.3专业版AI调用路径更新为三种场景（纯基础版离线/专业版浏览器云端AI/专业版小程序云端AI），确保专业用户无论访问方式均走云端AI，体验一致②§1.5.3新增专业版身份验证流程（JWT+网关验证+隐私声明）③新增§1.5.6基础版开源策略（Open Core）：开源PromiseLink（13步管线+实体提取+记忆+Todo+Promise+关联发现+Docker+H5+适配器），闭源PromiseLink Pro（网关+小程序+语音云端+图谱融合+定制版），License选AGPL v3，开源节奏M1-M2私有分发→M3-M4开源+Product Hunt/Hacker News | PromiseLink团队 |
 | v5.3 | 2026-06-18 | 用户7项新需求融合修订版：**①Repo分开**：新增§1.5.6a Repo分开策略（基础版公开仓库PromiseLink AGPL v3 + 专业版私有仓库PromiseLink-Pro商业License，物理分开而非单仓库多分支，共享协议层promiselink-contracts+工具层promiselink-utils MIT License）。**②UI布局策略**：新增§1.5.7 UI布局策略（基础版电脑宽屏三栏布局min-width 1024px左侧导航200px+中间内容自适应+右侧详情360px；专业版微信小程序手机竖屏375px单栏滚动；两版UI完全独立不共享样式/组件库/布局逻辑，仅共享API+数据模型+业务逻辑）。**③录入事件画面+解析纠偏**：新增§5.18录入事件画面设计与解析纠偏（5子节：录入画面布局基础版宽屏+专业版竖屏/解析结果分区显示人脉关系待办承诺四类/四类纠偏功能人脉多候选选择+关系AI推断可改+待办编辑删除添加+承诺确认忽略修改/确认提交流程校验+摘要+写入数据库/纠偏数据反馈闭环）。**④功能重点调整**：新增§3.0.2功能重点与优先级（核心三件套按生命周期推进：会后纪要→待办提醒→承诺跟进，P0最高优先级占研发资源70%；人脉管理/日程/仪表盘等辅助功能P1-P2占25%；按生命周期推进设计含义：录入即解析/待办即提醒/承诺即跟踪/推进即闭环）。**⑤详情页跳转**：新增§5.8.4详情页跳转设计（事件/人脉/待办/承诺四类详情页互相跳转形成关系网络导航，每类详情页展示3类关联+跳转入口，跳转逻辑navigateTo+navigateBack，最大跳转深度5层，基础版右侧详情区切换vs专业版跳转新页面）。**⑥专业版一键安装+桥接监控**：新增§1.5.3a专业版一键安装流程（5步：下载小程序→微信授权→输入邀请码→激活本地Docker→开始使用，无需API Key配置，邀请码6位一码一用户有效期30天）+§1.5.3b桥接监控与用量计费（8项监控指标request_count/token_input/token_output/token_total/estimated_cost/relay_latency_p95/error_count/active_days，3档计费套餐，5种降级策略，运营监控看板）。**⑦按生命周期推进**：融入§3.0.2功能重点，关系生命周期见面→记录→提醒→兑现→推进驱动核心三件套设计 | PromiseLink团队 |
 | v5.4 | 2026-06-18 | 文档一致性修订版（8项）：**①B8** §5.3补充Promise数据模型定义（逻辑视图复用todos表，说明Promise与Todo关系）**②B9** §5.18.6补充录入纠偏API契约（POST /events/{event_id}/correct，人脉/待办/承诺三类纠偏）+Pro_Edition_Tech_Design_Phase0.md §4.4补充中继业务接口示例**③I1** 定价统一为¥29/月(早鸟价)/¥49/月(常规价)，消除所有"待定"和"PoC验证后定价"**④I2** 仓库名统一为PromiseLink(基础版)+PromiseLink-Pro(专业版)，基础版仓库统一命名为PromiseLink，PromiseLink-miniapp合并到PromiseLink-Pro/miniapp/目录**⑤I9** Repo_Split_Decision.md补充§7 AGPL v3法律合规分析（pip安装不传染/submodule传染/推荐pip方案/免责声明）**⑥I10** edition_architecture.md补充§6 UI架构（基础版宽屏H5+专业版竖屏小程序，代码组织/构建流程/部署差异）**⑦I11** §1.5.3新增7天免费试用机制（无需付费需注册，每日100次AI调用，试用结束引导¥29/月早鸟价）**⑧I12** §1.5.3b新增网关宕机补偿机制（4h延1天/24h延7天+邮件/月度<99.5%减半，admin监控自动触发） | PromiseLink团队 |
+| v5.7 | 2026-06-20 | 仓库策略修订：§1.5.6a更新为三仓库独立策略（PromiseLink基础版公开AGPL v3 + PromiseLink-Pro专业版私有商业License + PromiseLink-miniapp小程序私有商业License），撤销v5.4中"PromiseLink-miniapp合并到PromiseLink-Pro/miniapp/目录"的决策，小程序代码独立仓库维护。同步更新Deployment_Guide.md小程序编译路径 | PromiseLink团队 |
 
 ### 7角色评审共识整合清单
 

@@ -2,7 +2,7 @@
 
 > **Slogan**: 让每一次连接，都更有价值
 >
-> **项目状态**: PoC 验收通过 | 基础版内部灰度就绪 | 1319+ 测试全通过 | 67% 覆盖率 | 成熟度92/100
+> **项目状态**: v0.6.3 基础版内部灰度就绪 | 1353+ 测试全通过 | 72% 覆盖率 | mypy 0错误 | 成熟度92/100
 >
 > **定位**: 先成就关系，再促成合作 — 利他切入的个人商务关系经营系统
 >
@@ -118,9 +118,9 @@ PromiseLink/
 
 ### 核心文档
 
-- [PRD v5.2](docs/spec/PRD_v1.md) - 产品需求文档
+- [PRD v5.7](docs/spec/PRD_v1.md) - 产品需求文档
 - [技术设计 v3.2](docs/architecture/PromiseLink_技术设计_v1.md) - 完整技术方案
-- [项目状态](docs/PROJECT_STATUS.md) - 11阶段生命周期跟踪（55%完成）
+- [项目状态](docs/PROJECT_STATUS.md) - 11阶段生命周期跟踪
 - [QUICKSTART](QUICKSTART.md) - 快速开始指南（含配置参考和FAQ）
 - [Setup指南](docs/deliverables/README_SETUP.md) - 安装说明（指向QUICKSTART）
 
@@ -129,10 +129,11 @@ PromiseLink/
 - [数据库设计 v3.0](docs/design/Database_Design_v1.md)
 - [API设计 v3.1](docs/design/API_Design_v1.md)
 - [算法设计 v2.8](docs/design/Algorithm_Design_v1.md)
-- [安全设计 v3.1](docs/design/Security_Design_v1.md)
 - [测试计划 v5.1](docs/design/Test_Plan_v1.md)
 - [集成设计 v2.9](docs/design/Integration_Design_v1.md)
 - [部署指南 v0.5.0](docs/design/Deployment_Guide.md)
+
+> 安全设计文档（Security_Design 系列、THREAT_MODEL）已随专业版迁移至 [PromiseLink-Pro](https://github.com/lulin70/PromiseLink-Pro) 私有仓库。
 
 ## 当前进度
 
@@ -147,7 +148,7 @@ PromiseLink/
 - [x] DataSourceAdapter抽象层（手动/CSV；语音/微信/邮件为专业版功能）
 - [x] CarryMem协议解耦（NullMemoryProvider优雅降级）
 - [x] 加密体系（HMAC-SHA256 + 字段级加密 + 行级安全）
-- [x] 63个测试文件 / **1319测试用例** (1210单元+42 E2E+50安全+17性能) / **67%覆盖率**
+- [x] 63个测试文件 / **1353测试用例** (含50个relay_client健壮性测试+12个v5.6纠偏测试) / **72%覆盖率**
 - [x] CI/CD + Alembic 就绪
 - [x] PoC Demo 4/4场景通过
 - [x] 一键安装/启动脚本（本地直接运行，无需Docker）
@@ -200,8 +201,8 @@ curl "http://localhost:8000/api/v1/entities/search?q=技术合作"
 
 | 指标       | 数值                                                               |
 | -------- | ---------------------------------------------------------------- |
-| 测试用例     | **1319 passed** (1210单元+42 E2E+50安全+17性能), 109 skipped, 0 failed |
-| 代码覆盖率    | **67%**                                                          |
+| 测试用例     | **1353 passed**, 45 skipped, 0 failed (含50个relay_client健壮性+12个v5.6纠偏+50安全+17性能) |
+| 代码覆盖率    | **72%**                                                          |
 | mypy类型检查 | **0错误** (116源文件全部通过)                                             |
 | ruff代码检查 | **0错误**                                                          |
 | 安全测试     | **50项全通过** (SQL注入/XSS/路径遍历/JWT/越权/输入验证/速率限制)                     |
@@ -209,18 +210,22 @@ curl "http://localhost:8000/api/v1/entities/search?q=技术合作"
 | API路由    | **26个路由文件 / 72个API端点**                                           |
 | 服务模块     | **38个**                                                          |
 | 数据模型     | **9个文件，11个模型类**                                                  |
-| 文档版本     | PRD v5.2 / Tech v3.2                                             |
-| 产品层级     | 基础版(本地免费) / 专业版(网关中继) / 定制版(团队)                                  |
-| 总体进度     | **85%**                                                          |
+| 文档版本     | PRD v5.7 / Tech v3.2                                             |
+| 软件版本     | v0.6.3                                                           |
+| 产品层级     | 基础版(本地免费) / 专业版(网关中继) / 小程序(手机竖屏) / 定制版(团队)                      |
+| 总体进度     | **92%**                                                          |
 
 ## 产品版本
 
-| 版本      | 定位         | 价格   | 部署方式                   |
-| ------- | ---------- | ---- | ---------------------- |
-| **基础版** | 本地免费，纯文本交互 | 免费   | 本地直接运行（无需Docker）       |
-| **定制版** | 销售团队协作，多租户 | 按需定制 | 云端Docker Compose + K8s |
+| 版本 | 仓库 | 定位 | 价格 | 部署方式 |
+|------|------|------|------|----------|
+| **基础版** | [PromiseLink](https://github.com/lulin70/PromiseLink) (🌐 公开 AGPL v3) | 本地免费，纯文本交互，电脑宽屏 | 免费 | 本地直接运行（无需Docker） |
+| **专业版** | [PromiseLink-Pro](https://github.com/lulin70/PromiseLink-Pro) (🔒 私有 商业License) | 云端AI网关+语音/邮件/OCR/隐私管理 | ¥29/月(早鸟) / ¥49/月(常规) | Docker + 云端网关 |
+| **小程序** | [PromiseLink-miniapp](https://github.com/lulin70/PromiseLink-miniapp) (🔒 私有 商业License) | 微信小程序，手机竖屏，专业版移动端 | 随专业版 | 微信小程序平台 |
+| **定制版** | (未公开) | 销售团队协作，多租户 | 按需定制 | 云端Docker Compose + K8s |
 
 > 基础版为纯文本交互，不包含语音功能和图片扫描功能。专业版依赖云端服务凭证。
+> 基础版通过 `relay_client` 可选连接专业版云端网关以使用云端 AI 能力（需专业版 License）。
 
 ## 团队
 

@@ -104,7 +104,7 @@ curl http://localhost:8000/api/v1/promises?view=my-promises \
 
 | 环境变量 | 默认值 | 说明 |
 |----------|--------|------|
-| `APP_EDITION` | `basic` | 版本：basic（基础版）或 pro（专业版） |
+| `APP_EDITION` | `basic` | 版本：仅 `basic`（基础版）。专业版为独立仓库 [PromiseLink-Pro](https://github.com/lulin70/PromiseLink-Pro)，需单独安装 |
 | `SECRET_KEY` | 自动生成 | JWT 签名密钥，生产环境必须配置 |
 | `POC_SECRET` | `promiselink2026` | PoC 登录密码 |
 | `LLM_PROVIDER` | `moka_ai` | LLM 提供商：moka_ai / openai / anthropic |
@@ -119,8 +119,8 @@ curl http://localhost:8000/api/v1/promises?view=my-promises \
 **Q: 启动报错 "secret_key must be changed"？**
 A: 非 development 环境必须设置 `SECRET_KEY`。生成方法：`python -c "import secrets; print(secrets.token_urlsafe(32))"`
 
-**Q: 如何切换到专业版？**
-A: 设置环境变量 `APP_EDITION=pro`，重启服务即可启用语音、邮件同步等专业功能。
+**Q: 如何使用专业版功能（语音/邮件同步/OCR等）？**
+A: 基础版（本仓库）不包含语音、邮件同步、OCR名片扫描等专业版功能，设置 `APP_EDITION=pro` 不会启用这些功能（相关模块已迁移至 PromiseLink-Pro 私有仓库）。如需使用专业版功能，请访问 [PromiseLink-Pro](https://github.com/lulin70/PromiseLink-Pro)（需授权）获取许可证密钥，并按专业版安装流程部署。
 
 **Q: 忘记 PoC 密码怎么办？**
 A: 在 `.env` 中修改 `POC_SECRET` 的值，重启服务生效。

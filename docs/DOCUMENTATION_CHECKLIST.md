@@ -1,7 +1,7 @@
 # PromiseLink 文档一致性检查清单
 
-> **更新时间**: 2026-06-09
-> **阶段**: Phase 1 前后端集成完成 (0.3.x) — 托管PoC部署就绪 + PoC准备度82/100
+> **更新时间**: 2026-06-20
+> **阶段**: v0.6.3 基础版内部灰度就绪 — 三仓库独立（PromiseLink + PromiseLink-Pro + PromiseLink-miniapp）
 > **目的**: 确认所有设计文档版本一致性，验证跨文档引用一致性
 
 ---
@@ -10,36 +10,34 @@
 
 | # | 文档 | 路径 | 当前版本 | 更新日期 | 状态 |
 |---|------|------|----------|----------|------|
-| 1 | **PRD** | `spec/PRD_v1.md` | **v5.2** | 2026-06-14 | ✅ 生效 |
+| 1 | **PRD** | `spec/PRD_v1.md` | **v5.7** | 2026-06-20 | ✅ 生效 |
 | 2 | **技术设计** | `architecture/PromiseLink_技术设计_v1.md` | **v3.2** | 2026-06-14 | ✅ 生效 |
 | 3 | **数据库设计** | `design/Database_Design_v1.md` | **v3.0** | 2026-06-14 | ✅ 生效 |
 | 4 | **API设计** | `design/API_Design_v1.md` | **v3.1** | 2026-06-14 | ✅ 生效 |
-| 5 | **安全设计** | `design/Security_Design_v1.md` | **v3.1** | 2026-06-14 | ✅ 生效 |
-| 6 | **安全威胁模型** | `design/Security_威胁模型.md` | **v3.0** | 2026-06-09 | ✅ 生效 |
-| 7 | **安全认证与API** | `design/Security_认证与API.md` | **v3.0** | 2026-06-09 | ✅ 生效 |
-| 8 | **安全数据保护与主权** | `design/Security_数据保护与主权.md` | **v3.0** | 2026-06-09 | ✅ 生效 |
-| 9 | **算法设计** | `design/Algorithm_Design_v1.md` | **v2.8** | 2026-06-08 | ✅ 生效 |
-| 10 | **测试计划** | `design/Test_Plan_v1.md` | **v5.1** | 2026-06-14 | ✅ 生效 |
-| 11 | **LLM Prompt模板** | `design/LLM_Prompt_Templates.md` | **0.4.1** | 2026-06-08 | ✅ 生效 |
-| 12 | **集成设计** | `design/Integration_Design_v1.md` | **v2.9** | 2026-06-09 | ✅ 生效 |
-| 13 | **部署指南** | `design/Deployment_Guide.md` | **v0.5.0** | 2026-06-14 | ✅ 生效 |
-| 14 | **UI/UX设计** | `design/UI_UX_Design_v1.md` | **v3.1** | 2026-06-14 | ✅ 生效 |
-| 15 | **规格说明README** | `spec/README.md` | **v5.2** | 2026-06-14 | ✅ 同步 |
-| 16 | **项目状态** | `PROJECT_STATUS.md` | **已同步** | 2026-06-14 | ✅ 最新 |
-| 17 | **托管PoC Docker Compose** | `docker-compose.hosted-poc.yml` | **v1.0** | 2026-06-09 | ✅ 已验证 |
-| 18 | **nginx配置** | `nginx/` | **v1.0** | 2026-06-09 | ✅ 已验证 |
-| 19 | **PoC环境变量** | `.env.poc.hosted` | **v1.0** | 2026-06-09 | ✅ 已验证 |
-| 20 | **部署脚本** | `scripts/ops/deploy-staging.sh` | **v1.0** | 2026-06-09 | ✅ 已验证 |
-| 21 | **备份脚本** | `scripts/backup.sh` | **v1.0** | 2026-06-09 | ✅ 已验证 |
-| 22 | **Prometheus配置** | `prometheus.yml` | **v1.0** | 2026-06-09 | ✅ 已验证 |
+| 5 | **算法设计** | `design/Algorithm_Design_v1.md` | **v2.8** | 2026-06-08 | ✅ 生效 |
+| 6 | **测试计划** | `design/Test_Plan_v1.md` | **v5.1** | 2026-06-14 | ✅ 生效 |
+| 7 | **LLM Prompt模板** | `design/LLM_Prompt_Templates.md` | **0.4.1** | 2026-06-08 | ✅ 生效 |
+| 8 | **集成设计** | `design/Integration_Design_v1.md` | **v2.9** | 2026-06-09 | ✅ 生效 |
+| 9 | **部署指南** | `design/Deployment_Guide.md` | **v0.5.0** | 2026-06-20 | ✅ 生效（小程序路径已修正） |
+| 10 | **UI/UX设计** | `design/UI_UX_Design_v1.md` | **v3.1** | 2026-06-14 | ✅ 生效 |
+| 11 | **规格说明README** | `spec/README.md` | **v5.7** | 2026-06-20 | ✅ 同步 |
+| 12 | **项目状态** | `PROJECT_STATUS.md` | **已同步** | 2026-06-20 | ✅ 最新 |
+| 13 | **托管PoC Docker Compose** | `docker-compose.hosted-poc.yml` | **v1.0** | 2026-06-09 | ✅ 已验证 |
+| 14 | **nginx配置** | `nginx/` | **v1.0** | 2026-06-09 | ✅ 已验证 |
+| 15 | **PoC环境变量** | `.env.poc.hosted` | **v1.0** | 2026-06-09 | ✅ 已验证 |
+| 16 | **部署脚本** | `scripts/ops/deploy-staging.sh` | **v1.0** | 2026-06-09 | ✅ 已验证 |
+| 17 | **备份脚本** | `scripts/backup.sh` | **v1.0** | 2026-06-09 | ✅ 已验证 |
+| 18 | **Prometheus配置** | `prometheus.yml` | **v1.0** | 2026-06-09 | ✅ 已验证 |
+
+> **注**: 安全设计文档（Security_Design_v1.md、Security_威胁模型.md、Security_认证与API.md、Security_数据保护与主权.md、THREAT_MODEL.md）已随专业版迁移至 [PromiseLink-Pro](https://github.com/lulin70/PromiseLink-Pro) 私有仓库 `docs/archive/design/` 目录。
 
 ### 版本对照总结
 
-- **需求层 (P1)**: PRD v5.2 ←→ 技术设计 v3.2（双主文档对齐）
-- **设计层 (P3-P7)**: 安全设计系列 v3.1 / 集成设计 v2.9 / API设计 v3.1 / 测试计划 v5.1 / 算法设计 v2.8
+- **需求层 (P1)**: PRD v5.7 ←→ 技术设计 v3.2（双主文档对齐）
+- **设计层 (P3-P7)**: 集成设计 v2.9 / API设计 v3.1 / 测试计划 v5.1 / 算法设计 v2.8（安全设计系列已迁Pro）
 - **部署层**: 部署指南 v0.5.0 / docker-compose.hosted-poc.yml v1.0 / nginx v1.0 / deploy-staging.sh v1.0 / backup.sh v1.0
 - **运维层**: Prometheus配置 v1.0 / 备份脚本 v1.0
-- **UI层**: UI/UX设计 v3.1（完整版，含小程序前端集成+托管PoC模式备注）
+- **UI层**: UI/UX设计 v3.1（基础版宽屏H5；小程序UI独立仓库 PromiseLink-miniapp）
 
 ---
 

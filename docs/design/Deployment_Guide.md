@@ -701,8 +701,8 @@ docker run -d \
 
 # Taro H5编译（专业版也支持H5访问）
 cd PromiseLink/frontend && npm run build:h5
-# 微信小程序编译（专业版小程序，位于 PromiseLink-Pro/miniapp/）
-# cd PromiseLink-Pro/miniapp && npm run build:weapp
+# 微信小程序编译（独立仓库 PromiseLink-miniapp）
+# cd PromiseLink-miniapp && npm run build:weapp
 ```
 
 #### 2.10.5 版本切换
