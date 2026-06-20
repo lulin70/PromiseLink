@@ -2,6 +2,24 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [0.6.3] - 2026-06-19
+
+### Added
+- PRD §5.18.3 纠偏5：承诺添加（手动补录）— 后端 CorrectedPromiseItem 支持 action='add'，前端承诺区新增[+添加承诺]按钮+内联表单
+- PRD §5.18.3 纠偏2：关系纠偏 — 后端新增 CorrectedAssociationItem + corrected_associations 字段，前端关系卡片新增[改]按钮+关系类型选择器
+- PRD §5.18.6 API契约扩展 — EventCorrectResponse 新增 promises_created/associations_updated 计数字段
+- 录入页文本框容量 5000→50000 字（对齐 PRD §5.18.1）
+- 录入页时间选择新增时分选择（对齐 PRD §5.18.1）
+
+### Changed
+- 基础版前端 api.ts 类型同步：CorrectedPromiseItem.id 改为可选，action 新增 'add'，新增 CorrectedAssociationItem 接口
+- correct_event 函数文档字符串更新为"五类纠偏"
+
+### Tests
+- 新增 test_event_correction_v56.py（12个测试）：承诺添加(6)+关系纠偏(4)+综合(2)
+- 全量回归：1353 passed, 45 skipped, 0 failed, 覆盖率 72%
+- mypy: 0 errors, ruff: all checks passed
+
 ## [0.6.2] - 2026-06-19
 
 ### Added — P1-P9批判性评审+三重点用户旅程测试增强

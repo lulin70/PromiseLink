@@ -521,10 +521,10 @@ export default function InputPage() {
                   value={rawText}
                   onInput={e => setRawText(e.detail.value)}
                   placeholder='记录一次重要交流...'
-                  maxlength={5000}
+                  maxlength={50000}
                   autoFocus
                 />
-                <Text className='char-count'>{rawText.length}/5000</Text>
+                <Text className='char-count'>{rawText.length}/50000</Text>
               </View>
             )}
 
@@ -571,16 +571,28 @@ export default function InputPage() {
                   </View>
                   <View className='bottom-field'>
                     <Text className='field-label'>时间</Text>
-                    <Picker
-                      mode='date'
-                      value={eventTime.slice(0, 10)}
-                      onChange={e => setEventTime(e.detail.value + eventTime.slice(10))}
-                    >
-                      <View className='picker-value'>
-                        <Text>{eventTime.slice(0, 10)}</Text>
-                        <Text className='picker-arrow'>▼</Text>
-                      </View>
-                    </Picker>
+                    <View style={{ display: 'flex', gap: '8px' }}>
+                      <Picker
+                        mode='date'
+                        value={eventTime.slice(0, 10)}
+                        onChange={e => setEventTime(e.detail.value + eventTime.slice(10))}
+                      >
+                        <View className='picker-value'>
+                          <Text>{eventTime.slice(0, 10)}</Text>
+                          <Text className='picker-arrow'>▼</Text>
+                        </View>
+                      </Picker>
+                      <Picker
+                        mode='time'
+                        value={eventTime.slice(11, 16)}
+                        onChange={e => setEventTime(eventTime.slice(0, 11) + e.detail.value)}
+                      >
+                        <View className='picker-value'>
+                          <Text>{eventTime.slice(11, 16)}</Text>
+                          <Text className='picker-arrow'>▼</Text>
+                        </View>
+                      </Picker>
+                    </View>
                   </View>
                 </View>
               </View>

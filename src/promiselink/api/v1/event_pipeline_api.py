@@ -20,7 +20,7 @@ from promiselink.core.auth import get_current_user_id
 from promiselink.core.exceptions import NotFoundError, ValidationError
 from promiselink.core.logging import get_logger, new_request_id
 from promiselink.database import get_async_session
-from promiselink.models import Entity, Event
+from promiselink.models import Association, Entity, Event
 from promiselink.models.todo import Todo as _Todo
 from promiselink.services.event_processor import process_event_background
 
@@ -274,11 +274,23 @@ class CorrectedTodoItem(BaseModel):
 class CorrectedPromiseItem(BaseModel):
     """User-corrected promise (承诺纠偏)."""
 
-    id: str = Field(..., description="已有承诺(待办) ID")
-    content: str | None = Field(default=None, description="修改后的内容")
-    due_date: datetime | None = Field(default=None, description="修改后的截止日期")
+    id: str | None = Field(default=None, description="已有承诺(待办) ID，add 动作时为 None")
+    content: str | None = Field(default=None, description="修改后的内容 / add 动作时为承诺内容")
+    due_date: datetime | None = Field(default=None, description="截止日期")
     promise_type: str | None = Field(default=None, description="my_promise | their_promise")
-    action: str = Field(..., description="confirm | ignore | modify")
+    promisor_id: str | None = Field(default=None, description="add 动作时责任人 ID")
+    beneficiary_id: str | None = Field(default=None, description="add 动作时受益人 ID")
+    action: str = Field(..., description="confirm | ignore | modify | add")
+
+
+class CorrectedAssociationItem(BaseModel):
+    """User-corrected association (关系纠偏)."""
+
+    source_entity_id: str = Field(..., description="源实体 ID")
+    target_entity_id: str = Field(..., description="目标实体 ID")
+    relationship_type: str | None = Field(default=None, description="修改后的关系类型")
+    strength: float | None = Field(default=None, description="修改后的关系强度 0-1")
+    action: str = Field(..., description="modify | delete")
 
 
 class EventCorrectRequest(BaseModel):
@@ -287,6 +299,7 @@ class EventCorrectRequest(BaseModel):
     corrected_entities: list[CorrectedEntityItem] = Field(default_factory=list)
     corrected_todos: list[CorrectedTodoItem] = Field(default_factory=list)
     corrected_promises: list[CorrectedPromiseItem] = Field(default_factory=list)
+    corrected_associations: list[CorrectedAssociationItem] = Field(default_factory=list)
 
 
 class EventCorrectResponse(BaseModel):
@@ -302,6 +315,8 @@ class EventCorrectResponse(BaseModel):
     promises_confirmed: int = 0
     promises_ignored: int = 0
     promises_modified: int = 0
+    promises_created: int = 0
+    associations_updated: int = 0
 
 
 @pipeline_router.post("/events/{event_id}/correct", response_model=EventCorrectResponse)
@@ -313,10 +328,11 @@ async def correct_event(
 ) -> EventCorrectResponse:
     """Apply user corrections to parsed event results (解析后纠偏).
 
-    三类纠偏:
+    五类纠偏:
     - 人脉: select_existing(合并到已有) / create_new(更新提取实体信息) / ignore(忽略)
+    - 关系: modify(修改关系类型/强度) / delete(删除关系)
     - 待办: edit(修改) / delete(删除) / add(新增)
-    - 承诺: confirm(确认) / ignore(忽略) / modify(修改)
+    - 承诺: confirm(确认) / ignore(忽略) / modify(修改) / add(手动补录)
     """
     new_request_id()
 
@@ -428,6 +444,48 @@ async def correct_event(
 
     # ── 承诺纠偏 ──
     for prom_item in request.corrected_promises:
+        if prom_item.action == "add":
+            # 纠偏5：承诺添加（手动补录）
+            if not prom_item.content:
+                continue
+            promisor_id = prom_item.promisor_id
+            beneficiary_id = prom_item.beneficiary_id
+            # 如果未指定，尝试从事件关联实体中推断
+            if not promisor_id or not beneficiary_id:
+                ent_result = await session.execute(
+                    select(Entity).where(
+                        Entity.source_event_id == str(event_id),
+                        Entity.user_id == user_id,
+                        Entity.status != "deleted",
+                    )
+                )
+                related_entities = ent_result.scalars().all()
+                if related_entities:
+                    # 简单策略：my_promise 时 promisor 为当前用户(隐式)，
+                    # beneficiary 为第一个关联实体；their_promise 时反过来
+                    counterparty_id = str(related_entities[0].id)
+                    if prom_item.promise_type == "their_promise":
+                        promisor_id = promisor_id or counterparty_id
+                    else:
+                        beneficiary_id = beneficiary_id or counterparty_id
+            new_promise = _Todo(
+                user_id=user_id,
+                title=prom_item.content[:200],
+                description=prom_item.content,
+                todo_type="promise",
+                action_type=prom_item.promise_type or "my_promise",
+                status="pending",
+                confirmation_status="confirmed",
+                due_date=prom_item.due_date,
+                promisor_id=promisor_id,
+                beneficiary_id=beneficiary_id,
+                related_entity_id=beneficiary_id or promisor_id,
+                source_event_id=str(event_id),
+            )
+            session.add(new_promise)
+            resp.promises_created += 1
+            continue
+
         prom_result = await session.execute(
             select(_Todo).where(
                 _Todo.id == prom_item.id,
@@ -457,6 +515,29 @@ async def correct_event(
             promise.confirmation_status = "confirmed"
             resp.promises_modified += 1
 
+    # ── 关系纠偏 ──
+    for assoc_item in request.corrected_associations:
+        assoc_result = await session.execute(
+            select(Association).where(
+                Association.source_entity_id == assoc_item.source_entity_id,
+                Association.target_entity_id == assoc_item.target_entity_id,
+                Association.user_id == user_id,
+            )
+        )
+        assoc = assoc_result.scalar_one_or_none()
+        if not assoc:
+            continue
+
+        if assoc_item.action == "modify":
+            if assoc_item.relationship_type is not None:
+                assoc.association_type = assoc_item.relationship_type
+            if assoc_item.strength is not None:
+                assoc.strength = assoc_item.strength
+            resp.associations_updated += 1
+        elif assoc_item.action == "delete":
+            await session.delete(assoc)
+            resp.associations_updated += 1
+
     await session.commit()
 
     logger.info(
@@ -465,6 +546,8 @@ async def correct_event(
         entities_updated=resp.entities_updated,
         todos_created=resp.todos_created,
         promises_confirmed=resp.promises_confirmed,
+        promises_created=resp.promises_created,
+        associations_updated=resp.associations_updated,
     )
 
     return resp

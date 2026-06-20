@@ -262,17 +262,28 @@ export interface CorrectedTodoItem {
 }
 
 export interface CorrectedPromiseItem {
-  id: string
+  id: string | null
   content?: string
   due_date?: string
   promise_type?: 'my_promise' | 'their_promise'
-  action: 'confirm' | 'ignore' | 'modify'
+  promisor_id?: string
+  beneficiary_id?: string
+  action: 'confirm' | 'ignore' | 'modify' | 'add'
+}
+
+export interface CorrectedAssociationItem {
+  source_entity_id: string
+  target_entity_id: string
+  relationship_type?: string
+  strength?: number
+  action: 'modify' | 'delete'
 }
 
 export interface EventCorrectRequest {
   corrected_entities: CorrectedEntityItem[]
   corrected_todos: CorrectedTodoItem[]
   corrected_promises: CorrectedPromiseItem[]
+  corrected_associations: CorrectedAssociationItem[]
 }
 
 export interface EventCorrectResponse {
