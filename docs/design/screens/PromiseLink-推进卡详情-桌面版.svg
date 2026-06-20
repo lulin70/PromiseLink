@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" width="1440" height="900">
+  <defs>
+    <filter id="shadow"><feDropShadow dx="0" dy="1" stdDeviation="3" flood-color="#3A3F42" flood-opacity="0.08"/></filter>
+    <filter id="sbar"><feDropShadow dx="2" dy="0" stdDeviation="8" flood-color="#3A3F42" flood-opacity="0.06"/></filter>
+  </defs>
+  <rect width="1440" height="900" fill="#F5F6F7"/>
+  
+  <!-- Sidebar -->
+  <rect x="0" y="0" width="200" height="900" fill="#FFF" filter="url(#sbar)"/>
+  <text x="32" y="52" font-family="Inter" font-size="20" fill="#3A3F42">🤝</text>
+  <text x="64" y="52" font-family="Inter" font-size="16" font-weight="600" fill="#3A3F42">PromiseLink</text>
+  <rect x="16" y="72" width="168" height="1" fill="#DDE0E3"/>
+  <rect x="16" y="88" width="168" height="40" rx="8" fill="#EDF0F2"/>
+  <text x="52" y="113" font-family="Inter" font-size="14" fill="#3A3F42">🏠 首页</text>
+  <text x="52" y="148" font-family="Inter" font-size="14" fill="#6B7280">📅 事件</text>
+  <text x="52" y="183" font-family="Inter" font-size="14" fill="#6B7280">👥 人脉</text>
+  <text x="52" y="218" font-family="Inter" font-size="14" fill="#6B7280">✓ 待办</text>
+  <text x="52" y="253" font-family="Inter" font-size="14" fill="#6B7280">🤝 承诺</text>
+  
+  <!-- Main Content -->
+  <rect x="224" y="20" width="840" height="860" rx="0" fill="transparent"/>
+  
+  <!-- Left Column: Person Info + Progress -->
+  <rect x="224" y="20" width="400" height="180" rx="12" fill="#FFF" filter="url(#shadow)"/>
+  <circle cx="260" cy="60" r="28" fill="#A0B0C4"/>
+  <text x="260" y="68" font-family="Inter" font-size="22" fill="#FFF" text-anchor="middle">张</text>
+  <text x="302" y="56" font-family="Inter" font-size="20" font-weight="600" fill="#3A3F42">张三</text>
+  <text x="302" y="76" font-family="Inter" font-size="13" fill="#6B7280">AI产品总监 · XYZ科技</text>
+  <text x="302" y="96" font-family="Inter" font-size="12" fill="#9CA3AF">📧 zhang@xyz.com · 📱 138****1234</text>
+  <rect x="548" y="40" width="60" height="28" rx="6" fill="#A0C4A8"/>
+  <text x="578" y="58" font-family="Inter" font-size="11" font-weight="600" fill="#FFF" text-anchor="middle">编辑</text>
+  
+  <rect x="244" y="112" width="360" height="6" rx="3" fill="#DDE0E3"/>
+  <rect x="244" y="112" width="230" height="6" rx="3" fill="#A0C4A8"/>
+  <text x="244" y="140" font-family="Inter" font-size="11" fill="#9CA3AF">关系阶段：合作中（3/5）</text>
+  <circle cx="270" cy="115" r="4" fill="#A0C4A8"/><text x="270" y="105" font-size="9" fill="#A0C4A8" text-anchor="middle">认识</text>
+  <circle cx="340" cy="115" r="4" fill="#A0C4A8"/><text x="340" y="105" font-size="9" fill="#A0C4A8" text-anchor="middle">了解</text>
+  <circle cx="410" cy="115" r="4" fill="#A0C4A8"/><text x="410" y="105" font-size="9" fill="#A0C4A8" text-anchor="middle">信任</text>
+  <circle cx="480" cy="115" r="4" fill="#DDE0E3"/><text x="480" y="105" font-size="9" fill="#9CA3AF" text-anchor="middle">合作</text>
+  <circle cx="550" cy="115" r="4" fill="#DDE0E3"/><text x="550" y="105" font-size="9" fill="#9CA3AF" text-anchor="middle">伙伴</text>
+  
+  <!-- Left: Promises -->
+  <rect x="224" y="216" width="400" height="200" rx="12" fill="#FFF" filter="url(#shadow)"/>
+  <text x="244" y="242" font-family="Inter" font-size="16" font-weight="600" fill="#3A3F42">📌 我的承诺</text>
+  <rect x="350" y="230" width="48" height="20" rx="4" fill="#C4A7A0"/>
+  <text x="374" y="244" font-family="Inter" font-size="10" font-weight="600" fill="#FFF" text-anchor="middle">2项</text>
+  <rect x="244" y="256" width="360" height="1" fill="#EDF0F2"/>
+  <text x="244" y="282" font-family="Inter" font-size="14" font-weight="600" fill="#3A3F42">本周发AI合作方案</text>
+  <text x="260" y="304" font-family="Inter" font-size="12" fill="#6B7280">承诺 · 明天截止 · 优先级 0.85</text>
+  <rect x="244" y="320" width="360" height="1" fill="#EDF0F2"/>
+  <text x="244" y="346" font-family="Inter" font-size="14" fill="#3A3F42">周五前约时间讨论</text>
+  <text x="260" y="368" font-family="Inter" font-size="12" fill="#6B7280">承诺 · 6月22日</text>
+  <rect x="244" y="384" width="360" height="1" fill="#EDF0F2"/>
+  <text x="244" y="406" font-family="Inter" font-size="12" fill="#A0C4A8">+ 添加新承诺</text>
+  
+  <!-- Left: Interactions -->
+  <rect x="224" y="432" width="400" height="220" rx="12" fill="#FFF" filter="url(#shadow)"/>
+  <text x="244" y="458" font-family="Inter" font-size="16" font-weight="600" fill="#3A3F42">🗣 交流记录</text>
+  <rect x="244" y="472" width="360" height="1" fill="#EDF0F2"/>
+  <circle cx="260" cy="510" r="6" fill="#A0C4A8"/>
+  <rect x="244" y="496" width="2" height="140" fill="#DDE0E3"/>
+  <text x="276" y="498" font-family="Inter" font-size="13" font-weight="600" fill="#3A3F42">AI项目合作讨论</text>
+  <text x="276" y="518" font-family="Inter" font-size="11" fill="#6B7280">6月18日 · 14:00-14:45 · 会议室A</text>
+  <circle cx="260" cy="555" r="6" fill="#A0B0C4"/>
+  <text x="276" y="543" font-family="Inter" font-size="13" fill="#3A3F42">微信讨论技术方案</text>
+  <text x="276" y="563" font-family="Inter" font-size="11" fill="#6B7280">6月12日 · 多次互动</text>
+  <circle cx="260" cy="600" r="6" fill="#B0A0C4"/>
+  <text x="276" y="588" font-family="Inter" font-size="13" fill="#3A3F42">产品发布会</text>
+  <text x="276" y="608" font-family="Inter" font-size="11" fill="#6B7280">6月1日 · 线下活动</text>
+  
+  <!-- Right Column: NeedInsight -->
+  <rect x="640" y="20" width="424" height="200" rx="12" fill="#FFF" filter="url(#shadow)"/>
+  <text x="660" y="46" font-family="Inter" font-size="16" font-weight="600" fill="#3A3F42">💡 关心与需求</text>
+  <rect x="660" y="64" width="384" height="1" fill="#EDF0F2"/>
+  <text x="660" y="94" font-family="Inter" font-size="13" fill="#6B7280">关键词</text>
+  <rect x="660" y="108" width="100" height="28" rx="8" fill="#A0C4A8" opacity="0.15"/>
+  <text x="710" y="126" font-family="Inter" font-size="12" fill="#A0C4A8" text-anchor="middle">AI应用落地</text>
+  <rect x="770" y="108" width="88" height="28" rx="8" fill="#A0B0C4" opacity="0.15"/>
+  <text x="814" y="126" font-family="Inter" font-size="12" fill="#A0B0C4" text-anchor="middle">团队扩张</text>
+  <rect x="868" y="108" width="92" height="28" rx="8" fill="#B0A0C4" opacity="0.15"/>
+  <text x="914" y="126" font-family="Inter" font-size="12" fill="#B0A0C4" text-anchor="middle">合作伙伴</text>
+  <text x="660" y="166" font-family="Inter" font-size="13" fill="#6B7280">摘要</text>
+  <text x="660" y="192" font-family="Inter" font-size="12" fill="#3A3F42" opacity="0.8">张三近期关注AI在实际业务中的落地应用，团队规模正在扩张，需要更多技术合作伙伴支持</text>
+  
+  <!-- Right: Common Topics -->
+  <rect x="640" y="236" width="424" height="170" rx="12" fill="#FFF" filter="url(#shadow)"/>
+  <text x="660" y="262" font-family="Inter" font-size="16" font-weight="600" fill="#3A3F42">📊 话题热区</text>
+  <rect x="660" y="280" width="384" height="1" fill="#EDF0F2"/>
+  <rect x="660" y="296" width="340" height="22" rx="6" fill="#A0C4A8" opacity="0.12"/>
+  <rect x="660" y="296" width="255" height="22" rx="6" fill="#A0C4A8" opacity="0.3"/>
+  <text x="670" y="312" font-family="Inter" font-size="12" fill="#3A3F42">AI技术应用</text><text x="1010" y="312" font-family="Inter" font-size="11" fill="#9CA3AF" text-anchor="end">75%</text>
+  <rect x="660" y="326" width="310" height="22" rx="6" fill="#A0B0C4" opacity="0.12"/>
+  <rect x="660" y="326" width="187" height="22" rx="6" fill="#A0B0C4" opacity="0.3"/>
+  <text x="670" y="342" font-family="Inter" font-size="12" fill="#3A3F42">团队管理</text><text x="1010" y="342" font-family="Inter" font-size="11" fill="#9CA3AF" text-anchor="end">55%</text>
+  <rect x="660" y="356" width="280" height="22" rx="6" fill="#B0A0C4" opacity="0.12"/>
+  <rect x="660" y="356" width="140" height="22" rx="6" fill="#B0A0C4" opacity="0.3"/>
+  <text x="670" y="372" font-family="Inter" font-size="12" fill="#3A3F42">行业趋势</text><text x="1010" y="372" font-family="Inter" font-size="11" fill="#9CA3AF" text-anchor="end">45%</text>
+  
+  <!-- Right: Meeting Prep -->
+  <rect x="640" y="422" width="424" height="150" rx="12" fill="#FFF" filter="url(#shadow)"/>
+  <text x="660" y="448" font-family="Inter" font-size="16" font-weight="600" fill="#3A3F42">🤝 下次见面准备</text>
+  <rect x="660" y="466" width="384" height="1" fill="#EDF0F2"/>
+  <text x="660" y="496" font-family="Inter" font-size="12" fill="#6B7280">建议话题</text>
+  <text x="660" y="518" font-family="Inter" font-size="13" fill="#3A3F42">1. 跟进上次AI项目合作方案进展</text>
+  <text x="660" y="542" font-family="Inter" font-size="13" fill="#3A3F42">2. 了解其团队扩张现状与招聘需求</text>
+  <text x="660" y="566" font-family="Inter" font-size="13" fill="#3A3F42">3. 探讨潜在的合作机会</text>
+  
+  <!-- Right: Quick Actions -->
+  <rect x="640" y="588" width="424" height="80" rx="12" fill="#FFF" filter="url(#shadow)"/>
+  <rect x="660" y="612" width="116" height="36" rx="8" fill="#A0C4A8"/>
+  <text x="718" y="635" font-family="Inter" font-size="13" font-weight="600" fill="#FFF" text-anchor="middle">📝 记录交流</text>
+  <rect x="786" y="612" width="96" height="36" rx="8" fill="#A0B0C4"/>
+  <text x="834" y="635" font-family="Inter" font-size="13" font-weight="600" fill="#FFF" text-anchor="middle">📌 加承诺</text>
+  <rect x="892" y="612" width="90" height="36" rx="8" fill="#B0A0C4"/>
+  <text x="937" y="635" font-family="Inter" font-size="13" font-weight="600" fill="#FFF" text-anchor="middle">📅 约见</text>
+  <rect x="992" y="612" width="52" height="36" rx="8" fill="#C4C0A0"/>
+  <text x="1018" y="635" font-family="Inter" font-size="13" font-weight="600" fill="#FFF" text-anchor="middle">💬</text>
+</svg>

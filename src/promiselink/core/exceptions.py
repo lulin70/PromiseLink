@@ -209,7 +209,7 @@ class DatabaseError(InfrastructureError):
 class CarryMemUnavailableError(InfrastructureError):
     """CarryMem service unavailable."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             message="CarryMem unavailable, using NullMemoryProvider",
             code="CARRYMEM_UNAVAILABLE",

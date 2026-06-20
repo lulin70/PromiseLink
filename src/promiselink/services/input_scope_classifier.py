@@ -311,7 +311,7 @@ class InputScopeClassifier:
 
         try:
             response = await self.llm.call_json(prompt=prompt, temperature=0.1)
-        except Exception as exc:
+        except Exception as exc:  # External API — keep broad catch for resilience
             logger.warning(
                 "llm_classify_failed",
                 event_id=str(event.id),

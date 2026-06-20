@@ -94,7 +94,7 @@ class Step01_VerifyEvent(PipelineStep):
                 confidence=scope_result.confidence,
                 method=scope_result.method,
             )
-        except Exception as scope_err:
+        except Exception as scope_err:  # External API — keep broad catch for resilience
             logger.error("pipeline_step3_input_scope_failed",
                 event_id=event_id, error=str(scope_err))
             context.should_stop = True
@@ -118,7 +118,7 @@ class Step01_VerifyEvent(PipelineStep):
                                 event_id=event_id,
                                 title=generated_title,
                             )
-                    except Exception as title_err:
+                    except Exception as title_err:  # External API — keep broad catch for resilience
                         logger.warning("pipeline_step4_title_failed",
                             event_id=event_id,
                             error=str(title_err),

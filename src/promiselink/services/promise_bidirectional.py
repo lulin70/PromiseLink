@@ -324,7 +324,7 @@ class PromiseBidirectionalHandler:
                 evidence_quote=result.get("evidence_quote"),
                 confidence=confidence,
             )
-        except Exception as e:
+        except Exception as e:  # External API — keep broad catch for resilience
             logger.error(
                 "llm_analyze_failed",
                 todo_id=str(todo.id),

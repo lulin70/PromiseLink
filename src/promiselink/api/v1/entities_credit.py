@@ -1,5 +1,7 @@
 """Entity credit score API endpoints (F-E5: Per-Person Credit Score)."""
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import func, select
@@ -45,7 +47,7 @@ async def get_entity_credit_score(
     entity_id: str,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> Any:
     """Calculate per-entity relationship credit score (0-100).
 
     Score = my_fulfillment*40% + their_fulfillment*35% + consistency*15% + timeliness*10%
@@ -83,7 +85,7 @@ async def list_credit_scores(
     offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> Any:
     """List all entities with credit scores, sorted by score descending."""
     new_request_id()
 

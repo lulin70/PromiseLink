@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from sqlalchemy import and_, update
+from sqlalchemy.exc import SQLAlchemyError
 
 from promiselink.core.logging import get_logger
 from promiselink.models.todo import Todo
@@ -32,7 +33,7 @@ class Step08_Notification(PipelineStep):
                     todo_type=todo.todo_type,
                     todo_id=str(todo.id),
                 )
-        except Exception as notif_err:
+        except Exception as notif_err:  # External API — keep broad catch for resilience
             logger.warning("pipeline_notification_failed", error=str(notif_err))
             context.failed_steps.append(self.name)
 
@@ -67,7 +68,7 @@ class Step08_Notification(PipelineStep):
                         overdue_count=overdue_count,
                     )
                     await commit_with_retry(session)
-        except Exception as overdue_err:
+        except SQLAlchemyError as overdue_err:
             logger.warning("pipeline_auto_overdue_failed", error=str(overdue_err))
 
         return context

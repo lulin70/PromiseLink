@@ -35,6 +35,6 @@ async def generate_event_title(llm_client: LLMClient, raw_text: str) -> str | No
         if len(title) > 50:
             title = title[:47] + "..."
         return title if title else None
-    except Exception as exc:
+    except Exception as exc:  # External API — keep broad catch for resilience
         logger.warning("title_generation_failed", error=str(exc))
         return None

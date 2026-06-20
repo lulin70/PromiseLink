@@ -4,6 +4,7 @@ All API calls are mocked — no real network access required.
 """
 
 import sqlite3
+from collections import OrderedDict
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -65,7 +66,7 @@ class TestEmbeddingProvider:
             provider._provider = "api"
             provider._client = mock_client
             provider._model = DEFAULT_EMBEDDING_MODEL
-            provider._cache = {}
+            provider._cache = OrderedDict()
             provider._cache_hits = 0
             provider._cache_misses = 0
             provider._local_model = None
@@ -95,7 +96,7 @@ class TestEmbeddingProvider:
             provider._provider = "api"
             provider._client = mock_client
             provider._model = DEFAULT_EMBEDDING_MODEL
-            provider._cache = {}
+            provider._cache = OrderedDict()
             provider._cache_hits = 0
             provider._cache_misses = 0
             provider._local_model = None
@@ -130,7 +131,7 @@ class TestEmbeddingProvider:
             provider._provider = "api"
             provider._client = mock_client
             provider._model = DEFAULT_EMBEDDING_MODEL
-            provider._cache = {}
+            provider._cache = OrderedDict()
             provider._cache_hits = 0
             provider._cache_misses = 0
             provider._local_model = None
@@ -169,7 +170,7 @@ class TestEmbeddingProvider:
             # Pre-populate cache
             import hashlib
             key_alpha = hashlib.sha256(b"alpha").hexdigest()
-            provider._cache = {key_alpha: fake_emb_alpha}
+            provider._cache = OrderedDict([(key_alpha, fake_emb_alpha)])
 
             results = await provider.embed_batch(["alpha", "beta"])
 
@@ -219,7 +220,7 @@ class TestSemanticSearchEngine:
         provider._provider = "api"
         provider._client = MagicMock()
         provider._model = DEFAULT_EMBEDDING_MODEL
-        provider._cache = {}
+        provider._cache = OrderedDict()
         provider._cache_hits = 0
         provider._cache_misses = 0
         provider._local_model = None

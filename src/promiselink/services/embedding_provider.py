@@ -8,6 +8,7 @@ Design reference: PromiseLink_技术设计_v1.md v2.8 §4.12.1
 
 import asyncio
 import hashlib
+from collections import OrderedDict
 from typing import Optional
 
 from openai import AsyncOpenAI
@@ -24,6 +25,10 @@ EMBEDDING_DIMENSIONS = 768
 # Local embedding model (same as CarryMem, already installed)
 LOCAL_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 LOCAL_EMBEDDING_DIMENSIONS = 384
+
+# Maximum number of embeddings to keep in the in-memory LRU cache.
+# Each 384-dim float embedding is ~3KB, so 1000 entries ≈ 3MB.
+EMBEDDING_CACHE_MAX_SIZE = 1000
 
 # ── Module-level singleton (avoids reloading sentence-transformers model) ──
 _shared_provider: Optional["EmbeddingProvider"] = None
@@ -87,7 +92,8 @@ class EmbeddingProvider:
                 base_url=self._settings.llm_base_url,
                 api_key=self._settings.llm_api_key,
             )
-        self._cache: dict[str, list[float]] = {}
+        # OrderedDict for LRU eviction; prevents unbounded memory growth.
+        self._cache: OrderedDict[str, list[float]] = OrderedDict()
         self._cache_hits = 0
         self._cache_misses = 0
         self._local_model = None  # Lazy-loaded sentence-transformers
@@ -95,6 +101,25 @@ class EmbeddingProvider:
     def _cache_key(self, text: str) -> str:
         """Generate cache key from text."""
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+    def _cache_get(self, key: str) -> list[float] | None:
+        """Get an embedding from the cache, marking it as recently used.
+
+        Returns None on miss. Moving the key to the end implements LRU.
+        """
+        if key in self._cache:
+            self._cache.move_to_end(key)
+            return self._cache[key]
+        return None
+
+    def _cache_put(self, key: str, embedding: list[float]) -> None:
+        """Store an embedding in the cache, evicting the least-recently-used
+        entry when the cache exceeds ``EMBEDDING_CACHE_MAX_SIZE``.
+        """
+        self._cache[key] = embedding
+        self._cache.move_to_end(key)
+        while len(self._cache) > EMBEDDING_CACHE_MAX_SIZE:
+            self._cache.popitem(last=False)
 
     async def embed(self, text: str) -> list[float]:
         """Get embedding for a single text string.
@@ -109,9 +134,10 @@ class EmbeddingProvider:
             List of floats (384 dimensions for local, varies for API)
         """
         key = self._cache_key(text)
-        if key in self._cache:
+        cached = self._cache_get(key)
+        if cached is not None:
             self._cache_hits += 1
-            return self._cache[key]
+            return cached
 
         self._cache_misses += 1
 
@@ -128,7 +154,7 @@ class EmbeddingProvider:
                 input=text,
             )
             embedding = response.data[0].embedding
-            self._cache[key] = embedding
+            self._cache_put(key, embedding)
 
             logger.debug(
                 "embedding_created_api",
@@ -136,7 +162,7 @@ class EmbeddingProvider:
                 dims=len(embedding),
             )
             return embedding
-        except Exception as api_err:
+        except Exception as api_err:  # External API — keep broad catch for resilience
             if "model_not_found" in str(api_err):
                 logger.debug("embedding_api_model_unavailable", note="API does not support embedding model, using local fallback")
             else:
@@ -161,8 +187,9 @@ class EmbeddingProvider:
 
         for i, text in enumerate(texts):
             key = self._cache_key(text)
-            if key in self._cache:
-                results[i] = self._cache[key]
+            cached = self._cache_get(key)
+            if cached is not None:
+                results[i] = cached
                 self._cache_hits += 1
             else:
                 uncached_indices.append(i)
@@ -189,7 +216,7 @@ class EmbeddingProvider:
                 for idx, data in zip(uncached_indices, response.data):
                     embedding = data.embedding
                     key = self._cache_key(uncached_texts[uncached_indices.index(idx)])
-                    self._cache[key] = embedding
+                    self._cache_put(key, embedding)
                     results[idx] = embedding
                     self._cache_misses += 1
 
@@ -198,7 +225,7 @@ class EmbeddingProvider:
                     count=len(uncached_texts),
                     dims=len(embedding),
                 )
-            except Exception as e:
+            except Exception as e:  # External API — keep broad catch for resilience
                 if "model_not_found" in str(e):
                     logger.debug("batch_embedding_api_model_unavailable", note="Using local fallback")
                 else:
@@ -241,7 +268,7 @@ class EmbeddingProvider:
         if self._client is not None:
             try:
                 await self._client.close()
-            except Exception as e:
+            except (OSError, RuntimeError) as e:
                 logger.warning("embedding_client_close_error", error=str(e))
             finally:
                 self._client = None
@@ -270,9 +297,9 @@ class EmbeddingProvider:
         loop = asyncio.get_event_loop()
         assert self._local_model is not None
         embedding = await loop.run_in_executor(
-            None, lambda: self._local_model.encode(text).tolist()  # type: ignore[union-attr]
+            None, lambda: self._local_model.encode(text).tolist()
         )
-        self._cache[cache_key] = embedding
+        self._cache_put(cache_key, embedding)
 
         logger.debug(
             "embedding_created_local",
@@ -315,6 +342,6 @@ class EmbeddingProvider:
         else:
             embedding = [0.0] * dims
 
-        self._cache[cache_key] = embedding
+        self._cache_put(cache_key, embedding)
         logger.warning("pseudo_embedding_used", text_len=len(text))
         return embedding

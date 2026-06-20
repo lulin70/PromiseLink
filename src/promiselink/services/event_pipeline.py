@@ -28,6 +28,8 @@ and re-exports the service classes so that existing test patches continue to wor
 
 from datetime import UTC, datetime
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from promiselink.core.logging import get_logger
 from promiselink.services.association_discovery import AssociationDiscoveryEngine  # noqa: F401
 from promiselink.services.llm_client import LLMClient
@@ -143,7 +145,7 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
             _row = _r.scalar_one_or_none()
             if _row:
                 _resolved_user_id = str(_row)
-    except Exception as resolve_err:
+    except SQLAlchemyError as resolve_err:
         logger.warning("pipeline_user_id_resolution_failed", event_id=str(event_id), error=str(resolve_err))
 
     pipeline_lock = get_pipeline_lock(user_id=_resolved_user_id)
@@ -201,10 +203,10 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
                                 event.processed_at = datetime.now(UTC)
                                 if ctx.failed_steps:
                                     event.failed_steps = list(ctx.failed_steps)
-                except Exception as mark_err:
+                except SQLAlchemyError as mark_err:
                     logger.error("pipeline_failed_to_mark_partial", event_id=str(event_id), error=str(mark_err))
 
-        except Exception as e:
+        except Exception as e:  # Pipeline catch-all — keep broad catch for resilience
             from sqlalchemy import select
 
             from promiselink.database import AsyncSessionLocal
@@ -226,7 +228,7 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
                         if event and event.status == "processing":
                             event.status = "failed"
                             event.processed_at = datetime.now(UTC)
-            except Exception as mark_failed_err:
+            except SQLAlchemyError as mark_failed_err:
                 logger.error("pipeline_failed_to_mark_failed", event_id=str(event_id), error=str(mark_failed_err))
 
         finally:

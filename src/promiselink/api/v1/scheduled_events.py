@@ -130,7 +130,7 @@ async def create_scheduled_event(
     request: ScheduledEventCreateRequest,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> Any:
     """Create a new scheduled event (planned future interaction)."""
     new_request_id()
 
@@ -185,7 +185,7 @@ async def list_scheduled_events(
     offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> Any:
     """List scheduled events with optional filtering."""
     new_request_id()
 
@@ -224,7 +224,7 @@ async def get_scheduled_event(
     scheduled_event_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> Any:
     """Get detailed information about a specific scheduled event."""
     new_request_id()
 
@@ -250,7 +250,7 @@ async def update_scheduled_event(
     request: ScheduledEventUpdateRequest,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> Any:
     """Update a pending scheduled event."""
     new_request_id()
 
@@ -308,7 +308,7 @@ async def delete_scheduled_event(
     scheduled_event_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> None:
     """Delete a pending scheduled event."""
     new_request_id()
 
@@ -343,7 +343,7 @@ async def record_scheduled_event(
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> RecordResponse:
     """Record actual content for a scheduled event.
 
     Creates an Event from the recorded content, links it to the
@@ -442,7 +442,7 @@ async def cancel_scheduled_event(
     request: CancelRequest,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> Any:
     """Cancel a scheduled event (pending or overdue only)."""
     new_request_id()
 

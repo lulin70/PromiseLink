@@ -79,6 +79,36 @@ class EntityResolutionEngine:
         self._alias_index: dict[str, list[Entity]] = {}
         self._index_loaded = False
 
+    def clear_index(self) -> None:
+        """Release in-memory entity indexes.
+
+        The resolution engine caches all of a user's person entities in three
+        dicts (``_name_index``, ``_surname_index``, ``_alias_index``) for O(1)
+        candidate lookup. For long-lived sessions or large entity sets this
+        can hold significant memory. Call this method when resolution is done
+        to allow the cached entities to be garbage-collected.
+
+        The index will be transparently rebuilt on the next ``resolve()`` call
+        if needed (``_index_loaded`` is reset to ``False``).
+        """
+        self._name_index.clear()
+        self._surname_index.clear()
+        self._alias_index.clear()
+        self._index_loaded = False
+
+    def index_size(self) -> int:
+        """Return the total number of entity references held in the in-memory indexes.
+
+        Useful for memory monitoring — a single entity may appear in multiple
+        indexes (name, surname, alias), so this counts references, not unique
+        entities.
+        """
+        return (
+            sum(len(v) for v in self._name_index.values())
+            + sum(len(v) for v in self._surname_index.values())
+            + sum(len(v) for v in self._alias_index.values())
+        )
+
     async def resolve(
         self, new_entity_data: dict[str, Any], user_id: str
     ) -> ResolutionResult:
@@ -637,7 +667,7 @@ class EntityResolutionEngine:
             response = await self.llm.generate(prompt, max_tokens=10)
             score = self._parse_llm_confidence(response)
             return score, {"llm_judgment": score}
-        except Exception as e:
+        except Exception as e:  # External API — keep broad catch for resilience
             logger.warning("llm_resolution_failed", error=str(e), exc_info=True)
             return 0.0, {}
 

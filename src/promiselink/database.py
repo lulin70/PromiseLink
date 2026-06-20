@@ -2,11 +2,12 @@
 
 import asyncio
 import uuid
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator, AsyncIterator, Generator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from sqlalchemy import create_engine, event
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -39,7 +40,7 @@ def _is_sqlite() -> bool:
 IS_SQLITE = _is_sqlite()
 
 
-def _uuid_default():
+def _uuid_default() -> str | uuid.UUID:
     """Generate a default UUID value compatible with current dialect."""
     if IS_SQLITE:
         return str(uuid.uuid4())
@@ -54,7 +55,7 @@ class Base(DeclarativeBase):
 
 
 # Sync engine for migrations
-def get_sync_engine():
+def get_sync_engine() -> Any:
     """Get synchronous engine for Alembic migrations."""
     url = settings.database_url
     if url.startswith("sqlite"):
@@ -62,7 +63,7 @@ def get_sync_engine():
         engine = create_engine(url, connect_args={"check_same_thread": False}, echo=settings.debug)
 
         @event.listens_for(engine, "connect")
-        def set_sqlite_pragma(dbapi_conn, connection_record):
+        def set_sqlite_pragma(dbapi_conn: Any, connection_record: Any) -> None:
             cursor = dbapi_conn.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.execute("PRAGMA journal_mode=WAL")
@@ -85,7 +86,7 @@ def get_sync_session() -> Generator[Session, None, None]:
     try:
         yield session
         session.commit()
-    except Exception:
+    except SQLAlchemyError:
         session.rollback()
         raise
     finally:
@@ -93,7 +94,7 @@ def get_sync_session() -> Generator[Session, None, None]:
 
 
 # Async engine for FastAPI
-def get_async_engine():
+def get_async_engine() -> Any:
     """Get asynchronous engine for FastAPI."""
     url = settings.database_url
 
@@ -104,7 +105,7 @@ def get_async_engine():
         engine = create_async_engine(url, echo=settings.debug, connect_args={"check_same_thread": False})
 
         @event.listens_for(engine.sync_engine, "connect")
-        def set_sqlite_pragma(dbapi_conn, connection_record):
+        def set_sqlite_pragma(dbapi_conn: Any, connection_record: Any) -> None:
             cursor = dbapi_conn.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.execute("PRAGMA journal_mode=WAL")
@@ -135,7 +136,7 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
         try:
             yield session
             await session.commit()
-        except Exception:
+        except SQLAlchemyError:
             await session.rollback()
             raise
         finally:
@@ -143,13 +144,13 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 @asynccontextmanager
-async def get_session_context():
+async def get_session_context() -> AsyncIterator[AsyncSession]:
     """Get database session as async context manager."""
     async with AsyncSessionLocal() as session:
         try:
             yield session
             await session.commit()
-        except Exception:
+        except SQLAlchemyError:
             await session.rollback()
             raise
 
@@ -203,12 +204,12 @@ def get_pipeline_lock(user_id: str = "") -> asyncio.Lock:
     return _pipeline_locks[user_id]
 
 
-async def init_db():
+async def init_db() -> None:
     """Initialize database tables."""
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
 
-async def close_db():
+async def close_db() -> None:
     """Close database connections."""
     await async_engine.dispose()

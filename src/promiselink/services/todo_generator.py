@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from promiselink.services.llm_provider import LLMProvider
 
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.core.exceptions import InvalidTodoTypeError
@@ -212,7 +213,7 @@ class TodoGenerator:
                     logger.warning("parallel_typed_todo_failed",
                         todo_type="unknown", error=str(gen_todo))
                 elif gen_todo is not None:
-                    all_generated.append(gen_todo)  # type: ignore[arg-type]
+                    all_generated.append(gen_todo)
 
         elif event.event_type == "manual":
             gen_followup = await self._generate_typed_todo(
@@ -266,7 +267,7 @@ class TodoGenerator:
                     event_id=str(event.id),
                 )
                 persisted_todos.append(todo)
-            except Exception as e:
+            except SQLAlchemyError as e:
                 logger.error(
                     "todo_persist_failed",
                     error=str(e),

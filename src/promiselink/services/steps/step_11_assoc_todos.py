@@ -107,7 +107,7 @@ class Step11_AssociationTodos(PipelineStep):
                                 session.add(todo)
 
                     await commit_with_retry(session)
-        except Exception as step12_err:
+        except Exception as step12_err:  # Broadened — DB failure logs and continues pipeline
             logger.warning("pipeline_step12_error", error=str(step12_err))
             context.failed_steps.append(self.name)
 

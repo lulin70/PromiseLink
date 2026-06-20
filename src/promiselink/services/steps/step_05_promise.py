@@ -78,7 +78,7 @@ class Step05_PromiseAnalysis(PipelineStep):
                         # F-68: Initialize fulfillment_status for promise-type todos
                         if analysis.action_type.value in ("my_promise", "their_promise"):
                             todo.fulfillment_status = "pending"
-                    except Exception as apply_err:
+                    except Exception as apply_err:  # Broadened — any apply failure skips this todo, continues loop
                         logger.warning("pipeline_promise_apply_failed",
                             todo_id=str(todo.id), error=str(apply_err))
 
@@ -88,7 +88,7 @@ class Step05_PromiseAnalysis(PipelineStep):
 
             context.todos = fresh_todos
             context.result.todos = fresh_todos
-        except Exception as promise_err:
+        except Exception as promise_err:  # External API — keep broad catch for resilience
             logger.warning("pipeline_promise_step_failed",
                 event_id=event_id, error=str(promise_err))
             context.failed_steps.append(self.name)

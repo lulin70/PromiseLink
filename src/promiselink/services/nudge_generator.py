@@ -91,7 +91,7 @@ async def generate_gentle_nudge(
         message = await llm.generate(prompt, max_tokens=100)
         if message and len(message.strip()) > 5:
             return message.strip()[:120] + " — via PromiseLink"  # Cap at 120 chars + branding
-    except Exception as exc:
+    except Exception as exc:  # External API — keep broad catch for resilience
         _logger.warning("gentle_nudge_llm_fallback", error=str(exc), exc_info=True)
 
     # Fallback template (no LLM available)

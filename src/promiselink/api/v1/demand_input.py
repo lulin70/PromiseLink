@@ -261,7 +261,7 @@ async def _extract_demand(text: str) -> dict:
         logger.warning("demand_llm_missing_fields", result=result)
         return _fallback_extract(text)
 
-    except Exception as exc:
+    except Exception as exc:  # External API — keep broad catch for resilience
         logger.warning(
             "demand_llm_fallback",
             error=str(exc),

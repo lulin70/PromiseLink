@@ -32,7 +32,7 @@ EXPORT_VERSION = "1.0"
 MAX_EXPORT_ENTITIES = 10000
 
 
-def _serialize_model(obj) -> dict:
+def _serialize_model(obj: Any) -> dict:
     """Convert a SQLAlchemy model instance to a plain dict for JSON export.
 
     Uses the ORM mapper to resolve Python attribute names (which may
@@ -96,7 +96,7 @@ async def export_user_data(
     user_id: str,
     session: AsyncSession = Depends(get_async_session),
     authenticated_user_id: str = Depends(get_current_user_id),
-):
+) -> Any:
     """Export all data owned by *user_id* as a streaming JSON document.
 
     **Data isolation**: the requested *user_id* must match the

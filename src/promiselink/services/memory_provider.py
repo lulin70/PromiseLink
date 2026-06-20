@@ -440,12 +440,12 @@ class CarryMemProvider:
         self,
         api_url: str = "http://localhost:8100",
         api_key: str = "",
-    ):
+    ) -> None:
         self.api_url = api_url.rstrip("/")
         self.api_key = api_key
-        self._client = None
+        self._client: Any = None
 
-    async def _get_client(self):
+    async def _get_client(self) -> Any:
         """Lazy-initialize httpx client."""
         if self._client is None:
             import httpx
@@ -546,7 +546,7 @@ class CarryMemProvider:
                     )
                 )
             return results
-        except Exception as e:
+        except Exception as e:  # External API — keep broad catch for resilience
             logger.warning("carrymem_search_failed", query=query[:50], error=str(e))
             return []
 
@@ -581,7 +581,7 @@ class CarryMemProvider:
                     )
                 )
             return entries
-        except Exception as e:
+        except Exception as e:  # External API — keep broad catch for resilience
             logger.warning(
                 "carrymem_get_by_entity_failed",
                 entity_id=entity_id,
@@ -599,7 +599,7 @@ class CarryMemProvider:
             response.raise_for_status()
             logger.info("carrymem_deleted", event_id=event_id)
             return True
-        except Exception as e:
+        except Exception as e:  # External API — keep broad catch for resilience
             logger.warning("carrymem_delete_failed", event_id=event_id, error=str(e))
             return False
 
@@ -609,7 +609,7 @@ class CarryMemProvider:
         try:
             response = await client.get("/health")
             return response.status_code == 200  # type: ignore[no-any-return]
-        except Exception as exc:
+        except Exception as exc:  # External API — keep broad catch for resilience
             logger.warning("carrymem_health_check_failed", error=str(exc))
             return False
 

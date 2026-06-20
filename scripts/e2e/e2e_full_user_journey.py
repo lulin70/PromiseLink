@@ -11,6 +11,7 @@ PromiseLink 基础版 — 完整用户旅程 E2E 测试
 """
 
 import json
+import os
 import sys
 import time
 from datetime import datetime
@@ -20,7 +21,7 @@ import httpx
 # ── 配置 ───────────────────────────────────────────────
 BASE = "http://localhost:8002/api/v1"
 TIMEOUT = 60.0
-POC_SECRET = "promiselink2026"
+POC_SECRET = os.getenv("POC_SECRET", "promiselink2026")
 USER_ID = "e2e_user_journey"
 
 # ── 6份用户场景录入内容 ─────────────────────────────────

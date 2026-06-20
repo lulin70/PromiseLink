@@ -7,6 +7,8 @@ Design reference: Algorithm_Design_v1.md v2.5 §2.11
 """
 
 
+from typing import Any
+
 from sqlalchemy import func, select
 
 from promiselink.core.logging import get_logger
@@ -28,7 +30,7 @@ class ImplicitFeedbackCollector:
     - Long-press to downweight (explicit negative feedback)
     """
 
-    async def record_completion(self, todo: Todo, session) -> int:
+    async def record_completion(self, todo: Todo, session: Any) -> int:
         """Record the completion rank for a todo.
 
         Args:
@@ -61,7 +63,7 @@ class ImplicitFeedbackCollector:
 
         return rank
 
-    async def get_completion_stats(self, user_id: str, session) -> dict:
+    async def get_completion_stats(self, user_id: str, session: Any) -> dict:
         """Get completion statistics for a user.
 
         Args:

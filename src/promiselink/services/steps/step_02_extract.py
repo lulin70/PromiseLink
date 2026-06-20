@@ -71,7 +71,7 @@ class Step02_ExtractEntities(PipelineStep):
                         )).scalars().all()
                     )
                 await commit_with_retry(session)
-        except Exception as extract_err:
+        except Exception as extract_err:  # External API — keep broad catch for resilience
             logger.error("pipeline_extraction_failed",
                 event_id=event_id, error=str(extract_err))
             context.should_stop = True

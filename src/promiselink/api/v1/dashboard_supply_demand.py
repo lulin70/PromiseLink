@@ -1,5 +1,7 @@
 """Dashboard Supply-Demand Matching endpoint — F-E4: 供需匹配."""
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -55,7 +57,7 @@ async def get_supply_demand(
     offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> Any:
     """Find supply-demand matching opportunities across contacts.
 
     Matches entities that have demands against those that have supplies.

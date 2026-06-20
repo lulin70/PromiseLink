@@ -11,6 +11,7 @@ Template mapping:
 from dataclasses import dataclass, field
 from typing import Any, cast
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.core.logging import get_logger
@@ -170,7 +171,7 @@ class EntityExtractor:
                         event_keywords=event_keywords,
                     )
                     persisted_entities.append(entity)
-            except Exception as persist_err:
+            except SQLAlchemyError as persist_err:
                 logger.error(
                     "resolve_persist_failed",
                     person_name=person.name,
@@ -261,7 +262,7 @@ class EntityExtractor:
                 prompt=prompt,
                 temperature=0.3,
             )
-        except Exception as e:
+        except Exception as e:  # External API — keep broad catch for resilience
             logger.warning("card_extraction_failed", error=str(e)[:200])
             return ExtractionResult(persons=[])
 
@@ -315,7 +316,7 @@ class EntityExtractor:
                 prompt=prompt,
                 temperature=0.3,
             )
-        except Exception as e:
+        except Exception as e:  # External API — keep broad catch for resilience
             logger.warning("conversation_extraction_failed", error=str(e)[:200])
             return ExtractionResult(persons=[])
 
@@ -534,7 +535,7 @@ class EntityExtractor:
                 concern=cast(Any, properties.get("concern")),
                 capability=cast(Any, properties.get("capability")),
             )
-        except Exception as validation_err:
+        except (ValueError, TypeError) as validation_err:
             from promiselink.config import get_settings
             settings = get_settings()
             if settings.strict_properties_validation:

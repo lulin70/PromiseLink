@@ -47,7 +47,7 @@ class NotificationMessage:
 class NotificationService:
     """Notification dispatch service."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         settings = get_settings()
         self.wechat_app_id = settings.wechat_app_id
         self.wechat_app_secret = settings.wechat_app_secret
@@ -69,7 +69,7 @@ class NotificationService:
             else:
                 logger.warning("unknown_notification_channel", channel=message.channel)
                 return False
-        except Exception as e:
+        except Exception as e:  # External API — keep broad catch for resilience
             logger.error("notification_send_failed", channel=message.channel, user_id=message.user_id, error=str(e))
             return False
 

@@ -1,7 +1,7 @@
 """Smart Follow-up Reminder API endpoints (F-69)."""
 
 from datetime import UTC, datetime, time, timedelta
-from typing import cast
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -110,7 +110,7 @@ def _classify_reminder_type(todo: Todo) -> str:
 async def get_daily_reminders(
     user_id: str = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_async_session),
-):
+) -> Any:
     """Get daily reminder list with fatigue and quiet-hours filtering.
 
     Algorithm:
@@ -209,7 +209,7 @@ async def take_reminder_action(
     req: ReminderActionRequest,
     user_id: str = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_async_session),
-):
+) -> Any:
     """One-click action on a reminder: completed / snoozed / dismissed.
 
     Also records the action in reminder_logs for response latency tracking.
@@ -272,7 +272,7 @@ async def take_reminder_action(
 async def get_preferences(
     user_id: str = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_async_session),
-):
+) -> Any:
     """Get current reminder preferences for the user."""
     new_request_id()
 
@@ -305,7 +305,7 @@ async def update_preferences(
     req: PreferenceUpdateRequest,
     user_id: str = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_async_session),
-):
+) -> Any:
     """Update reminder preferences. Only provided fields are updated."""
     new_request_id()
 

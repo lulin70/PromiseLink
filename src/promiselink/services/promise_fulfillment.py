@@ -74,10 +74,10 @@ class SensitivityFilter:
         if isinstance(resource, dict):
             sens = resource.get("sensitivity")
             if sens:
-                return str(sens)  # type: ignore[no-any-return]
+                return str(sens)
         sens = props.get("resource_sensitivity")
         if sens:
-            return str(sens)  # type: ignore[no-any-return]
+            return str(sens)
         return self.DEFAULT
 
     def batch_filter(self, persons: list[Entity]) -> tuple[list[Entity], list[Entity]]:

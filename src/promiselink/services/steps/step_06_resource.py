@@ -49,13 +49,13 @@ class Step06_ResourceOveruse(PipelineStep):
                                 source_event_id=event_id,
                                 session=overuse_session,
                             )
-                        except Exception as overuse_err:
+                        except Exception as overuse_err:  # Broadened — single overuse check failure doesn't break loop
                             logger.warning("pipeline_step8_3_overuse_check_failed",
                                 entity_id=str(todo.related_entity_id),
                                 error=str(overuse_err))
 
                 await commit_with_retry(overuse_session)
-        except Exception as overuse_init_err:
+        except Exception as overuse_init_err:  # Broadened — init/DB failure logs and continues pipeline
             logger.warning("pipeline_step8_3_overuse_init_failed", error=str(overuse_init_err))
             context.failed_steps.append(self.name)
 

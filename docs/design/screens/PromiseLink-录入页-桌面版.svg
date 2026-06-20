@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" width="1440" height="900">
+  <defs>
+    <filter id="shadow"><feDropShadow dx="0" dy="1" stdDeviation="3" flood-color="#3A3F42" flood-opacity="0.08"/></filter>
+    <filter id="sbar"><feDropShadow dx="2" dy="0" stdDeviation="8" flood-color="#3A3F42" flood-opacity="0.06"/></filter>
+  </defs>
+  <rect width="1440" height="900" fill="#F5F6F7"/>
+  
+  <!-- Sidebar -->
+  <rect x="0" y="0" width="200" height="900" fill="#FFF" filter="url(#sbar)"/>
+  <text x="32" y="52" font-size="20" font-family="Inter" fill="#3A3F42">🤝</text>
+  <text x="64" y="52" font-size="16" font-weight="600" font-family="Inter" fill="#3A3F42">PromiseLink</text>
+  <rect x="16" y="72" width="168" height="1" fill="#DDE0E3"/>
+  <text x="52" y="113" font-size="14" font-family="Inter" fill="#6B7280">🏠 首页</text>
+  <text x="52" y="148" font-size="14" font-family="Inter" fill="#6B7280">📅 事件</text>
+  <text x="52" y="183" font-size="14" font-family="Inter" fill="#6B7280">👥 人脉</text>
+  <text x="52" y="218" font-size="14" font-family="Inter" fill="#6B7280">✓ 待办</text>
+  <rect x="16" y="238" width="168" height="40" rx="8" fill="#EDF0F2"/>
+  <text x="52" y="263" font-size="14" font-weight="600" font-family="Inter" fill="#A0C4A8">✏️ 录入</text>
+  
+  <!-- Left: Input -->
+  <rect x="224" y="20" width="580" height="860" rx="12" fill="#FFF" filter="url(#shadow)"/>
+  <text x="244" y="50" font-size="16" font-weight="600" font-family="Inter" fill="#3A3F42">记录交流</text>
+  
+  <rect x="244" y="70" width="540" height="200" rx="12" fill="#F5F6F7"/>
+  <rect x="484" y="120" width="60" height="60" rx="30" fill="#A0B0C4"/>
+  <text x="514" y="156" font-size="24" font-family="Inter" fill="#FFF" text-anchor="middle">🎤</text>
+  <text x="514" y="188" font-size="13" font-weight="600" font-family="Inter" fill="#6B7280" text-anchor="middle">语音输入</text>
+  <text x="514" y="206" font-size="11" font-family="Inter" fill="#9CA3AF" text-anchor="middle">实时转写</text>
+  
+  <rect x="244" y="284" width="540" height="260" rx="10" fill="#FFF" stroke="#DDE0E3" stroke-width="1"/>
+  <text x="264" y="314" font-size="13" font-family="Inter" fill="#9CA3AF">写下交流内容...</text>
+  <text x="264" y="344" font-size="14" font-family="Inter" fill="#3A3F42">• 6月18日和张三开会讨论了AI项目合作</text>
+  <text x="264" y="374" font-size="14" font-family="Inter" fill="#6B7280">  → 提取：人物「张三」，事件「AI项目讨论」</text>
+  <text x="264" y="404" font-size="14" font-family="Inter" fill="#3A3F42">• 我答应本周给他发合作方案</text>
+  <text x="264" y="434" font-size="14" font-family="Inter" fill="#6B7280">  → 提取：承诺「本周五前发方案」</text>
+  <text x="264" y="464" font-size="14" font-family="Inter" fill="#3A3F42">• 他提到团队正在扩张</text>
+  <text x="264" y="494" font-size="14" font-family="Inter" fill="#6B7280">  → 提取：关心「团队扩张」</text>
+  <text x="264" y="524" font-size="14" font-family="Inter" fill="#C4C8CC">|</text>
+  
+  <rect x="244" y="560" width="170" height="72" rx="10" fill="#F5F6F7"/>
+  <text x="264" y="586" font-size="12" font-family="Inter" fill="#6B7280">💡 示例：会议记录</text>
+  <text x="264" y="608" font-size="11" font-family="Inter" fill="#9CA3AF">和张三聊了AI合作，</text>
+  <text x="264" y="626" font-size="11" font-family="Inter" fill="#9CA3AF">答应本周发方案</text>
+  
+  <rect x="430" y="560" width="170" height="72" rx="10" fill="#F5F6F7"/>
+  <text x="450" y="586" font-size="12" font-family="Inter" fill="#6B7280">💡 示例：微信对话</text>
+  <text x="450" y="608" font-size="11" font-family="Inter" fill="#9CA3AF">李四说团队扩张</text>
+  <text x="450" y="626" font-size="11" font-family="Inter" fill="#9CA3AF">顺利，下周详聊</text>
+  
+  <!-- Right: Preview -->
+  <rect x="820" y="20" width="600" height="860" rx="12" fill="#FFF" filter="url(#shadow)"/>
+  <text x="840" y="50" font-size="16" font-weight="600" font-family="Inter" fill="#3A3F42">🤖 AI 实时预览</text>
+  <rect x="840" y="70" width="560" height="1" fill="#EDF0F2"/>
+  
+  <text x="840" y="106" font-size="13" fill="#9CA3AF" font-family="Inter">识别的人物</text>
+  <rect x="840" y="118" width="560" height="44" rx="8" fill="#F5F6F7"/>
+  <circle cx="864" cy="140" r="14" fill="#A0B0C4"/>
+  <text x="864" y="146" font-size="11" font-family="Inter" fill="#FFF" text-anchor="middle">张</text>
+  <text x="888" y="146" font-size="13" font-weight="600" font-family="Inter" fill="#3A3F42">张三</text>
+  <text x="930" y="146" font-size="12" font-family="Inter" fill="#6B7280">AI产品总监 · XYZ科技</text>
+  
+  <text x="840" y="190" font-size="13" fill="#9CA3AF" font-family="Inter">提取的承诺</text>
+  <rect x="840" y="202" width="560" height="60" rx="8" fill="#FFF3F0"/>
+  <text x="860" y="226" font-size="14" font-weight="600" font-family="Inter" fill="#C4A7A0">📌 本周五前发AI合作方案</text>
+  <text x="860" y="248" font-size="12" font-family="Inter" fill="#6B7280">类型：承诺 · 截止：6月22日 · 来源：本次记录</text>
+  
+  <text x="840" y="290" font-size="13" fill="#9CA3AF" font-family="Inter">提取的关心</text>
+  <rect x="840" y="302" width="560" height="44" rx="8" fill="#F0F3FF"/>
+  <text x="860" y="326" font-size="14" font-weight="600" font-family="Inter" fill="#A0B0C4">💙 团队扩张进展</text>
+  <text x="860" y="324" font-size="14" fill="#6B7280" font-family="Inter"> / </text>
+  <text x="875" y="324" font-size="12" fill="#6B7280" font-family="Inter">类型：关心 · 来源：本次记录</text>
+
+  <text x="840" y="390" font-size="13" fill="#9CA3AF" font-family="Inter">输入履历关联</text>
+  <rect x="840" y="402" width="560" height="44" rx="8" fill="#F5F6F7"/>
+  <text x="860" y="426" font-size="12" fill="#6B7280" font-family="Inter">← 上次关联人：张三（6月12日微信讨论）</text>
+  
+  <!-- Confirm -->
+  <rect x="840" y="470" width="560" height="48" rx="10" fill="#A0C4A8"/>
+  <text x="1120" y="500" font-size="16" font-weight="600" font-family="Inter" fill="#FFF" text-anchor="middle">确认保存</text>
+</svg>

@@ -62,7 +62,7 @@ class Step04_TodoGeneration(PipelineStep):
                 )
                 context.result.step_timings["step4_todos"] = time.monotonic() - _t4
                 await commit_with_retry(session)
-        except Exception as todo_err:
+        except Exception as todo_err:  # External API — keep broad catch for resilience
             logger.warning("pipeline_todo_generation_failed",
                 event_id=event_id, error=str(todo_err))
             context.failed_steps.append(self.name)

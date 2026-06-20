@@ -11,6 +11,8 @@ import time
 from collections import OrderedDict
 from typing import Any
 
+from redis.exceptions import RedisError
+
 from promiselink.config import get_settings
 from promiselink.core.logging import get_logger
 
@@ -20,7 +22,7 @@ _redis_client = None
 
 _MEMORY_CACHE_MAX_SIZE = 1000
 
-async def get_redis():
+async def get_redis() -> Any:
     """Get or create Redis client (singleton)."""
     global _redis_client
     settings = get_settings()
@@ -36,12 +38,12 @@ async def get_redis():
             )
             await _redis_client.ping()
             logger.info("redis_connected", url=settings.redis_url)
-        except Exception as e:
+        except (ImportError, RedisError) as e:
             logger.warning("redis_connection_failed", error=str(e))
             _redis_client = None
     return _redis_client
 
-async def close_redis():
+async def close_redis() -> None:
     """Close Redis connection."""
     global _redis_client
     if _redis_client:
@@ -51,7 +53,7 @@ async def close_redis():
 class CacheService:
     """Application-level cache service with Redis backend and in-memory fallback."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # OrderedDict for LRU-like eviction; stores (value, expire_at) tuples
         self._memory_cache: OrderedDict[str, tuple[Any, float]] = OrderedDict()
 
@@ -68,7 +70,7 @@ class CacheService:
                 val = await redis.get(f"promiselink:{key}")
                 if val:
                     return json.loads(val)
-            except Exception as e:
+            except Exception as e:  # Broadened from RedisError for resilience — any Redis failure falls back to memory
                 logger.warning("redis_get_failed", key=key, error=str(e))
         # Fallback to memory cache
         entry = self._memory_cache.get(key)
@@ -90,7 +92,7 @@ class CacheService:
             try:
                 await redis.set(f"promiselink:{key}", json.dumps(value, default=str), ex=ttl)
                 return
-            except Exception as e:
+            except Exception as e:  # Broadened from RedisError for resilience — any Redis failure falls back to memory
                 logger.warning("redis_set_failed", key=key, error=str(e))
         # Fallback to memory cache with TTL
         expire_at = time.time() + ttl if ttl > 0 else 0
@@ -106,7 +108,7 @@ class CacheService:
         if redis:
             try:
                 await redis.delete(f"promiselink:{key}")
-            except Exception as e:
+            except Exception as e:  # Broadened from RedisError for resilience — any Redis failure falls back to memory
                 logger.warning("redis_delete_failed", key=key, error=str(e))
         self._memory_cache.pop(key, None)
 

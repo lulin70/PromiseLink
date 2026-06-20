@@ -62,7 +62,7 @@ class Step03_SemanticEmbedding(PipelineStep):
                             text=combined_text,
                             user_id=str(entity.user_id),
                         )
-                except Exception as embed_err:
+                except Exception as embed_err:  # External API — keep broad catch for resilience
                     logger.warning("pipeline_step5_5_entity_embed_failed",
                         entity_id=str(entity.id), error=str(embed_err))
 
@@ -78,7 +78,7 @@ class Step03_SemanticEmbedding(PipelineStep):
                         text=event.raw_text[:500],
                         user_id=str(event.user_id),
                     )
-        except Exception as embed_init_err:
+        except Exception as embed_init_err:  # External API — keep broad catch for resilience
             logger.warning("pipeline_step5_5_init_failed", error=str(embed_init_err))
             context.failed_steps.append(self.name)
 

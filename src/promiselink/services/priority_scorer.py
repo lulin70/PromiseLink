@@ -57,8 +57,8 @@ class PriorityScore:
 
 
 async def _write_audit_log(
-    session,
-    todo,
+    session: Any,
+    todo: Any,
     old_score: float | None,
     new_score: float,
     score_version: str,
@@ -182,7 +182,7 @@ class PriorityScorer:
         """Calculate importance based on todo_type."""
         return IMPORTANCE_WEIGHTS.get(todo_type, DEFAULT_IMPORTANCE)
 
-    async def score_and_update_todo(self, todo, session) -> float:
+    async def score_and_update_todo(self, todo: Any, session: Any) -> float:
         """Score a Todo ORM object and update its dynamic_score field.
 
         Also writes a ScoreAuditLog entry for traceability.
@@ -229,7 +229,7 @@ class PriorityScorer:
 
         return result.score
 
-    async def batch_score_todos(self, todos, session) -> list[PriorityScore]:
+    async def batch_score_todos(self, todos: Any, session: Any) -> list[PriorityScore]:
         """Score multiple todos in batch.
 
         Also writes ScoreAuditLog entries for each todo.
@@ -300,7 +300,7 @@ class PriorityScorerV2(PriorityScorer):
         "context": 0.15,
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         from promiselink.services.context_matcher import ContextMatcher
         from promiselink.services.dependency_analyzer import DependencyAnalyzer
@@ -308,7 +308,7 @@ class PriorityScorerV2(PriorityScorer):
         self.dependency_analyzer = DependencyAnalyzer()
         self.context_matcher = ContextMatcher()
 
-    async def score_with_context(self, todo, session, brief=None) -> PriorityScore:
+    async def score_with_context(self, todo: Any, session: Any, brief: Any = None) -> PriorityScore:
         """Four-dimensional scoring (requires session for graph queries).
 
         Args:
@@ -361,7 +361,7 @@ class PriorityScorerV2(PriorityScorer):
             },
         )
 
-    async def score_and_update_todo_v2(self, todo, session) -> float:
+    async def score_and_update_todo_v2(self, todo: Any, session: Any) -> float:
         """Score a Todo with four-dimensional model and update + audit log.
 
         Args:
@@ -401,7 +401,7 @@ class PriorityScorerV2(PriorityScorer):
 
         return result.score
 
-    async def batch_score_with_context(self, todos, session) -> list[PriorityScore]:
+    async def batch_score_with_context(self, todos: Any, session: Any) -> list[PriorityScore]:
         """Score multiple todos with four-dimensional model.
 
         Also writes ScoreAuditLog entries for each todo.

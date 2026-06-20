@@ -2,6 +2,7 @@
 
 import hashlib
 import hmac
+from typing import Any
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -27,7 +28,7 @@ class LoginResponse(BaseModel):
 
 
 @router.post("/auth/login", response_model=LoginResponse)
-async def login(request: LoginRequest):
+async def login(request: LoginRequest) -> Any:
     """PoC login: 需要poc_secret验证。生产环境应禁用此端点，使用微信OAuth。"""
     from promiselink.config import get_settings
     settings = get_settings()
@@ -53,7 +54,7 @@ class WeChatLoginResponse(BaseModel):
 
 
 @router.post("/auth/wechat/login", response_model=WeChatLoginResponse)
-async def wechat_login(request: WeChatLoginRequest, session: AsyncSession = Depends(get_async_session)):
+async def wechat_login(request: WeChatLoginRequest, session: AsyncSession = Depends(get_async_session)) -> Any:
     """微信小程序登录：用code换取openid，创建/查找用户，返回JWT。"""
     from promiselink.core.wechat import WeChatOAuthError, wechat_oauth
 

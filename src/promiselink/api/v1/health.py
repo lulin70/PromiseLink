@@ -1,6 +1,7 @@
 """Health check endpoints with dependency verification."""
 
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
@@ -18,7 +19,7 @@ router = APIRouter()
 
 
 @router.get("/health")
-async def health_check():
+async def health_check() -> Any:
     """
     Basic health check endpoint (unauthenticated, no sensitive info).
 
@@ -45,7 +46,7 @@ async def health_check_db(
     try:
         await session.execute(text("SELECT 1"))
         db_status = "connected"
-    except Exception as exc:
+    except Exception as exc:  # Health check — keep broad catch for resilience
         db_status = "error"
         logger.warning("health_db_check_failed", error=str(exc))
 
@@ -75,7 +76,7 @@ async def health_check_full(
     try:
         await session.execute(text("SELECT 1"))
         components["database"] = {"status": "healthy", "type": "sqlite"}
-    except Exception as exc:
+    except Exception as exc:  # Health check — keep broad catch for resilience
         components["database"] = {"status": "unhealthy"}
         overall_healthy = False
         logger.warning("health_full_db_check_failed", error=str(exc))
@@ -93,9 +94,9 @@ async def health_check_full(
             components["cache"] = {"status": "degraded", "backend": "memory"}
         try:
             await cache.delete(test_key)
-        except Exception as exc:
+        except Exception as exc:  # Health check — keep broad catch for resilience
             logger.debug("health_cache_cleanup_failed", error=str(exc))
-    except Exception as exc:
+    except Exception as exc:  # Health check — keep broad catch for resilience
         components["cache"] = {"status": "degraded", "backend": "memory"}
         logger.warning("health_cache_check_failed", error=str(exc))
 
@@ -108,7 +109,7 @@ async def health_check_full(
         else:
             components["llm"] = {"status": "not_configured"}
             overall_healthy = False
-    except Exception as exc:
+    except Exception as exc:  # Health check — keep broad catch for resilience
         components["llm"] = {"status": "error"}
         overall_healthy = False
         logger.warning("health_llm_check_failed", error=str(exc))

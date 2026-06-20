@@ -203,7 +203,7 @@ class SemanticSearchEngine:
         blob = self._embedding_to_blob(embedding)
         vec_available = self._vec_available
 
-        def _do_store():
+        def _do_store() -> None:
             conn = sqlite3.connect(self.db_path)
             try:
                 conn.execute("""
@@ -264,7 +264,7 @@ class SemanticSearchEngine:
         """Search using sqlite-vec virtual table."""
         db_path = self.db_path
 
-        def _do_search():
+        def _do_search() -> Any:
             conn = sqlite3.connect(db_path)
             try:
                 results = conn.execute("""
@@ -298,10 +298,16 @@ class SemanticSearchEngine:
     async def _search_with_python(
         self, query_embedding: list[float], user_id: str, top_k: int
     ) -> list[SearchResult]:
-        """Fallback search using Python cosine similarity."""
+        """Fallback search using Python cosine similarity.
+
+        Uses numpy for vectorized batch cosine similarity when available —
+        this is significantly more memory-efficient and faster than building
+        a Python list of per-row float lists for large embedding sets.
+        Falls back to pure-Python cosine similarity if numpy is unavailable.
+        """
         db_path = self.db_path
 
-        def _do_search():
+        def _do_search() -> Any:
             conn = sqlite3.connect(db_path)
             try:
                 rows = conn.execute("""
@@ -310,6 +316,60 @@ class SemanticSearchEngine:
                     WHERE user_id = ?
                 """, (user_id,)).fetchall()
 
+                if not rows:
+                    return []
+
+                # Try numpy vectorized path (memory-efficient batch similarity)
+                try:
+                    import numpy as np
+
+                    query_arr = np.asarray(query_embedding, dtype=np.float32)
+                    query_norm = np.linalg.norm(query_arr)
+                    if query_norm == 0:
+                        return [
+                            SearchResult(
+                                target_type=t_type,
+                                target_id=t_id,
+                                score=0.0,
+                            )
+                            for t_type, t_id, _ in rows[:top_k]
+                        ]
+
+                    # Build matrix in one allocation instead of N Python lists.
+                    # Each row is unpacked from its BLOB directly into the matrix.
+                    dim = len(query_embedding)
+                    matrix = np.empty((len(rows), dim), dtype=np.float32)
+                    for i, (_, _, blob) in enumerate(rows):
+                        count = len(blob) // 4
+                        # Pad/truncate to dim if storage dimensions differ
+                        unpacked = list(struct.unpack(f"{count}f", blob))
+                        row_len = min(count, dim)
+                        matrix[i, :row_len] = unpacked[:row_len]
+                        if row_len < dim:
+                            matrix[i, row_len:] = 0.0
+
+                    # Vectorized cosine similarity: dot / (norm_q * norm_r)
+                    row_norms = np.linalg.norm(matrix, axis=1)
+                    # Avoid division by zero
+                    safe_norms = np.where(row_norms == 0, 1.0, row_norms)
+                    similarities = (matrix @ query_arr) / (safe_norms * query_norm)
+
+                    # Get top_k indices sorted by similarity descending
+                    top_indices = np.argsort(-similarities)[:top_k]
+
+                    return [
+                        SearchResult(
+                            target_type=rows[idx][0],
+                            target_id=rows[idx][1],
+                            score=round(float(similarities[idx]), 4),
+                        )
+                        for idx in top_indices
+                    ]
+                except ImportError:
+                    # numpy not available — fall back to pure Python
+                    pass
+
+                # Pure-Python fallback
                 results = []
                 for target_type, target_id, blob in rows:
                     stored_embedding = self._blob_to_embedding(blob)
@@ -344,7 +404,7 @@ class SemanticSearchEngine:
         actual_dims = self._actual_dims
         vec_available = self._vec_available
 
-        def _do_stats():
+        def _do_stats() -> Any:
             conn = sqlite3.connect(db_path)
             try:
                 if user_id:

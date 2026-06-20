@@ -70,7 +70,7 @@ class Step12_RelationshipBriefUpdate(PipelineStep):
                                     is_new=brief_result.is_new,
                                     modules=brief_result.modules_updated,
                                 )
-                        except Exception as brief_err:
+                        except Exception as brief_err:  # External API — keep broad catch for resilience
                             logger.warning("pipeline_brief_update_failed",
                                 entity_id=str(entity.id),
                                 error=str(brief_err),
@@ -79,7 +79,7 @@ class Step12_RelationshipBriefUpdate(PipelineStep):
                 await commit_with_retry(session)
         except ImportError:
             logger.debug("pipeline_step13_skipped_relationship_brief_not_available")
-        except Exception as step13_err:
+        except Exception as step13_err:  # External API — keep broad catch for resilience
             logger.warning("pipeline_step13_error", error=str(step13_err))
             context.failed_steps.append(self.name)
 

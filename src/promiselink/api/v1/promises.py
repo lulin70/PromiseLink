@@ -3,6 +3,7 @@
 import json
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -63,7 +64,7 @@ async def list_promises(
     limit: int = Query(20, ge=1, le=100),
     user_id: str = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_async_session),
-):
+) -> Any:
     """List promises with dual view (my-promises / their-promises)."""
     new_request_id()
 
@@ -150,7 +151,7 @@ async def update_fulfillment(
     req: FulfillmentUpdateRequest,
     user_id: str = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_async_session),
-):
+) -> Any:
     """Update fulfillment status of a promise.
 
     Security: their_promise type only allows pending->fulfilled (user confirms).
@@ -179,8 +180,11 @@ async def update_fulfillment(
     todo.fulfillment_status = req.fulfillment_status
     if req.fulfillment_status == "fulfilled":
         todo.fulfilled_at = datetime.now(UTC)
+    elif req.fulfillment_status == "overdue":
+        todo.overdue_notified_at = datetime.now(UTC)
     elif req.fulfillment_status == "pending":
         todo.fulfilled_at = None
+        todo.overdue_notified_at = None
 
     await session.commit()
     return FulfillmentUpdateResponse(todo_id=todo_id, fulfillment_status=req.fulfillment_status)
@@ -190,7 +194,7 @@ async def update_fulfillment(
 async def promise_stats(
     user_id: str = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_async_session),
-):
+) -> Any:
     """Promise fulfillment statistics."""
     new_request_id()
 
@@ -239,7 +243,7 @@ async def get_nudge_draft(
     todo_id: str,
     user_id: str = Depends(get_current_user_id),
     session: AsyncSession = Depends(get_async_session),
-):
+) -> Any:
     """Generate or retrieve a gentle nudge message for an overdue their_promise.
 
     Only works for their_promise type todos that are pending or overdue.

@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from promiselink.services.llm_provider import LLMProvider
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.core.logging import get_logger
@@ -261,7 +262,7 @@ class RelationshipBriefService:
                     data["basic_info"] = self._build_basic_info(db_entity)
                     if "basic_info" not in modules_updated:
                         modules_updated.append("basic_info")
-            except Exception as exc:
+            except SQLAlchemyError as exc:
                 logger.debug(
                     "brief_basic_info_db_fallback_failed",
                     person_entity_id=person_entity_id,
@@ -673,7 +674,7 @@ class RelationshipBriefService:
                             "evidence": cr.get("evidence", {}),
                             "confidence": cr.get("confidence", 0),
                         })
-        except Exception as exc:
+        except (SQLAlchemyError, ImportError) as exc:
             logger.debug("cold_discovery_failed_best_effort", entity_id=entity_id, error=str(exc))
 
         return entries

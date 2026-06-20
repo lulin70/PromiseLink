@@ -142,7 +142,7 @@ class RedisSlidingWindow:
             remaining = limit - current_count - 1
             return True, remaining, 0
 
-        except Exception as e:
+        except Exception as e:  # Broadened from RedisError — any failure falls back to in-memory
             logger.warning("redis_rate_limit_failed", error=str(e))
             # Fall back to in-memory
             return await _memory_limiter.is_allowed(key, limit)

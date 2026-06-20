@@ -2,8 +2,10 @@
 
 import asyncio
 import signal
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -37,7 +39,7 @@ _shutdown_event = asyncio.Event()
 _pending_tasks: set[asyncio.Task] = set()
 
 
-async def _scheduled_event_maintenance():
+async def _scheduled_event_maintenance() -> None:
     """Background task: periodically mark overdue scheduled events and cleanup cancelled ones.
 
     Runs every 5 minutes. First run after 30 seconds delay.
@@ -67,7 +69,7 @@ async def _scheduled_event_maintenance():
                         cancelled_cleaned=cleaned_count,
                     )
 
-        except Exception as e:
+        except Exception as e:  # Startup/shutdown — keep broad catch for resilience
             logger.error("scheduled_event_maintenance_error", error=str(e))
 
         # Wait 5 minutes or until shutdown
@@ -78,7 +80,7 @@ async def _scheduled_event_maintenance():
             pass  # Normal: continue loop
 
 
-def _signal_handler(signum, frame):
+def _signal_handler(signum: int, frame: Any) -> None:
     """Handle SIGTERM/SIGINT for graceful shutdown."""
     import structlog
     logger = structlog.get_logger()
@@ -92,7 +94,7 @@ signal.signal(signal.SIGINT, _signal_handler)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan manager with graceful shutdown."""
     # Startup
     import structlog
@@ -145,7 +147,7 @@ async def lifespan(app: FastAPI):
                     task.cancel()
                 # Wait for cancellation to propagate
                 await asyncio.gather(*pending, return_exceptions=True)
-        except Exception as e:
+        except Exception as e:  # Startup/shutdown — keep broad catch for resilience
             logger.error("shutdown_task_error", error=str(e))
 
     from promiselink.core.redis import close_redis
@@ -167,7 +169,7 @@ async def lifespan(app: FastAPI):
     try:
         from promiselink.services.relay_client import close_relay_client
         await close_relay_client()
-    except Exception as e:
+    except Exception as e:  # Startup/shutdown — keep broad catch for resilience
         logger.warning("relay_client_close_error", error=str(e))
 
     await close_db()
@@ -206,7 +208,7 @@ app.add_middleware(
 # ── X-Powered-By Header Middleware ──
 
 @app.middleware("http")
-async def add_powered_by_header(request: Request, call_next):
+async def add_powered_by_header(request: Request, call_next: Any) -> Any:
     """Add X-Powered-By: PromiseLink to all HTTP responses."""
     response = await call_next(request)
     response.headers["X-Powered-By"] = "PromiseLink"
@@ -236,7 +238,7 @@ _BUSINESS_ERROR_STATUS: dict[str, int] = {
 
 
 @app.exception_handler(BusinessError)
-async def business_error_handler(request: Request, exc: BusinessError):
+async def business_error_handler(request: Request, exc: BusinessError) -> JSONResponse:
     """Handle business logic errors with structured error response."""
     status_code = _BUSINESS_ERROR_STATUS.get(exc.code, 400)
     return JSONResponse(
@@ -252,7 +254,7 @@ async def business_error_handler(request: Request, exc: BusinessError):
 
 
 @app.exception_handler(LLMError)
-async def llm_error_handler(request: Request, exc: LLMError):
+async def llm_error_handler(request: Request, exc: LLMError) -> JSONResponse:
     """Handle LLM-related errors."""
     status_code = 503  # Service Unavailable
     if exc.code == "LLM_RATE_LIMIT":
@@ -272,7 +274,7 @@ async def llm_error_handler(request: Request, exc: LLMError):
 
 
 @app.exception_handler(PromiseLinkError)
-async def promiselink_error_handler(request: Request, exc: PromiseLinkError):
+async def promiselink_error_handler(request: Request, exc: PromiseLinkError) -> JSONResponse:
     """Handle all other PromiseLink errors."""
     return JSONResponse(
         status_code=500,
@@ -287,7 +289,7 @@ async def promiselink_error_handler(request: Request, exc: PromiseLinkError):
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request, exc):
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     """Handle request validation errors with standard error format."""
     # Sanitize errors: convert bytes to str to avoid JSON serialization TypeError
     safe_errors = []
@@ -307,7 +309,7 @@ async def validation_exception_handler(request, exc):
     )
 
 
-def _sanitize_bytes_recursive(obj):
+def _sanitize_bytes_recursive(obj: Any) -> Any:
     """Recursively convert bytes to str in nested structures."""
     if isinstance(obj, bytes):
         return obj.decode("utf-8", errors="replace")
@@ -319,7 +321,7 @@ def _sanitize_bytes_recursive(obj):
 
 
 @app.exception_handler(404)
-async def not_found_handler(request, exc):
+async def not_found_handler(request: Request, exc: Any) -> JSONResponse:
     """Handle 404 errors."""
     return JSONResponse(
         status_code=404,
@@ -328,7 +330,7 @@ async def not_found_handler(request, exc):
 
 
 @app.exception_handler(500)
-async def internal_error_handler(request, exc):
+async def internal_error_handler(request: Request, exc: Any) -> JSONResponse:
     """Handle 500 errors."""
     return JSONResponse(
         status_code=500,

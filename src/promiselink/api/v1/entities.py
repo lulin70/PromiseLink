@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, ConfigDict
@@ -74,7 +75,7 @@ async def list_entities(
     offset: int = 0,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> Any:
     """List entities with optional filtering and pagination."""
     new_request_id()
 
@@ -144,7 +145,7 @@ async def get_dormant_contacts(
     min_days: int = Query(60, ge=1, le=730),
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> DormantContactsResponse:
     """Scan for dormant person contacts and return reactivation candidates.
 
     Returns contacts with no interaction for >= min_days, sorted by
@@ -176,7 +177,7 @@ async def get_entity(
     entity_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> Any:
     """Get detailed information about a specific entity."""
     new_request_id()
 
@@ -204,7 +205,7 @@ async def update_entity(
     request: EntityUpdateRequest,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> Any:
     """Update an entity's fields."""
     new_request_id()
 
@@ -245,7 +246,7 @@ async def delete_entity(
     entity_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> None:
     """Delete an entity and its associations."""
     new_request_id()
 
@@ -319,7 +320,7 @@ async def get_entity_history(
     entity_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> EntityHistoryResponse:
     """Get the complete interaction history for a specific entity.
 
     Returns all events, todos, and associations related to this entity.

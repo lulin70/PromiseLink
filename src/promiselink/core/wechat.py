@@ -23,7 +23,7 @@ class WeChatOAuthService:
 
     CODE2SESSION_URL = "https://api.weixin.qq.com/sns/jscode2session"
 
-    def __init__(self):
+    def __init__(self) -> None:
         settings = get_settings()
         self.app_id = settings.wechat_app_id
         self.app_secret = settings.wechat_app_secret

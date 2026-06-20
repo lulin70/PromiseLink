@@ -490,10 +490,10 @@ class TestG303OverdueStatus:
     async def test_overdue_notified_at_field_exists(
         self, client: AsyncSession, db_session: AsyncSession
     ):
-        """Verify: overdue_notified_at字段存在于模型中.
+        """Verify: overdue_notified_at字段在标记overdue后被自动设置.
 
         Scenario: 标记overdue后查询todo，检查overdue_notified_at字段
-        Expected: 字段存在（当前实现未自动设置，报告为bug）
+        Expected: 字段存在且被设置为当前时间（bug已修复）
         """
         todo = await insert_promise_todo(
             db_session,
@@ -512,9 +512,8 @@ class TestG303OverdueStatus:
         db_todo = await get_todo_from_db(db_session, str(todo.id))
         # 字段存在于模型中（验证字段可访问）
         assert hasattr(db_todo, "overdue_notified_at")
-        # 当前实现：PATCH endpoint不自动设置overdue_notified_at（报告为bug）
-        # 此处验证字段可读，值为None（当前行为）
-        assert db_todo.overdue_notified_at is None
+        # Bug已修复：PATCH endpoint在overdue时自动设置overdue_notified_at
+        assert db_todo.overdue_notified_at is not None
 
 
 # ══════════════════════════════════════════════════════════════════════════════

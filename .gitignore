@@ -52,7 +52,6 @@ checkpoint_*/
 scratchpad_*/
 
 # === Internal docs (sensitive) ===
-docs/internal/
 archive/
 
 # === Logs ===
@@ -73,11 +72,6 @@ node_modules/
 *.tar.gz
 *.zip
 
-# === External docs binary assets ===
-docs/external/**/*.png
-docs/external/**/*.xlsx
-docs/external/**/*.pptx
-
 # === Frontend build cache ===
 frontend/.swc/
 frontend/dist/
@@ -89,7 +83,6 @@ htmlcov/
 .ruff_cache/
 .mypy_cache/
 *.mp4
-docs/external/**/*.pdf
 
 # Debug scripts
 debug_batch.py

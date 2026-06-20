@@ -9,10 +9,12 @@ Endpoints:
 
 import uuid
 from collections.abc import Callable
+from typing import Any
 
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.api.dependencies import rate_limit_dependency
@@ -157,7 +159,7 @@ def _summarize_module(key: str, data: dict) -> str:
     if fn:
         try:
             return fn(data)
-        except Exception as exc:
+        except (KeyError, TypeError, ValueError, IndexError) as exc:
             logger.debug("brief_summary_format_failed", key=key, error=str(exc))
             return "数据异常"
 
@@ -240,7 +242,7 @@ async def get_relationship_brief(
     entity_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> Any:
     """Get the relationship progress tracking card for a specific person entity."""
     new_request_id()
 
@@ -262,7 +264,7 @@ async def get_relationship_brief_aggregated(
     entity_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> Any:
     """Get aggregated relationship brief with structured 12-module view.
 
     Resolves entity name/company, formats each module into human-readable form,
@@ -295,7 +297,7 @@ async def get_relationship_brief_aggregated(
                 or (props.get("basic") or {}).get("company")
                 or None
             )
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         logger.warning("failed_to_resolve_entity", entity_id=str(entity_id), error=str(exc))
 
     # 3. Stage metadata
@@ -396,7 +398,7 @@ async def list_relationship_briefs(
     offset: int = 0,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> Any:
     """List all relationship briefs for the current user.
 
     Supports optional filtering by relationship_stage.
@@ -427,7 +429,7 @@ async def update_relationship_brief(
     body: UpdateRelationshipBriefRequest,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> Any:
     """Partially update a relationship brief with optimistic locking.
 
     Uses expected_version for conflict detection.

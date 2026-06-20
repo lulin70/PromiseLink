@@ -1,7 +1,7 @@
 # PromiseLink PRD — 变更记录篇
 
 > **文档名称**: PRD_变更记录.md
-> **版本**: v4.8
+> **版本**: v5.5
 > **拆分日期**: 2026-06-08
 > **来源**: PRD_v1.md 拆分
 > **负责人**: CarryMem 团队
@@ -49,6 +49,8 @@
 | v4.6 | 2026-06-06 | Phase 1动态优先级四维演进详细设计：①§1.7.5扩展Phase 1四维模型完整设计②新增维度3依赖性：全图谱路径分析算法（有向依赖图+阻塞链检测+3跳间接依赖+dependency_score=Σ(1/depth)×blocked_weight）③新增维度4场景匹配：Event表驱动算法（未来24h meeting/call扫描+Entity匹配+context_score=max(0,1-hours/24)）④权重配置从PoC(0.4/0.6/0/0)演进为Phase1(0.3/0.35/0.2/0.15)⑤新增F-55依赖性全图谱路径分析⑥新增F-56场景匹配Event表驱动 | CarryMem团队 |
 | v4.7 | 2026-06-06 | Phase 1向量化功能设计：①新增§1.7.7向量化语义能力②新增F-57语义搜索（embedding向量化Entity/Event，支持自然语言查询）③新增F-58关联发现增强（embedding余弦相似度补充结构化匹配，混合得分0.7×structured+0.3×semantic）④技术选型：text-embedding-3-small（Moka AI API，API模式768维/本地降级384维，兼容OpenAI SDK）+sqlite-vec扩展（零额外依赖）⑤向量化对象：Entity(concern+capability+basic)+Event(raw_text摘要)⑥性能目标：embedding<500ms/条，语义搜索<200ms(100条以内)⑦Phase 2迁移路径：sqlite-vec→pgvector | CarryMem团队 |
 | v4.3 | 2026-06-04 | 7角色Review融合+许总PoC反馈修订版：**A组（P0阻塞修复）**：①F-45新增evidence_quote PII脱敏策略（BLK-1：sanitize_llm_input清洗/API返回脱敏/不参与搜索索引/crypto.py加密引用）②F-44新增input_scope服务端校验规则（BLK-2：仅接受auto/InputClassifier强制覆盖/hint参考/400错误码）③F-45 action_type枚举从5种统一为6种（BLK-3：my_promise/their_promise/my_followup/mutual_action/system_reminder/unclear）+Todo模型新增evidence_event_id外键字段（Arch意见C2）。**B组（许总PoC反馈）**：④新增F-49日视图（今日议程）作为首页子模块⑤F-04关联发现引擎增加"主题互通"用户视角语言+D3.js Phase 1 Plus计划⑥产品愿景增加"终身关系经营智能体"长期愿景（CarryMem 7种记忆类型支撑）+数据导出提前到Phase 1⑦F-10/F-41语音交互增加许总确认为刚需注释+Mock TTS端点。**C组（7角色Review意见采纳）**：⑧PM意见C1：PoC退出条件增加测试方法学表（100条脱敏数据/PM+Arch双签/Sprint 2窗口）⑨Tester意见C3：F-47增加回归测试策略标注（2正向+1异常用例/E2E场景/Sprint阻塞）⑩DevOps意见C4：新增§4.5运维监控指标（6项P0指标含延迟/分布/覆盖率）⑪UI意见C5：F-47推进卡12模块展示优先级（P0首屏/P1展开/P2详情页） | CarryMem团队 |
+| v5.5 | 2026-06-20 | ①新增§1.8 MVP策略决策（打法B确认：专业版早鸟¥29/月MVP，语音录入为核心入口，三个场景闭环）②更新§3.0.2明确打法B=MVP范围（会后记录+待办提醒+承诺跟进，语音录入P0）③更新F-10语音录入优先级为P0（MVP核心，非Phase 1扩展）④排除功能清单：care/risk/cooperation_signal三种Todo移入Phase 2，MVP仅保留promise/followup两种） | CarryMem团队 |
+| v5.6 | 2026-06-20 | ①§5.18.2解析展示增强：承诺区新增[+添加承诺]按钮+内联纠偏视觉提示（点击文字直接改）②新增§5.18.3纠偏5：承诺手动添加纠偏③新增§5.18.7内联纠偏交互设计（人名/关系/待办可点选纠偏，替代弹表单）④新增§5.18.8全局撤销Undo设计（纠偏操作5秒可撤销，栈深10步）⑤更新§5.18.6录入纠偏API：corrected_promises支持add动作+promises_created响应字段 | CarryMem团队 |
 
 ### 7角色评审共识整合清单
 

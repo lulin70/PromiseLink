@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, ConfigDict
@@ -94,7 +95,7 @@ async def list_todos(
     offset: int = 0,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> PaginatedResponse[TodoResponse]:
     """List todos with optional filtering, sorting, and pagination.
 
     Sort modes:
@@ -207,7 +208,7 @@ async def list_pending_confirmations(
     event_id: str | None = None,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> list[ConfirmationItem]:
     """List promise-type todos pending user confirmation.
 
     Filters by event_id if provided, otherwise returns all pending confirmations.
@@ -251,7 +252,7 @@ async def get_todo(
     todo_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> TodoDetailResponse:
     """Get detailed information about a specific todo.
 
     Enriches response with related_entity_name, source_event_title and
@@ -332,7 +333,7 @@ async def update_todo(
     request: TodoUpdateRequest,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> Any:
     """Update a todo (including state transitions via TodoStateMachine)."""
     new_request_id()
 
@@ -387,7 +388,7 @@ async def delete_todo(
     todo_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> None:
     """Delete a todo."""
     new_request_id()
 
@@ -415,7 +416,7 @@ async def confirm_todo(
     req: ConfirmRequest,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> TodoConfirmResponse:
     """Confirm or reject an AI-extracted promise todo.
 
     - confirmed: mark as confirmed, apply optional corrections

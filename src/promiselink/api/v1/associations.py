@@ -50,7 +50,7 @@ async def list_associations(
     offset: int = 0,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> Any:
     """List associations with optional filtering."""
     new_request_id()
 
@@ -85,7 +85,7 @@ async def get_association(
     association_id: uuid.UUID,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
-):
+) -> Any:
     """Get a specific association by ID."""
     new_request_id()
 

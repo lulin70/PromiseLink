@@ -41,7 +41,7 @@ class Step09_MemoryStorage(PipelineStep):
                     entity_ids=entity_ids,
                     summary=extraction.summary if extraction else "",
                 )
-        except Exception as mem_err:
+        except Exception as mem_err:  # External API — keep broad catch for resilience
             logger.error(
                 "pipeline_memory_failed",
                 event_id=event_id,

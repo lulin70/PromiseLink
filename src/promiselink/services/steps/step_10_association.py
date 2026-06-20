@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import time
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from promiselink.core.logging import get_logger
 from promiselink.services.steps.context import PipelineContext, PipelineStep
 
@@ -46,7 +48,7 @@ class Step10_AssociationDiscovery(PipelineStep):
                             user_id=user_id,
                             event_id=event_id,
                         )
-        except Exception as assoc_err:
+        except SQLAlchemyError as assoc_err:
             logger.warning("pipeline_association_discovery_failed",
                 event_id=event_id, error=str(assoc_err))
             context.failed_steps.append(self.name)

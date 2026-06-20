@@ -39,11 +39,11 @@ class Step07_PriorityScoring(PipelineStep):
                         score_result = await scorer_v2.score_with_context(todo, score_session)
                         todo.dynamic_score = score_result.score
                         todo.score_calculated_at = datetime.now(UTC)
-                    except Exception as score_err:
+                    except Exception as score_err:  # External API — keep broad catch for resilience
                         logger.warning("pipeline_step8_5_score_failed",
                             todo_id=str(todo.id), error=str(score_err))
                 await commit_with_retry(score_session)
-        except Exception as scorer_err:
+        except Exception as scorer_err:  # Broadened — init/DB failure logs and continues pipeline
             logger.warning("pipeline_step8_5_scorer_init_failed", error=str(scorer_err))
             context.failed_steps.append(self.name)
 

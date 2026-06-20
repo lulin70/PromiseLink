@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 375 2400" role="img">
+  <title>PromiseLink 首次体验 — 4屏录入闭环</title>
+  <desc>屏1:信任承诺 → 屏2:一句话输入 → 屏3:确认重点 → 屏4:获得价值</desc>
+
+  <defs>
+    <filter id="cardShadow" x="-1" y="-1" width="102%" height="104%">
+      <feDropShadow dx="0" dy="1" stdDeviation="3" flood-color="#3A3F42" flood-opacity="0.08"/>
+    </filter>
+  </defs>
+
+  <rect width="375" height="2400" fill="#F5F6F7"/>
+
+  <!-- ====== SCREEN 1: 信任承诺 ====== -->
+  <rect x="16" y="16" width="343" height="580" rx="20" fill="#FFFFFF" filter="url(#cardShadow)"/>
+
+  <!-- Progress dots -->
+  <circle cx="172" cy="60" r="4" fill="#A0C4A8"/>
+  <circle cx="188" cy="60" r="4" fill="#DDE0E3"/>
+  <circle cx="204" cy="60" r="4" fill="#DDE0E3"/>
+
+  <!-- Icon -->
+  <rect x="140" y="100" width="96" height="96" rx="24" fill="#A0C4A8"/>
+  <text x="188" y="148" font-family="Inter, sans-serif" font-size="40" fill="#FFFFFF" text-anchor="middle">🤝</text>
+
+  <!-- Title -->
+  <text x="188" y="240" font-family="Inter, sans-serif" font-size="22" font-weight="600" fill="#3A3F42" text-anchor="middle">这是你的私人关系助手</text>
+  <text x="188" y="268" font-family="Inter, sans-serif" font-size="14" fill="#9CA3AF" text-anchor="middle">所有数据只属于你，无人可见</text>
+
+  <!-- Value points -->
+  <text x="80" y="320" font-family="Inter, sans-serif" font-size="13" fill="#6B7280">📝 记住每一次重要的交流</text>
+  <text x="80" y="348" font-family="Inter, sans-serif" font-size="13" fill="#6B7280">✅ 兑现你答应过的事</text>
+  <text x="80" y="376" font-family="Inter, sans-serif" font-size="13" fill="#6B7280">💡 在对的时候关心对的人</text>
+
+  <!-- CTA Button -->
+  <rect x="48" y="430" width="280" height="52" rx="26" fill="#A0C4A8"/>
+  <text x="188" y="456" font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">记录一次重要交流</text>
+
+  <!-- Skip -->
+  <text x="188" y="510" font-family="Inter, sans-serif" font-size="14" fill="#9CA3AF" text-anchor="middle">跳过，稍后再说</text>
+
+  <text x="188" y="560" font-family="Inter, sans-serif" font-size="11" fill="#9CA3AF" text-anchor="middle">← 左滑进入下一步</text>
+
+  <!-- ====== SCREEN 2: 一句话输入 ====== -->
+  <rect x="16" y="620" width="343" height="580" rx="20" fill="#FFFFFF" filter="url(#cardShadow)"/>
+
+  <circle cx="172" cy="664" r="4" fill="#DDE0E3"/>
+  <circle cx="188" cy="664" r="4" fill="#A0C4A8"/>
+  <circle cx="204" cy="664" r="4" fill="#DDE0E3"/>
+
+  <text x="188" y="710" font-family="Inter, sans-serif" font-size="18" font-weight="600" fill="#3A3F42" text-anchor="middle">描述一次你关心的事</text>
+  <text x="188" y="734" font-family="Inter, sans-serif" font-size="13" fill="#9CA3AF" text-anchor="middle">越自然越好，像聊天一样</text>
+
+  <!-- Input box -->
+  <rect x="48" y="760" width="280" height="120" rx="12" fill="#F5F6F7"/>
+  <text x="64" y="790" font-family="Inter, sans-serif" font-size="14" fill="#3A3F42">和张三讨论了AI项目合作，</text>
+  <text x="64" y="814" font-family="Inter, sans-serif" font-size="14" fill="#3A3F42">答应本周发方案。他说团队</text>
+  <text x="64" y="838" font-family="Inter, sans-serif" font-size="14" fill="#3A3F42">在扩张中。</text>
+  <text x="64" y="862" font-family="Inter, sans-serif" font-size="13" fill="#9CA3AF">|</text>
+
+  <!-- Example cards -->
+  <text x="56" y="910" font-family="Inter, sans-serif" font-size="11" fill="#9CA3AF">试试这样说</text>
+
+  <rect x="48" y="922" width="280" height="36" rx="8" fill="#F5F6F7" stroke="#DDE0E3" stroke-width="0.5"/>
+  <text x="64" y="940" font-family="Inter, sans-serif" font-size="12" fill="#6B7280">"和李四吃饭，他说在招人"</text>
+
+  <rect x="48" y="966" width="280" height="36" rx="8" fill="#F5F6F7" stroke="#DDE0E3" stroke-width="0.5"/>
+  <text x="64" y="984" font-family="Inter, sans-serif" font-size="12" fill="#6B7280">"关心王五的发布会进展"</text>
+
+  <!-- Voice button -->
+  <circle cx="188" cy="1070" r="28" fill="#A0B0C4"/>
+  <text x="188" y="1070" font-family="Inter, sans-serif" font-size="22" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">🎤</text>
+  <text x="188" y="1116" font-family="Inter, sans-serif" font-size="12" fill="#6B7280" text-anchor="middle">用语音说也行</text>
+
+  <!-- ====== SCREEN 3: 确认重点 ====== -->
+  <rect x="16" y="1228" width="343" height="580" rx="20" fill="#FFFFFF" filter="url(#cardShadow)"/>
+
+  <circle cx="172" cy="1272" r="4" fill="#DDE0E3"/>
+  <circle cx="188" cy="1272" r="4" fill="#DDE0E3"/>
+  <circle cx="204" cy="1272" r="4" fill="#A0C4A8"/>
+
+  <text x="188" y="1318" font-family="Inter, sans-serif" font-size="18" font-weight="600" fill="#3A3F42" text-anchor="middle">确认一下，我理解的对吗？</text>
+
+  <!-- Recognized entity -->
+  <rect x="48" y="1344" width="280" height="72" rx="10" fill="#F5F6F7"/>
+  <text x="64" y="1370" font-family="Inter, sans-serif" font-size="12" fill="#9CA3AF">人物</text>
+  <circle cx="80" cy="1390" r="14" fill="#A0B0C4"/>
+  <text x="80" y="1390" font-family="Inter, sans-serif" font-size="10" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">张</text>
+  <text x="104" y="1390" font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#3A3F42">张三 (AI项目经理)</text>
+
+  <!-- Extracted promise -->
+  <rect x="48" y="1432" width="280" height="72" rx="10" fill="#F5F6F7"/>
+  <text x="64" y="1458" font-family="Inter, sans-serif" font-size="12" fill="#9CA3AF">承诺</text>
+  <text x="64" y="1482" font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#3A3F42">本周发AI方案</text>
+  <rect x="200" y="1472" width="48" height="18" rx="4" fill="#A0C4A8" fill-opacity="0.15"/>
+  <text x="224" y="1481" font-family="Inter, sans-serif" font-size="10" fill="#A0C4A8" text-anchor="middle" dominant-baseline="central">承诺</text>
+
+  <!-- Extracted care -->
+  <rect x="48" y="1520" width="280" height="72" rx="10" fill="#F5F6F7"/>
+  <text x="64" y="1546" font-family="Inter, sans-serif" font-size="12" fill="#9CA3AF">关心</text>
+  <text x="64" y="1570" font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#3A3F42">团队扩张进展</text>
+
+  <rect x="48" y="1620" width="280" height="48" rx="24" fill="#A0C4A8"/>
+  <text x="188" y="1644" font-family="Inter, sans-serif" font-size="15" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">对，确认保存</text>
+
+  <text x="188" y="1692" font-family="Inter, sans-serif" font-size="14" fill="#C4A7A0" text-anchor="middle">我想修改一下</text>
+
+  <!-- ====== SCREEN 4: 获得价值 ====== -->
+  <rect x="16" y="1830" width="343" height="540" rx="20" fill="#FFFFFF" filter="url(#cardShadow)"/>
+
+  <circle cx="188" cy="1870" r="6" fill="#A0C4A8"/>
+  <text x="188" y="1894" font-family="Inter, sans-serif" font-size="12" fill="#A0C4A8" text-anchor="middle">完成！</text>
+
+  <rect x="120" y="1920" width="136" height="68" rx="16" fill="#A0C4A8" fill-opacity="0.10"/>
+  <text x="188" y="1954" font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#A0C4A8" text-anchor="middle">关系已记录 ✓</text>
+
+  <!-- Value demonstration -->
+  <rect x="48" y="2010" width="280" height="44" rx="8" fill="#F5F6F7"/>
+  <text x="64" y="2032" font-family="Inter, sans-serif" font-size="13" fill="#6B7280">📅 已添加到今日日程: "发AI方案"</text>
+
+  <rect x="48" y="2062" width="280" height="44" rx="8" fill="#F5F6F7"/>
+  <text x="64" y="2084" font-family="Inter, sans-serif" font-size="13" fill="#6B7280">🤝 下次联系时提醒: "张三在扩张团队"</text>
+
+  <rect x="48" y="2114" width="280" height="44" rx="8" fill="#F5F6F7"/>
+  <text x="64" y="2136" font-family="Inter, sans-serif" font-size="13" fill="#6B7280">💡 建议行动: 联系李四聊团队架构</text>
+
+  <!-- CTA -->
+  <rect x="48" y="2180" width="280" height="48" rx="24" fill="#A0C4A8"/>
+  <text x="188" y="2204" font-family="Inter, sans-serif" font-size="15" font-weight="600" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">进入 PromiseLink →</text>
+
+  <text x="188" y="2260" font-family="Inter, sans-serif" font-size="13" fill="#6B7280" text-anchor="middle">下次再记录一条</text>
+</svg>

@@ -8,6 +8,12 @@
 >
 > **License**: AGPL v3 — 商业使用需遵守许可证条款
 
+> **PromiseLink** 是 AI 驱动的个人商务关系经营助手的**开源基础版**（AGPL v3）。
+> 定位为**本地免费部署的纯文本关系助手**，提供事件录入 → 实体提取 → Todo生成 → 承诺追踪 → 关联发现 → 仪表盘的核心闭环。
+> **不包含**语音输入、语音查询、邮件同步、微信转发、OCR名片扫描、隐私数据管理等专业版功能。
+> 通过 `relay_client` 可选连接专业版云端网关以使用云端 AI 能力（需专业版 License）。
+> 前端为 Taro H5（桌面浏览器宽屏优先，兼容移动端）。
+
 ## 快速启动
 
 ```bash
@@ -38,8 +44,7 @@ PromiseLink/
 │   │   ├── event.py            # 互动事件
 │   │   ├── todo.py             # 行动提醒（6类）
 │   │   ├── association.py      # 关联发现
-│   │   ├── relationship_brief.py  # 关系简报
-│   │   └── voice_session.py    # 语音会话
+│   │   └── relationship_brief.py  # 关系简报
 │   ├── api/v1/                 # REST API（26个路由文件）
 │   │   ├── health.py           # 健康检查
 │   │   ├── events.py           # 事件CRUD + Pipeline触发
@@ -48,12 +53,9 @@ PromiseLink/
 │   │   ├── associations.py     # 关联查询
 │   │   ├── relationship_briefs.py  # 关系简报
 │   │   ├── dashboard.py        # 数据看板
-│   │   ├── voice.py / voice_query.py  # 语音输入/查询
-│   │   ├── import_csv.py       # CSV导入
 │   │   ├── export.py           # 数据导出
 │   │   ├── demand_input.py     # 需求输入
-│   │   ├── auth.py             # 认证
-│   │   ├── wechat_forward.py / email_sync.py  # 数据接入
+│   │   └── auth.py             # 认证
 │   ├── services/               # 核心引擎（38个模块）
 │   │   ├── event_pipeline.py   # 13步事件处理管线
 │   │   ├── entity_extractor.py    # LLM实体提取
@@ -92,19 +94,22 @@ PromiseLink/
 ```
 
 **Todo 类型**（雾色系）:
-| 类型 | 颜色 | 含义 |
-|------|------|------|
-| promise | 雾绿 | 承诺事项 |
-| help | 雾紫 | 帮助建议 |
-| care | 雾蓝 | 关注提醒 |
-| followup | 雾金 | 后续跟进 |
-| cooperation_signal | 雾白 | 合作信号 |
-| risk | 烟粉 | 风险预警 |
+
+| 类型                  | 颜色 | 含义   |
+| ------------------- | -- | ---- |
+| promise             | 雾绿 | 承诺事项 |
+| help                | 雾紫 | 帮助建议 |
+| care                | 雾蓝 | 关注提醒 |
+| followup            | 雾金 | 后续跟进 |
+| cooperation\_signal | 雾白 | 合作信号 |
+| risk                | 烟粉 | 风险预警 |
 
 ### 数据接入层（DataSourceAdapter）
-- 手动输入 / 语音输入 / 微信转发 / CSV导入 / **邮件同步**
+
+- 手动输入 / CSV导入（语音输入/微信转发/邮件同步为专业版功能）
 
 ### Insight Engine（洞察引擎）
+
 - 动态优先级评分（4维：紧急度×0.4 + 重要度×0.6）
 - 隐式反馈学习（完成顺序→关系权重）
 - 场景匹配（DependencyAnalyzer + ContextMatcher）
@@ -112,6 +117,7 @@ PromiseLink/
 ## 文档索引
 
 ### 核心文档
+
 - [PRD v5.2](docs/spec/PRD_v1.md) - 产品需求文档
 - [技术设计 v3.2](docs/architecture/PromiseLink_技术设计_v1.md) - 完整技术方案
 - [项目状态](docs/PROJECT_STATUS.md) - 11阶段生命周期跟踪（55%完成）
@@ -119,6 +125,7 @@ PromiseLink/
 - [Setup指南](docs/deliverables/README_SETUP.md) - 安装说明（指向QUICKSTART）
 
 ### 详细设计文档
+
 - [数据库设计 v3.0](docs/design/Database_Design_v1.md)
 - [API设计 v3.1](docs/design/API_Design_v1.md)
 - [算法设计 v2.8](docs/design/Algorithm_Design_v1.md)
@@ -127,19 +134,17 @@ PromiseLink/
 - [集成设计 v2.9](docs/design/Integration_Design_v1.md)
 - [部署指南 v0.5.0](docs/design/Deployment_Guide.md)
 
-### 评估报告
-- [POC准备度评估](docs/external/for_team/PromiseLink_POC准备度评估报告.md)
-
 ## 当前进度
 
 ### ✅ 已完成（P1-P9）
+
 - [x] PRD v5.2（关系经营核心闭环 + 向量化语义能力）
 - [x] 技术设计 v3.2（Insight Engine + DataSourceAdapter + 向量语义）
 - [x] P0核心算法全部实现（实体归一/承诺履行/状态机/关联发现/动态评分）
 - [x] FastAPI完整实现（26个路由文件 / 72个API端点）
 - [x] 38个服务模块（Pipeline/NLG/SemanticSearch/MemoryProvider等）
-- [x] 9个模型文件，11个模型类（entity/event/todo/association/relationship_brief/voice_session等）
-- [x] DataSourceAdapter抽象层（手动/语音/微信/CSV/邮件）
+- [x] 8个模型文件（entity/event/todo/association/relationship_brief/scheduled_event/reminder/score_audit_log）
+- [x] DataSourceAdapter抽象层（手动/CSV；语音/微信/邮件为专业版功能）
 - [x] CarryMem协议解耦（NullMemoryProvider优雅降级）
 - [x] 加密体系（HMAC-SHA256 + 字段级加密 + 行级安全）
 - [x] 63个测试文件 / **1319测试用例** (1210单元+42 E2E+50安全+17性能) / **67%覆盖率**
@@ -149,21 +154,22 @@ PromiseLink/
 - [x] Taro H5前端打包发布
 
 ### 🔴 未启动
+
 - [ ] 专业版: 网关中继开发（SQLite+relay gateway）
 - [ ] 定制版: 团队协作功能（PG+Redis+多租户）
 
 ## 技术栈
 
-| 层面 | 技术 |
-|------|------|
-| **框架** | FastAPI 0.109+ (Python 3.11+) |
-| **数据库** | SQLite (基础版+专业版长期方案) / PostgreSQL 15 (定制版) |
-| **ORM** | SQLAlchemy 2.0+ (async) |
-| **LLM** | Moka AI (Claude Sonnet 4.6) / OpenAI (GPT-5.5) / Anthropic |
-| **向量** | sqlite-vec (基础版+专业版) / pgvector (定制版) |
-| **缓存** | Redis (定制版) |
-| **算法** | NetworkX + RapidFuzz + numpy |
-| **部署** | 基础版: 本地直接运行（无需Docker） / 专业版: Docker + 网关中继 / 定制版: Docker Compose + K8s |
+| 层面      | 技术                                                                     |
+| ------- | ---------------------------------------------------------------------- |
+| **框架**  | FastAPI 0.109+ (Python 3.11+)                                          |
+| **数据库** | SQLite (基础版+专业版长期方案) / PostgreSQL 15 (定制版)                             |
+| **ORM** | SQLAlchemy 2.0+ (async)                                                |
+| **LLM** | Moka AI (Claude Sonnet 4.6) / OpenAI (GPT-5.5) / Anthropic             |
+| **向量**  | sqlite-vec (基础版+专业版) / pgvector (定制版)                                  |
+| **缓存**  | Redis (定制版)                                                            |
+| **算法**  | NetworkX + RapidFuzz + numpy                                           |
+| **部署**  | 基础版: 本地直接运行（无需Docker） / 专业版: Docker + 网关中继 / 定制版: Docker Compose + K8s |
 
 ## 验证安装
 
@@ -192,27 +198,26 @@ curl "http://localhost:8000/api/v1/entities/search?q=技术合作"
 
 ## 质量指标
 
-| 指标 | 数值 |
-|------|------|
-| 测试用例 | **1319 passed** (1210单元+42 E2E+50安全+17性能), 109 skipped, 0 failed |
-| 代码覆盖率 | **67%** |
-| mypy类型检查 | **0错误** (116源文件全部通过) |
-| ruff代码检查 | **0错误** |
-| 安全测试 | **50项全通过** (SQL注入/XSS/路径遍历/JWT/越权/输入验证/速率限制) |
-| 性能测试 | **17项全通过** (API响应<50-500ms+并发+内存) |
-| API路由 | **26个路由文件 / 72个API端点** |
-| 服务模块 | **38个** |
-| 数据模型 | **9个文件，11个模型类** |
-| 文档版本 | PRD v5.2 / Tech v3.2 |
-| 产品层级 | 基础版(本地免费) / 专业版(网关中继) / 定制版(团队) |
-| 总体进度 | **85%** |
+| 指标       | 数值                                                               |
+| -------- | ---------------------------------------------------------------- |
+| 测试用例     | **1319 passed** (1210单元+42 E2E+50安全+17性能), 109 skipped, 0 failed |
+| 代码覆盖率    | **67%**                                                          |
+| mypy类型检查 | **0错误** (116源文件全部通过)                                             |
+| ruff代码检查 | **0错误**                                                          |
+| 安全测试     | **50项全通过** (SQL注入/XSS/路径遍历/JWT/越权/输入验证/速率限制)                     |
+| 性能测试     | **17项全通过** (API响应<50-500ms+并发+内存)                                |
+| API路由    | **26个路由文件 / 72个API端点**                                           |
+| 服务模块     | **38个**                                                          |
+| 数据模型     | **9个文件，11个模型类**                                                  |
+| 文档版本     | PRD v5.2 / Tech v3.2                                             |
+| 产品层级     | 基础版(本地免费) / 专业版(网关中继) / 定制版(团队)                                  |
+| 总体进度     | **85%**                                                          |
 
 ## 产品版本
 
-| 版本 | 定位 | 价格 | 部署方式 |
-|------|------|------|----------|
-| **基础版** | 本地免费，纯文本交互 | 免费 | 本地直接运行（无需Docker） |
-| **专业版** | 网关中继，微信小程序随时访问 | ¥29/月（早鸟价） / ¥49/月（常规价） | 本地Docker + 云中继网关 |
+| 版本      | 定位         | 价格   | 部署方式                   |
+| ------- | ---------- | ---- | ---------------------- |
+| **基础版** | 本地免费，纯文本交互 | 免费   | 本地直接运行（无需Docker）       |
 | **定制版** | 销售团队协作，多租户 | 按需定制 | 云端Docker Compose + K8s |
 
 > 基础版为纯文本交互，不包含语音功能和图片扫描功能。专业版依赖云端服务凭证。
@@ -220,7 +225,7 @@ curl "http://localhost:8000/api/v1/entities/search?q=技术合作"
 ## 团队
 
 - **负责人**: 林总（CarryMem团队）
-- **合作方**: 许总（IAMHERE数字名片）
+- **合作方**: 许总，李总，简总，Sophia J Lin
 
 ## License
 

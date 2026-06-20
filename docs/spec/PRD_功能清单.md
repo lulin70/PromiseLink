@@ -92,7 +92,7 @@
 | F-08 CSV导入 | — | ✅ | ✅ | 冷启动刚需(PM建议提前) |
 | F-19 TTS播报 | — | ✅ | ✅ | 许总核心场景(PM建议提前) |
 | F-09 名片扫描 | — | ✅ | ✅ | 小程序原生（多入口之一）。**数字名片对接决策（2026-06-08确认）**：PoC阶段不对接外部数字名片平台（如陈宇鑫公司），名片扫描保持当前"补充身份输入"定位。原因：(1)名片信息量有限，核心价值在后续记录；(2)当前名片体验"不丝滑"是交互设计问题，非接口问题；(3)对接增加PoC不确定性。Phase1再评估对接方案。 |
-| F-10 语音录入 | — | ✅ | ✅ | 小程序原生。**许总（种子用户）已确认为刚需，Phase 1首批验证优先级最高**。PoC阶段可增加Mock TTS端点验证数据流（0.5天）。[v4.4新增] 不仅支持录入Event,还支持查询指令的语音输入(作为F-50语音助手的前置输入层) |
+| F-10 语音录入 | — | ✅ | ✅ | **P0（MVP核心入口，打法B确认）**。小程序原生 `wx.getRecorderManager` + 云端ASR。许总（种子用户）已确认为刚需，MVP首批验证优先级最高。语音录入→AI解析→待办/承诺提取，完整跑通核心三件套。 |
 | F-11 数据管理 | — | ✅ | ✅ | H5页面 |
 | F-12 关系图谱 | — | ✅ | ✅ | H5页面 |
 | F-13 推送通知 | — | ✅ | ✅ | 三通道+防打扰 |
@@ -104,6 +104,7 @@
 | F-20 操作历史 | — | — | ✅ | Phase 2（非RBAC审计） |
 | F-21 数据导出 | — | ✅ | ✅ | **v4.3提前到Phase 1**（终身智能体数据可携带保障） |
 | F-33 日历同步 | — | — | ✅ | Phase 2(原生能力) |
+| F-70 录入纠偏增强 | — | ✅ | ✅ | 内联纠偏（点文字直接改）+ 全局撤销Undo + 承诺手动添加，提升录入页可调整性 |
 | F-40+ 高级功能 | — | — | ✅ | 竞对预警/图数据库/向量搜索 |
 
 ***
@@ -172,12 +173,12 @@
 | 属性       | 说明                                                                                                                                                                                                                                                  |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 功能描述     | 基于关联发现结果和事件类型，生成差异化Todo项（信息型+行动型），支持状态追踪和完成度统计                                                                                                                                                                                                      |
-| Todo类型   | 🤝 Promise（承诺追踪）; 🫶 Help（帮助建议）; 💙 Care（关怀提醒）; 🔄 Followup（跟进待办）; ✨ Cooperation\_Signal（合作信号）; 🔴 Risk（风险预警）                                                                                                                               |
+| Todo类型   | **MVP范围（打法B）**: 🤝 Promise（承诺追踪）; 🔄 Followup（跟进待办）。**Phase 2+**: 新增🫶 Help（帮助建议）; 💙 Care（关怀提醒）; ✨ Cooperation_Signal（合作信号）; 🔴 Risk（风险预警）                                                                |
 | 状态流转     | pending → in\_progress → done / dismissed / snoozed; snoozed到期后自动恢复pending                                                                                                                               |
-| Action路由 | **card\_save**: 🤝💙信息型Todo+🫶帮助建议; **meeting**: 🤝💙信息型Todo+🔄行动项分解(按会议类型A/B/C/D)+待确认清单; **call**: 🤝💙信息型Todo+🔄跟进行动+承诺追踪; **manual**: 🤝💙增量Todo+合并建议                                                                                                |
+| Action路由 | **MVP范围（打法B）**: card_scan→🤝 Promise; meeting→🤝 Promise+🔄 Followup(按会议类型A/B/C/D); call→🤝 Promise+🔄 Followup; manual→🤝 Promise增量。**Phase 2+**: 新增💙 Care/🫶 Help/✨ Cooperation_Signal/🔴 Risk生成能力                                                                |
 | API      | `GET /api/v1/todos?status=pending&limit=20`; `PATCH /api/v1/todos/{id}` (更新状态); `GET /api/v1/todos/stats` (完成度统计); `POST /api/v1/todos/{id}/feedback`                                                                                               |
 | 输出Schema | card\_save: `{todo, actions[🔄]}`; meeting: `{todos[], actions[🔄{task,who,when,priority}], decisions[], pending_decisions[]}`; call: `{todos[], commitments[], followups[🔄]}`; manual: `{todos_delta[], merge_suggestions[]}` |
-| 验收标准     | ① Todo生成延迟<500ms ② 6种Todo类型全部可生成 ③ 状态流转API响应<200ms ④ 完成度统计API响应<500ms ⑤ card\_save Todo包含🫶帮助建议 ⑥ meeting Todo包含🔄行动项列表 ⑦ 不同event\_type的输出Schema符合各自定义 ⑧ Todo去重率100%（同一关联24小时内不重复生成）                                                 |
+| 验收标准     | ① Todo生成延迟<500ms ② **MVP：2种Todo类型（Promise/Followup）** ③ 状态流转API响应<200ms ④ 完成度统计API响应<500ms ⑤ meeting Todo包含🔄行动项列表 ⑥ 不同event\_type的输出Schema符合各自定义 ⑦ Todo去重率100%（同一关联24小时内不重复生成） ⑧ **Phase 2+ 完成6种Todo类型全部可生成**                                                 |
 
 #### F-07: Todo反馈与追踪闭环
 
