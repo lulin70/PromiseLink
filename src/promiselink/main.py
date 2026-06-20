@@ -22,6 +22,7 @@ from promiselink.api.v1 import (
     events,
     export,
     health,
+    metrics,
     promises,
     relationship_briefs,
     reminders,
@@ -30,6 +31,8 @@ from promiselink.api.v1 import (
 )
 from promiselink.config import get_settings
 from promiselink.core.exceptions import BusinessError, LLMError, PromiseLinkError
+from promiselink.core.metrics import init_app_metrics
+from promiselink.core.metrics import metrics_middleware as _metrics_middleware
 from promiselink.database import close_db, init_db
 
 settings = get_settings()
@@ -100,7 +103,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     import structlog
     logger = structlog.get_logger()
     logger.info("promiselink_starting")
-    logger.info("PromiseLink v0.6.3 — AGPL v3. Commercial use requires compliance. https://promiselink.app")
+    logger.info("PromiseLink v0.6.4 — AGPL v3. Commercial use requires compliance. https://promiselink.app")
 
     # Check for default secret key
     if settings.secret_key == "change-me-in-production" and settings.app_env != "test":
@@ -120,6 +123,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     await init_db()
     logger.info("database_initialized")
+
+    # Initialize Prometheus application metrics
+    init_app_metrics()
+    logger.info("metrics_initialized")
 
     # Start scheduled event background tasks (overdue marking + cancelled cleanup)
     _se_task = asyncio.create_task(_scheduled_event_maintenance())
@@ -213,6 +220,14 @@ async def add_powered_by_header(request: Request, call_next: Any) -> Any:
     response = await call_next(request)
     response.headers["X-Powered-By"] = "PromiseLink"
     return response
+
+
+# ── Prometheus Metrics Middleware ──
+
+@app.middleware("http")
+async def prometheus_metrics_middleware(request: Request, call_next: Any) -> Any:
+    """Prometheus metrics middleware — records HTTP request count and duration."""
+    return await _metrics_middleware(request, call_next)
 
 
 # ── Exception Handlers ──
@@ -340,6 +355,7 @@ async def internal_error_handler(request: Request, exc: Any) -> JSONResponse:
 
 # Include routers — Basic routes (always registered)
 app.include_router(health.router, prefix=settings.api_prefix, tags=["Health"])
+app.include_router(metrics.router, prefix=settings.api_prefix, tags=["Metrics"])
 app.include_router(auth.router, prefix=settings.api_prefix, tags=["Auth"])
 app.include_router(events.router, prefix=settings.api_prefix, tags=["Events"])
 app.include_router(entities.router, prefix=settings.api_prefix, tags=["Entities"])

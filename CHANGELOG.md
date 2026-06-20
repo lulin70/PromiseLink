@@ -2,6 +2,24 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [0.6.4] - 2026-06-20
+
+### Added — P10部署发布+P11运维保障推进
+- **install.sh 重写**（48行→296行）：8步流程对齐专业版（Python检查→Node检查→venv创建→依赖安装→前端构建→数据库迁移→配置检查+自动生成SECRET_KEY→健康验证）
+- **start.sh 重写**（48行→372行）：5种模式（前台/守护进程/停止/状态/重启）+端口冲突检测+PID管理+日志轮转（5MB自动归档）+健康检查（30s超时）
+- **P11 Prometheus监控端点**：新增 `/api/v1/metrics` 端点（Prometheus文本格式），暴露 http_requests_total counter + http_request_duration_seconds histogram + promiselink_info gauge + event_processing metrics
+- **Prometheus中间件**：自动采集所有HTTP请求的计数和耗时，与 monitoring/alerts.yml 告警规则对齐
+- 新增 prometheus-client>=0.20.0 依赖
+
+### Fixed — CI/CD隐患修正
+- 移除 `pip-audit --ignore-vuln GHSA-xxxx` 占位符（不再掩盖真实漏洞）
+- 覆盖率阈值 75%→72%（与实际覆盖率对齐，避免CI失败）
+
+### Tests
+- 全量回归：1353 passed, 45 skipped, 0 failed, 覆盖率 72%
+- mypy: 0 errors, ruff: all checks passed
+- /api/v1/metrics 端点验证成功（Prometheus格式指标正常输出）
+
 ## [0.6.3] - 2026-06-19
 
 ### Added

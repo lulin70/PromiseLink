@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # Application
     app_name: str = "PromiseLink"
-    app_version: str = "0.6.3"
+    app_version: str = "0.6.4"
     app_env: str = "development"
     debug: bool = False
     log_level: str = "INFO"
