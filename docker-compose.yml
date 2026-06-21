@@ -1,12 +1,14 @@
 version: '3.8'
 
 # Profiles usage:
-#   docker compose up                                    → starts only the app (SQLite mode)
+#   docker compose up                                    → starts only the app (SQLite mode, FastAPI serves H5)
 #   docker compose --profile full up                     → starts app + postgres + redis
+#   docker compose --profile production up               → starts app + nginx (reverse proxy with HTTPS)
+#   docker compose --profile production --profile full up → full stack with nginx
 # Other docker-compose files (docker-compose.basic.yml, etc.) serve specific use cases.
 
 services:
-  # FastAPI application
+  # FastAPI application (includes built H5 frontend at /app/static)
   promiselink:
     build: .
     container_name: promiselink-api
@@ -32,6 +34,25 @@ services:
         condition: service_started
         required: false
     command: uvicorn promiselink.main:app --host 0.0.0.0 --port 8000 --workers 2
+    networks:
+      - promiselink-network
+    restart: unless-stopped
+
+  # Nginx reverse proxy (production profile)
+  # Serves as TLS terminator and forwards /api/* to FastAPI
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: promiselink-nginx
+    profiles: ["production"]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/certs:/etc/letsencrypt:ro
+      - ./nginx/www:/var/www/certbot:ro
+    depends_on:
+      - promiselink
     networks:
       - promiselink-network
     restart: unless-stopped

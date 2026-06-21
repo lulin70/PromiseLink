@@ -2,6 +2,17 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [0.6.5] - 2026-06-21
+
+### Added — P10 Docker多阶段构建
+- **Dockerfile 改造**：新增 `frontend-builder` 阶段（node:20-alpine），在Docker构建时自动编译H5前端，构建产物COPY到 `/app/static/`，FastAPI直接serve前端静态文件
+- **docker-compose.yml 增强**：新增 `nginx` 服务（production profile），支持TLS终止+反向代理，与现有 `nginx/conf.d/default.conf` 配置对齐
+- **.dockerignore 更新**：保留 `frontend/` 源码（供frontend-builder阶段使用），排除 `frontend/dist/` 和 `frontend/node_modules/`（避免缓存污染）
+
+### Tests
+- 全量回归：1353 passed, 45 skipped, 0 failed, 覆盖率 72%
+- ruff: all checks passed
+
 ## [0.6.4] - 2026-06-20
 
 ### Added — P10部署发布+P11运维保障推进

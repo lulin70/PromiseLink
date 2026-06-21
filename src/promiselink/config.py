@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # Application
     app_name: str = "PromiseLink"
-    app_version: str = "0.6.4"
+    app_version: str = "0.6.5"
     app_env: str = "development"
     debug: bool = False
     log_level: str = "INFO"
@@ -48,16 +48,6 @@ class Settings(BaseSettings):
             if v_lower in ("basic", "pro"):
                 return v_lower
         raise ValueError("app_edition must be either 'basic' or 'pro'")
-
-    @field_validator("ai_mode", mode="before")
-    @classmethod
-    def validate_ai_mode(cls, v: Any) -> str:
-        """Validate ai_mode is either 'local' or 'relay'."""
-        if isinstance(v, str):
-            v_lower = v.lower()
-            if v_lower in ("local", "relay"):
-                return v_lower
-        raise ValueError("ai_mode must be either 'local' or 'relay'")
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -149,7 +139,6 @@ class Settings(BaseSettings):
     relay_reconnect_max: int = 30  # 最大重连间隔(秒)
     relay_heartbeat_interval: int = 30  # 心跳间隔(秒)
     relay_token_refresh_interval: int = 900  # relay token刷新间隔(秒)
-    ai_mode: str = "local"  # local / relay
 
     # ── Pro Edition: License Verification ──
     pro_license_key: str = Field(default="", description="专业版许可证密钥")

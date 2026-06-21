@@ -1,10 +1,29 @@
 # PromiseLink FastAPI Application
 # Multi-stage build for production-optimized image
 # =============================================================================
-# Stage 1: Builder — install dependencies into virtual environment
-# Stage 2: Runtime — copy only what's needed, run as non-root user
+# Stage 1: frontend-builder — build H5 static assets with Node.js
+# Stage 2: builder — install Python dependencies into virtual environment
+# Stage 3: runtime — copy only what's needed, run as non-root user
 # =============================================================================
 
+# =============================================================================
+# Stage 1: Frontend Builder — Taro H5 build
+# =============================================================================
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /frontend
+
+# Install dependencies first (cached layer)
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+# Copy frontend source and build H5 distribution
+COPY frontend/ ./
+RUN npm run build:h5
+
+# =============================================================================
+# Stage 2: Builder — install Python dependencies
+# =============================================================================
 FROM python:3.11-slim AS builder
 
 WORKDIR /build
@@ -24,7 +43,7 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
 # =============================================================================
-# Stage 2: Runtime — minimal image with non-root user
+# Stage 3: Runtime — minimal image with non-root user
 # =============================================================================
 FROM python:3.11-slim AS runtime
 
@@ -44,6 +63,10 @@ WORKDIR /app
 
 # Copy application code (src/promiselink/ → /app/src/promiselink/)
 COPY src/ ./src/
+
+# Copy frontend build output from frontend-builder
+# main.py mounts /app/static as the H5 static files root
+COPY --from=frontend-builder --chown=promiselink:promiselink /frontend/dist/ /app/static/
 
 # Create data directory for SQLite (owned by non-root user)
 RUN mkdir -p /app/data && chown promiselink:promiselink /app/data
