@@ -9,7 +9,6 @@ with LLM calls mocked out. No external services required.
 
 import base64
 import json
-import os
 import uuid
 from datetime import UTC
 
@@ -326,106 +325,6 @@ class TestVectorInjection:
         result_ids_b = [r.target_id for r in results_b]
         assert "entity-b" in result_ids_b
         assert "entity-a" not in result_ids_b
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 19.3 CSV导入安全专项
-# ══════════════════════════════════════════════════════════════════════════════
-
-
-@pytest.mark.skipif(
-    os.environ.get("APP_EDITION", "basic") != "pro",
-    reason="CSV Import API is a Pro-only feature",
-)
-class TestCSVImportSecurity:
-    """CSV import security tests."""
-
-    @pytest.mark.asyncio
-    async def test_tc_sec_220_csv_formula_injection(self, client: AsyncClient, db_session: AsyncSession):
-        """TC-SEC-220: CSV公式注入(=CMD...)防护验证.
-
-        Test that CSV with formula injection payloads is handled safely.
-        """
-        # CSV with formula injection in name field
-        csv_content = "name,company,title\n=CMD(\"del /f /q *.*\"),TestCorp,Engineer\n张三,ABC,Manager"
-        csv_bytes = csv_content.encode("utf-8")
-
-        resp = await client.post(
-            f"{API_PREFIX}/import/csv",
-            files={"file": ("test.csv", csv_bytes, "text/csv")},
-        )
-
-        # The import should succeed (formula is just treated as text)
-        assert resp.status_code in (200, 201)
-        data = resp.json()
-
-        # Verify the formula string is stored as plain text, not executed
-        # The entity with =CMD should be created but name should be stored as-is
-        # (it's the frontend's responsibility to escape when rendering)
-        assert data["created_entities"] >= 1
-
-    @pytest.mark.asyncio
-    async def test_tc_sec_221_large_csv_dos_protection(self, client: AsyncClient, db_session: AsyncSession):
-        """TC-SEC-221: 超大CSV文件DoS防护验证.
-
-        Test that very large CSV files are handled without crashing.
-        """
-        # Create a moderately large CSV (1000 rows) — not too large for test speed
-        rows = ["name,company,title"]
-        for i in range(1000):
-            rows.append(f"Person{i},Company{i},Title{i}")
-        csv_content = "\n".join(rows)
-        csv_bytes = csv_content.encode("utf-8")
-
-        resp = await client.post(
-            f"{API_PREFIX}/import/csv",
-            files={"file": ("large.csv", csv_bytes, "text/csv")},
-        )
-
-        # Should succeed (or at least not crash with 500)
-        assert resp.status_code in (200, 201)
-        data = resp.json()
-        assert data["imported_count"] == 1000
-
-    @pytest.mark.asyncio
-    async def test_tc_sec_222_csv_encoding_attack(self, client: AsyncClient, db_session: AsyncSession):
-        """TC-SEC-222: CSV编码攻击(UTF-7/BOM注入)防护验证.
-
-        Test that CSV with BOM or unusual encoding is handled safely.
-        """
-        # CSV with UTF-8 BOM
-        bom = b"\xef\xbb\xbf"
-        csv_content = bom + "name,company,title\n张三,测试公司,工程师\n".encode()
-
-        resp = await client.post(
-            f"{API_PREFIX}/import/csv",
-            files={"file": ("bom.csv", csv_content, "text/csv")},
-        )
-
-        # Should handle BOM gracefully
-        assert resp.status_code in (200, 201, 400)
-        if resp.status_code in (200, 201):
-            data = resp.json()
-            # If import succeeded, the name should not contain BOM artifacts
-            assert data["imported_count"] >= 1
-
-    @pytest.mark.asyncio
-    async def test_csv_non_csv_file_rejected(self, client: AsyncClient, db_session: AsyncSession):
-        """Verify that non-CSV files are rejected."""
-        resp = await client.post(
-            f"{API_PREFIX}/import/csv",
-            files={"file": ("test.exe", b"MZ\x90\x00", "application/octet-stream")},
-        )
-        assert resp.status_code == 400
-
-    @pytest.mark.asyncio
-    async def test_csv_empty_file_rejected(self, client: AsyncClient, db_session: AsyncSession):
-        """Verify that empty CSV files are rejected."""
-        resp = await client.post(
-            f"{API_PREFIX}/import/csv",
-            files={"file": ("empty.csv", b"", "text/csv")},
-        )
-        assert resp.status_code == 400
 
 
 # ══════════════════════════════════════════════════════════════════════════════

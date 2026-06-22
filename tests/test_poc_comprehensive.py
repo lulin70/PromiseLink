@@ -1,7 +1,7 @@
 """POC Comprehensive Integration, Stress, and Security Tests for PromiseLink.
 
 Tests against a running backend at http://localhost:8001 with:
-- PROMISELINK_POC_SECRET=promiselink2026
+- POC_SECRET=promiselink2026
 - LLM_API_KEY configured
 
 Test classes:
@@ -48,7 +48,7 @@ def _is_server_available():
 pytestmark = pytest.mark.skipif(
     not _is_server_available(),
     reason="Integration tests require a running backend at http://localhost:8001. "
-           "Start the server with PROMISELINK_POC_SECRET=promiselink2026 and run with --run-integration",
+           "Start the server with POC_SECRET=promiselink2026 and run with --run-integration",
 )
 
 

@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # Application
     app_name: str = "PromiseLink"
-    app_version: str = "0.6.5"
+    app_version: str = "0.6.6"
     app_env: str = "development"
     debug: bool = False
     log_level: str = "INFO"
@@ -125,13 +125,6 @@ class Settings(BaseSettings):
     opportunity_match_strong_threshold: float = 0.80
     opportunity_match_potential_threshold: float = 0.60
 
-    # Media Services (ASR/TTS/OCR)
-    asr_provider: str = "moka_ai"
-    tts_provider: str = "moka_ai"
-    ocr_provider: str = "moka_ai"
-    media_max_audio_size_mb: int = 25
-    media_max_image_size_mb: int = 10
-
     # ── Pro Edition: Gateway Relay ──
     relay_gateway_url: str = Field(default="", description="网关WSS地址，设置即启用relay_client")
     relay_user_token: str = Field(default="", description="网关JWT令牌")
@@ -142,18 +135,6 @@ class Settings(BaseSettings):
 
     # ── Pro Edition: License Verification ──
     pro_license_key: str = Field(default="", description="专业版许可证密钥")
-
-    # ── Pro Edition: Email Sync ──
-    email_imap_host: str = ""
-    email_imap_port: int = 993
-    email_imap_ssl: bool = True
-    email_username: str = ""
-    email_password: str = ""  # 应用专用密码
-    email_sync_interval: int = 300  # 同步间隔(秒)，0=手动
-
-    # ── Pro Edition: Privacy Data Management ──
-    privacy_audit_log_enabled: bool = True
-    privacy_mask_display: bool = True  # 展示层脱敏
 
     # Rate Limiting (basic版适当放宽)
     rate_limit_enabled: bool = True

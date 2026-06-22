@@ -439,7 +439,7 @@ class TestAuthAPIIntegration:
     @pytest.mark.asyncio
     async def test_login_with_wrong_secret_returns_401(self, db_session: AsyncSession):
         """Login with wrong poc_secret returns 401."""
-        os.environ["PROMISELINK_POC_SECRET"] = "correct-secret"
+        os.environ["POC_SECRET"] = "correct-secret"
 
         try:
             async def override_get_async_session():
@@ -455,7 +455,7 @@ class TestAuthAPIIntegration:
                 )
             assert resp.status_code == 401
         finally:
-            os.environ.pop("PROMISELINK_POC_SECRET", None)
+            os.environ.pop("POC_SECRET", None)
             app.dependency_overrides.clear()
 
     @pytest.mark.asyncio
@@ -636,155 +636,6 @@ class TestDashboardIntegration:
         assert resp.status_code == 200
         data = resp.json()
         assert "关键人物A" in data["key_persons"]
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Test 4: Privacy API Integration
-# ══════════════════════════════════════════════════════════════════════════════
-
-
-@pytest.mark.skipif(
-    os.environ.get("APP_EDITION", "basic") != "pro",
-    reason="Privacy API is a Pro-only feature",
-)
-class TestPrivacyAPIIntegration:
-    """Verify privacy endpoints: data-summary, export, and user-data DELETE."""
-
-    @pytest.mark.asyncio
-    async def test_data_summary_returns_correct_counts(
-        self, client: AsyncClient, db_session: AsyncSession
-    ):
-        """GET /privacy/data-summary returns accurate counts of all user data."""
-        # Create events
-        event1 = await insert_event(db_session, title="Event 1")
-        event2 = await insert_event(db_session, title="Event 2")
-        event3 = await insert_event(db_session, title="Event 3")
-
-        # Create entities
-        await insert_entity(db_session, name="Person A", source_event_id=event1.id)
-        await insert_entity(db_session, name="Person B", source_event_id=event2.id)
-
-        # Create todos
-        await insert_todo(db_session, title="Todo 1", source_event_id=event1.id)
-        await insert_todo(db_session, title="Todo 2", source_event_id=event2.id)
-
-        # Create association
-        entity_a = await insert_entity(db_session, name="Assoc A", source_event_id=event3.id)
-        entity_b = await insert_entity(db_session, name="Assoc B", source_event_id=event3.id)
-        await insert_association(
-            db_session,
-            source_entity_id=entity_a.id,
-            target_entity_id=entity_b.id,
-            source_event_id=event3.id,
-        )
-        await db_session.commit()
-
-        resp = await client.get(f"{API_PREFIX}/privacy/data-summary")
-        assert resp.status_code == 200
-        data = resp.json()
-
-        assert data["events"] >= 3
-        assert data["entities"] >= 4  # 2 + 2 for association
-        assert data["todos"] >= 2
-        assert data["associations"] >= 1
-
-    @pytest.mark.asyncio
-    async def test_export_returns_user_data(self, client: AsyncClient, db_session: AsyncSession):
-        """GET /export/{user_id} returns structured JSON export of all user data."""
-        event = await insert_event(db_session, title="Export Test Event")
-        await insert_entity(db_session, name="Export Person", source_event_id=event.id)
-        await insert_todo(db_session, title="Export Todo", source_event_id=event.id)
-        await db_session.commit()
-
-        resp = await client.get(f"{API_PREFIX}/export/{TEST_USER_ID}")
-        assert resp.status_code == 200
-        data = json.loads(resp.text)
-
-        assert data["export_version"] == "1.0"
-        assert data["user_id"] == TEST_USER_ID
-        assert "exported_at" in data
-        assert len(data["events"]) >= 1
-        assert len(data["entities"]) >= 1
-        assert len(data["todos"]) >= 1
-
-    @pytest.mark.asyncio
-    async def test_export_forbidden_for_other_user(self, client: AsyncClient, db_session: AsyncSession):
-        """GET /export/{other_user_id} returns 403."""
-        resp = await client.get(f"{API_PREFIX}/export/{OTHER_USER_ID}")
-        assert resp.status_code == 403
-
-    @pytest.mark.asyncio
-    async def test_privacy_export_endpoint(self, client: AsyncClient, db_session: AsyncSession):
-        """POST /privacy/export returns download URL."""
-        resp = await client.post(f"{API_PREFIX}/privacy/export")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "download_url" in data
-        assert TEST_USER_ID in data["download_url"]
-
-    @pytest.mark.asyncio
-    async def test_delete_user_data_cleans_everything(
-        self, client: AsyncClient, db_session: AsyncSession
-    ):
-        """DELETE /privacy/user-data removes all user data."""
-        # Seed data
-        event = await insert_event(db_session, title="To Be Deleted")
-        entity = await insert_entity(db_session, name="Delete Me", source_event_id=event.id)
-        await insert_todo(db_session, title="Delete Todo", source_event_id=event.id)
-        await db_session.commit()
-
-        # Verify data exists
-        resp = await client.get(f"{API_PREFIX}/privacy/data-summary")
-        assert resp.status_code == 200
-        before = resp.json()
-        assert before["events"] >= 1
-
-        # Delete all user data
-        resp = await client.delete(f"{API_PREFIX}/privacy/user-data")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["deleted"] is True
-        assert data["events_deleted"] >= 1
-
-        # Verify data is gone
-        resp = await client.get(f"{API_PREFIX}/privacy/data-summary")
-        assert resp.status_code == 200
-        after = resp.json()
-        assert after["events"] == 0
-        assert after["entities"] == 0
-        assert after["todos"] == 0
-        assert after["associations"] == 0
-
-    @pytest.mark.asyncio
-    async def test_delete_only_affects_current_user(
-        self, client: AsyncClient, db_session: AsyncSession
-    ):
-        """DELETE /privacy/user-data does not affect other users' data."""
-        # Create data for other user
-        other_event = Event(
-            id=str(uuid.uuid4()),
-            user_id=OTHER_USER_ID,
-            event_type="meeting",
-            source="test",
-            title="Other User Event",
-            raw_text="Should not be deleted",
-            status="completed",
-        )
-        db_session.add(other_event)
-        await db_session.commit()
-
-        # Delete current user's data
-        resp = await client.delete(f"{API_PREFIX}/privacy/user-data")
-        assert resp.status_code == 200
-
-        # Verify other user's data still exists
-        from sqlalchemy import func, select
-        count = (
-            await db_session.execute(
-                select(func.count()).select_from(Event).where(Event.user_id == OTHER_USER_ID)
-            )
-        ).scalar()
-        assert count >= 1
 
 
 # ══════════════════════════════════════════════════════════════════════════════

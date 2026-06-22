@@ -2,7 +2,7 @@
 
 > **Slogan**: 让每一次连接，都更有价值
 >
-> **项目状态**: v0.6.3 基础版内部灰度就绪 | 1353+ 测试全通过 | 72% 覆盖率 | mypy 0错误 | 成熟度92/100
+> **项目状态**: v0.6.6 基础版P0-P2阻断项修复 | 1353 测试 | 72% 覆盖率门槛 | mypy 0错误
 >
 > **定位**: 先成就关系，再促成合作 — 利他切入的个人商务关系经营系统
 >
@@ -65,7 +65,6 @@ PromiseLink/
 │   │   ├── promise_fulfillment.py  # 承诺履行追踪
 │   │   ├── association_discovery.py # 关联发现（3策略）
 │   │   ├── priority_scorer.py      # 动态优先级评分
-│   │   ├── nlg_service.py          # 自然语言生成
 │   │   ├── llm_client.py           # LLM客户端（Moka AI）
 │   │   ├── semantic_search.py      # 向量语义搜索
 │   │   ├── memory_provider.py      # CarryMem集成
@@ -181,6 +180,7 @@ curl http://localhost:8000/api/v1/health
 # 创建互动事件（触发完整Pipeline）
 curl -X POST http://localhost:8000/api/v1/events \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
   -d '{
     "event_type": "meeting",
     "source": "manual",
@@ -188,13 +188,16 @@ curl -X POST http://localhost:8000/api/v1/events \
   }'
 
 # 查询实体列表
-curl http://localhost:8000/api/v1/entities
+curl http://localhost:8000/api/v1/entities \
+  -H "Authorization: Bearer <token>"
 
 # 查询Todo列表（含动态优先级排序）
-curl http://localhost:8000/api/v1/todos
+curl http://localhost:8000/api/v1/todos \
+  -H "Authorization: Bearer <token>"
 
 # 语义搜索
-curl "http://localhost:8000/api/v1/entities/search?q=技术合作"
+curl "http://localhost:8000/api/v1/entities?search=技术合作" \
+  -H "Authorization: Bearer <token>"
 ```
 
 ## 质量指标
@@ -211,9 +214,9 @@ curl "http://localhost:8000/api/v1/entities/search?q=技术合作"
 | 服务模块     | **38个**                                                          |
 | 数据模型     | **9个文件，11个模型类**                                                  |
 | 文档版本     | PRD v5.7 / Tech v3.2                                             |
-| 软件版本     | v0.6.3                                                           |
+| 软件版本     | v0.6.6                                                           |
 | 产品层级     | 基础版(本地免费) / 专业版(网关中继) / 小程序(手机竖屏) / 定制版(团队)                      |
-| 总体进度     | **92%**                                                          |
+| 总体进度     | **85%**                                                          |
 
 ## 产品版本
 

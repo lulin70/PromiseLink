@@ -99,7 +99,9 @@ signal.signal(signal.SIGINT, _signal_handler)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan manager with graceful shutdown."""
-    # Startup
+    # Configure structured logging before any logger usage
+    from promiselink.core.logging import configure_logging
+    configure_logging(log_level=settings.log_level, json_output=settings.app_env != "development")
     import structlog
     logger = structlog.get_logger()
     logger.info("promiselink_starting")

@@ -116,7 +116,7 @@ fi
 # =============================================================================
 CURRENT_SECRET=$(grep -E "^SECRET_KEY=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- || true)
 
-if [ -z "$CURRENT_SECRET" ] || [ "$CURRENT_SECRET" = "change-me-to-a-random-string" ]; then
+if [ -z "$CURRENT_SECRET" ] || [ "$CURRENT_SECRET" = "change-me-in-production" ]; then
     GENERATED_SECRET=$(python3 -c "import secrets; print(secrets.token_urlsafe(32))" 2>/dev/null || openssl rand -base64 32 | tr -d '\n')
     if grep -q "^SECRET_KEY=" "$ENV_FILE"; then
         sed -i.bak "s|^SECRET_KEY=.*|SECRET_KEY=${GENERATED_SECRET}|" "$ENV_FILE" && rm -f "${ENV_FILE}.bak"

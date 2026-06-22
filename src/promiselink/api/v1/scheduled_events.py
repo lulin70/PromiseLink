@@ -385,10 +385,11 @@ async def record_scheduled_event(
         )
 
     # Build participants context for raw_text prefix
+    participants_prefix = ""
     if se.participants:
         names = [p.get("name", "") for p in se.participants if p.get("name")]
         if names:
-            f"（与{'、'.join(names)}）"
+            participants_prefix = f"（与{'、'.join(names)}）"
 
     # Create Event
     event = Event(
@@ -397,7 +398,7 @@ async def record_scheduled_event(
         source="scheduled_record",
         title=se.topic,
         timestamp=datetime.now(UTC),
-        raw_text=request.raw_text,
+        raw_text=participants_prefix + request.raw_text if request.raw_text else participants_prefix,
         metadata_={
             "scheduled_event_id": str(se.id),
             "scheduled_at": se.scheduled_at.isoformat(),
@@ -562,12 +563,14 @@ async def _match_participants(
         if not name or p.get("entity_id"):
             continue
 
-        # Try exact match on canonical_name or alias
+        # Try exact match on canonical_name or alias.
+        # Entity.status legal values: provisional/confirmed/merged/deleted.
+        # Match active (non-deleted, non-merged) entities only.
         result = await session.execute(
             select(Entity.id, Entity.name).where(
                 and_(
                     Entity.user_id == user_id,
-                    Entity.status == "active",
+                    Entity.status.in_(["confirmed", "provisional"]),
                     (Entity.canonical_name == name) | (Entity.name == name),
                 )
             ).limit(1)

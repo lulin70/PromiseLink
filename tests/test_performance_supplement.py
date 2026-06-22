@@ -9,7 +9,6 @@ Heavy tests marked with @pytest.mark.slow.
 """
 
 import asyncio
-import os
 import time
 import uuid
 from unittest.mock import AsyncMock, patch
@@ -38,7 +37,6 @@ API_PREFIX = "/api/v1"
 # Scaled-down data volumes for CI
 CI_ENTITY_COUNT = 100  # instead of 10000
 CI_ASSOCIATION_COUNT = 200  # instead of 100000
-CI_IMPORT_ROWS = 100  # instead of 1000
 
 
 # ── Fixtures ──
@@ -463,38 +461,6 @@ class TestLargeDataPerformance:
         # Query should be fast
         assert elapsed < 2.0, f"Association query took {elapsed:.2f}s, expected <2s"
         assert len(associations) > 0
-
-    @pytest.mark.slow
-    @pytest.mark.skipif(
-        os.environ.get("APP_EDITION", "basic") != "pro",
-        reason="CSV Import API is a Pro-only feature",
-    )
-    @pytest.mark.asyncio
-    async def test_tc_perf_012_csv_import_throughput(self, client: AsyncClient, db_session: AsyncSession):
-        """TC-PERF-012: 批量导入千条记录的吞吐量验证.
-
-        Test CSV import throughput with CI_IMPORT_ROWS rows.
-        """
-        # Generate CSV content
-        rows = ["name,company,title,phone,email"]
-        for i in range(CI_IMPORT_ROWS):
-            rows.append(f"ImportPerson{i},ImportCorp{i},Title{i},1380000{i:04d},user{i}@test.com")
-        csv_content = "\n".join(rows)
-        csv_bytes = csv_content.encode("utf-8")
-
-        start = time.perf_counter()
-        resp = await client.post(
-            f"{API_PREFIX}/import/csv",
-            files={"file": ("perf_test.csv", csv_bytes, "text/csv")},
-        )
-        elapsed = time.perf_counter() - start
-
-        assert resp.status_code in (200, 201)
-        data = resp.json()
-        assert data["imported_count"] == CI_IMPORT_ROWS
-        # Import should complete in reasonable time
-        # CI scale (100 rows): <10s; production scale (1000 rows): <30s
-        assert elapsed < 30.0, f"CSV import took {elapsed:.2f}s, expected <30s"
 
 
 # ══════════════════════════════════════════════════════════════════════════════

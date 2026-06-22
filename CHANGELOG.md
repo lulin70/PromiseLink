@@ -2,12 +2,49 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [0.6.6] - 2026-06-21
+
+### Fixed — P0阻断项修复（5项）
+- **P0-1: 前端补齐专业版引导入口**：DesktopSidebar 底部新增"升级专业版"引导卡片（标题+描述+了解详情按钮），莫兰迪色系样式，达成硬约束"基础版UI需包含专业版引导入口"
+- **P0-2: poc_secret明文存储修复**：`auth.ts` 中 `saveLoginCredentials`/`getSavedSecret` 从 localStorage 改为 sessionStorage，关闭标签页即清除，减少XSS攻击的长期暴露窗口；`logout` 同步清除 secret
+- **P0-3: PoC登录端点环境检查**：`auth.py` login 端点新增生产环境检查，`app_env=="production"` 且 `poc_secret==默认值"promiselink2026"` 时拒绝登录，防止生产环境误用默认密码
+- **P0-4: 依赖锁文件**：新增 `requirements.lock`（232行），锁定已验证的依赖版本组合，保证构建可复现
+- **P0-5: 测试数文档统一**：README/CHANGELOG/PROJECT_STATUS 测试数统一为 1353 passed（之前三处矛盾：1351/1353/1390）
+
+### Changed — P1死代码清理（5项，共627行+13配置字段）
+- **P1-1: config.py死配置清理**：删除 ASR/TTS/OCR provider（5字段）、Email IMAP（6字段）、Privacy（2字段）共13个死配置字段，对应路由已删除
+- **P1-2: schemas死Schema清理**：删除 `ImportCSVResponse`、`TTSFallbackResponse` 两个无引用的Schema类，同步更新 `__init__.py` 导出列表
+- **P1-3: skip测试清理**：删除6处被 `@pytest.mark.skipif(APP_EDITION!="pro")` 跳过的专业版测试（共627行）：TestEmailSyncAPI/TestVoiceAssistantJourney/3个Privacy API测试/TestPrivacyAPIIntegration/TestCSVImportSecurity/CSV Import性能测试
+- **P1-4: 前端admin/usage清理**：删除 `frontend/src/pages/admin/usage/` 目录（桥接监控仪表盘，调用基础版不存在的Pro网关admin API），从 `app.config.ts` 移除页面注册
+- **P1-5: 坏脚本清理**：删除 `scripts/demo/demo_for_xu.py`（导入已删除的 `nlu_intent_classifier` 模块，运行场景2会 ImportError）
+
+### Tests
+- 全量回归：1353 passed, 25 skipped, 0 failed, 覆盖率 72%（133.96s）
+- ruff: all checks passed
+- mypy: 0 errors (111 source files)
+- 基础版独立运行验证通过
+
 ## [0.6.5] - 2026-06-21
 
 ### Added — P10 Docker多阶段构建
 - **Dockerfile 改造**：新增 `frontend-builder` 阶段（node:20-alpine），在Docker构建时自动编译H5前端，构建产物COPY到 `/app/static/`，FastAPI直接serve前端静态文件
 - **docker-compose.yml 增强**：新增 `nginx` 服务（production profile），支持TLS终止+反向代理，与现有 `nginx/conf.d/default.conf` 配置对齐
 - **.dockerignore 更新**：保留 `frontend/` 源码（供frontend-builder阶段使用），排除 `frontend/dist/` 和 `frontend/node_modules/`（避免缓存污染）
+
+### Fixed — 项目整理评估修复（7维度走读）
+- **P0 BUG: Entity.status 过滤错误**：`scheduled_events.py:570` 使用不存在的 `"active"` 状态值，改为 `in_(["confirmed", "provisional"])`，修复计划事件参与者自动匹配失效
+- **P0 BUG: snoozed_until 字段访问错误**：`todos.py:325` 用 `getattr(todo, 'snoozed_until', None)` 访问不存在的字段，改为查询 `SnoozeSchedule` 表获取真实恢复时间
+- **P0: 依赖声明不一致**：`pyproject.toml` 缺失 `asyncpg`/`aiosqlite`/`structlog`/`python-dotenv`/`cryptography`，导致 `pip install -e .` 后运行时 ImportError，已补全
+- **P1: no-op 字符串构造**：`scheduled_events.py:391` 构造参与者前缀字符串但未赋值，导致 raw_text 缺少参与者上下文，已修复
+- **P1: 版本号不一致**：`__init__.py` 版本 0.5.2 落后于 `config.py`/`pyproject.toml` 的 0.6.5，已统一
+- **P1: configure_logging() 未调用**：`main.py` 直接用 `structlog.get_logger()` 但未初始化 processor 链，日志可能非 JSON 格式，已在 lifespan 启动时调用
+- **P1: monitoring/README.md 与代码不符**：文档声称基础版无 metrics 端点，实际已有，已更新文档
+
+### Changed — 技术债清理
+- 删除 `config.py` 中未使用的 `ai_mode` 配置项及其 field_validator
+- 删除 4 个孤儿登录页文件（`pages/login/index.tsx`、`pages/index/login.tsx` 等，未在 app.config.ts 注册）
+- 更新 `monitoring/README.md` 反映基础版已包含 Prometheus metrics 端点
+- 更新 `README.md` 版本号 v0.6.3 → v0.6.5
 
 ### Tests
 - 全量回归：1353 passed, 45 skipped, 0 failed, 覆盖率 72%

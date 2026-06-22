@@ -11,7 +11,6 @@ export default defineAppConfig({
     'pages/promises/index',
     'pages/promises/detail',
     'pages/login/index',
-    'pages/admin/usage/index',
   ],
   tabBar: {
     color: '#8a8a8a',

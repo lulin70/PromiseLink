@@ -1,7 +1,7 @@
 # PromiseLink 文档一致性检查清单
 
 > **更新时间**: 2026-06-20
-> **阶段**: v0.6.3 基础版内部灰度就绪 — 三仓库独立（PromiseLink + PromiseLink-Pro + PromiseLink-miniapp）
+> **阶段**: v0.6.5 基础版内部灰度就绪 — 三仓库独立（PromiseLink + PromiseLink-Pro + PromiseLink-miniapp）
 > **目的**: 确认所有设计文档版本一致性，验证跨文档引用一致性
 
 ---

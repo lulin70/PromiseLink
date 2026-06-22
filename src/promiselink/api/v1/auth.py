@@ -27,14 +27,28 @@ class LoginResponse(BaseModel):
     user_id: str
 
 
+DEFAULT_POC_SECRET = "promiselink2026"
+
+
 @router.post("/auth/login", response_model=LoginResponse)
 async def login(request: LoginRequest) -> Any:
-    """PoC login: 需要poc_secret验证。生产环境应禁用此端点，使用微信OAuth。"""
+    """PoC login: 需要poc_secret验证。生产环境必须修改默认密码。
+
+    Security constraints:
+    - Production environment rejects the default poc_secret (must be changed).
+    - Uses constant-time comparison to prevent timing attacks.
+    """
     from promiselink.config import get_settings
     settings = get_settings()
     poc_secret = settings.poc_secret
     if not poc_secret:
         raise ForbiddenError("PoC login is disabled. Use /auth/wechat/login.")
+    # Block default secret in production to prevent credential-guessing attacks
+    if settings.app_env == "production" and poc_secret == DEFAULT_POC_SECRET:
+        raise ForbiddenError(
+            "Default PoC secret is not allowed in production. "
+            "Change POC_SECRET in your .env before deploying."
+        )
     # Use constant-time comparison to prevent timing attacks
     if not hmac.compare_digest(request.poc_secret, poc_secret):
         raise UnauthorizedError("Invalid PoC secret")

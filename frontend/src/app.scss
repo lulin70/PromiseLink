@@ -87,8 +87,9 @@ page {
   }
 
   // Hide Taro TabBar on desktop (multiple selectors for compatibility)
+  // NOTE: Do NOT hide .taro-tabbar__container — it is the root wrapper that
+  // contains .taro-tabbar__panel (page content). Hiding it blanks the page.
   .taro-tabbar__tabbar,
-  .taro-tabbar__container,
   .taro-tabbar,
   taro-tabbar-core,
   taro-tabbar {
@@ -222,6 +223,13 @@ page {
       color: var(--pl-primary);
       display: block;
     }
+
+    .pl-brand-edition {
+      font-size: 11px;
+      color: var(--pl-text-light);
+      margin-top: 2px;
+      display: block;
+    }
   }
 
   .pl-nav {
@@ -262,6 +270,49 @@ page {
 
       .pl-nav-label,
       .pl-nav-icon {
+        color: #fff;
+      }
+    }
+  }
+
+  // ── Pro edition upgrade guide (bottom of sidebar) ──
+  .pl-pro-guide {
+    margin: 12px 8px 16px;
+    padding: 12px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(123, 158, 168, 0.08), rgba(160, 130, 140, 0.08));
+    border: 1px solid var(--pl-border);
+
+    .pl-pro-guide-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--pl-primary);
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .pl-pro-guide-desc {
+      font-size: 11px;
+      color: var(--pl-text-light);
+      line-height: 1.4;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .pl-pro-guide-btn {
+      display: inline-block;
+      padding: 5px 12px;
+      border-radius: 4px;
+      background: var(--pl-primary);
+      cursor: pointer;
+      transition: opacity 0.2s;
+
+      &:hover {
+        opacity: 0.85;
+      }
+
+      .pl-pro-guide-btn-text {
+        font-size: 11px;
         color: #fff;
       }
     }

@@ -300,6 +300,17 @@ async def get_todo(
             source_event_title = row[0]
             source_event_date = row[1].strftime("%m-%d") if row[1] else None
 
+    # Enrich with snooze schedule (recover_at) if todo is snoozed
+    snoozed_until: datetime | None = None
+    if todo.status == "snoozed":
+        from promiselink.models.todo import SnoozeSchedule
+        snooze_result = await session.execute(
+            select(SnoozeSchedule.recover_at).where(
+                SnoozeSchedule.todo_id == str(todo.id),
+            )
+        )
+        snoozed_until = snooze_result.scalar_one_or_none()
+
     return TodoDetailResponse(
         id=todo.id,
         user_id=todo.user_id,
@@ -322,7 +333,7 @@ async def get_todo(
         confirmation_status=todo.confirmation_status,
         evidence_quote=todo.evidence_quote,
         properties=todo.properties,
-        snoozed_until=getattr(todo, 'snoozed_until', None),
+        snoozed_until=snoozed_until,
         completed_at=todo.completed_at,
     )
 

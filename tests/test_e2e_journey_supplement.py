@@ -7,7 +7,6 @@ with LLM calls mocked out. No external services required.
 """
 
 import json
-import os
 import uuid
 from datetime import UTC, date, datetime, timedelta
 from unittest.mock import AsyncMock, patch
@@ -538,80 +537,3 @@ class TestDataLoop:
         assert str(assoc.id) not in remaining_assoc_ids
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 18.3 语音助手完整旅程
-# ══════════════════════════════════════════════════════════════════════════════
-
-
-@pytest.mark.skipif(
-    os.environ.get("APP_EDITION", "basic") != "pro",
-    reason="Voice Assistant is a Pro-only feature",
-)
-class TestVoiceAssistantJourney:
-    """Voice assistant complete journey tests."""
-
-    @pytest.mark.asyncio
-    async def test_tc_e2e_090_voice_query_end_to_end(self, client: AsyncClient, db_session: AsyncSession):
-        """TC-E2E-090: 语音唤醒→说出需求→系统理解→返回结果→用户确认完整流程.
-
-        Test voice query API end-to-end with mocked LLM.
-        """
-        # Setup: Create some data for the voice query to find
-        event = await insert_event(db_session, title="语音测试事件")
-        entity = await insert_entity(
-            db_session, name="语音测试人", source_event_id=event.id
-        )
-        todo = await insert_todo(
-            db_session,
-            title="给语音测试人发资料",
-            todo_type="promise",
-            source_event_id=event.id,
-            related_entity_id=entity.id,
-            status="pending",
-            priority=1,
-        )
-        await db_session.commit()
-
-        # Mock the NLU classifier to return a known intent
-        from promiselink.services.nlu_intent_classifier import NLUResult, VoiceIntent
-
-        mock_nlu_result = NLUResult(
-            intent=VoiceIntent.PROMISE_TRACKER,
-            confidence=0.95,
-            slots={"person": "语音测试人"},
-            evidence="keyword match",
-            method="rule",
-        )
-
-        # Mock NLG response
-        mock_nlg_response = "您有1个待完成的承诺事项：给语音测试人发资料"
-
-        with patch(
-            "promiselink.api.v1.voice_query.NLUIntentClassifier"
-        ) as mock_classifier_cls, patch(
-            "promiselink.api.v1.voice_query.generate_nlu_response",
-            return_value=mock_nlg_response,
-        ), patch(
-            "promiselink.api.v1.voice_query.LLMClient"
-        ) as mock_llm_cls:
-            mock_classifier_instance = mock_classifier_cls.return_value
-            # classify is an async method, use AsyncMock so it's awaitable
-            mock_classifier_instance.classify = AsyncMock(return_value=mock_nlu_result)
-
-            # Step 1: Send voice query
-            resp = await client.post(
-                f"{API_PREFIX}/voice/query",
-                json={"text": "我有什么待办事项"},
-            )
-
-        # Verify response structure
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["intent"] == "promise_tracker"
-        assert data["confidence"] == 0.95
-        assert data["response"] == mock_nlg_response
-        # Data should contain the promise todo
-        assert data["data"] is not None
-        assert "todos" in data["data"]
-        assert len(data["data"]["todos"]) >= 1
-        assert any("语音测试人" in t["title"] for t in data["data"]["todos"])

@@ -22,18 +22,6 @@ class DeleteCountResponse(BaseModel):
     message: str
 
 
-class ImportCSVResponse(BaseModel):
-    imported_count: int
-    created_entities: int
-    created_todos: int
-    message: str
-
-
-class TTSFallbackResponse(BaseModel):
-    text: str
-    use_client_tts: bool = True
-
-
 class HealthResponse(BaseModel):
     status: str
     timestamp: datetime

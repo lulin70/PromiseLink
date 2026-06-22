@@ -69,6 +69,7 @@ function DesktopSidebar() {
     <View className='pl-sidebar'>
       <View className='pl-sidebar-brand'>
         <Text className='pl-brand-text'>PromiseLink</Text>
+        <Text className='pl-brand-edition'>基础版</Text>
       </View>
       <View className='pl-nav'>
         {NAV_ITEMS.map(item => (
@@ -81,6 +82,16 @@ function DesktopSidebar() {
             <Text className='pl-nav-label'>{item.label}</Text>
           </View>
         ))}
+      </View>
+      <View className='pl-pro-guide'>
+        <Text className='pl-pro-guide-title'>升级专业版</Text>
+        <Text className='pl-pro-guide-desc'>解锁语音录入、邮件同步、OCR名片扫描等高级功能</Text>
+        <View
+          className='pl-pro-guide-btn'
+          onClick={() => window.open('https://promiselink.com/pro', '_blank')}
+        >
+          <Text className='pl-pro-guide-btn-text'>了解详情</Text>
+        </View>
       </View>
     </View>
   )

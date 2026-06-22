@@ -24,6 +24,37 @@ sys.path.insert(0, str(project_root / "src"))
 
 BASE_URL = "http://localhost:8000/api/v1"
 TIMEOUT = 120.0
+POC_USER_ID = "e2e-journey-user"
+POC_SECRET = "promiselink2026"
+
+# JWT token obtained from login; attached to all authenticated requests
+AUTH_TOKEN: str | None = None
+
+
+def _auth_headers() -> dict[str, str]:
+    """Return headers with Bearer token if authenticated."""
+    if AUTH_TOKEN:
+        return {"Authorization": f"Bearer {AUTH_TOKEN}"}
+    return {}
+
+
+async def login(client: httpx.AsyncClient) -> bool:
+    """Login via PoC endpoint and cache the JWT token globally."""
+    global AUTH_TOKEN
+    try:
+        resp = await client.post(
+            f"{BASE_URL}/auth/login",
+            json={"user_id": POC_USER_ID, "poc_secret": POC_SECRET},
+            timeout=TIMEOUT,
+        )
+        if resp.status_code == 200:
+            AUTH_TOKEN = resp.json()["access_token"]
+            return True
+        print(f"  ❌ 登录失败: {resp.status_code} {resp.text[:200]}")
+        return False
+    except Exception as e:
+        print(f"  ❌ 登录异常: {e}")
+        return False
 
 # ── Test Data ──
 
@@ -95,7 +126,7 @@ async def wait_for_pipeline(client: httpx.AsyncClient, event_id: str, max_wait: 
     for _ in range(max_wait // 2):
         await asyncio.sleep(2)
         try:
-            resp = await client.get(f"{BASE_URL}/events/{event_id}", timeout=TIMEOUT)
+            resp = await client.get(f"{BASE_URL}/events/{event_id}", headers=_auth_headers(), timeout=TIMEOUT)
             if resp.status_code == 200:
                 event = resp.json()
                 if event.get("status") == "completed":
@@ -128,7 +159,7 @@ async def screen1_raw_data(
     }
 
     try:
-        resp = await client.post(f"{BASE_URL}/events", json=payload, timeout=TIMEOUT)
+        resp = await client.post(f"{BASE_URL}/events", json=payload, headers=_auth_headers(), timeout=TIMEOUT)
         if resp.status_code == 201:
             data = resp.json()
             event_id = data["id"]
@@ -163,11 +194,13 @@ async def screen2_entity_extraction(
 
     # Fetch entities
     try:
-        resp = await client.get(f"{BASE_URL}/entities", params={"limit": 20}, timeout=TIMEOUT)
+        resp = await client.get(f"{BASE_URL}/entities", params={"limit": 20}, headers=_auth_headers(), timeout=TIMEOUT)
         if resp.status_code != 200:
             print(f"  ⚠️ 实体查询失败: {resp.status_code}")
             return []
-        entities = resp.json()
+        body = resp.json()
+        # API returns {"items": [...], "total": N}
+        entities = body.get("items", body) if isinstance(body, dict) else body
     except Exception as e:
         print(f"  ⚠️ 实体查询异常: {e}")
         return []
@@ -227,7 +260,7 @@ async def screen3_collision_discovery(
     # Fetch associations
     try:
         # Try associations endpoint (may not exist yet)
-        resp = await client.get(f"{BASE_URL}/associations", params={"limit": 20}, timeout=TIMEOUT)
+        resp = await client.get(f"{BASE_URL}/associations", params={"limit": 20}, headers=_auth_headers(), timeout=TIMEOUT)
         if resp.status_code == 200:
             associations = resp.json()
         else:
@@ -314,11 +347,13 @@ async def screen4_todo_output(
     _divider("Screen 4: Todo产出 — 最终生成了什么行动项")
 
     try:
-        resp = await client.get(f"{BASE_URL}/todos", params={"limit": 20}, timeout=TIMEOUT)
+        resp = await client.get(f"{BASE_URL}/todos", params={"limit": 20}, headers=_auth_headers(), timeout=TIMEOUT)
         if resp.status_code != 200:
             print(f"  ⚠️ Todo查询失败: {resp.status_code}")
             return []
-        todos = resp.json()
+        body = resp.json()
+        # API returns {"items": [...], "total": N}
+        todos = body.get("items", body) if isinstance(body, dict) else body
     except Exception as e:
         print(f"  ⚠️ Todo查询异常: {e}")
         return []
@@ -417,7 +452,13 @@ async def main():
         if not await wait_for_server(client):
             print("❌ 服务器未就绪，请先启动: python -m promiselink.main")
             sys.exit(1)
-        print("✅ 服务器就绪\n")
+        print("✅ 服务器就绪")
+
+        # Login to obtain JWT token
+        if not await login(client):
+            print("❌ 登录失败，请检查 POC_SECRET 配置")
+            sys.exit(1)
+        print("✅ 登录成功\n")
 
         # ── Journey 1: Meeting ──
         await run_journey(

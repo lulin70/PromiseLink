@@ -3,6 +3,7 @@
 ## 前置条件
 
 - Python 3.11+
+- Node.js 18+（用于构建 H5 前端）
 - LLM API Key（推荐 Moka AI / OpenAI / Anthropic）
 
 ## 快速启动

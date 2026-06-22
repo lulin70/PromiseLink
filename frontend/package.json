@@ -1,6 +1,6 @@
 {
   "name": "promiselink-frontend",
-  "version": "0.5.2",
+  "version": "0.6.5",
   "private": true,
   "description": "PromiseLink 基础版 H5 前端",
   "templateInfo": {

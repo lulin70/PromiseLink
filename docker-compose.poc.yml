@@ -51,8 +51,8 @@ services:
       - .env.poc
     environment:
       # 以下变量可在 docker-compose 层面覆盖 .env.poc 中的值
-      - PROMISELINK_STAGE=poc
-      - PROMISELINK_DB_PATH=/data/promiselink_poc.db
+      - APP_ENV=poc
+      - DATABASE_URL=sqlite:///data/promiselink_poc.db
 
     # ------------------------------------------------------------------
     # 数据卷：持久化 SQLite 数据库文件

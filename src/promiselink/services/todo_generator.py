@@ -258,9 +258,22 @@ class TodoGenerator:
                 unique_generated.extend(fallback_todos)
 
         # Persist all unique generated todos
+        # F-50: Associate todos with extracted entities by matching person names
+        entity_name_map: dict[str, str] = {}
+        for ent in entities:
+            if ent.id and ent.name:
+                entity_name_map[ent.name] = str(ent.id)
+
         persisted_todos: list[Todo] = []
         for gen in unique_generated:
             try:
+                # Match todo to entity by person name in title/description
+                if not gen.related_entity_id and entity_name_map:
+                    todo_text = f"{gen.title} {gen.description}"
+                    for name, eid in entity_name_map.items():
+                        if name and name in todo_text:
+                            gen.related_entity_id = eid
+                            break
                 todo = await self._persist_todo(
                     gen=gen,
                     user_id=str(event.user_id),

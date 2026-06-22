@@ -4,7 +4,7 @@ This module provides ``RelayClient`` — an async HTTP client that bridges
 the local PromiseLink app to the cloud AI gateway. It supports four
 relay channels (LLM / ASR / TTS / OCR) and implements the
 :class:`promiselink.services.llm_provider.LLMProvider` Protocol so it
-can transparently replace the local ``LLMClient`` when ``ai_mode=relay``.
+can transparently replace the local ``LLMClient`` when relay mode is enabled.
 
 Design goals (Pro Edition Tech Design Phase0 §4.3.4-§4.3.7, §8):
 
