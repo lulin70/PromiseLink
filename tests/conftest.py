@@ -8,8 +8,9 @@ import pytest_asyncio
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-# Force IS_SQLITE=True BEFORE importing models, so column types use String(36)
-os.environ.setdefault("DATABASE_URL", "sqlite://")
+# Force SQLite for tests (override CI DATABASE_URL to avoid PostgreSQL connection issues)
+os.environ["DATABASE_URL"] = "sqlite://"
+os.environ["TEST_MODE"] = "true"
 
 from promiselink.database import Base
 
