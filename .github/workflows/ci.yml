@@ -261,6 +261,8 @@ jobs:
           VERSION=$(grep 'version = "' pyproject.toml | head -1 | sed 's/.*version = "\(.*\)".*/\1/')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
+          # Docker tags must be lowercase; github.repository may contain uppercase
+          echo "repo_lower=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -268,15 +270,15 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
+            ghcr.io/${{ steps.version.outputs.repo_lower }}:latest
+            ghcr.io/${{ steps.version.outputs.repo_lower }}:${{ steps.version.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Verify Docker image
         run: |
-          docker pull ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
-          docker run --rm ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }} \
+          docker pull ghcr.io/${{ steps.version.outputs.repo_lower }}:${{ steps.version.outputs.version }}
+          docker run --rm ghcr.io/${{ steps.version.outputs.repo_lower }}:${{ steps.version.outputs.version }} \
             python -c "import promiselink; print(f'PromiseLink v{promiselink.__version__} OK')"
 
   deploy-staging:
