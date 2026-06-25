@@ -424,7 +424,7 @@ export default function CorrectionPanel({
                             {basic?.company && <Text className='candidate-meta'>{String(basic.company)}</Text>}
                             {basic?.title && <Text className='candidate-meta'>{String(basic.title)}</Text>}
                           </View>
-                          {corr.selected_entity_id === c.id && <Text className='check-mark'>✓</Text>}
+                          {corr.selected_entity_id === c.id && <Text className='check-mark'>√</Text>}
                         </View>
                       )
                     })}

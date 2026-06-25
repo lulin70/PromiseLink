@@ -71,7 +71,7 @@ if [ -f "$ENV_FILE" ]; then
     info "配置文件 $ENV_FILE 已存在，跳过创建"
 else
     if [ ! -f "$ENV_EXAMPLE" ]; then
-        error "找不到模板文件 $ENV_EXAMPLE，请确认项目完整性"
+        error "找不到模板文件 $ENV_EXAMPLE ，请确认项目完整性"
     fi
     cp "$ENV_EXAMPLE" "$ENV_FILE"
     success "已从模板创建 $ENV_FILE"

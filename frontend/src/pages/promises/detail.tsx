@@ -184,7 +184,7 @@ export default function PromiseDetailPage() {
                 className={`action-btn primary ${actionLoading ? 'disabled' : ''}`}
                 onClick={() => !actionLoading && handleStatusChange('fulfilled')}
               >
-                <Text>✓ 已兑现</Text>
+                <Text>√ 已兑现</Text>
               </View>
             </View>
           )}

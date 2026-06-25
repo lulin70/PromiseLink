@@ -36,7 +36,7 @@ export default function TodoLink({ todoId, title, dueDate, status, todoType }: T
       }}
     >
       <View className='todo-link-icon'>
-        <Text className='todo-link-icon-text'>✓</Text>
+        <Text className='todo-link-icon-text'>√</Text>
       </View>
       <View className='todo-link-info'>
         <Text className='todo-link-title'>{title}</Text>

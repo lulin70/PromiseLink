@@ -381,14 +381,14 @@ export default function InputPage() {
   }
 
   function getPipelineStatusIcon(): string {
-    if (!eventDetail) return '⏳'
+    if (!eventDetail) return '...'
     switch (eventDetail.status) {
-      case 'completed': return '✅'
-      case 'failed': return '❌'
-      case 'processing': return '🔄'
-      case 'awaiting_retry': return '🔔'
-      case 'degraded_completed': return '⚠️'
-      default: return '⏳'
+      case 'completed': return '√'
+      case 'failed': return '×'
+      case 'processing': return '...'
+      case 'awaiting_retry': return '!'
+      case 'degraded_completed': return '!'
+      default: return '...'
     }
   }
 
@@ -434,7 +434,7 @@ export default function InputPage() {
               <Text className='char-count'>{demandText.length}/2000</Text>
               {error && (
                 <View className='error-msg'>
-                  <Text>✗ {error}</Text>
+                  <Text>× {error}</Text>
                 </View>
               )}
               <Button
@@ -542,12 +542,12 @@ export default function InputPage() {
                 <View className='file-upload-area' onClick={handleFileUpload}>
                   {selectedFile ? (
                     <View className='file-selected'>
-                      <Text className='file-icon'>📄</Text>
+                      <Text className='file-icon'>文</Text>
                       <Text className='file-name'>{selectedFile}</Text>
                     </View>
                   ) : (
                     <View className='file-hint'>
-                      <Text className='file-hint-icon'>📁</Text>
+                      <Text className='file-hint-icon'>文</Text>
                       <Text className='file-hint-text'>点击选择文件或拖拽到此处</Text>
                       <Text className='file-hint-ext'>支持 .txt、.md 格式</Text>
                     </View>
@@ -601,7 +601,7 @@ export default function InputPage() {
             {/* Error */}
             {error && (
               <View className='error-msg'>
-                <Text>✗ {error}</Text>
+                <Text>× {error}</Text>
               </View>
             )}
 
@@ -620,7 +620,7 @@ export default function InputPage() {
             {/* Upload progress indicator (file mode) */}
             {inputMode === 'file' && loading && (
               <View className='upload-loading'>
-                <Text className='upload-loading-text'>📤 文件上传中...</Text>
+                <Text className='upload-loading-text'>文件上传中...</Text>
               </View>
             )}
 
@@ -652,14 +652,14 @@ export default function InputPage() {
             {/* Polling indicator */}
             {polling && (
               <View className='polling-indicator'>
-                <Text className='polling-text'>🔄 正在处理，请稍候...</Text>
+                <Text className='polling-text'>正在处理，请稍候...</Text>
               </View>
             )}
 
             {/* P2: Polling timeout notice */}
             {pollTimeout && !polling && (
               <View className='polling-indicator'>
-                <Text className='polling-text'>⚠️ 处理时间较长，请稍后在列表中查看结果</Text>
+                <Text className='polling-text'>处理时间较长，请稍后在列表中查看结果</Text>
               </View>
             )}
 
@@ -728,7 +728,7 @@ export default function InputPage() {
           {/* 纠偏完成提示 */}
           {corrected && (
             <View className='corrected-banner'>
-              <Text className='corrected-text'>✓ 纠偏已保存，解析结果已更新</Text>
+              <Text className='corrected-text'>√ 纠偏已保存，解析结果已更新</Text>
             </View>
           )}
 

@@ -473,7 +473,7 @@ export default function EventsPage() {
                       handleDeleteEvent(expandedDetail.id)
                     }}
                   >
-                    🗑 删除此事件
+                    删除此事件
                   </Text>
                 </View>
                 {/* View full detail button */}
@@ -561,7 +561,7 @@ export default function EventsPage() {
           <View className='modal-content create-schedule-modal' onClick={e => e.stopPropagation()}>
             <View className='modal-header'>
               <Text className='modal-title'>新建预定日程</Text>
-              <Text className='modal-close' onClick={() => setShowCreateSchedule(false)}>✕</Text>
+              <Text className='modal-close' onClick={() => setShowCreateSchedule(false)}>×</Text>
             </View>
             <View className='modal-body'>
               <View className='form-group'>

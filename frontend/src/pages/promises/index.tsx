@@ -237,7 +237,7 @@ export default function PromisesPage() {
       <ScrollView scrollY className='promise-list'>
         {promises.length === 0 && !loading && (
           <View className='empty'>
-            <Text className='empty-icon'>{activeView === 0 ? '📋' : '🤝'}</Text>
+            <Text className='empty-icon'>{activeView === 0 ? '—' : '—'}</Text>
             <Text className='empty-text'>
               {activeView === 0 ? '暂无我的承诺记录' : '暂无对方承诺记录'}
             </Text>
@@ -375,7 +375,7 @@ export default function PromisesPage() {
           <View className='nudge-popup-content' onClick={e => e.stopPropagation()}>
             <View className='nudge-popup-header'>
               <Text className='nudge-popup-title'>催促消息草稿</Text>
-              <Text className='nudge-popup-close' onClick={closeNudge}>✕</Text>
+              <Text className='nudge-popup-close' onClick={closeNudge}>×</Text>
             </View>
             {nudgeLoading ? (
               <View className='nudge-loading'><Text>AI正在生成话术，请稍候...</Text></View>

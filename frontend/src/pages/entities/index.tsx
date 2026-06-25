@@ -139,10 +139,10 @@ export default function EntitiesPage() {
   }
 
   const ENTITY_TYPE_MAP: Record<string, string> = {
-    person: '👤 人物',
-    organization: '🏢 组织',
-    location: '📍 地点',
-    other: '📌 其他',
+    person: '人物',
+    organization: '组织',
+    location: '地点',
+    other: '其他',
   }
 
   // Internal fields that should not be shown to users
@@ -262,7 +262,7 @@ export default function EntitiesPage() {
 
       {/* F-E3: Dormant Contacts Entry */}
       <View className='dormant-entry' onClick={handleShowDormant}>
-        <Text className='dormant-entry-icon'>🔍</Text>
+        <Text className='dormant-entry-icon'>搜</Text>
         <Text className='dormant-entry-text'>发现沉睡人脉</Text>
         <Text className='dormant-entry-desc'>找出值得重新联系的人</Text>
       </View>
@@ -307,7 +307,7 @@ export default function EntitiesPage() {
           <View className='modal-content' onClick={e => e.stopPropagation()}>
             <View className='modal-header'>
               <Text className='modal-title'>{detail.name}</Text>
-              <Text className='modal-close' onClick={closeDetail}>✕</Text>
+              <Text className='modal-close' onClick={closeDetail}>×</Text>
             </View>
             <View className='modal-body'>
               <View className='detail-row'>
@@ -370,7 +370,7 @@ export default function EntitiesPage() {
                     handleDeleteEntity()
                   }}
                 >
-                  🗑 删除此人脉
+                  删除此人脉
                 </Text>
               </View>
 
@@ -429,7 +429,7 @@ export default function EntitiesPage() {
                   {stageInfo.suggestion && (
                     <View className='stage-suggestion'>
                       <Text className='suggestion-reason'>→ {stageInfo.suggestion.target_stage_label}: {stageInfo.suggestion.reason}</Text>
-                      <Text className='suggestion-hint'>💡 {stageInfo.suggestion.action_hint}</Text>
+                      <Text className='suggestion-hint'>提示：{stageInfo.suggestion.action_hint}</Text>
                     </View>
                   )}
                 </View>
@@ -499,14 +499,14 @@ export default function EntitiesPage() {
           <View className='dormant-modal-content' onClick={e => e.stopPropagation()}>
             <View className='dormant-modal-header'>
               <Text className='dormant-modal-title'>发现沉睡人脉</Text>
-              <Text className='dormant-modal-close' onClick={closeDormant}>✕</Text>
+              <Text className='dormant-modal-close' onClick={closeDormant}>×</Text>
             </View>
 
             {dormantLoading ? (
               <View className='dormant-loading'><Text>正在扫描...</Text></View>
             ) : dormantContacts.length === 0 ? (
               <View className='dormant-empty'>
-                <Text className='dormant-empty-icon'>💤</Text>
+                <Text className='dormant-empty-icon'>—</Text>
                 <Text className='dormant-empty-text'>暂无沉睡联系人</Text>
                 <Text className='dormant-empty-hint'>你的人脉都保持活跃状态，做得很好！</Text>
               </View>

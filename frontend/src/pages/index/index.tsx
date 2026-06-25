@@ -215,7 +215,7 @@ export default function Index() {
           {/* Data Export */}
           <View className='section'>
             <View className='export-btn' onClick={handleExportData}>
-              <Text className='export-btn-text'>📦 导出数据</Text>
+              <Text className='export-btn-text'>导出数据</Text>
             </View>
           </View>
 

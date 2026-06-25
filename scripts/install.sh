@@ -68,26 +68,46 @@ die() {
     exit 1
 }
 
+# ── Python 命令探测 ──
+# macOS 等系统默认 python3 可能是 3.9，优先寻找 3.11/3.12/3.13。
+detect_python() {
+    local candidates=("python3.13" "python3.12" "python3.11")
+    for cmd in "${candidates[@]}"; do
+        if command -v "$cmd" &>/dev/null; then
+            echo "$cmd"
+            return 0
+        fi
+    done
+    if command -v python3 &>/dev/null; then
+        echo "python3"
+        return 0
+    fi
+    echo ""
+}
+
 # ── 步骤 1: 检查 Python 环境 ──
 
 check_python() {
     print_step "【1/8】检查 Python 环境..."
 
-    if ! command -v python3 &>/dev/null; then
+    PYTHON_CMD=$(detect_python)
+    if [[ -z "$PYTHON_CMD" ]]; then
         die "未找到 Python3，请先安装 Python 3.11 或更高版本。
      下载地址：https://www.python.org/downloads/"
     fi
 
-    PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')")
-    python3 -c "
+    PYTHON_VERSION=$($PYTHON_CMD -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')")
+    if ! $PYTHON_CMD -c "
 import sys
 if sys.version_info < (3, 11):
     print('ERROR')
     sys.exit(1)
-" 2>/dev/null || die "Python 版本过低（当前 $PYTHON_VERSION），需要 3.11+。
+" 2>/dev/null; then
+        die "Python 版本过低（当前 $PYTHON_VERSION ），需要 3.11+ 。
      下载地址：https://www.python.org/downloads/"
+    fi
 
-    print_ok "Python $PYTHON_VERSION"
+    print_ok "Python $PYTHON_VERSION （命令：$PYTHON_CMD ）"
 }
 
 # ── 步骤 2: 检查 Node.js 环境 ──
@@ -117,7 +137,7 @@ create_venv() {
     if [[ -d "$VENV_DIR" ]]; then
         print_info "虚拟环境已存在，跳过创建。"
     else
-        if python3 -m venv "$VENV_DIR"; then
+        if $PYTHON_CMD -m venv "$VENV_DIR"; then
             print_ok "虚拟环境创建完成: $VENV_DIR"
         else
             die "虚拟环境创建失败，请检查 Python venv 模块是否可用。"
