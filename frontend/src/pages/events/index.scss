@@ -50,7 +50,7 @@
       color: #666;
 
       &.active {
-        background: #e6f7ff;
+        background: #E8EEF0;
         color: #7B9EA8;
         font-weight: 500;
       }
@@ -68,12 +68,11 @@
       border-radius: 36px;
       padding: 0 28px;
       font-size: 26px;
-      outline: none;
-      background: #f5f5f5;
+            background: #f5f5f5;
       box-sizing: border-box;
 
       &:focus {
-        border-color: #a0b0c4;
+        border-color: var(--pl-primary-light);
         background: #fff;
       }
     }
@@ -83,7 +82,7 @@
     text-align: center;
     padding: 60px 0;
     font-size: 28px;
-    color: #999;
+    color: #6B6B6B;
   }
 
   .error-container {
@@ -104,12 +103,12 @@
   .empty {
     text-align: center;
     padding: 80px 0;
-    color: #999;
+    color: #6B6B6B;
     font-size: 28px;
 
     .empty-hint {
       font-size: 24px;
-      color: #bfbfbf;
+      color: #8A8A8A;
       margin-top: 12px;
       display: block;
     }
@@ -173,22 +172,22 @@
         }
 
         &.status-completed {
-          background: #f6ffed;
+          background: #E8F0E8;
           Text { color: #A0C4A8; }
         }
 
         &.status-pending {
-          background: #e6f7ff;
+          background: #E8EEF0;
           Text { color: #7B9EA8; }
         }
 
         &.status-processing {
-          background: #fff7e6;
-          Text { color: #fa8c16; }
+          background: #F0EDE5;
+          Text { color: var(--pl-warning); }
         }
 
         &.status-failed {
-          background: #fff2f0;
+          background: #F0E8E6;
           Text { color: #C4A7A0; }
         }
       }
@@ -219,7 +218,7 @@
           color: #7B9EA8;
           text-decoration: underline;
           cursor: pointer;
-          background: #e6f7ff;
+          background: #E8EEF0;
           padding: 2px 10px;
           border-radius: 6px;
 
@@ -232,7 +231,7 @@
 
     .expand-arrow {
       font-size: 20px;
-      color: #bfbfbf;
+      color: #8A8A8A;
       margin-left: 12px;
       flex-shrink: 0;
     }
@@ -251,7 +250,7 @@
 
         .detail-label {
           font-size: 22px;
-          color: #999;
+          color: #6B6B6B;
           display: block;
           margin-bottom: 4px;
         }
@@ -280,7 +279,7 @@
       .retry-btn {
         font-size: 22px;
         color: #fff;
-        background: #a0b0c4;
+        background: var(--pl-primary-light);
         padding: 4px 16px;
         border-radius: 12px;
 
@@ -334,7 +333,7 @@
         &.pending-confirm-item {
           flex-direction: column;
           align-items: flex-start;
-          background: #f0f5ff;
+          background: #E8EEF0;
           padding: 12px;
           border-radius: 8px;
           margin-bottom: 8px;
@@ -357,8 +356,8 @@
 
         .todo-action-tag {
           font-size: 18px;
-          color: #a0b0c4;
-          background: #e8edf5;
+          color: var(--pl-primary-light);
+          background: #E8EEF0;
           padding: 2px 8px;
           border-radius: 4px;
           flex-shrink: 0;
@@ -388,7 +387,7 @@
 
         .related-todo-status {
           font-size: 22px;
-          color: #999;
+          color: #6B6B6B;
         }
 
         .pending-confirm-status {
@@ -404,12 +403,12 @@
 
         .done-btn {
           color: #A0C4A8;
-          background: #f6ffed;
-          border: 1px solid #b7eb8f;
+          background: #E8F0E8;
+          border: 1px solid #C8D8C8;
         }
 
         .dismiss-btn {
-          color: #999;
+          color: #6B6B6B;
           background: #fafafa;
           border: 1px solid #e8e8e8;
         }
@@ -430,7 +429,7 @@
 
     // Scheduled event card styles
     &.scheduled-card {
-      border-left: 4px solid #a0b0c4;
+      border-left: 4px solid var(--pl-primary-light);
 
       &.status-overdue {
         border-left-color: #c4a7a0;
@@ -453,17 +452,17 @@
       }
 
       &.status-pending {
-        background: #e6f7ff;
-        Text { color: #a0b0c4; }
+        background: #E8EEF0;
+        Text { color: var(--pl-primary-light); }
       }
 
       &.status-overdue {
-        background: #fff2f0;
+        background: #F0E8E6;
         Text { color: #c4a7a0; }
       }
 
       &.status-recorded {
-        background: #f6ffed;
+        background: #E8F0E8;
         Text { color: #a0c4a8; }
       }
     }
@@ -501,7 +500,7 @@
       }
 
       .record-btn {
-        background: #a0b0c4;
+        background: var(--pl-primary-light);
         color: #fff;
 
         Text { color: #fff; }
@@ -510,9 +509,9 @@
       .cancel-btn {
         background: #fff;
         border: 1px solid #d9d9d9;
-        color: #999;
+        color: #6B6B6B;
 
-        Text { color: #999; }
+        Text { color: #6B6B6B; }
       }
 
       .view-event-btn {
@@ -523,7 +522,7 @@
       }
     }
   .create-schedule-btn {
-    background: #a0b0c4;
+    background: var(--pl-primary-light);
     color: #fff;
     text-align: center;
     padding: 20px;
@@ -576,7 +575,7 @@
 
       .modal-close {
         font-size: 36px;
-        color: #999;
+        color: #6B6B6B;
         padding: 0 8px;
       }
     }
@@ -605,14 +604,14 @@
           background: #fafafa;
 
           &:focus {
-            border-color: #a0b0c4;
+            border-color: var(--pl-primary-light);
             background: #fff;
           }
         }
       }
 
       .submit-schedule-btn {
-        background: #a0b0c4;
+        background: var(--pl-primary-light);
         color: #fff;
         text-align: center;
         padding: 20px;
@@ -664,11 +663,10 @@
     .loading { padding: 30px 0; font-size: 14px; }
     .error-container { padding: 30px 24px; .error-text { font-size: 13px; } }
 
-    // List area: reserve space for right-column detail panel
+    // List area: global .pl-detail column already occupies the right via flex
     .event-list {
       height: calc(100vh - 200px);
       padding: 16px 24px;
-      padding-right: 380px;
     }
 
     .empty { padding: 40px 0; font-size: 14px; .empty-hint { font-size: 12px; margin-top: 6px; } }
@@ -694,20 +692,9 @@
       }
       .expand-arrow { font-size: 12px; margin-left: 8px; }
 
-      // Detail panel: position as fixed right-column on desktop
+      // Detail panel: inline within card (global .pl-detail column handles right-side summary)
       .event-detail {
-        position: fixed;
-        top: 0;
-        right: 0;
-        width: 360px;
-        height: 100vh;
-        overflow-y: auto;
-        background: #fff;
-        border-left: 1px solid #e0ddd8;
-        box-shadow: -2px 0 8px rgba(0,0,0,0.08);
-        padding: 20px;
-        z-index: 50;
-        border-top: none;
+        padding: 12px 16px;
 
         .detail-row {
           margin-bottom: 10px;

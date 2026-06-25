@@ -30,7 +30,7 @@
 
     .login-subtitle {
       font-size: 24px;
-      color: #999;
+      color: #6B6B6B;
       display: block;
       text-align: center;
       margin-top: 8px;
@@ -113,7 +113,7 @@
     text-align: center;
     padding: 60px 0;
     font-size: 28px;
-    color: #999;
+    color: #6B6B6B;
   }
 
   .error-container {
@@ -159,7 +159,7 @@
 
       .card-label {
         font-size: 22px;
-        color: #999;
+        color: #6B6B6B;
         margin-top: 8px;
         display: block;
       }
@@ -185,7 +185,7 @@
     border: 2px dashed #d9d9d9;
 
     .quick-input-placeholder {
-      color: #bfbfbf;
+      color: #8A8A8A;
       font-size: 28px;
     }
   }
@@ -289,7 +289,7 @@
 
       .todo-due {
         font-size: 22px;
-        color: #999;
+        color: #6B6B6B;
       }
 
       .todo-overdue-badge {
@@ -305,7 +305,7 @@
   .empty {
     text-align: center;
     padding: 40px 0;
-    color: #999;
+    color: #6B6B6B;
     font-size: 26px;
   }
 
@@ -321,7 +321,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 16px rgba(24, 144, 255, 0.4);
+    box-shadow: 0 4px 16px rgba(123, 158, 168, 0.3);
     z-index: 100;
 
     .fab-icon {
@@ -334,11 +334,11 @@
 
   // F-E4: Supply-Demand Matching
   .sd-section {
-    background: linear-gradient(135deg, #f6ffed 0%, #fff7e6 100%);
+    background: linear-gradient(135deg, #E8F0E8 0%, #F0EDE5 100%);
     border-radius: 16px;
     padding: 24px;
 
-    .sd-title { color: #389e0d !important; }
+    .sd-title { color: var(--pl-success); }
   }
 
   .sd-card {
@@ -362,7 +362,7 @@
 
       .sd-arrow {
         font-size: 22px;
-        color: #999;
+        color: #6B6B6B;
       }
 
       .sd-supplier {
@@ -388,14 +388,14 @@
 
     .sd-reason {
       font-size: 22px;
-      color: #999;
+      color: #6B6B6B;
       display: block;
     }
   }
 
   // F-G1: Relationship Health Diagnostic
   .health-section {
-    background: linear-gradient(135deg, #f0f5ff 0%, #e6f7ff 100%);
+    background: linear-gradient(135deg, #E8EEF0 0%, #E8EEF0 100%);
     border-radius: 16px;
     padding: 24px;
 
@@ -493,7 +493,7 @@
 
   // F-G3: Care Reminders
   .care-section {
-    background: linear-gradient(135deg, #fffbe6 0%, #fff1b8 100%);
+    background: linear-gradient(135deg, #F0EDE5 0%, #F0EDE5 100%);
     border-radius: 16px;
     padding: 24px;
 
@@ -535,8 +535,8 @@
       border-left: 4px solid #C4C0A0;
 
       &.care-business {
-        border-left-color: #a0b0c4;
-        background: #fafbfc;
+        border-left-color: var(--pl-primary-light);
+        background: #F5F3F0;
       }
 
       .care-card-top {
@@ -570,7 +570,7 @@
 
       .care-action {
         font-size: 22px;
-        color: #ad6800;
+        color: #8A7A5A;
         font-style: italic;
         display: block;
         margin-top: 6px;
@@ -578,7 +578,7 @@
 
       .care-meta {
         font-size: 20px;
-        color: #999;
+        color: #6B6B6B;
         display: block;
         margin-top: 4px;
       }

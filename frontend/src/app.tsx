@@ -1,20 +1,30 @@
 import { PropsWithChildren, useEffect, useState } from 'react'
-import { View, Text } from '@tarojs/components'
+import { View, Text, Image } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { getEventDetail } from './services/api'
 import { isLoggedIn } from './services/auth'
 import Guide from './components/Guide/Guide'
+import homeIcon from './icons/home.png'
+import homeActiveIcon from './icons/home-active.png'
+import eventsIcon from './icons/events.png'
+import eventsActiveIcon from './icons/events-active.png'
+import peopleIcon from './icons/people.png'
+import peopleActiveIcon from './icons/people-active.png'
+import todoIcon from './icons/todo.png'
+import todoActiveIcon from './icons/todo-active.png'
+import promiseIcon from './icons/promise.png'
+import promiseActiveIcon from './icons/promise-active.png'
 import './app.scss'
 
 const GUIDE_STORAGE_KEY = 'guide_shown'
 
 // Desktop navigation items (mirrors tabBar config in app.config.ts)
 const NAV_ITEMS = [
-  { path: '/pages/index/index', label: '首页', icon: '🏠' },
-  { path: '/pages/events/index', label: '事件', icon: '📅' },
-  { path: '/pages/entities/index', label: '人脉', icon: '👥' },
-  { path: '/pages/todos/index', label: '待办', icon: '✓' },
-  { path: '/pages/promises/index', label: '承诺', icon: '🤝' },
+  { path: '/pages/index/index', label: '首页', icon: homeIcon, activeIcon: homeActiveIcon },
+  { path: '/pages/events/index', label: '事件', icon: eventsIcon, activeIcon: eventsActiveIcon },
+  { path: '/pages/entities/index', label: '人脉', icon: peopleIcon, activeIcon: peopleActiveIcon },
+  { path: '/pages/todos/index', label: '待办', icon: todoIcon, activeIcon: todoActiveIcon },
+  { path: '/pages/promises/index', label: '承诺', icon: promiseIcon, activeIcon: promiseActiveIcon },
 ]
 
 // Event type labels for detail summary
@@ -72,16 +82,19 @@ function DesktopSidebar() {
         <Text className='pl-brand-edition'>基础版</Text>
       </View>
       <View className='pl-nav'>
-        {NAV_ITEMS.map(item => (
-          <View
-            key={item.path}
-            className={`pl-nav-item ${activePath.includes(item.path) ? 'active' : ''}`}
-            onClick={() => handleNav(item.path)}
-          >
-            <Text className='pl-nav-icon'>{item.icon}</Text>
-            <Text className='pl-nav-label'>{item.label}</Text>
-          </View>
-        ))}
+        {NAV_ITEMS.map(item => {
+          const isActive = activePath.includes(item.path)
+          return (
+            <View
+              key={item.path}
+              className={`pl-nav-item ${isActive ? 'active' : ''}`}
+              onClick={() => handleNav(item.path)}
+            >
+              <Image className='pl-nav-icon' src={isActive ? item.activeIcon : item.icon} />
+              <Text className='pl-nav-label'>{item.label}</Text>
+            </View>
+          )
+        })}
       </View>
       <View className='pl-pro-guide'>
         <Text className='pl-pro-guide-title'>升级专业版</Text>
@@ -171,7 +184,6 @@ function DesktopDetailBar() {
         </View>
       ) : (
         <View className='pl-detail-empty'>
-          <Text className='pl-detail-empty-icon'>📋</Text>
           <Text className='pl-detail-empty-text'>选择一项查看详情摘要</Text>
         </View>
       )}

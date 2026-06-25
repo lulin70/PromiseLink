@@ -11,7 +11,7 @@ import uuid
 from collections.abc import Callable
 from typing import Any
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -394,8 +394,8 @@ async def get_relationship_brief_aggregated(
 )
 async def list_relationship_briefs(
     stage: str | None = None,
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(50, ge=1),
+    offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
 ) -> Any:

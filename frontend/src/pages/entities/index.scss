@@ -43,7 +43,7 @@
     text-align: center;
     padding: 60px 0;
     font-size: 28px;
-    color: #999;
+    color: #6B6B6B;
   }
 
   .error {
@@ -68,7 +68,7 @@
       width: 80px;
       height: 80px;
       border-radius: 50%;
-      background: #e6f7ff;
+      background: #E8EEF0;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -94,7 +94,7 @@
 
       .entity-type {
         font-size: 22px;
-        color: #999;
+        color: #6B6B6B;
         margin-top: 4px;
         display: block;
       }
@@ -117,7 +117,7 @@
   .empty {
     text-align: center;
     padding: 80px 0;
-    color: #999;
+    color: #6B6B6B;
     font-size: 28px;
   }
 
@@ -156,7 +156,7 @@
 
       .modal-close {
         font-size: 36px;
-        color: #999;
+        color: #6B6B6B;
         padding: 8px;
       }
     }
@@ -171,7 +171,7 @@
         .detail-label {
           width: 120px;
           font-size: 26px;
-          color: #999;
+          color: #6B6B6B;
           flex-shrink: 0;
         }
 
@@ -239,14 +239,14 @@
             font-size: 24px;
             color: #7B9EA8;
             padding: 8px 16px;
-            background: #e6f7ff;
+            background: #E8EEF0;
             border-radius: 8px;
             flex-shrink: 0;
           }
 
           .detail-edit-cancel {
             font-size: 24px;
-            color: #999;
+            color: #6B6B6B;
             padding: 8px 12px;
             flex-shrink: 0;
           }
@@ -291,14 +291,14 @@
 
         .related-item-meta {
           font-size: 22px;
-          color: #999;
+          color: #6B6B6B;
           margin-left: 8px;
           flex-shrink: 0;
         }
 
         .dismiss-btn {
           font-size: 22px;
-          color: #999;
+          color: #6B6B6B;
           padding: 4px 12px;
           border: 1px solid #ddd;
           border-radius: 12px;
@@ -309,7 +309,7 @@
 
   // F-E3: Dormant Contacts
   .dormant-entry {
-    background: linear-gradient(135deg, #e6f7ff 0%, #f0f5ff 100%);
+    background: linear-gradient(135deg, #E8EEF0 0%, #E8EEF0 100%);
     border-radius: 12px;
     padding: 20px 24px;
     margin-bottom: 16px;
@@ -325,7 +325,7 @@
     }
     .dormant-entry-desc {
       font-size: 22px;
-      color: #999;
+      color: #6B6B6B;
     }
   }
 
@@ -363,7 +363,7 @@
 
     .dormant-modal-close {
       font-size: 36px;
-      color: #999;
+      color: #6B6B6B;
       padding: 8px;
     }
   }
@@ -372,7 +372,7 @@
     text-align: center;
     padding: 60px 0;
 
-    Text { font-size: 28px; color: #999; }
+    Text { font-size: 28px; color: #6B6B6B; }
   }
 
   .dormant-empty-icon { font-size: 64px; display: block; margin-bottom: 12px; }
@@ -418,7 +418,7 @@
       flex: 1;
 
       .dormant-name { font-size: 28px; font-weight: bold; color: #333; display: block; }
-      .dormant-company { font-size: 22px; color: #999; display: block; }
+      .dormant-company { font-size: 22px; color: #6B6B6B; display: block; }
     }
 
     .dormant-score {
@@ -447,18 +447,18 @@
     }
 
     .dormant-icebreaker {
-      background: #fffbe6;
+      background: #F0EDE5;
       border-radius: 8px;
       padding: 10px 14px;
       margin-top: 10px;
 
       .ice-label { font-size: 20px; color: #C4C0A0; font-weight: bold; }
-      .ice-text { font-size: 24px; color: #ad6800; line-height: 1.5; }
+      .ice-text { font-size: 24px; color: #8A7A5A; line-height: 1.5; }
   }
 
   // F-E5: Credit Score
   .credit-score-section {
-    background: linear-gradient(135deg, #f0f5ff 0%, #e6f7ff 100%);
+    background: linear-gradient(135deg, #E8EEF0 0%, #E8EEF0 100%);
     border-radius: 12px;
     padding: 20px;
     margin-top: 16px;
@@ -483,7 +483,7 @@
 
         Text { color: #fff; }
 
-        &.grade-Ap { background: linear-gradient(135deg, #cf1322, #a8071a); }
+        &.grade-Ap { background: linear-gradient(135deg, #C4A7A0, #A88A82); }
         &.grade-A { background: #A0C4A8; }
         &.grade-B { background: #7B9EA8; }
         &.grade-C { background: #C4C0A0; }
@@ -531,7 +531,7 @@
 
   // F-G2: Relationship Stage
   .stage-section {
-    background: linear-gradient(135deg, #f9f0ff 0%, #f0f5ff 100%);
+    background: linear-gradient(135deg, #EEE8F0 0%, #E8EEF0 100%);
     border-radius: 12px;
     padding: 20px;
     margin-top: 16px;
@@ -569,7 +569,7 @@
     }
 
     .stage-suggestion {
-      background: #fffbe6;
+      background: #F0EDE5;
       border-radius: 8px;
       padding: 14px 16px;
       border-left: 3px solid #C4C0A0;
@@ -583,7 +583,7 @@
 
       .suggestion-hint {
         font-size: 22px;
-        color: #ad6800;
+        color: #8A7A5A;
         display: block;
       }
     }
@@ -615,11 +615,10 @@
 
     .loading, .error { padding: 30px 0; font-size: 14px; }
 
-    // List: reserve space for right-column detail
+    // List: global .pl-detail column already occupies the right via flex
     .entity-list {
       height: calc(100vh - 180px);
       padding: 12px 24px;
-      padding-right: 380px;
     }
 
     .entity-card {
@@ -649,27 +648,19 @@
       .dormant-entry-desc { font-size: 11px; }
     }
 
-    // ── Detail modal → right-column panel ──
+    // ── Detail modal → centered modal on desktop (global .pl-detail handles right column) ──
     .modal-overlay {
-      position: fixed;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      left: auto;
-      width: 360px;
-      background: transparent;
-      align-items: stretch;
-      z-index: 50;
+      padding: 20px;
+      align-items: center;
     }
 
     .modal-content {
-      width: 100%;
-      max-height: 100vh;
-      border-radius: 0;
+      max-width: 500px;
+      max-height: 85vh;
+      border-radius: 12px;
       padding: 20px;
       overflow-y: auto;
-      box-shadow: -2px 0 8px rgba(0,0,0,0.08);
-      border-left: 1px solid #e0ddd8;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.12);
 
       .modal-header { margin-bottom: 16px; .modal-title { font-size: 18px; } .modal-close { font-size: 18px; padding: 4px; } }
 

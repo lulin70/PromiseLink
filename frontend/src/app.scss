@@ -45,6 +45,20 @@ page {
   box-sizing: border-box;
 }
 
+// ── Global button states (disabled + hover feedback) ──
+button:disabled,
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+button:hover,
+.btn:hover {
+  opacity: 0.85;
+  transition: opacity 0.2s;
+}
+
 // ── Mobile (<768px): hide sidebar and detail (single-column) ──
 .pl-sidebar,
 .pl-detail {
@@ -250,10 +264,9 @@ page {
     transition: background 0.2s;
 
     .pl-nav-icon {
-      font-size: 18px;
-      line-height: 1;
       width: 20px;
-      text-align: center;
+      height: 20px;
+      flex-shrink: 0;
     }
 
     .pl-nav-label {

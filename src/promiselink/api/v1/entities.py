@@ -71,8 +71,8 @@ async def list_entities(
     entity_type: str | None = None,
     status: str | None = None,
     search: str | None = None,
-    limit: int = 100,
-    offset: int = 0,
+    limit: int = Query(100, ge=1),
+    offset: int = Query(0, ge=0),
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
 ) -> Any:
