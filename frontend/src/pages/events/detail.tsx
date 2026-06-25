@@ -118,10 +118,10 @@ export default function EventDetailPage() {
           </View>
 
           {/* Related entities */}
-          {detail.entities && detail.entities.length > 0 && (
+          {detail.related_entities && detail.related_entities.length > 0 && (
             <View className='section-card'>
-              <Text className='section-title'>关联人脉 ({detail.entities.length})</Text>
-              {detail.entities.map(ent => (
+              <Text className='section-title'>关联人脉 ({detail.related_entities.length})</Text>
+              {detail.related_entities.map(ent => (
                 <EntityLink
                   key={ent.id}
                   entityId={ent.id}
@@ -162,7 +162,7 @@ export default function EventDetailPage() {
           )}
 
           {/* Empty state for associations */}
-          {(!detail.entities || detail.entities.length === 0) &&
+          {(!detail.related_entities || detail.related_entities.length === 0) &&
             (!detail.related_todos || detail.related_todos.length === 0) && (
             <View className='empty-associations'>
               <Text>暂无关联数据</Text>

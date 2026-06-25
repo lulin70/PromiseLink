@@ -51,7 +51,7 @@
 
       .stat-label {
         font-size: 20px;
-        color: #999;
+        color: #6B6B6B;
         margin-top: 4px;
         display: block;
       }
@@ -62,15 +62,15 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: #e6f7ff;
-    border: 1px solid #91d5ff;
+    background: #E8EEF0;
+    border: 1px solid #C8D8DC;
     border-radius: 8px;
     padding: 16px 20px;
     margin: 12px 16px;
     cursor: pointer;
 
     &:active {
-      background: #bae7ff;
+      background: #D8E4E8;
     }
 
     .confirm-hint-text {
@@ -162,7 +162,7 @@
       margin-right: 12px;
 
       &.active {
-        background: #e6f7ff;
+        background: #E8EEF0;
         color: #7B9EA8;
       }
     }
@@ -178,11 +178,10 @@
       border-radius: 36px;
       padding: 0 28px;
       font-size: 26px;
-      outline: none;
-      background: #f5f5f5;
+            background: #f5f5f5;
       box-sizing: border-box;
       &:focus {
-        border-color: #a0b0c4;
+        border-color: var(--pl-primary-light);
         background: #fff;
       }
     }
@@ -192,7 +191,7 @@
     text-align: center;
     padding: 60px 0;
     font-size: 28px;
-    color: #999;
+    color: #6B6B6B;
   }
 
   .error {
@@ -212,20 +211,20 @@
     box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 
     &.pending-confirm {
-      border: 2px dashed #ffd666;
-      background: #fffbeb;
+      border: 2px dashed #D8D0B8;
+      background: #F0EDE5;
     }
 
     &.unconfirmed {
       border-left: 4px solid #7B9EA8;
-      background: #f0f7ff;
+      background: #E8EEF0;
     }
 
     .ai-confirm-banner {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: #e6f7ff;
+      background: #E8EEF0;
       border-radius: 8px;
       padding: 12px 16px;
       margin-bottom: 12px;
@@ -253,7 +252,7 @@
 
           &.ignore-btn {
             background: #fff;
-            color: #999;
+            color: #6B6B6B;
             border: 1px solid #d9d9d9;
           }
         }
@@ -279,13 +278,13 @@
 
       .promise-action {
         font-size: 22px;
-        color: #999;
+        color: #6B6B6B;
       }
 
       .confirm-hint {
         font-size: 20px;
         color: #C4C0A0;
-        background: #fffbe6;
+        background: #F0EDE5;
         padding: 2px 12px;
         border-radius: 4px;
       }
@@ -311,7 +310,7 @@
 
       .promise-entity-label {
         font-size: 22px;
-        color: #999;
+        color: #6B6B6B;
       }
     }
 
@@ -327,7 +326,7 @@
     }
 
     .source-event-link {
-      color: #a0b0c4;
+      color: var(--pl-primary-light);
       font-size: 24px;
       margin-left: 8px;
       padding: 4px 0;
@@ -342,12 +341,12 @@
 
       .promise-due {
         font-size: 22px;
-        color: #fa8c16;
+        color: var(--pl-warning);
       }
 
       .promise-date {
         font-size: 22px;
-        color: #999;
+        color: #6B6B6B;
       }
 
       .promise-action-btns {
@@ -364,26 +363,26 @@
 
       .fulfill-btn {
         color: #A0C4A8;
-        background: #f6ffed;
-        border: 1px solid #b7eb8f;
+        background: #E8F0E8;
+        border: 1px solid #C8D8C8;
       }
 
       .broken-btn {
-        color: #999;
+        color: #6B6B6B;
         background: #fafafa;
         border: 1px solid #e8e8e8;
       }
 
       .revert-btn {
         color: #7B9EA8;
-        background: #e6f7ff;
-        border: 1px solid #91d5ff;
+        background: #E8EEF0;
+        border: 1px solid #C8D8DC;
       }
 
       .nudge-action-btn {
-        color: #fa8c16;
-        background: #fff7e6;
-        border: 1px solid #ffd591;
+        color: var(--pl-warning);
+        background: #F0EDE5;
+        border: 1px solid #D8CDB8;
       }
     }
   }
@@ -407,7 +406,7 @@
 
     .empty-hint {
       font-size: 24px;
-      color: #999;
+      color: #6B6B6B;
       display: block;
     }
   }
@@ -448,7 +447,7 @@
 
     .nudge-popup-close {
       font-size: 36px;
-      color: #999;
+      color: #6B6B6B;
       padding: 8px;
     }
   }
@@ -479,7 +478,7 @@
 
   .nudge-disclaimer {
     font-size: 22px;
-    color: #999;
+    color: #6B6B6B;
     display: block;
     text-align: center;
     margin-bottom: 20px;

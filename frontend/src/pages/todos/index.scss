@@ -105,12 +105,11 @@
       border-radius: 36px;
       padding: 0 28px;
       font-size: 26px;
-      outline: none;
-      background: #f5f5f5;
+            background: #f5f5f5;
       box-sizing: border-box;
 
       &:focus {
-        border-color: #a0b0c4;
+        border-color: var(--pl-primary-light);
         background: #fff;
       }
     }
@@ -120,7 +119,7 @@
     text-align: center;
     padding: 60px 0;
     font-size: 28px;
-    color: #999;
+    color: #6B6B6B;
   }
 
   .error {
@@ -188,7 +187,7 @@
 
       .todo-due {
         font-size: 22px;
-        color: #fa8c16;
+        color: var(--pl-warning);
         margin-top: 8px;
         display: block;
       }
@@ -201,7 +200,7 @@
 
         .todo-entity-label {
           font-size: 22px;
-          color: #999;
+          color: #6B6B6B;
         }
       }
 
@@ -217,7 +216,7 @@
       }
 
       .source-event-link {
-        color: #a0b0c4;
+        color: var(--pl-primary-light);
         font-size: 24px;
         margin-left: 8px;
         padding: 4px 0;
@@ -233,8 +232,8 @@
       gap: 12px;
 
       .done-btn {
-        background: #f6ffed;
-        border: 2px solid #b7eb8f;
+        background: #E8F0E8;
+        border: 2px solid #C8D8C8;
         border-radius: 8px;
         padding: 8px 24px;
 
@@ -257,8 +256,8 @@
       }
 
       .dismiss-btn {
-        background: #fff1f0;
-        border: 2px solid #ffa39e;
+        background: #F0E8E6;
+        border: 2px solid #D8C8C4;
         border-radius: 8px;
         padding: 8px 24px;
 
@@ -274,7 +273,7 @@
       }
 
       .dismissed-label {
-        color: #999;
+        color: #6B6B6B;
         font-size: 24px;
       }
     }
@@ -283,7 +282,7 @@
   .empty {
     text-align: center;
     padding: 80px 0;
-    color: #999;
+    color: #6B6B6B;
     font-size: 28px;
   }
 }
