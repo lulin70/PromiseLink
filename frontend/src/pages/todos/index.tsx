@@ -267,7 +267,7 @@ export default function TodosPage() {
                       className='delete-btn'
                       onClick={() => handleDeleteTodo(todo.id)}
                     >
-                      <Text>🗑 删除</Text>
+                      <Text>删除</Text>
                     </View>
                     <View
                       className='dismiss-btn'
@@ -279,7 +279,7 @@ export default function TodosPage() {
                       className='done-btn'
                       onClick={() => handleMarkDone(todo.id)}
                     >
-                      <Text>✓ 完成</Text>
+                      <Text>√ 完成</Text>
                     </View>
                   </>
                 )}

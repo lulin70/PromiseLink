@@ -187,7 +187,7 @@ export default function TodoDetailPage() {
                 className={`action-btn primary ${actionLoading ? 'disabled' : ''}`}
                 onClick={() => !actionLoading && handleStatusChange('done')}
               >
-                <Text>✓ 完成</Text>
+                <Text>√ 完成</Text>
               </View>
             </View>
           )}

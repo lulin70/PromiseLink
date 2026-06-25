@@ -15,10 +15,10 @@ import PromiseLink from '../../components/PromiseLink'
 import './detail.scss'
 
 const ENTITY_TYPE_MAP: Record<string, string> = {
-  person: '👤 人物',
-  organization: '🏢 组织',
-  location: '📍 地点',
-  other: '📌 其他',
+  person: '人物',
+  organization: '组织',
+  location: '地点',
+  other: '其他',
 }
 
 const INTERNAL_KEYS = new Set([

@@ -51,7 +51,7 @@ export default function PromiseLink({
       }}
     >
       <View className='promise-link-icon'>
-        <Text className='promise-link-icon-text'>🤝</Text>
+        <Text className='promise-link-icon-text'>诺</Text>
       </View>
       <View className='promise-link-info'>
         <Text className='promise-link-text'>{displayText}</Text>

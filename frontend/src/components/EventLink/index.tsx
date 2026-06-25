@@ -40,7 +40,7 @@ export default function EventLink({ eventId, title, timestamp, eventType }: Even
       }}
     >
       <View className='event-link-icon'>
-        <Text className='event-link-icon-text'>📅</Text>
+        <Text className='event-link-icon-text'>日</Text>
       </View>
       <View className='event-link-info'>
         <Text className='event-link-title'>{title || '未命名事件'}</Text>

@@ -9,14 +9,7 @@ interface EntityLinkProps {
   entityType?: string
 }
 
-const ENTITY_TYPE_ICON: Record<string, string> = {
-  person: '👤',
-  organization: '🏢',
-  location: '📍',
-  other: '📌',
-}
-
-export default function EntityLink({ entityId, name, company, entityType }: EntityLinkProps) {
+export default function EntityLink({ entityId, name, company }: EntityLinkProps) {
   return (
     <View
       className='entity-link-card'
@@ -27,7 +20,7 @@ export default function EntityLink({ entityId, name, company, entityType }: Enti
     >
       <View className='entity-link-avatar'>
         <Text className='entity-link-avatar-text'>
-          {entityType ? ENTITY_TYPE_ICON[entityType] || '👤' : name.charAt(0)}
+          {name.charAt(0)}
         </Text>
       </View>
       <View className='entity-link-info'>

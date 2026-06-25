@@ -55,23 +55,24 @@ def upgrade() -> None:
     op.create_index('idx_se_overdue_scan', 'scheduled_events', ['status', 'scheduled_at'])
 
     # Update reminder_type_check to include 'scheduled_due'
-    op.drop_constraint('reminder_type_check', 'reminder_logs', type_='check')
-    op.create_check_constraint(
-        'reminder_type_check',
-        'reminder_logs',
-        "reminder_type IN ('promise_due', 'followup', 'stage_suggestion', 'dormant_contact', 'scheduled_due')",
-    )
+    # SQLite 不支持 ALTER TABLE DROP/CREATE CHECK CONSTRAINT，使用 batch 模式重建表。
+    with op.batch_alter_table('reminder_logs', schema=None) as batch_op:
+        batch_op.drop_constraint('reminder_type_check', type_='check')
+        batch_op.create_check_constraint(
+            'reminder_type_check',
+            "reminder_type IN ('promise_due', 'followup', 'stage_suggestion', 'dormant_contact', 'scheduled_due')",
+        )
 
 
 def downgrade() -> None:
     """Drop scheduled_events table and revert reminder_type constraint."""
-    # Revert reminder_type_check
-    op.drop_constraint('reminder_type_check', 'reminder_logs', type_='check')
-    op.create_check_constraint(
-        'reminder_type_check',
-        'reminder_logs',
-        "reminder_type IN ('promise_due', 'followup', 'stage_suggestion', 'dormant_contact')",
-    )
+    # Revert reminder_type_check (SQLite batch mode)
+    with op.batch_alter_table('reminder_logs', schema=None) as batch_op:
+        batch_op.drop_constraint('reminder_type_check', type_='check')
+        batch_op.create_check_constraint(
+            'reminder_type_check',
+            "reminder_type IN ('promise_due', 'followup', 'stage_suggestion', 'dormant_contact')",
+        )
 
     op.drop_index('idx_se_overdue_scan', 'scheduled_events')
     op.drop_index('idx_se_user_scheduled', 'scheduled_events')
