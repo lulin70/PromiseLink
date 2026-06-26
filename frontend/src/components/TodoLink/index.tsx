@@ -26,7 +26,7 @@ function formatDueDate(dueDate?: string): string {
   return `${month}/${day}`
 }
 
-export default function TodoLink({ todoId, title, dueDate, status, todoType }: TodoLinkProps) {
+export default function TodoLink({ todoId, title, dueDate, status }: TodoLinkProps) {
   return (
     <View
       className='todo-link-card'

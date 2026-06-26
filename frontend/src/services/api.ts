@@ -109,6 +109,7 @@ export interface EventResponse {
   id: string
   user_id: string
   event_type: string
+  source?: string
   title: string
   status: string
   input_scope?: string
@@ -173,7 +174,7 @@ export interface PaginatedResponse<T> {
 }
 
 export async function createEvent(rawText: string, eventType: string = 'manual'): Promise<EventCreateResponse> {
-  return request<EventResponse>({
+  return request<EventCreateResponse>({
     method: 'POST',
     path: '/events',
     body: {

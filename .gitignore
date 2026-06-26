@@ -87,3 +87,6 @@ htmlcov/
 
 # Debug scripts
 debug_batch.py
+
+# Security scan output
+bandit-report.json

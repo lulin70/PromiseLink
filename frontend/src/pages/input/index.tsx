@@ -129,8 +129,8 @@ export default function InputPage() {
       setEventDetail({
         id: detail.id,
         status: detail.status,
-        pipeline: (detail as Record<string, unknown>).pipeline as string | null ?? null,
-        processed_at: (detail as Record<string, unknown>).processed_at as string | null ?? null,
+        pipeline: detail.pipeline ?? null,
+        processed_at: detail.processed_at ?? null,
       })
 
       if (detail.status === 'completed' || detail.status === 'failed' || detail.status === 'awaiting_retry') {

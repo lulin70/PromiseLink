@@ -112,7 +112,7 @@ export default function PromisesPage() {
           <Text className='login-title'>需要登录</Text>
           <View className='form-group'>
             <Text className='label'>PoC 密钥</Text>
-            <Input className='input' type='password' value={loginSecret} onInput={e => setLoginSecret(e.detail.value)} placeholder='请输入 PoC Secret' />
+            <Input className='input' type='safe-password' value={loginSecret} onInput={e => setLoginSecret(e.detail.value)} placeholder='请输入 PoC Secret' />
           </View>
           {loginError ? <Text className='error-text'>{loginError}</Text> : null}
           <View className={`login-btn ${loginLoading?'loading':''}`} onClick={loginLoading?undefined:handleInlineLogin}>

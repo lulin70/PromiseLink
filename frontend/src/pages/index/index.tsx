@@ -132,7 +132,7 @@ export default function Index() {
             <Text className='label'>PoC 密钥</Text>
             <Input
               className='input'
-              type='password'
+              type='safe-password'
               value={loginSecret}
               onInput={e => setLoginSecret(e.detail.value)}
               placeholder='请输入 PoC Secret'
@@ -302,7 +302,7 @@ export default function Index() {
                 {healthData.items
                   .sort((a, b) => a.health_score - b.health_score)
                   .slice(0, 5)
-                  .map((item, idx) => (
+                  .map((item) => (
                   <View
                     key={item.entity_id}
                     className={`health-card health-${item.health_level}`}
