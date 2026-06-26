@@ -225,3 +225,27 @@ P2-P3 (清理) ────────────────────┘
 | 日期 | 任务 | 状态 | 提交 |
 |---|---|---|---|
 | 2026-06-26 | 计划文档建立 | 完成 | - |
+| 2026-06-26 | P0-1: Pro 集成断裂修复 | 完成 | PromiseLink-Pro bbf0ce3 |
+| 2026-06-26 | P0-2: miniapp 敏感信息存储整改 | 完成 | PromiseLink-miniapp |
+| 2026-06-26 | P0-3: miniapp TypeScript 错误清零 | 完成 | PromiseLink-miniapp |
+| 2026-06-26 | P1-1: 基础版文档清理 | 完成 | PromiseLink b763fad |
+| 2026-06-26 | P1-2: 基础版 CI 门禁收紧 | 完成 | PromiseLink b763fad |
+| 2026-06-26 | P1-4: Pro API Key Pool 合并 | 完成 | PromiseLink-Pro bbf0ce3 |
+| 2026-06-26 | P1-5: Pro mypy 16 错误 + InMemoryLicenseService 接口对齐 | 完成 | PromiseLink-Pro bbf0ce3 |
+| 2026-06-26 | P1-6: LICENSE 版权方统一 | 完成 | PromiseLink-Pro bbf0ce3 |
+| 2026-06-26 | P1-7: 媒体上传 MIME+大小校验 | 完成 | PromiseLink-Pro bbf0ce3 |
+| 2026-06-26 | P2-1: wechat.py 撤销删除（OAuth 登录仍在使用） | 撤销 | - |
+| 2026-06-26 | P2-2: LLM 响应缓存推迟 | 推迟 | - |
+| 2026-06-26 | P3-1: 临时文件清理 | 完成 | 三仓库 |
+| 2026-06-26 | P3-2: miniapp 7 个幽灵组件清理 | 完成 | PromiseLink-miniapp ee800ef |
+
+## 8. 最终回归验证（2026-06-26）
+
+| 仓库 | 测试结果 | mypy/tsc | 覆盖率 |
+|---|---|---|---|
+| PromiseLink (基础版) | 1353 passed, 25 skipped | mypy 0 errors | 72% |
+| PromiseLink-Pro | 530 passed, 1 skipped | mypy 0 errors | 91% |
+| PromiseLink-miniapp | 8 passed | tsc 0 source errors | - |
+| **合计** | **1891 passed** | - | - |
+
+所有三仓库已直接推送到 main 分支（不经 PR）。
