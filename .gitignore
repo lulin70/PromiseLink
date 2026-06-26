@@ -64,6 +64,7 @@ logs/
 *_draft.*
 *_old.*
 *_tmp.*
+.promiselink.pid
 
 # === Node.js ===
 node_modules/

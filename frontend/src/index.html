@@ -8,6 +8,16 @@
   <meta name="format-detection" content="telephone=no">
   <title>PromiseLink</title>
   <script>
+    // Taro H5 rem baseline: designWidth=750, postcss rootValue=40 -> 750/18.75=40px
+    function setRootFontSize() {
+      var w = document.documentElement.clientWidth || window.innerWidth;
+      // Cap at 750px so desktop layout does not over-scale
+      var base = Math.min(w, 750) / 18.75;
+      document.documentElement.style.fontSize = base + 'px';
+    }
+    setRootFontSize();
+    window.addEventListener('resize', setRootFontSize);
+
     // Auto-removes the loading screen on load
     window.addEventListener('DOMContentLoaded', function() {
       var loading = document.getElementById('loading');
