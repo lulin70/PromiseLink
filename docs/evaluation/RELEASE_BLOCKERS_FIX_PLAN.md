@@ -249,3 +249,108 @@ P2-P3 (清理) ────────────────────┘
 | **合计** | **1891 passed** | - | - |
 
 所有三仓库已直接推送到 main 分支（不经 PR）。
+
+---
+
+## 9. H5 真实用户场景验证补充（2026-06-26）
+
+> 目标：在 H5 预览环境中验证 miniapp 核心用户旅程：登录 → 录入交流 → 校正候选 → 待办仪表盘。
+
+### 9.1 验证环境
+
+| 组件 | 地址/版本 | 状态 |
+|---|---|---|
+| miniapp H5 dev server | http://localhost:10086 | 运行中（webpack5 watch） |
+| PromiseLink 基础版 | http://localhost:8000/api/v1 | 健康（v0.6.6） |
+| PromiseLink-Pro 网关 | http://localhost:8001/api/v1/pro | 健康（v0.6.6） |
+| PoC 密钥 | `promiselink2026` | 可用 |
+
+### 9.2 已验证场景
+
+#### 9.2.1 登录（H5 UI 层）
+
+- 在浏览器中打开 http://localhost:10086/#/pages/login/index。
+- 输入 PoC 密钥 `promiselink2026`，点击「密钥登录」。
+- 结果：`POST /api/v1/auth/login` 返回 200，token 写入 secureStorage（内存 + sessionStorage），页面跳转至首页 `/pages/home/index`。
+- 结论：**通过**。
+
+#### 9.2.2 首页/仪表盘渲染（H5 UI 层）
+
+- 登录后首页成功渲染，显示：
+  - 问候语、今日日期
+  - 「今日日程」「紧急待办」区域
+  - 底部 TabBar（今日/人脉/录入/待办/我的）
+  - 新用户引导弹窗（可点击「跳过」关闭）
+- 网络请求：`GET /api/v1/events?user_id=...` 与 `GET /api/v1/todos?user_id=...` 均返回 200。
+- 结论：**通过**。
+
+#### 9.2.3 录入交流 / AI 解析 / 校正候选 / 待办生成（API 层）
+
+由于 H5 预览在页面切换时触发 Taro H5 + Stencil 渲染崩溃（见 9.3），后续流程通过直接调用后端 API 验证数据链路：
+
+| 步骤 | API | 结果 |
+|---|---|---|
+| 批量录入交流 | `POST /api/v1/events/batch` | 200，成功创建 2 条事件 |
+| AI 提取人脉 | `GET /api/v1/events` | 返回事件含实体「张总」「李总」 |
+| 人脉纠偏 | `POST /api/v1/events/{id}/correct` | 200，将「张总」校正为「张三/ABC科技/CEO」 |
+| AI 生成待办 | `GET /api/v1/todos` | 返回 5+ 条待办（合作信号、风险预警、关注） |
+| 仪表盘 | `GET /api/v1/dashboard/day-view` | 200，事件带 todo_count，summary 正确 |
+
+结论：后端数据链路完整，**API 层通过**。
+
+### 9.3 发现的问题
+
+#### 问题 1：H5 预览跨页导航导致 WebView 崩溃
+
+- 现象：从首页切换至「录入」「待办」等 Tab 页面时，浏览器 WebView 出现 `NotFoundError: Failed to execute 'insertBefore' on 'Node'`（Stencil 内部），随后 WebView 无响应。
+- 影响：H5 预览环境下无法完成完整 UI 级点击验证（录入表单填写、待办列表滚动等）。
+- 根因：Taro H5 4.1.9 + React 18 在自定义元素（Stencil）更新时存在竞态；当前为 dev/watch 构建，非生产产物。
+- 缓解：小程序主战场为微信小程序（WeChat DevTools/真机），非 H5；H5 仅用于本地预览。
+- 后续：建议使用微信开发者工具进行最终真机/模拟器验证；如 H5 为正式交付渠道，需单独立项修复 Stencil 渲染稳定性。
+
+#### 问题 2：CORS 默认未包含 miniapp H5 dev origin
+
+- 现象：首次登录时 `POST /api/v1/auth/login` 因 CORS 预检返回 400，`net::ERR_FAILED`。
+- 修复：在三个仓库的 dev CORS 配置中追加 `http://localhost:10086`。
+  - `PromiseLink/src/promiselink/config.py`
+  - `PromiseLink-Pro/gateway/main.py`
+- 提交：PromiseLink `a2dae95`，PromiseLink-Pro `5fc1f5f`。
+
+#### 问题 3：miniapp 未解包后端分页响应
+
+- 现象：首页 `setEvents(eventsData)` 收到 `{items, total, limit, offset}` 对象，导致 `events.filter is not a function` 崩溃。
+- 修复：在 `PromiseLink-miniapp/src/services/api.ts` 中，`getEvents`/`getTodos`/`getEntities`/`getPromises` 统一返回 `res.data.items`。
+- 提交：PromiseLink-miniapp `cc33605`。
+
+### 9.4 验证结论
+
+| 检查项 | 结果 | 说明 |
+|---|---|---|
+| H5 登录 | 通过 | UI + API 双重验证 |
+| H5 首页渲染 | 通过 | UI 验证 |
+| 录入交流（API） | 通过 | 后端批量创建事件 |
+| AI 解析人脉（API） | 通过 | 实体自动提取 |
+| 校正候选（API） | 通过 | `/events/{id}/correct` 纠偏成功 |
+| 待办生成（API） | 通过 | AI 生成合作信号/风险/关注类待办 |
+| 仪表盘（API） | 通过 | 日视图返回事件与汇总 |
+| H5 跨页导航稳定性 | **不通过** | Stencil 渲染崩溃，影响 H5 预览体验 |
+| miniapp 单元测试 | 通过 | 8/8 |
+| miniapp tsc | 通过 | 0 source errors |
+| 基础版 API 测试 | 通过 | 21/21 |
+| Pro 网关测试 | 通过 | 29/29 |
+
+---
+
+## 10. 发布 Go/No-Go 结论
+
+**建议：Go with H5 preview caveat（带 H5 预览限制条件的发布）**
+
+理由：
+1. 核心发布阻塞项（P0-P1）已全部修复并推送到 main。
+2. 后端 API 与数据链路（登录、录入、AI 解析、纠偏、待办、仪表盘）经真实数据验证可用。
+3. H5 预览环境存在 Stencil 渲染稳定性问题，但项目定位中小程序为微信小程序（手机竖屏窄版），H5 仅作为本地预览渠道，非最终用户主入口。
+4. 建议发布前必须完成：使用微信开发者工具在模拟器+真机上跑通「登录 → 录入 → 纠偏 → 待办」完整 UI 流程；若小程序端同样崩溃，则升级为 P0 阻塞。
+
+**当前状态**：除 H5 预览稳定性外，其余发布条件已满足。
+
+**发布决策**：条件通过（Conditional Go），待微信小程序真机验证后最终确认。
