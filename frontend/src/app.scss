@@ -65,8 +65,16 @@ button:hover,
   display: none;
 }
 
+// Ensure Taro H5 bottom TabBar is always visible and spans full width on mobile
+.weui-tabbar,
+.taro-tabbar__tabbar {
+  width: 100% !important;
+  left: 0 !important;
+  right: 0 !important;
+}
+
 // ── Tablet (768px–1023px): keep existing centered single-column behavior ──
-@media screen and (min-width: 768px) and (max-width: 1023px) {
+@media screen and (min-width: 768PX) and (max-width: 1023PX) {
   page {
     max-width: 750px;
     margin: 0 auto;
@@ -91,7 +99,7 @@ button:hover,
 }
 
 // ── Desktop (≥1024px): three-column layout ──
-@media screen and (min-width: 1024px) {
+@media screen and (min-width: 1024PX) {
   :root {
     --pl-font-base: 14px;
     --pl-radius-card: 8px;
