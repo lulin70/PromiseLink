@@ -133,10 +133,11 @@ export default function InputPage() {
         processed_at: detail.processed_at ?? null,
       })
 
-      if (detail.status === 'completed' || detail.status === 'failed' || detail.status === 'awaiting_retry') {
+      if (detail.status === 'completed' || detail.status === 'failed' || detail.status === 'awaiting_retry' || detail.status === 'degraded_completed') {
         setPolling(false)
-        if (detail.status === 'completed') {
+        if (detail.status === 'completed' || detail.status === 'degraded_completed') {
           // Load full parsed result (entities / associations / todos)
+          // degraded_completed means non-critical steps failed but core data is usable
           setParsedDetail(detail)
           try {
             const confirmations = await getPendingConfirmations(eventId)

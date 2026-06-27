@@ -25,13 +25,30 @@ class Step13_CompleteEvent(PipelineStep):
         assert context.result is not None
 
         # Determine final status based on step failures
-        if context.failed_steps:
+        # Critical steps (extraction/todo/promise) failing → "failed"
+        # Non-critical steps (association/notification/memory) failing → "degraded_completed"
+        CRITICAL_STEPS = {"step01_verify", "step02_extract", "step04_todo", "step05_promise"}
+        critical_failures = [s for s in context.failed_steps if any(s.startswith(c) for c in CRITICAL_STEPS)]
+        non_critical_failures = [s for s in context.failed_steps if s not in critical_failures]
+
+        if critical_failures:
             final_status = "failed"
             result_status = "failed"
             logger.warning(
-                "pipeline_step_failures",
+                "pipeline_critical_step_failures",
                 event_id=event_id,
                 failed_steps=context.failed_steps,
+                critical_failures=critical_failures,
+            )
+        elif non_critical_failures:
+            # Non-critical step failures: event data is still usable, mark as degraded
+            final_status = "degraded_completed"
+            result_status = "degraded_completed"
+            logger.warning(
+                "pipeline_non_critical_step_failures",
+                event_id=event_id,
+                failed_steps=context.failed_steps,
+                non_critical_failures=non_critical_failures,
             )
         else:
             final_status = "completed"

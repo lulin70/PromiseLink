@@ -10,6 +10,7 @@ export default defineAppConfig({
     'pages/entities/detail',
     'pages/promises/index',
     'pages/promises/detail',
+    'pages/mine/index',
   ],
   tabBar: {
     color: '#8a8a8a',

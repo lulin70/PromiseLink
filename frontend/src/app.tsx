@@ -1,7 +1,6 @@
 import { PropsWithChildren, useEffect, useState } from 'react'
 import { View, Text, Image } from '@tarojs/components'
 import Taro from '@tarojs/taro'
-import { getEventDetail } from './services/api'
 import { isLoggedIn } from './services/auth'
 import Guide from './components/Guide/Guide'
 import homeIcon from './icons/home.png'
@@ -26,16 +25,6 @@ const NAV_ITEMS = [
   { path: '/pages/todos/index', label: '待办', icon: todoIcon, activeIcon: todoActiveIcon },
   { path: '/pages/promises/index', label: '承诺', icon: promiseIcon, activeIcon: promiseActiveIcon },
 ]
-
-// Event type labels for detail summary
-const EVENT_TYPE_LABELS: Record<string, string> = {
-  manual: '手动录入',
-  meeting: '会议',
-  call: '电话',
-  wechat_forward: '微信转发',
-  email: '邮件',
-  card_save: '名片',
-}
 
 function getCurrentPath(): string {
   if (typeof window === 'undefined') return ''
@@ -96,100 +85,22 @@ function DesktopSidebar() {
           )
         })}
       </View>
-      <View className='pl-pro-guide'>
-        <Text className='pl-pro-guide-title'>升级专业版</Text>
-        <Text className='pl-pro-guide-desc'>解锁语音录入、邮件同步、OCR名片扫描等高级功能</Text>
-        <View
-          className='pl-pro-guide-btn'
-          onClick={() => window.open('https://promiselink.com/pro', '_blank')}
-        >
-          <Text className='pl-pro-guide-btn-text'>了解详情</Text>
+      <View
+        className={`pl-nav-item pl-nav-mine ${activePath.includes('/pages/mine') ? 'active' : ''}`}
+        onClick={() => Taro.navigateTo({ url: '/pages/mine/index' })}
+      >
+        <View className='pl-nav-mine-avatar'>
+          <Text className='pl-nav-mine-text'>我</Text>
         </View>
+        <Text className='pl-nav-label'>我的</Text>
       </View>
     </View>
   )
 }
 
-// Desktop right detail column - shows contextual summary based on current route
-function DesktopDetailBar() {
-  const [routePath, setRoutePath] = useState(getCurrentPath())
-  const [summary, setSummary] = useState<{ title: string; rows: { label: string; value: string }[] } | null>(null)
-  const [loading, setLoading] = useState(false)
-
-  // Poll for route changes (Taro H5 uses pushState which doesn't fire popstate)
-  useEffect(() => {
-    const handler = () => setRoutePath(getCurrentPath())
-    window.addEventListener('popstate', handler)
-    const interval = setInterval(handler, 400)
-    return () => {
-      window.removeEventListener('popstate', handler)
-      clearInterval(interval)
-    }
-  }, [])
-
-  // Load contextual summary based on current route params
-  useEffect(() => {
-    let cancelled = false
-    async function loadSummary() {
-      setSummary(null)
-      setLoading(false)
-
-      // Use Taro.getCurrentInstance().router to read current route + params
-      const instance = Taro.getCurrentInstance()
-      const path = instance.router?.path || ''
-      const params = instance.router?.params || {}
-
-      // Event detail page: show event summary
-      if (path.includes('/pages/events/detail') && params.id) {
-        setLoading(true)
-        try {
-          const detail = await getEventDetail(params.id)
-          if (cancelled) return
-          setSummary({
-            title: detail.title,
-            rows: [
-              { label: '类型', value: EVENT_TYPE_LABELS[detail.event_type] || detail.event_type },
-              { label: '状态', value: detail.status },
-              { label: '时间', value: new Date(detail.timestamp).toLocaleString('zh-CN') },
-              { label: '人脉', value: `${detail.related_entities?.length || 0} 人` },
-              { label: '待办', value: `${detail.related_todos?.length || 0} 条` },
-            ],
-          })
-        } catch {
-          // Auth or network error - fall through to empty state
-        } finally {
-          if (!cancelled) setLoading(false)
-        }
-      }
-    }
-    loadSummary()
-    return () => { cancelled = true }
-  }, [routePath])
-
-  return (
-    <View className='pl-detail'>
-      {summary ? (
-        <View className='pl-detail-content'>
-          <Text className='pl-detail-title'>{summary.title}</Text>
-          {summary.rows.map((row, i) => (
-            <View key={i} className='pl-detail-row'>
-              <Text className='pl-detail-label'>{row.label}</Text>
-              <Text className='pl-detail-value'>{row.value}</Text>
-            </View>
-          ))}
-        </View>
-      ) : loading ? (
-        <View className='pl-detail-empty'>
-          <Text className='pl-detail-empty-text'>加载中...</Text>
-        </View>
-      ) : (
-        <View className='pl-detail-empty'>
-          <Text className='pl-detail-empty-text'>选择一项查看详情摘要</Text>
-        </View>
-      )}
-    </View>
-  )
-}
+// DesktopDetailBar removed (Q1): the right-side detail column was only fetching
+// real data on the event detail page, showing placeholder text on all other pages.
+// Removed to simplify the desktop layout to 2-column (sidebar + content).
 
 function App({ children }: PropsWithChildren) {
   const isDesktop = useIsDesktop()
@@ -259,7 +170,6 @@ function App({ children }: PropsWithChildren) {
       <View className='pl-app-content'>
         {children}
       </View>
-      {isDesktop && <DesktopDetailBar />}
       <Guide visible={guideVisible} onClose={handleGuideClose} />
     </View>
   )

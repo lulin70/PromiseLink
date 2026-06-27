@@ -1,0 +1,115 @@
+// Mine page styles — Morandi color palette
+
+.mine-page {
+  min-height: 100vh;
+  background-color: var(--pl-bg-gray);
+  padding: var(--pl-spacing-base);
+}
+
+.mine-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 32px 24px;
+  background-color: var(--pl-bg-white);
+  border-radius: var(--pl-radius-card);
+  box-shadow: var(--pl-shadow-card);
+  margin-bottom: 24px;
+}
+
+.mine-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: var(--pl-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mine-avatar-text {
+  color: #fff;
+  font-size: 36px;
+  font-weight: 600;
+}
+
+.mine-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mine-user-id {
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--pl-text);
+}
+
+.mine-user-edition {
+  font-size: 24px;
+  color: var(--pl-text-secondary);
+}
+
+.mine-section {
+  background-color: var(--pl-bg-white);
+  border-radius: var(--pl-radius-card);
+  box-shadow: var(--pl-shadow-card);
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+
+.mine-section-title {
+  padding: 24px 24px 12px;
+  font-size: 24px;
+  color: var(--pl-text-secondary);
+}
+
+.mine-menu-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28px 24px;
+  border-top: 1px solid var(--pl-border);
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--pl-bg-gray);
+  }
+}
+
+.mine-menu-label {
+  font-size: 28px;
+  color: var(--pl-text);
+}
+
+.mine-menu-arrow {
+  font-size: 28px;
+  color: var(--pl-text-secondary);
+}
+
+.mine-pro-features {
+  padding: 12px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mine-pro-feature {
+  font-size: 26px;
+  color: var(--pl-text-secondary);
+  line-height: 1.6;
+}
+
+.mine-logout {
+  padding: 24px 0;
+}
+
+.mine-logout-btn {
+  width: 100%;
+  height: 88px;
+  border: 1px solid var(--pl-danger);
+  border-radius: var(--pl-radius-item);
+  background-color: var(--pl-bg-white);
+  color: var(--pl-danger);
+  font-size: 30px;
+}

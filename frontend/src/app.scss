@@ -59,9 +59,8 @@ button:hover,
   transition: opacity 0.2s;
 }
 
-// ── Mobile (<768px): hide sidebar and detail (single-column) ──
-.pl-sidebar,
-.pl-detail {
+// ── Mobile (<768px): hide sidebar (single-column) ──
+.pl-sidebar {
   display: none;
 }
 
@@ -92,13 +91,10 @@ button:hover,
     margin: 0 auto;
   }
 
-  // Hide detail column on tablet (two-column max: sidebar is JS-gated, detail hidden)
-  .pl-detail {
-    display: none;
-  }
+  // (DesktopDetailBar removed — no detail column to hide)
 }
 
-// ── Desktop (≥1024px): three-column layout ──
+// ── Desktop (≥1024px): two-column layout (sidebar + content) ──
 @media screen and (min-width: 1024PX) {
   :root {
     --pl-font-base: 14px;
@@ -139,73 +135,7 @@ button:hover,
     overflow-x: hidden;
   }
 
-  // ── Right detail column (third column on desktop) ──
-  .pl-detail {
-    width: var(--pl-detail-width);
-    flex-shrink: 0;
-    background: var(--pl-bg-white);
-    border-left: 1px solid var(--pl-border);
-    overflow-y: auto;
-    padding: 16px;
-    display: block;
-  }
-
-  // Detail column content (summary rows)
-  .pl-detail-content {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .pl-detail-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--pl-text);
-    line-height: 1.4;
-    word-break: break-word;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--pl-border);
-  }
-
-  .pl-detail-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 12px;
-    font-size: 13px;
-  }
-
-  .pl-detail-label {
-    color: var(--pl-text-secondary);
-    flex-shrink: 0;
-  }
-
-  .pl-detail-value {
-    color: var(--pl-text);
-    text-align: right;
-    word-break: break-word;
-  }
-
-  // Detail column empty state
-  .pl-detail-empty {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 48px 16px;
-    color: var(--pl-text-secondary);
-
-    .pl-detail-empty-icon {
-      font-size: 32px;
-      line-height: 1;
-    }
-
-    .pl-detail-empty-text {
-      font-size: 13px;
-      text-align: center;
-    }
-  }
+  // (DesktopDetailBar removed — two-column layout: sidebar + content)
 
   // Pages: remove mobile tabbar padding, use full height
   .page-index,
@@ -296,46 +226,27 @@ button:hover,
     }
   }
 
-  // ── Pro edition upgrade guide (bottom of sidebar) ──
-  .pl-pro-guide {
-    margin: 12px 8px 16px;
-    padding: 12px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, rgba(123, 158, 168, 0.08), rgba(160, 130, 140, 0.08));
-    border: 1px solid var(--pl-border);
+  // ── "我的" (Mine) nav item at bottom of sidebar (Q2) ──
+  .pl-nav-mine {
+    margin: 8px 8px 16px;
+    border-top: 1px solid var(--pl-border);
+    padding-top: 12px;
+  }
 
-    .pl-pro-guide-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--pl-primary);
-      display: block;
-      margin-bottom: 4px;
-    }
+  .pl-nav-mine-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--pl-primary-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
 
-    .pl-pro-guide-desc {
-      font-size: 11px;
-      color: var(--pl-text-light);
-      line-height: 1.4;
-      display: block;
-      margin-bottom: 8px;
-    }
-
-    .pl-pro-guide-btn {
-      display: inline-block;
-      padding: 5px 12px;
-      border-radius: 4px;
-      background: var(--pl-primary);
-      cursor: pointer;
-      transition: opacity 0.2s;
-
-      &:hover {
-        opacity: 0.85;
-      }
-
-      .pl-pro-guide-btn-text {
-        font-size: 11px;
-        color: #fff;
-      }
-    }
+  .pl-nav-mine-text {
+    font-size: 12px;
+    color: var(--pl-primary);
+    font-weight: 600;
   }
 }
