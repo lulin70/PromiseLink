@@ -5,8 +5,10 @@
 > **定位**: 先成就关系，再促成合作 — 利他切入的个人商务关系经营系统
 
 <p align="center">
+  <a href="https://promiselink.cn"><img src="https://img.shields.io/badge/🌐_官网-promiselink.cn-blue?style=for-the-badge" alt="Website"></a>
+  <br/>
   <a href="https://github.com/lulin70/PromiseLink/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/lulin70/PromiseLink/ci.yml?branch=main&label=CI&logo=github" alt="CI"></a>
-  <img src="https://img.shields.io/badge/tests-1378%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-1353%20passed-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/coverage-72%25-green" alt="Coverage">
   <img src="https://img.shields.io/badge/mypy-0%20errors-brightgreen" alt="mypy">
   <img src="https://img.shields.io/badge/ruff-0%20errors-brightgreen" alt="ruff">
@@ -36,7 +38,7 @@
 
 | 优势 | 数据证明 | 对比传统 CRM |
 |------|---------|-------------|
-| 🏭 **工业级质量** | 1378 测试通过 / 72% 覆盖率 / mypy 0 / ruff 0 / 50 安全测试 / 17 性能测试 | 多数开源 CRM < 30% 覆盖率 |
+| 🏭 **工业级质量** | 1353 测试通过 / 72% 覆盖率 / mypy 0 / ruff 0 / 50 安全测试 / 17 性能测试 | 多数开源 CRM < 30% 覆盖率 |
 | 🧠 **核心算法层不依赖 LLM** | 实体归一 / Todo 状态机 / 承诺履行 / 关联发现 / 动态评分 — 纯算法实现（NetworkX + RapidFuzz + numpy），可离线运行、可审计 | 主流 AI-CRM 全链路依赖 GPT API |
 | 🚀 **便携零部署** | `pip install -e .` + `bash scripts/start.sh` 即用，无需 Docker / K8s | 同类工具需 docker-compose |
 

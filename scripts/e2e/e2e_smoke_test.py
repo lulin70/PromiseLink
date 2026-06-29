@@ -2,12 +2,13 @@
 """PromiseLink E2E Smoke Test — validates core user journey."""
 
 import json
+import os
 import sys
 import time
 import urllib.error
 import urllib.request
 
-BASE = "http://localhost:8002/api/v1"
+BASE = os.getenv("API_BASE_URL", "http://localhost:8000/api/v1")
 USER_ID = "e2e-test-user-001"
 
 def api(method, path, data=None, token=None):

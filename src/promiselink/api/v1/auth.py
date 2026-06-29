@@ -46,7 +46,7 @@ async def login(request: LoginRequest) -> Any:
     # Block default secret in non-dev/test environments to prevent credential-guessing attacks
     if settings.app_env not in ("development", "test") and poc_secret == DEFAULT_POC_SECRET:
         raise ForbiddenError(
-            "Default PoC secret not allowed in {} environment. Set POC_SECRET env var.".format(settings.app_env)
+            f"Default PoC secret not allowed in {settings.app_env} environment. Set POC_SECRET env var."
         )
     # Use constant-time comparison to prevent timing attacks
     if not hmac.compare_digest(request.poc_secret, poc_secret):

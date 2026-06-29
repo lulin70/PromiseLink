@@ -1,5 +1,9 @@
 # PromiseLink 快速开始
 
+> **官网**: [https://promiselink.cn](https://promiselink.cn)  
+> **GitHub**: [https://github.com/lulin70/PromiseLink](https://github.com/lulin70/PromiseLink)  
+> **License**: AGPL v3
+
 ## 前置条件
 
 - Python 3.11+
@@ -106,8 +110,8 @@ curl http://localhost:8000/api/v1/promises?view=my-promises \
 | 环境变量 | 默认值 | 说明 |
 |----------|--------|------|
 | `APP_EDITION` | `basic` | 版本：仅 `basic`（基础版）。专业版为独立仓库 [PromiseLink-Pro](https://github.com/lulin70/PromiseLink-Pro)，需单独安装 |
-| `SECRET_KEY` | 自动生成 | JWT 签名密钥，生产环境必须配置 |
-| `POC_SECRET` | `promiselink2026` | PoC 登录密码 |
+| `SECRET_KEY` | 自动生成 | JWT 签名密钥，⚠️ 生产环境必须配置强随机密钥 |
+| `POC_SECRET` | 必须配置 | PoC 登录密码，⚠️ 默认弱密码已禁用，必须设置自定义密码 |
 | `LLM_PROVIDER` | `moka_ai` | LLM 提供商：moka_ai / openai / anthropic |
 | `LLM_API_KEY` | 空 | LLM API 密钥 |
 | `LLM_BASE_URL` | 自动填充 | LLM API 地址（根据 LLM_PROVIDER 自动设置） |
