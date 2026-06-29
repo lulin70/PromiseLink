@@ -43,11 +43,10 @@ async def login(request: LoginRequest) -> Any:
     poc_secret = settings.poc_secret
     if not poc_secret:
         raise ForbiddenError("PoC login is disabled. Use /auth/wechat/login.")
-    # Block default secret in production to prevent credential-guessing attacks
-    if settings.app_env == "production" and poc_secret == DEFAULT_POC_SECRET:
+    # Block default secret in non-dev/test environments to prevent credential-guessing attacks
+    if settings.app_env not in ("development", "test") and poc_secret == DEFAULT_POC_SECRET:
         raise ForbiddenError(
-            "Default PoC secret is not allowed in production. "
-            "Change POC_SECRET in your .env before deploying."
+            "Default PoC secret not allowed in {} environment. Set POC_SECRET env var.".format(settings.app_env)
         )
     # Use constant-time comparison to prevent timing attacks
     if not hmac.compare_digest(request.poc_secret, poc_secret):

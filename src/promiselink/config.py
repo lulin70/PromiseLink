@@ -36,11 +36,14 @@ class Settings(BaseSettings):
     api_port: int = 8000
     api_prefix: str = "/api/v1"
     cors_origins: list[str] = Field(
-        default_factory=lambda: [
+        default=[
             "http://localhost:3000",
             "http://localhost:8000",
             "http://localhost:10086",
-        ]
+            "https://promiselink.cn",
+            "https://www.promiselink.cn",
+        ],
+        description="Allowed CORS origins",
     )
 
     @field_validator("app_edition", mode="before")

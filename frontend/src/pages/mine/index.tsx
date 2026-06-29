@@ -19,7 +19,7 @@ export default function MinePage() {
   }
 
   function handleProUpgrade() {
-    window.open('https://promiselink.com/pro', '_blank')
+    window.open('https://promiselink.cn/pro', '_blank')
   }
 
   function handleAbout() {

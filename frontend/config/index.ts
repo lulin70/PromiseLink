@@ -1,8 +1,10 @@
 import { defineConfig } from '@tarojs/cli'
 import devConfig from './dev'
+import prodConfig from './prod'
 
 export default defineConfig(async () => {
   return {
+    ...(process.env.NODE_ENV === 'production' ? prodConfig : devConfig),
     projectName: 'promiselink-frontend',
     date: '2026-6-12',
     designWidth: 750,
@@ -37,7 +39,7 @@ export default defineConfig(async () => {
         port: 3000,
         proxy: {
           '/api': {
-            target: 'http://localhost:8002',
+            target: 'http://localhost:8000',
             changeOrigin: true,
           },
         },

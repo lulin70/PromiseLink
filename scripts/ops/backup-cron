@@ -1,2 +1,2 @@
 # PromiseLink backup - run every 6 hours
-0 */6 * * * /opt/promiselink/scripts/backup.sh >> /opt/promiselink/logs/backup.log 2>&1
+0 */6 * * * /opt/promiselink/scripts/ops/backup.sh >> /opt/promiselink/logs/backup.log 2>&1
