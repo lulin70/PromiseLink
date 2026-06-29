@@ -3372,7 +3372,7 @@ GDPR合规端点，支持数据查看、导出、删除。
 ```json
 {
   "connected": true,
-  "gateway_url": "wss://api.promiselink.com/relay",
+  "gateway_url": "wss://api.promiselink.cn/relay",
   "connected_at": "2026-06-11T10:00:00Z",
   "last_heartbeat": "2026-06-11T10:05:00Z",
   "reconnect_count": 0
@@ -3409,7 +3409,7 @@ GDPR合规端点，支持数据查看、导出、删除。
 ```json
 {
   "status": "reconnecting",
-  "gateway_url": "wss://api.promiselink.com/relay",
+  "gateway_url": "wss://api.promiselink.cn/relay",
   "attempt": 1
 }
 ```

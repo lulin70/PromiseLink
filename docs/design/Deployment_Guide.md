@@ -389,7 +389,7 @@ docker compose -f docker-compose.poc.yml logs --tail=50
 
 ```bash
 # 1. 域名解析：将域名A记录指向服务器公网IP
-#    例如：api.promiselink.com → 123.45.67.89
+#    例如：api.promiselink.cn → 123.45.67.89
 
 # 2. 安装Nginx和Certbot
 sudo apt update && sudo apt install -y nginx certbot python3-certbot-nginx
@@ -398,7 +398,7 @@ sudo apt update && sudo apt install -y nginx certbot python3-certbot-nginx
 sudo tee /etc/nginx/sites-available/promiselink <<'EOF'
 server {
     listen 80;
-    server_name api.promiselink.com;
+    server_name api.promiselink.cn;
 
     location / {
         proxy_pass http://127.0.0.1:8000;
@@ -416,7 +416,7 @@ sudo ln -sf /etc/nginx/sites-available/promiselink /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 
 # 4. 获取Let's Encrypt SSL证书（自动配置HTTPS）
-sudo certbot --nginx -d api.promiselink.com
+sudo certbot --nginx -d api.promiselink.cn
 
 # 5. 验证自动续期
 sudo certbot renew --dry-run
@@ -451,7 +451,7 @@ nano .env.poc
 #   PROMISELINK_SECRET_KEY=<用下方命令生成>
 #   LLM_API_KEY=<你的API Key>
 #   LLM_BASE_URL=<对应的API地址>
-#   PROMISELINK_CORS_ORIGINS=["https://api.promiselink.com"]
+#   PROMISELINK_CORS_ORIGINS=["https://api.promiselink.cn"]
 
 # 生成SECRET_KEY
 python3 -c "import secrets; print(secrets.token_urlsafe(32))"
@@ -474,7 +474,7 @@ docker compose -f docker-compose.poc.yml ps
 curl http://localhost:8000/api/v1/health
 
 # 外部HTTPS验证
-curl https://api.promiselink.com/api/v1/health
+curl https://api.promiselink.cn/api/v1/health
 ```
 
 预期响应：
@@ -493,9 +493,9 @@ curl https://api.promiselink.com/api/v1/health
 
 | 配置项 | 域名 |
 |--------|------|
-| request合法域名 | `https://api.promiselink.com` |
-| uploadFile合法域名 | `https://api.promiselink.com` |
-| downloadFile合法域名 | `https://api.promiselink.com` |
+| request合法域名 | `https://api.promiselink.cn` |
+| uploadFile合法域名 | `https://api.promiselink.cn` |
+| downloadFile合法域名 | `https://api.promiselink.cn` |
 
 #### 2.9.5 运维管理
 
@@ -532,7 +532,7 @@ git pull origin main
 docker compose -f docker-compose.poc.yml up -d --build
 
 # 验证更新成功
-curl https://api.promiselink.com/api/v1/health
+curl https://api.promiselink.cn/api/v1/health
 ```
 
 #### 2.9.6 专业版升级（SQLite长期方案）
@@ -558,7 +558,7 @@ sqlite3 data/promiselink_poc.db "SELECT COUNT(*) FROM events;"
 docker compose -f docker-compose.poc.yml up -d --build
 
 # 4. 验证服务
-curl https://api.promiselink.com/api/v1/health
+curl https://api.promiselink.cn/api/v1/health
 ```
 
 **定制版迁移**（销售团队场景，独立分支）：
@@ -695,7 +695,7 @@ docker run -d \
   -v ~/promiselink-data:/app/data \
   -e LLM_API_KEY=sk-xxx \
   -e POC_SECRET=your-secret \
-  -e RELAY_GATEWAY_URL=wss://api.promiselink.com/relay \
+  -e RELAY_GATEWAY_URL=wss://api.promiselink.cn/relay \
   -e RELAY_TOKEN=your-relay-token \
   promiselink:latest
 
@@ -711,7 +711,7 @@ cd PromiseLink/frontend && npm run build:h5
 
 | 环境变量 | 基础版 | 专业版 | 说明 |
 |----------|--------|--------|------|
-| `RELAY_GATEWAY_URL` | 不设置 | `wss://api.promiselink.com/relay` | 设置即启用网关中继 |
+| `RELAY_GATEWAY_URL` | 不设置 | `wss://api.promiselink.cn/relay` | 设置即启用网关中继 |
 | `RELAY_TOKEN` | 不设置 | 网关认证Token | 网关连接凭证 |
 
 > **说明**：从基础版升级到专业版无需重新部署，只需添加 `RELAY_GATEWAY_URL` 和 `RELAY_TOKEN` 环境变量后重启容器即可。relay_client在检测到 `RELAY_GATEWAY_URL` 配置后，作为FastAPI进程内的后台asyncio Task自动启动，无需独立容器。
@@ -882,7 +882,7 @@ cp .env.poc.example .env
 # 编辑 .env，修改以下关键项：
 #   PROMISELINK_STAGE=professional
 #   DATABASE_URL=sqlite+aiosqlite:///./data/promiselink.db
-#   RELAY_GATEWAY_URL=wss://api.promiselink.com/relay
+#   RELAY_GATEWAY_URL=wss://api.promiselink.cn/relay
 #   RELAY_TOKEN=your-relay-token
 #   （无需REDIS_URL，专业版使用内存缓存）
 #   （无需LLM_API_KEY，AI调用走网关代理）
@@ -892,7 +892,7 @@ docker compose -f docker-compose.poc.yml up -d --build
 
 # 4. 验证relay_client已启动
 docker compose logs promiselink | grep "relay_client"
-# 预期输出：relay_client started, connecting to wss://api.promiselink.com/relay
+# 预期输出：relay_client started, connecting to wss://api.promiselink.cn/relay
 
 # 5. 验证健康检查
 curl http://localhost:8000/api/v1/health
@@ -947,11 +947,11 @@ curl http://localhost:8000/api/v1/health
 
 | 配置项 | 域名 | 说明 |
 |--------|------|------|
-| request合法域名 | `https://api.promiselink.com` | API请求（经网关中继） |
-| socket合法域名 | `wss://api.promiselink.com` | WebSocket中继连接 |
-| uploadFile合法域名 | `https://api.promiselink.com` | 文件上传 |
-| downloadFile合法域名 | `https://api.promiselink.com` | 文件下载 |
-| webview业务域名 | `promiselink.com` | H5页面 |
+| request合法域名 | `https://api.promiselink.cn` | API请求（经网关中继） |
+| socket合法域名 | `wss://api.promiselink.cn` | WebSocket中继连接 |
+| uploadFile合法域名 | `https://api.promiselink.cn` | 文件上传 |
+| downloadFile合法域名 | `https://api.promiselink.cn` | 文件下载 |
+| webview业务域名 | `promiselink.cn` | H5页面 |
 
 > **说明**：专业版无需自行配置Nginx和SSL证书，云中继网关已处理HTTPS终止和域名管理。
 
@@ -1386,8 +1386,8 @@ echo "PostgreSQL:" && docker compose exec postgres psql -U promiselink -c \
 python3 scripts/verify_migration.py --source sqlite --target postgresql --sample-size 10
 
 # 3. 功能验证
-curl -H "Authorization: Bearer $TOKEN" https://api.promiselink.com/api/v1/entities
-curl -H "Authorization: Bearer $TOKEN" https://api.promiselink.com/api/v1/events
+curl -H "Authorization: Bearer $TOKEN" https://api.promiselink.cn/api/v1/entities
+curl -H "Authorization: Bearer $TOKEN" https://api.promiselink.cn/api/v1/events
 ```
 
 **迁移改动量预估**：
@@ -1661,7 +1661,7 @@ docker compose exec promiselink-api env | grep -E "^TTS_|^VOICE_"
 | 数据库迁移失败 | 表结构不一致 | `alembic current` 查看当前版本 | `alembic upgrade head` 重新迁移 |
 | CORS报错 | Origin不在白名单 | 检查 `PROMISELINK_CORS_ORIGINS` | 添加请求来源到白名单 |
 | Redis连接失败 | Redis未启动或密码错误 | `docker compose ps redis` | 启动Redis或修正密码配置 |
-| 小程序请求失败 | 域名未配置白名单 | 检查微信公众平台配置 | 添加 `https://api.promiselink.com` |
+| 小程序请求失败 | 域名未配置白名单 | 检查微信公众平台配置 | 添加 `https://api.promiselink.cn` |
 | 磁盘空间不足 | 日志/数据过大 | `df -h` 检查磁盘 | 清理日志或扩容磁盘 |
 
 ### 10.2 日志查看方法
