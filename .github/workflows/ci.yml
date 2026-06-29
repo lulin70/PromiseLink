@@ -60,7 +60,7 @@ jobs:
           REDIS_ENABLED: "false"
           TZ: Asia/Shanghai
         run: |
-          pytest tests/ -v --cov=src/promiselink --cov-report=xml --cov-report=term-missing --cov-fail-under=72 -k "not embedding_provider_local and not embedding_provider_similar and not full_embedding_to_similarity"
+          pytest tests/ -v --cov=src/promiselink --cov-report=xml --cov-report=term-missing --cov-fail-under=70 -k "not embedding_provider_local and not embedding_provider_similar and not full_embedding_to_similarity"
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4

@@ -214,14 +214,14 @@ def make_event_payload(**overrides) -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-class TestG1_01_EmailEventType:
-    """G1-01: POST /events with event_type='email' — verify creation succeeds."""
+class TestG1_01_ManualEventType:
+    """G1-01: POST /events with event_type='manual' — verify creation succeeds."""
 
-    async def test_create_email_event_returns_201(self, client: AsyncClient):
-        """Happy: email event created successfully with correct response fields."""
+    async def test_create_manual_event_returns_201(self, client: AsyncClient):
+        """Happy: manual event created successfully with correct response fields."""
         # Arrange
         payload = make_event_payload(
-            event_type="email",
+            event_type="manual",
             source="gmail",
             title="与客户邮件往来",
             raw_text="今天收到客户的邮件，讨论合作细节",
@@ -233,7 +233,7 @@ class TestG1_01_EmailEventType:
         # Assert
         assert resp.status_code == 201
         data = resp.json()
-        assert data["event_type"] == "email"
+        assert data["event_type"] == "manual"
         assert data["title"] == "与客户邮件往来"
         assert data["source"] == "gmail"
         assert data["status"] == "pending"
@@ -241,13 +241,13 @@ class TestG1_01_EmailEventType:
         assert "id" in data
         assert len(data["id"]) > 0
 
-    async def test_email_event_persisted_with_correct_type(
+    async def test_manual_event_persisted_with_correct_type(
         self, client: AsyncClient, db_session: AsyncSession
     ):
-        """Happy: email event is persisted in DB with correct type and source."""
+        """Happy: manual event is persisted in DB with correct type and source."""
         # Arrange
         payload = make_event_payload(
-            event_type="email",
+            event_type="manual",
             source="outlook",
             title="项目确认邮件",
             raw_text="确认项目交付时间",
@@ -260,7 +260,7 @@ class TestG1_01_EmailEventType:
         # Assert — verify DB persistence
         result = await db_session.execute(select(Event).where(Event.id == event_id))
         event = result.scalar_one()
-        assert event.event_type == "email"
+        assert event.event_type == "manual"
         assert event.source == "outlook"
         assert event.title == "项目确认邮件"
         assert event.raw_text == "确认项目交付时间"
@@ -362,7 +362,7 @@ class TestG1_03_BatchCreation:
         # Arrange
         events = [
             make_event_payload(event_type="meeting", title="有效事件_0", raw_text="text0"),
-            make_event_payload(event_type="email", title="有效事件_1", raw_text="text1"),
+            make_event_payload(event_type="manual", title="有效事件_1", raw_text="text1"),
             make_event_payload(event_type="call", title="有效事件_2", raw_text="text2"),
             make_event_payload(event_type="invalid_type", title="无效事件_3", raw_text="text3"),
             make_event_payload(event_type="bad_type", title="无效事件_4", raw_text="text4"),

@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     app_edition: str = "basic"  # "basic" or "pro"
 
     # API
-    api_host: str = "0.0.0.0"
+    api_host: str = "0.0.0.0"  # nosec B104 — container must bind all interfaces; port mapping controls exposure
     api_port: int = 8000
     api_prefix: str = "/api/v1"
     cors_origins: list[str] = Field(
