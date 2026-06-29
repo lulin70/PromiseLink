@@ -26,7 +26,7 @@ export default function EventDetailPage() {
 
   useEffect(() => {
     if (!isLoggedIn()) {
-      Taro.redirectTo({ url: '/pages/index/index' })
+      Taro.reLaunch({ url: '/pages/index/index' })
       return
     }
     const eventId = router.params.id

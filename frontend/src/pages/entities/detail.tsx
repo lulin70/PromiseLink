@@ -70,7 +70,7 @@ export default function EntityDetailPage() {
 
   useEffect(() => {
     if (!isLoggedIn()) {
-      Taro.redirectTo({ url: '/pages/index/index' })
+      Taro.reLaunch({ url: '/pages/index/index' })
       return
     }
     const entityId = router.params.id

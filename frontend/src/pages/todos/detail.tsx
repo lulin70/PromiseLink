@@ -40,7 +40,7 @@ export default function TodoDetailPage() {
 
   useEffect(() => {
     if (!isLoggedIn()) {
-      Taro.redirectTo({ url: '/pages/index/index' })
+      Taro.reLaunch({ url: '/pages/index/index' })
       return
     }
     const todoId = router.params.id

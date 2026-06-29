@@ -18,7 +18,7 @@ class Event(Base):
     Schema aligned with Technical Design v1.7 §3.1
     """
 
-    VALID_TYPES = ["card_save", "meeting", "call", "manual", "email", "wechat_forward"]
+    VALID_TYPES = ["card_save", "meeting", "call", "manual", "wechat_forward"]
 
     __tablename__ = "events"
 
@@ -83,7 +83,7 @@ class Event(Base):
     # Constraints
     __table_args__ = (
         CheckConstraint(
-            "event_type IN ('card_save', 'meeting', 'call', 'manual', 'email', 'wechat_forward')",
+            "event_type IN ('card_save', 'meeting', 'call', 'manual', 'wechat_forward')",
             name="event_type_check",
         ),
         CheckConstraint(

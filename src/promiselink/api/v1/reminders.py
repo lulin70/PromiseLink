@@ -83,8 +83,11 @@ def _is_quiet_hours(quiet_start: time, quiet_end: time, now: time | None = None)
 
 def _classify_reminder_type(todo: Todo) -> str:
     """Determine reminder_type based on todo attributes."""
-    if todo.todo_type == "promise" and todo.due_date and todo.due_date <= datetime.now(UTC):
-        return "promise_due"
+    now = datetime.now(UTC)
+    if todo.todo_type == "promise" and todo.due_date:
+        due = todo.due_date.replace(tzinfo=UTC) if todo.due_date.tzinfo is None else todo.due_date
+        if due <= now:
+            return "promise_due"
     if todo.todo_type == "followup":
         return "followup"
     # Check properties for stage_suggestion / dormant_contact hints

@@ -103,7 +103,7 @@ export default function InputPage() {
   }, [scheduledEventId])
 
   if (!isLoggedIn()) {
-    Taro.redirectTo({ url: '/pages/index/login' })
+    Taro.switchTab({ url: '/pages/index/index' })
     return null
   }
 
@@ -717,7 +717,7 @@ export default function InputPage() {
           </View>
 
           {/* ── 4区解析结果展示 + 纠偏 (extracted to CorrectionPanel) ── */}
-          {eventDetail?.status === 'completed' && parsedDetail && !corrected && (
+          {(eventDetail?.status === 'completed' || eventDetail?.status === 'degraded_completed') && parsedDetail && !corrected && (
             <CorrectionPanel
               eventId={result.id}
               parsedDetail={parsedDetail}
@@ -804,7 +804,7 @@ export default function InputPage() {
             >
               继续录入
             </Button>
-            {eventDetail?.status === 'completed' && (
+            {(eventDetail?.status === 'completed' || eventDetail?.status === 'degraded_completed') && (
               <Button
                 className='view-todos-btn'
                 onClick={() => Taro.switchTab({ url: '/pages/todos/index' })}
@@ -812,7 +812,7 @@ export default function InputPage() {
                 查看待办
               </Button>
             )}
-            {eventDetail?.status === 'completed' && (
+            {(eventDetail?.status === 'completed' || eventDetail?.status === 'degraded_completed') && (
               <Button
                 className='view-events-btn'
                 onClick={() => Taro.switchTab({ url: '/pages/events/index' })}

@@ -2,6 +2,31 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [0.7.0] - 2026-06-28
+
+### Fixed — P0 阻断项修复
+- **P0-1: 文件上传失败修复（Q5）**：DB 约束 `association_type_check` 缺少 `topic_overlap`/`supply_demand`/`industry_chain` 三种关联类型，导致非关键步骤失败被标记为 `failed`；新增 Alembic 迁移 `g7b8c9d0e1f2_sync_association_type_check` 同步约束，Step13 区分关键步骤与非关键步骤，非关键步骤失败降级为 `degraded_completed`，前端轮询逻辑同步适配
+- **P0-2: 基础版与小程序数据不一致（Q4）**：小程序每次登录生成随机 UUID v4，导致与基础版固定 `poc-user` 数据隔离；修复为使用固定 `poc-user`，确保两端数据一致
+
+### Fixed — P1 改进
+- **P1-1: 事件类型 card_scan 拼写修复（Q6）**：小程序 TS types/UI/EventCard 使用 `card_scan`，后端使用 `card_save`，统一为 `card_save`
+- **P1-2: 小程序 API URL 缺少 /api/v1 前缀**：`config/dev.ts` 中 `TARO_APP_API_URL` 为 `http://localhost:8000`，缺少 `/api/v1` 前缀导致所有 PATCH 请求 405；修复为 `http://localhost:8000/api/v1`
+
+### Changed — P2 设计优化
+- **P2-1: 移除 DesktopDetailBar（Q1）**：详情摘要栏仅在事件详情页加载真实数据，其他页面均显示占位文本；遵循 Simplicity First 原则移除该组件，桌面布局从三栏改为两栏
+- **P2-2: "我的"入口移至侧边栏底部（Q2）**：原"升级Pro"区块替换为"我的"导航项，Pro 升级入口移至"我的"页面内部；新建 mine 页面包含用户信息、Pro 升级、关于、退出登录
+
+### Event Types — 统一事件类型
+- 移除 `email` 事件类型（专业版邮件同步自动生成，基础版不支持）
+- 保留 5 种事件类型：`manual`/`meeting`/`call`/`card_save`/`wechat_forward`
+- 新增 Alembic 迁移 `h8c9d0e1f2a3_remove_email_event_type` 清理历史数据
+
+### Miniapp Fixes — 小程序修复
+- 移除 mock 降级数据，所有数据走真实 API
+- 3 个孤立页面（voice-query/reminders/demand）加入口
+- store userId 同步修复
+- title 修正为 "PromiseLink"
+
 ## [0.6.6] - 2026-06-21
 
 ### Fixed — P0阻断项修复（5项）

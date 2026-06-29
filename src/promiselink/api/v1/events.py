@@ -52,7 +52,7 @@ __all__ = [
 class EventCreateRequest(BaseModel):
     """Request schema for creating an event."""
 
-    event_type: str = Field(..., description="Event type: card_save, meeting, call, manual")
+    event_type: str = Field(..., description="Event type: card_save, meeting, call, manual, wechat_forward")
     source: str = Field(..., description="Data source identifier")
     title: str = Field(default="未命名", max_length=200, description="Event title (auto-generated from raw_text if omitted)")
     timestamp: datetime | None = Field(default=None, description="Event timestamp")
