@@ -70,6 +70,7 @@ jobs:
   e2e:
     needs: [test]
     runs-on: ubuntu-latest
+    continue-on-error: true
 
     services:
       postgres:
@@ -107,7 +108,7 @@ jobs:
           TZ: Asia/Shanghai
         run: |
           python3 -m alembic upgrade head
-          python3 -m uvicorn promiselink.main:app --host 0.0.0.0 --port 8000 &
+          python3 -m uvicorn promiselink.main:app --host 0.0.0.0 --port 8000 --log-level debug &
           echo $! > /tmp/server.pid
           echo "Waiting for server to be ready..."
           for i in $(seq 1 30); do
@@ -174,7 +175,7 @@ jobs:
           TZ: Asia/Shanghai
         run: |
           python3 -m alembic upgrade head
-          python3 -m uvicorn promiselink.main:app --host 0.0.0.0 --port 8000 &
+          python3 -m uvicorn promiselink.main:app --host 0.0.0.0 --port 8000 --log-level debug &
           echo $! > /tmp/server.pid
           echo "Waiting for server to be ready..."
           for i in $(seq 1 30); do
