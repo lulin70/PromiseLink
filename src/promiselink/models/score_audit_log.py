@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import JSON, Float, ForeignKey, Index, String, func
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from promiselink.database import IS_SQLITE, Base
@@ -26,16 +26,16 @@ class ScoreAuditLog(Base):
     # Primary key (INTEGER autoincrement for SQLite/PG compatibility)
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
-    # Foreign key to Todo
+    # Foreign key to Todo (String(36) to match todos.id type in alembic migration)
     todo_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         ForeignKey("todos.id", ondelete="CASCADE"),
         nullable=False,
     )
 
     # User who owns the scored todo
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         nullable=False,
     )
 
