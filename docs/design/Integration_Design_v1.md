@@ -148,7 +148,7 @@ sequenceDiagram
 
     Note over MP: 生成WebView URL
 
-    MP->>H5: 打开WebView<br/>https://promiselink.com/h5?ticket=T_xxx
+    MP->>H5: 打开WebView<br/>https://promiselink.cn/h5?ticket=T_xxx
     H5->>H5: 从URL解析ticket参数
 
     H5->>API: POST /api/v1/auth/exchange<br/>{ticket: "T_xxx"}
@@ -272,7 +272,7 @@ wx.miniProgram.navigateBack()
 
 ```javascript
 // 小程序通过URL参数传递指令
-const h5Url = `https://promiselink.com/h5?ticket=${ticket}&action=view_person&id=${personId}`
+const h5Url = `https://promiselink.cn/h5?ticket=${ticket}&action=view_person&id=${personId}`
 
 // 小程序接收H5消息
 <web-view src="{{h5Url}}" bindmessage="onMessage"></web-view>
@@ -305,7 +305,7 @@ Page({
 
     // 1. 获取临时授权码
     const ticketRes = await wx.request({
-      url: 'https://api.promiselink.com/api/v1/auth/ticket',
+      url: 'https://api.promiselink.cn/api/v1/auth/ticket',
       method: 'POST',
       data: {
         action: 'view_person',
@@ -319,7 +319,7 @@ Page({
 
     // 2. 构造H5 URL（仅传递ticket，不传明文token）
     this.setData({
-      h5Url: `https://promiselink.com/h5?ticket=${ticketRes.data.code}`
+      h5Url: `https://promiselink.cn/h5?ticket=${ticketRes.data.code}`
     })
   },
 
@@ -3610,7 +3610,7 @@ class WeChatPushClient:
 {
   "touser": "{{openid}}",
   "template_id": "TPL_PROMISE",
-  "url": "https://promiselink.com/h5/todos/{{todo_id}}",
+  "url": "https://promiselink.cn/h5/todos/{{todo_id}}",
   "data": {
     "first": {"value": "🟢 你答应过XX的事，明天到期", "color": "#A0C4A8"},
     "keyword1": {"value": "{{person_name}} - {{promise_content}}"},
@@ -3627,7 +3627,7 @@ class WeChatPushClient:
 {
   "touser": "{{openid}}",
   "template_id": "TPL_HELP",
-  "url": "https://promiselink.com/h5/todos/{{todo_id}}",
+  "url": "https://promiselink.cn/h5/todos/{{todo_id}}",
   "data": {
     "first": {"value": "⚪ XX最近在关注YY，你可以帮到他", "color": "#B8C4C0"},
     "keyword1": {"value": "{{person_name}} - {{care_topic}}"},
@@ -3644,7 +3644,7 @@ class WeChatPushClient:
 {
   "touser": "{{openid}}",
   "template_id": "TPL_CARE",
-  "url": "https://promiselink.com/h5/todos/{{todo_id}}",
+  "url": "https://promiselink.cn/h5/todos/{{todo_id}}",
   "data": {
     "first": {"value": "🔵 XX上次提到的YY，有新进展了吗", "color": "#A0B0C4"},
     "keyword1": {"value": "{{person_name}} - {{care_topic}}"},
@@ -3661,7 +3661,7 @@ class WeChatPushClient:
 {
   "touser": "{{openid}}",
   "template_id": "TPL_FOLLOWUP",
-  "url": "https://promiselink.com/h5/todos/{{todo_id}}",
+  "url": "https://promiselink.cn/h5/todos/{{todo_id}}",
   "data": {
     "first": {"value": "🟣 有事项需要跟进", "color": "#B0A0C4"},
     "keyword1": {"value": "{{followup_description}}"},
@@ -3678,7 +3678,7 @@ class WeChatPushClient:
 {
   "touser": "{{openid}}",
   "template_id": "TPL_COOPERATION_SIGNAL",
-  "url": "https://promiselink.com/h5/todos/{{todo_id}}",
+  "url": "https://promiselink.cn/h5/todos/{{todo_id}}",
   "data": {
     "first": {"value": "⚪ 你和XX在YY方面有合作可能", "color": "#C4C0A0"},
     "keyword1": {"value": "{{person_name}} - {{cooperation_topic}}"},
@@ -3695,7 +3695,7 @@ class WeChatPushClient:
 {
   "touser": "{{openid}}",
   "template_id": "TPL_RISK",
-  "url": "https://promiselink.com/h5/todos/{{todo_id}}",
+  "url": "https://promiselink.cn/h5/todos/{{todo_id}}",
   "data": {
     "first": {"value": "🔴 风险预警", "color": "#C4A7A0"},
     "keyword1": {"value": "{{risk_description}}"},
