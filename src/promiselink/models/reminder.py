@@ -1,9 +1,11 @@
 """Reminder models for F-69 Smart Follow-up Reminders."""
 
+import uuid
 from datetime import UTC, datetime, time
 
-from sqlalchemy import JSON, CheckConstraint, Column, DateTime, Index, Integer, String, Time
+from sqlalchemy import JSON, CheckConstraint, DateTime, Index, Integer, String, Time
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column
 
 from promiselink.database import IS_SQLITE, Base, _uuid_default
 
@@ -13,12 +15,17 @@ class ReminderPreference(Base):
 
     __tablename__ = "reminder_preferences"
 
-    user_id = Column(UUID(as_uuid=True) if not IS_SQLITE else String(36), primary_key=True)
-    preferred_times = Column(JSON, default=["09:00", "20:00"])
-    fatigue_threshold = Column(Integer, default=5)
-    quiet_hours_start = Column(Time, default=time(22, 0))
-    quiet_hours_end = Column(Time, default=time(8, 0))
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        primary_key=True,
+    )
+    preferred_times: Mapped[list[str] | None] = mapped_column(JSON, default=["09:00", "20:00"])
+    fatigue_threshold: Mapped[int] = mapped_column(Integer, default=5)
+    quiet_hours_start: Mapped[time | None] = mapped_column(Time, default=time(22, 0))
+    quiet_hours_end: Mapped[time | None] = mapped_column(Time, default=time(8, 0))
+    updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    )
 
 
 class ReminderLog(Base):
@@ -26,17 +33,24 @@ class ReminderLog(Base):
 
     __tablename__ = "reminder_logs"
 
-    id = Column(
+    id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True) if not IS_SQLITE else String(36),
         primary_key=True,
         default=_uuid_default,
     )
-    user_id = Column(UUID(as_uuid=True) if not IS_SQLITE else String(36), nullable=False, index=True)
-    todo_id = Column(UUID(as_uuid=True) if not IS_SQLITE else String(36), nullable=False)
-    reminder_type = Column(String(30), nullable=False)
-    sent_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
-    action_taken = Column(String(20), nullable=True)
-    response_latency_seconds = Column(Integer, nullable=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        nullable=False,
+        index=True,
+    )
+    todo_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        nullable=False,
+    )
+    reminder_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    sent_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    action_taken: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    response_latency_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (
         CheckConstraint(
