@@ -1,7 +1,7 @@
 """Smart Follow-up Reminder API endpoints (F-69)."""
 
 from datetime import UTC, datetime, time, timedelta
-from typing import Any, cast
+from typing import Any
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -201,7 +201,7 @@ async def get_daily_reminders(
     return DailyReminderResponse(
         items=items,
         total_pending=total_pending,
-        fatigue_remaining=cast(int, fatigue_remaining) - len(items),
+        fatigue_remaining=fatigue_remaining - len(items),
         is_quiet_hours=quiet,
     )
 
@@ -255,9 +255,9 @@ async def take_reminder_action(
     )
     log_entry = log_result.scalar_one_or_none()
     if log_entry:
-        log_entry.action_taken = req.action  # type: ignore[assignment]
+        log_entry.action_taken = req.action
         latency = (datetime.now(UTC) - log_entry.sent_at).total_seconds()
-        log_entry.response_latency_seconds = int(latency)  # type: ignore[assignment]
+        log_entry.response_latency_seconds = int(latency)
 
     await session.commit()
 
@@ -296,8 +296,8 @@ async def get_preferences(
 
     return PreferenceResponse(
         user_id=pref.user_id,  # type: ignore[arg-type]
-        preferred_times=pref.preferred_times or ["09:00", "20:00"],  # type: ignore[arg-type]
-        fatigue_threshold=pref.fatigue_threshold,  # type: ignore[arg-type]
+        preferred_times=pref.preferred_times or ["09:00", "20:00"],
+        fatigue_threshold=pref.fatigue_threshold,
         quiet_hours_start=pref.quiet_hours_start.strftime("%H:%M") if pref.quiet_hours_start else "22:00",
         quiet_hours_end=pref.quiet_hours_end.strftime("%H:%M") if pref.quiet_hours_end else "08:00",
     )
@@ -331,28 +331,28 @@ async def update_preferences(
 
     # Apply updates
     if req.preferred_times is not None:
-        pref.preferred_times = req.preferred_times  # type: ignore[assignment]
+        pref.preferred_times = req.preferred_times
     if req.fatigue_threshold is not None:
-        pref.fatigue_threshold = req.fatigue_threshold  # type: ignore[assignment]
+        pref.fatigue_threshold = req.fatigue_threshold
     if req.quiet_hours_start is not None:
         try:
-            pref.quiet_hours_start = datetime.strptime(req.quiet_hours_start, "%H:%M").time()  # type: ignore[assignment]
+            pref.quiet_hours_start = datetime.strptime(req.quiet_hours_start, "%H:%M").time()
         except ValueError:
             raise ValidationError("Invalid quiet_hours_start format. Use HH:MM")
     if req.quiet_hours_end is not None:
         try:
-            pref.quiet_hours_end = datetime.strptime(req.quiet_hours_end, "%H:%M").time()  # type: ignore[assignment]
+            pref.quiet_hours_end = datetime.strptime(req.quiet_hours_end, "%H:%M").time()
         except ValueError:
             raise ValidationError("Invalid quiet_hours_end format. Use HH:MM")
 
-    pref.updated_at = datetime.now(UTC)  # type: ignore[assignment]
+    pref.updated_at = datetime.now(UTC)
     await session.commit()
     await session.refresh(pref)
 
     return PreferenceResponse(
         user_id=pref.user_id,  # type: ignore[arg-type]
-        preferred_times=pref.preferred_times or ["09:00", "20:00"],  # type: ignore[arg-type]
-        fatigue_threshold=pref.fatigue_threshold,  # type: ignore[arg-type]
+        preferred_times=pref.preferred_times or ["09:00", "20:00"],
+        fatigue_threshold=pref.fatigue_threshold,
         quiet_hours_start=pref.quiet_hours_start.strftime("%H:%M") if pref.quiet_hours_start else "22:00",
         quiet_hours_end=pref.quiet_hours_end.strftime("%H:%M") if pref.quiet_hours_end else "08:00",
     )
