@@ -9,7 +9,7 @@
 # =============================================================================
 # Stage 1: Frontend Builder — Taro H5 build
 # =============================================================================
-FROM node:20-alpine AS frontend-builder
+FROM node:20-slim AS frontend-builder
 
 WORKDIR /frontend
 
@@ -19,7 +19,6 @@ RUN npm ci --no-audit --no-fund
 
 # Copy frontend source and build H5 distribution
 COPY frontend/ ./
-RUN ls -la config/ && cat config/index.ts | head -5
 RUN npm run build:h5
 
 # =============================================================================
