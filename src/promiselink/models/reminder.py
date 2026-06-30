@@ -3,8 +3,9 @@
 from datetime import UTC, datetime, time
 
 from sqlalchemy import JSON, CheckConstraint, Column, DateTime, Index, Integer, String, Time
+from sqlalchemy.dialects.postgresql import UUID
 
-from promiselink.database import Base, _uuid_default
+from promiselink.database import IS_SQLITE, Base, _uuid_default
 
 
 class ReminderPreference(Base):
@@ -12,7 +13,7 @@ class ReminderPreference(Base):
 
     __tablename__ = "reminder_preferences"
 
-    user_id = Column(String(36), primary_key=True)
+    user_id = Column(UUID(as_uuid=True) if not IS_SQLITE else String(36), primary_key=True)
     preferred_times = Column(JSON, default=["09:00", "20:00"])
     fatigue_threshold = Column(Integer, default=5)
     quiet_hours_start = Column(Time, default=time(22, 0))
@@ -26,12 +27,12 @@ class ReminderLog(Base):
     __tablename__ = "reminder_logs"
 
     id = Column(
-        String(36),
+        UUID(as_uuid=True) if not IS_SQLITE else String(36),
         primary_key=True,
         default=_uuid_default,
     )
-    user_id = Column(String(36), nullable=False, index=True)
-    todo_id = Column(String(36), nullable=False)
+    user_id = Column(UUID(as_uuid=True) if not IS_SQLITE else String(36), nullable=False, index=True)
+    todo_id = Column(UUID(as_uuid=True) if not IS_SQLITE else String(36), nullable=False)
     reminder_type = Column(String(30), nullable=False)
     sent_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     action_taken = Column(String(20), nullable=True)
