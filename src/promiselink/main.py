@@ -105,7 +105,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     import structlog
     logger = structlog.get_logger()
     logger.info("promiselink_starting")
-    logger.info("PromiseLink v0.6.6 — AGPL v3. Commercial use requires compliance. https://promiselink.app")
+    logger.info(f"PromiseLink v{settings.app_version} — AGPL v3. Commercial use requires compliance. https://promiselink.app")
 
     # Check for default secret key
     if settings.secret_key == "change-me-in-production" and settings.app_env != "test":
@@ -349,6 +349,31 @@ async def not_found_handler(request: Request, exc: Any) -> JSONResponse:
 @app.exception_handler(500)
 async def internal_error_handler(request: Request, exc: Any) -> JSONResponse:
     """Handle 500 errors."""
+    from promiselink.core.logging import get_logger
+    get_logger("promiselink.errors").error(
+        "internal_error",
+        method=request.method,
+        path=request.url.path,
+        error=str(exc),
+        exc_info=True,
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"error": {"code": "INTERNAL_ERROR", "message": "Internal server error"}},
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catch-all handler for all unhandled exceptions — logs full traceback."""
+    from promiselink.core.logging import get_logger
+    get_logger("promiselink.errors").exception(
+        "unhandled_exception",
+        method=request.method,
+        path=request.url.path,
+        error_type=type(exc).__name__,
+        error=str(exc),
+    )
     return JSONResponse(
         status_code=500,
         content={"error": {"code": "INTERNAL_ERROR", "message": "Internal server error"}},

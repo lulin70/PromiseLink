@@ -29,11 +29,7 @@ settings = get_settings()
 # ── Dialect detection (used by models for SQLite/PG compatibility) ──
 
 def _is_sqlite() -> bool:
-    """Detect if current dialect is SQLite based on config URL or test mode."""
-    import sys
-    # In pytest environment, always use SQLite-compatible types
-    if "pytest" in sys.modules:
-        return True
+    """Detect if current dialect is SQLite based on config URL."""
     return settings.database_url.startswith("sqlite")
 
 
