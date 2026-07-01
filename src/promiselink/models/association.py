@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import (
     JSON,
     CheckConstraint,
+    DateTime,
     Float,
     ForeignKey,
     Index,
@@ -80,13 +81,16 @@ class Association(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="confirmed")
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(nullable=False, default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=func.now()
+    )
     updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         default=func.now(),
         onupdate=func.now(),
     )
-    last_interaction: Mapped[datetime | None] = mapped_column()
+    last_interaction: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Constraints
     __table_args__ = (

@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, CheckConstraint, Index, String, Text, func
+from sqlalchemy import JSON, CheckConstraint, DateTime, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -42,7 +42,9 @@ class Event(Base):
     )
     source: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False, default="未命名")
-    timestamp: Mapped[datetime] = mapped_column(nullable=False, index=True, default=func.now())
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True, default=func.now()
+    )
 
     # Raw content (max 500KB as per Technical Design §3.1)
     raw_text: Mapped[str | None] = mapped_column(Text)
@@ -77,8 +79,10 @@ class Event(Base):
     input_scope_confidence: Mapped[float | None] = mapped_column(nullable=True)
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(nullable=False, default=func.now())
-    processed_at: Mapped[datetime | None] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=func.now()
+    )
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Constraints
     __table_args__ = (

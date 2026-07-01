@@ -11,6 +11,7 @@ from typing import Any
 from sqlalchemy import (
     JSON,
     CheckConstraint,
+    DateTime,
     ForeignKey,
     Index,
     Integer,
@@ -98,13 +99,16 @@ class RelationshipBrief(Base):
     # Metadata
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     last_updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         default=func.now(),
         onupdate=func.now(),
     )
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(nullable=False, default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=func.now()
+    )
 
     # Constraints
     __table_args__ = (

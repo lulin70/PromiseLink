@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, CheckConstraint, Index, String, Text, func
+from sqlalchemy import JSON, CheckConstraint, DateTime, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -43,6 +43,7 @@ class ScheduledEvent(Base):
         index=True,
     )
     scheduled_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         index=True,
     )
@@ -79,7 +80,7 @@ class ScheduledEvent(Base):
     cancel_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Reminder
-    reminder_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    reminder_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Metadata
     metadata_: Mapped[dict[str, Any] | None] = mapped_column(
@@ -89,13 +90,16 @@ class ScheduledEvent(Base):
     )
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(nullable=False, default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=func.now()
+    )
     updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         default=func.now(),
         onupdate=func.now(),
     )
-    recorded_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    recorded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Constraints
     __table_args__ = (

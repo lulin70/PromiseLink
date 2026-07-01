@@ -24,7 +24,7 @@ class ReminderPreference(Base):
     quiet_hours_start: Mapped[time | None] = mapped_column(Time, default=time(22, 0))
     quiet_hours_end: Mapped[time | None] = mapped_column(Time, default=time(8, 0))
     updated_at: Mapped[datetime | None] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
     )
 
 
@@ -48,7 +48,7 @@ class ReminderLog(Base):
         nullable=False,
     )
     reminder_type: Mapped[str] = mapped_column(String(30), nullable=False)
-    sent_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
     action_taken: Mapped[str | None] = mapped_column(String(20), nullable=True)
     response_latency_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
 

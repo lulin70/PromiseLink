@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Float, ForeignKey, Index, String, func
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Index, String, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -60,6 +60,7 @@ class ScoreAuditLog(Base):
 
     # Timestamp
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         nullable=False,
         default=func.now(),
     )
