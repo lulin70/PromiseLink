@@ -79,7 +79,15 @@ def upgrade() -> None:
     if bind.dialect.name == "sqlite":
         return
 
+    # Some tables (e.g. score_audit_logs) are created by Base.metadata.create_all()
+    # at app startup, not by alembic migrations. Skip non-existent tables — they
+    # will be created with the correct type (DateTime(timezone=True)) by create_all().
+    inspector = sa.inspect(bind)
+    existing_tables = inspector.get_table_names()
+
     for table, column in DATETIME_COLUMNS:
+        if table not in existing_tables:
+            continue
         op.alter_column(
             table_name=table,
             column_name=column,
@@ -94,7 +102,12 @@ def downgrade() -> None:
     if bind.dialect.name == "sqlite":
         return
 
+    inspector = sa.inspect(bind)
+    existing_tables = inspector.get_table_names()
+
     for table, column in DATETIME_COLUMNS:
+        if table not in existing_tables:
+            continue
         op.alter_column(
             table_name=table,
             column_name=column,
