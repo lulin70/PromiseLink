@@ -374,9 +374,10 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
         error_type=type(exc).__name__,
         error=str(exc),
     )
+    detail = str(exc) if settings.app_env != "production" else "Internal server error"
     return JSONResponse(
         status_code=500,
-        content={"error": {"code": "INTERNAL_ERROR", "message": "Internal server error"}},
+        content={"error": {"code": "INTERNAL_ERROR", "message": detail, "type": type(exc).__name__}},
     )
 
 
