@@ -276,6 +276,11 @@
         color: #6B6B6B;
         font-size: 24px;
       }
+
+      .snoozed-label {
+        color: #7B9EA8;
+        font-size: 24px;
+      }
     }
   }
 
@@ -349,6 +354,7 @@
         .dismiss-btn { border-radius: 6px; padding: 4px 14px; border-width: 1px; Text { font-size: 12px; } }
         .done-label { font-size: 12px; }
         .dismissed-label { font-size: 12px; }
+        .snoozed-label { font-size: 12px; }
       }
     }
 

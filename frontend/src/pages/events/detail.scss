@@ -245,6 +245,11 @@
       background: #f0f0f0;
       color: #6B6B6B;
     }
+
+    &.status-snoozed {
+      background: #e6eef0;
+      color: #7B9EA8;
+    }
   }
 
   // Priority badge

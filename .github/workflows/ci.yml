@@ -124,6 +124,9 @@ jobs:
       - name: Run E2E tests
         run: python3 scripts/e2e/e2e_basic_test.py
 
+      - name: Run E2E user operations tests
+        run: python3 -m pytest scripts/e2e/e2e_user_operations_full.py -v --tb=short
+
       - name: Display server logs
         if: always()
         run: cat /tmp/server.log || true

@@ -282,15 +282,41 @@ async def get_nudge_draft(
         except (json.JSONDecodeError, TypeError):
             logger.warning("nudge_draft_cache_parse_failed", todo_id=todo_id)
 
-    # Generate new nudge
-    nudge_text = await generate_gentle_nudge(session, todo, config)
-    is_fallback = "不着急" in nudge_text  # Heuristic: fallback template contains this phrase
+    # Generate new nudge (with fallback if generation or entity lookup fails)
+    try:
+        nudge_text = await generate_gentle_nudge(session, todo, config)
+        is_fallback = "不着急" in nudge_text  # Heuristic: fallback template contains this phrase
+    except Exception as exc:
+        logger.warning(
+            "nudge_draft_generation_failed",
+            todo_id=todo_id,
+            error=str(exc),
+            exc_info=True,
+        )
+        nudge_text = (
+            f"对方，之前提到的{todo.description or todo.title or '那件事'}"
+            "不知进展如何？方便的话跟我同步一下情况，不着急。 — via PromiseLink"
+        )
+        is_fallback = True
 
-    # Cache result in properties._nlg_draft
-    props = todo.properties or {}
-    props["_nlg_draft"] = {"nudge_text": nudge_text, "is_fallback": is_fallback, "generated_at": datetime.now(UTC).isoformat()}
-    todo.properties = props
-    await session.commit()
+    # Cache result in properties._nlg_draft (best-effort; don't fail the request)
+    try:
+        props = todo.properties or {}
+        props["_nlg_draft"] = {
+            "nudge_text": nudge_text,
+            "is_fallback": is_fallback,
+            "generated_at": datetime.now(UTC).isoformat(),
+        }
+        todo.properties = props
+        await session.commit()
+    except Exception as exc:
+        logger.warning(
+            "nudge_draft_cache_write_failed",
+            todo_id=todo_id,
+            error=str(exc),
+            exc_info=True,
+        )
+        await session.rollback()
 
     return NudgeDraftResponse(
         todo_id=todo_id,

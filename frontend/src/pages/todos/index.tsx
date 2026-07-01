@@ -11,6 +11,7 @@ const STATUS_TABS = [
   { value: 'pending', label: '待处理' },
   { value: 'done', label: '已完成' },
   { value: 'dismissed', label: '已忽略' },
+  { value: 'snoozed', label: '已推迟' },
 ]
 
 const TYPE_TABS = [
@@ -288,6 +289,9 @@ export default function TodosPage() {
                 )}
                 {todo.status === 'dismissed' && (
                   <Text className='dismissed-label'>已忽略</Text>
+                )}
+                {todo.status === 'snoozed' && (
+                  <Text className='snoozed-label'>已推迟</Text>
                 )}
               </View>
             </View>

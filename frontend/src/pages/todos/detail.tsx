@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { View, Text, ScrollView } from '@tarojs/components'
 import Taro, { useRouter } from '@tarojs/taro'
-import { getTodoDetail, updateTodoStatus, dismissTodo, TodoDetailResponse } from '../../services/api'
+import { getTodoDetail, updateTodoStatus, dismissTodo, actionReminder, TodoDetailResponse } from '../../services/api'
 import { isLoggedIn } from '../../services/auth'
 import { navigateBack } from '../../services/navigation'
 import EventLink from '../../components/EventLink'
@@ -12,6 +12,7 @@ const STATUS_TABS = [
   { value: 'pending', label: '待处理' },
   { value: 'done', label: '已完成' },
   { value: 'dismissed', label: '已忽略' },
+  { value: 'snoozed', label: '已推迟' },
 ]
 
 const TYPE_LABELS: Record<string, string> = {
@@ -76,6 +77,31 @@ export default function TodoDetailPage() {
         await updateTodoStatus(detail.id, newStatus)
       }
       Taro.showToast({ title: '操作成功', icon: 'success' })
+      await loadDetail(detail.id)
+    } catch (err) {
+      Taro.showToast({ title: '操作失败', icon: 'error' })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  async function handleSnooze() {
+    if (!detail) return
+    const modalOpts = {
+      title: '推迟待办',
+      content: '24',
+      editable: true,
+      placeholderText: '请输入推迟小时数（默认24）',
+      confirmText: '推迟',
+      cancelText: '取消',
+    }
+    const res = await Taro.showModal(modalOpts)
+    if (!res.confirm) return
+    try {
+      setActionLoading(true)
+      const snoozeHours = parseInt((res as { content?: string }).content || '24', 10) || 24
+      await actionReminder(detail.id, 'snoozed', snoozeHours)
+      Taro.showToast({ title: '已推迟', icon: 'success' })
       await loadDetail(detail.id)
     } catch (err) {
       Taro.showToast({ title: '操作失败', icon: 'error' })
@@ -184,6 +210,12 @@ export default function TodoDetailPage() {
                 <Text>忽略</Text>
               </View>
               <View
+                className={`action-btn secondary ${actionLoading ? 'disabled' : ''}`}
+                onClick={() => !actionLoading && handleSnooze()}
+              >
+                <Text>推迟</Text>
+              </View>
+              <View
                 className={`action-btn primary ${actionLoading ? 'disabled' : ''}`}
                 onClick={() => !actionLoading && handleStatusChange('done')}
               >
@@ -192,7 +224,7 @@ export default function TodoDetailPage() {
             </View>
           )}
 
-          {(detail.status === 'done' || detail.status === 'dismissed') && (
+          {(detail.status === 'done' || detail.status === 'dismissed' || detail.status === 'snoozed') && (
             <View className='action-bar'>
               <View
                 className={`action-btn primary ${actionLoading ? 'disabled' : ''}`}
