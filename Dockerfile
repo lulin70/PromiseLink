@@ -47,6 +47,17 @@ RUN pip install --no-cache-dir --upgrade pip \
 # =============================================================================
 FROM python:3.11-slim AS runtime
 
+# Build-time version label (kept in sync with VERSION file and pyproject.toml)
+ARG VERSION=0.7.0
+
+# OCI-standard image labels for registry indexing and traceability
+LABEL org.opencontainers.image.title="PromiseLink" \
+      org.opencontainers.image.description="AI-driven personal business relationship management assistant (base edition, AGPL v3)" \
+      org.opencontainers.image.source="https://github.com/lulin70/PromiseLink" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.licenses="AGPL-3.0" \
+      org.opencontainers.image.authors="CarryMem Team <team@carrymem.com>"
+
 # Install runtime-only dependencies
 RUN apt-get update && apt-get install -y \
     libpq5 \
