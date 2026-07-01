@@ -20,7 +20,7 @@ from promiselink.core.exceptions import (
     LLMTimeoutError,
 )
 from promiselink.core.logging import get_logger
-from promiselink.core.text_utils import extract_json_from_text
+from promiselink.core.text_utils import extract_json_from_text, sanitize_llm_input
 
 logger = get_logger("promiselink.llm_client")
 
@@ -307,6 +307,7 @@ class LLMClient:
         Returns:
             The generated text response.
         """
+        prompt = sanitize_llm_input(prompt)
         messages = [{"role": "user", "content": prompt}]
         return await self._call_with_retry(
             messages=messages,
@@ -377,6 +378,7 @@ class LLMClient:
         Returns:
             The generated short text response.
         """
+        prompt = sanitize_llm_input(prompt)
         messages = [{"role": "user", "content": prompt}]
         return await self._call_with_retry(
             messages=messages,

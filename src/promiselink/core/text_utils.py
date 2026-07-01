@@ -7,6 +7,8 @@ import json
 import logging
 import re
 
+from promiselink.core.exceptions import PromptInjectionError
+
 logger = logging.getLogger("promiselink.text_utils")
 
 # Prompt injection detection patterns
@@ -87,7 +89,9 @@ def sanitize_llm_input(text: str, max_len: int = 8000) -> str:
     """Sanitize input text before sending to LLM.
 
     Truncates to max_len and removes characters that could interfere
-    with JSON output parsing or prompt injection.
+    with JSON output parsing. Raises PromptInjectionError if injection
+    patterns are detected — per hard constraint, LLM calls must be
+    blocked and template degradation triggered.
 
     Args:
         text: Raw input text.
@@ -95,6 +99,9 @@ def sanitize_llm_input(text: str, max_len: int = 8000) -> str:
 
     Returns:
         Sanitized text safe for LLM input.
+
+    Raises:
+        PromptInjectionError: If a prompt injection pattern is detected.
     """
     if not text:
         return ""
@@ -103,12 +110,15 @@ def sanitize_llm_input(text: str, max_len: int = 8000) -> str:
     text = text.replace("\x00", "").replace("\ufffd", "")
     text = re.sub(r"```\w*\n?", "", text)
 
-    # Detect and remove prompt injection patterns
+    # Detect prompt injection patterns — raise to block LLM call
     for pattern in INJECTION_PATTERNS:
         matches = pattern.findall(text)
         if matches:
-            logger.warning("prompt_injection_detected", extra={"pattern": pattern.pattern, "matches": matches})
-            text = pattern.sub("", text)
+            logger.warning(
+                "prompt_injection_detected",
+                extra={"pattern": pattern.pattern, "matches": matches},
+            )
+            raise PromptInjectionError(pattern=pattern.pattern, matches=matches)
 
     return text.strip()
 

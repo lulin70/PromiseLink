@@ -188,6 +188,22 @@ class LLMResponseParseError(LLMError):
         )
 
 
+class PromptInjectionError(LLMError):
+    """Raised when prompt injection is detected in input text.
+
+    Per hard constraint: prompt injection detection must block LLM calls
+    and trigger template-based degradation. Subclassing LLMError allows
+    existing except Exception/except LLMError handlers to degrade gracefully.
+    """
+
+    def __init__(self, pattern: str, matches: list[str] | None = None):
+        super().__init__(
+            message=f"Prompt injection detected (pattern: {pattern})",
+            code="PROMPT_INJECTION_BLOCKED",
+            details={"pattern": pattern, "matches": matches or []},
+        )
+
+
 # ── Infrastructure Errors ──
 
 
