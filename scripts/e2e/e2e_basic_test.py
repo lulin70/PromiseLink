@@ -16,6 +16,8 @@ import urllib.request
 BASE_URL = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8000"
 API = f"{BASE_URL}/api/v1"
 
+E2E_USER_ID = "00000000-0000-4000-8000-000000000001"
+
 passed = 0
 failed = 0
 token = None
@@ -75,7 +77,7 @@ print("\n📋 阶段 2：认证")
 
 # 步骤 1: PoC 登录
 status, data = api_call("POST", "/auth/login", body={
-    "user_id": "e2e-test-user",
+    "user_id": E2E_USER_ID,
     "poc_secret": "promiselink2026",
 })
 if status == 200 and "access_token" in data:
@@ -236,7 +238,7 @@ else:
     log_fail(f"关系简报查询失败: {status}")
 
 # 步骤 15: 数据导出
-status, data = api_call("GET", "/export/e2e-test-user")
+status, data = api_call("GET", f"/export/{E2E_USER_ID}")
 if status == 200:
     log_ok("数据导出成功")
 else:

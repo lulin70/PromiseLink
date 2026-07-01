@@ -22,7 +22,7 @@ import httpx
 BASE = "http://localhost:8002/api/v1"
 TIMEOUT = 60.0
 POC_SECRET = os.getenv("POC_SECRET", "promiselink2026")
-USER_ID = "e2e_user_journey"
+USER_ID = "00000000-0000-4000-8000-000000000004"
 
 # ── 6份用户场景录入内容 ─────────────────────────────────
 # 基于真实业务场景，覆盖核心功能点

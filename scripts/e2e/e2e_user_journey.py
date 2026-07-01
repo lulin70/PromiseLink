@@ -24,7 +24,7 @@ sys.path.insert(0, str(project_root / "src"))
 
 BASE_URL = "http://localhost:8000/api/v1"
 TIMEOUT = 120.0
-POC_USER_ID = "e2e-journey-user"
+POC_USER_ID = "00000000-0000-4000-8000-000000000003"
 POC_SECRET = "promiselink2026"
 
 # JWT token obtained from login; attached to all authenticated requests

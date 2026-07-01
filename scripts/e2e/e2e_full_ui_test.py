@@ -35,7 +35,7 @@ passed = 0
 failed = 0
 skipped = 0
 token = None
-user_id = "e2e-full-ui-user"
+user_id = "00000000-0000-4000-8000-000000000005"
 
 
 def log_ok(msg: str):

@@ -9,7 +9,7 @@ import urllib.error
 import urllib.request
 
 BASE = os.getenv("API_BASE_URL", "http://localhost:8000/api/v1")
-USER_ID = "e2e-test-user-001"
+USER_ID = "00000000-0000-4000-8000-000000000002"
 
 def api(method, path, data=None, token=None):
     url = f"{BASE}{path}"
