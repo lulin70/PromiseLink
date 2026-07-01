@@ -12,6 +12,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       matrix:
         python-version: ["3.11"]
@@ -70,7 +71,7 @@ jobs:
   e2e:
     needs: [test]
     runs-on: ubuntu-latest
-    continue-on-error: true
+    timeout-minutes: 15
 
     services:
       postgres:
@@ -138,6 +139,7 @@ jobs:
   e2e-nightly:
     needs: test
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     if: github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
 
     services:
@@ -192,7 +194,7 @@ jobs:
           curl -sf http://localhost:8000/api/v1/health || (echo "Server failed to start" && cat /tmp/server.log && exit 1)
 
       - name: Run E2E basic test
-        run: python3 scripts/e2e/e2e_basic_test.py || true
+        run: python3 scripts/e2e/e2e_basic_test.py
 
       - name: Run E2E smoke test
         run: python3 scripts/e2e/e2e_smoke_test.py || true
@@ -217,6 +219,7 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -234,6 +237,7 @@ jobs:
 
   security:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -260,6 +264,7 @@ jobs:
   build-and-push:
     needs: [test, e2e, frontend]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
@@ -307,6 +312,7 @@ jobs:
   deploy-staging:
     needs: build-and-push
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     if: github.ref == 'refs/heads/main'
     environment: staging
     steps:
