@@ -52,8 +52,8 @@ DATETIME_COLUMNS: list[tuple[str, str]] = [
     ("todos", "score_calculated_at"),
     ("todos", "fulfilled_at"),
     ("todos", "overdue_notified_at"),
-    # snoozed_todos (recover_at already uses TIMESTAMP(timezone=True))
-    ("snoozed_todos", "created_at"),
+    # snooze_schedules (recover_at already uses TIMESTAMP(timezone=True))
+    ("snooze_schedules", "created_at"),
     # scheduled_events
     ("scheduled_events", "scheduled_at"),
     ("scheduled_events", "reminder_at"),
