@@ -84,7 +84,7 @@ def upgrade() -> None:
             table_name=table,
             column_name=column,
             type_=sa.DateTime(timezone=True),
-            postgresql_using=f"{column} AT TIME ZONE 'UTC' AS TIMESTAMP WITH TIME ZONE",
+            postgresql_using=f"{column} AT TIME ZONE 'UTC'",
         )
 
 
