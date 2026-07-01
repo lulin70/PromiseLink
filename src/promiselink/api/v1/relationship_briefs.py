@@ -18,7 +18,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.api.dependencies import rate_limit_dependency
-from promiselink.api.v1.schemas import PaginatedResponse
+from promiselink.api.v1.schemas import PaginatedResponse, UUIDStr
 from promiselink.core.auth import get_current_user_id
 from promiselink.core.exceptions import ConflictError, NotFoundError, ValidationError
 from promiselink.core.logging import get_logger, new_request_id
@@ -40,9 +40,9 @@ router = APIRouter(dependencies=[Depends(rate_limit_dependency)])
 class RelationshipBriefResponse(BaseModel):
     """Full relationship brief response."""
 
-    id: uuid.UUID | str
-    user_id: uuid.UUID | str
-    person_entity_id: uuid.UUID | str
+    id: UUIDStr
+    user_id: UUIDStr
+    person_entity_id: UUIDStr
     relationship_stage: str
     brief_data: dict
     version: int
@@ -210,8 +210,8 @@ class BriefModuleItem(BaseModel):
 class RelationshipBriefAggregatedResponse(BaseModel):
     """Aggregated relationship brief with structured 12-module view."""
 
-    id: uuid.UUID | str
-    person_entity_id: uuid.UUID | str
+    id: UUIDStr
+    person_entity_id: UUIDStr
     person_name: str | None = None
     person_company: str | None = None
     relationship_stage: str

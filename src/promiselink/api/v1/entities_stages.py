@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.api.dependencies import rate_limit_dependency
+from promiselink.api.v1.schemas import UUIDStr
 from promiselink.core.auth import get_current_user_id
 from promiselink.core.exceptions import NotFoundError
 from promiselink.core.logging import get_logger
@@ -33,7 +34,7 @@ class StageSuggestion(BaseModel):
 
 
 class StageInfoResponse(BaseModel):
-    entity_id: str
+    entity_id: UUIDStr
     name: str
     current_stage: str
     current_stage_label: str

@@ -10,7 +10,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.api.dependencies import rate_limit_dependency
-from promiselink.api.v1.schemas import PaginatedResponse
+from promiselink.api.v1.schemas import PaginatedResponse, UUIDStr
 from promiselink.core.auth import get_current_user_id
 from promiselink.core.exceptions import NotFoundError
 from promiselink.core.logging import get_logger, new_request_id
@@ -27,19 +27,19 @@ router = APIRouter(dependencies=[Depends(rate_limit_dependency)])
 
 
 class TodoResponse(BaseModel):
-    id: uuid.UUID | str
-    user_id: uuid.UUID | str
+    id: UUIDStr
+    user_id: UUIDStr
     todo_type: str
     title: str
     description: str | None = None
-    related_entity_id: uuid.UUID | str | None = None
+    related_entity_id: UUIDStr | None = None
     related_entity_name: str | None = None
     priority: int
     priority_override: str | None = None
     priority_source: str = "ai"
     status: str
     due_date: datetime | None = None
-    source_event_id: uuid.UUID | str | None = None
+    source_event_id: UUIDStr | None = None
     source_event_title: str | None = None
     source_event_date: str | None = None
     created_at: datetime | None = None
@@ -71,7 +71,7 @@ class ConfirmRequest(BaseModel):
 
 
 class ConfirmationItem(BaseModel):
-    todo_id: str
+    todo_id: UUIDStr
     todo_type: str
     title: str
     description: str | None = None

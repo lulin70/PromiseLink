@@ -18,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.api.dependencies import rate_limit_dependency
+from promiselink.api.v1.schemas import UUIDStr
 from promiselink.core.auth import get_current_user_id
 from promiselink.core.exceptions import NotFoundError, ValidationError
 from promiselink.core.file_utils import decode_content
@@ -78,14 +79,14 @@ class EventCreateRequest(BaseModel):
 
 class EventEntityRef(BaseModel):
     """Lightweight entity reference for event cards."""
-    id: str
+    id: UUIDStr
     name: str
 
 
 class EventEntityDetail(BaseModel):
     """Detailed entity reference for event detail (纠偏用)."""
 
-    id: str
+    id: UUIDStr
     name: str
     entity_type: str
     company: str | None = None
@@ -97,7 +98,7 @@ class EventEntityDetail(BaseModel):
 class EventAssociationRef(BaseModel):
     """Lightweight association reference for event detail (关系区)."""
 
-    id: str
+    id: UUIDStr
     source_entity_name: str
     target_entity_name: str
     association_type: str
@@ -107,8 +108,8 @@ class EventAssociationRef(BaseModel):
 class EventResponse(BaseModel):
     """Response schema for event data."""
 
-    id: str
-    user_id: str
+    id: UUIDStr
+    user_id: UUIDStr
     event_type: str
     source: str
     title: str
@@ -123,14 +124,14 @@ class EventResponse(BaseModel):
 class EventTodoRef(BaseModel):
     """Lightweight todo reference for event detail."""
 
-    id: str
+    id: UUIDStr
     todo_type: str
     title: str
     status: str
     description: str | None = None
     due_date: datetime | None = None
     priority: int = 3
-    related_entity_id: str | None = None
+    related_entity_id: UUIDStr | None = None
     confirmation_status: str | None = None
     action_type: str | None = None
     evidence_quote: str | None = None

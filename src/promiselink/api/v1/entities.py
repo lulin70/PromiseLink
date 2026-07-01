@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from promiselink.api.dependencies import rate_limit_dependency
 from promiselink.api.v1.entities_credit import router as credit_router
 from promiselink.api.v1.entities_stages import router as stages_router
-from promiselink.api.v1.schemas import PaginatedResponse
+from promiselink.api.v1.schemas import PaginatedResponse, UUIDStr
 from promiselink.core.auth import get_current_user_id
 from promiselink.core.crypto import (
     decrypt_pii_in_properties,
@@ -37,8 +37,8 @@ router.include_router(credit_router)
 
 
 class EntityResponse(BaseModel):
-    id: uuid.UUID | str
-    user_id: uuid.UUID | str
+    id: UUIDStr
+    user_id: UUIDStr
     entity_type: str
     name: str
     canonical_name: str
@@ -52,7 +52,7 @@ class EntityResponse(BaseModel):
 
 
 class EntityDetailResponse(EntityResponse):
-    source_event_id: uuid.UUID | str | None = None
+    source_event_id: UUIDStr | None = None
     updated_at: datetime | None = None
 
 
@@ -118,7 +118,7 @@ async def list_entities(
 
 
 class DormantContactItem(BaseModel):
-    entity_id: str
+    entity_id: UUIDStr
     name: str
     company: str | None = None
     dormant_days: int
@@ -275,7 +275,7 @@ async def delete_entity(
 
 class EventBriefResponse(BaseModel):
     """Brief event info for entity history."""
-    id: uuid.UUID | str
+    id: UUIDStr
     event_type: str
     title: str
     timestamp: datetime | None = None
@@ -287,7 +287,7 @@ class EventBriefResponse(BaseModel):
 
 class TodoBriefResponse(BaseModel):
     """Brief todo info for entity history."""
-    id: uuid.UUID | str
+    id: UUIDStr
     todo_type: str
     title: str
     priority: int
@@ -299,7 +299,7 @@ class TodoBriefResponse(BaseModel):
 
 class AssociationBriefResponse(BaseModel):
     """Brief association info for entity history."""
-    id: uuid.UUID | str
+    id: UUIDStr
     association_type: str
     target_entity_name: str | None = None
     strength: float

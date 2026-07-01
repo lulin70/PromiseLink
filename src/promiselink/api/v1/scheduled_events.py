@@ -10,7 +10,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.api.dependencies import rate_limit_dependency
-from promiselink.api.v1.schemas import PaginatedResponse
+from promiselink.api.v1.schemas import PaginatedResponse, UUIDStr
 from promiselink.core.auth import get_current_user_id
 from promiselink.core.exceptions import ConflictError, NotFoundError, ValidationError
 from promiselink.core.logging import get_logger, new_request_id
@@ -79,15 +79,15 @@ class ScheduledEventUpdateRequest(BaseModel):
 class ScheduledEventResponse(BaseModel):
     """Response schema for scheduled event data."""
 
-    id: str
-    user_id: str
+    id: UUIDStr
+    user_id: UUIDStr
     scheduled_at: datetime
     topic: str
     participants: list[dict[str, Any]] | None
     location: str | None
     event_type: str
     status: str
-    linked_event_id: str | None
+    linked_event_id: UUIDStr | None
     cancel_reason: str | None
     reminder_at: datetime | None
     event_metadata: dict[str, Any] | None = Field(default=None, alias="metadata_")
@@ -111,8 +111,8 @@ class RecordRequest(BaseModel):
 class RecordResponse(BaseModel):
     """Response schema after recording a scheduled event."""
 
-    scheduled_event_id: str
-    event_id: str
+    scheduled_event_id: UUIDStr
+    event_id: UUIDStr
     pipeline_status: str
 
 

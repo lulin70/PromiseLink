@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from promiselink.api.v1.schemas import UUIDStr
 from promiselink.core.auth import get_current_user_id
 from promiselink.core.exceptions import ValidationError
 from promiselink.core.logging import get_logger, new_request_id
@@ -23,7 +24,7 @@ router = APIRouter(tags=["Dashboard"])
 
 
 class RangeViewEventItem(BaseModel):
-    id: str
+    id: UUIDStr
     event_type: str
     title: str
     timestamp: str | None = None
@@ -33,7 +34,7 @@ class RangeViewEventItem(BaseModel):
 
 
 class RangeViewTodoItem(BaseModel):
-    id: str
+    id: UUIDStr
     todo_type: str
     title: str
     status: str

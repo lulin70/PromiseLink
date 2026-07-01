@@ -1,6 +1,5 @@
 """Dashboard Day View endpoint — F-49: 日视图 Dashboard API."""
 
-import uuid
 from datetime import UTC, date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query
@@ -8,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from promiselink.api.v1.schemas import UUIDStr
 from promiselink.core.auth import get_current_user_id
 from promiselink.core.logging import get_logger, new_request_id
 from promiselink.core.natural_date import parse_natural_date
@@ -25,7 +25,7 @@ router = APIRouter(tags=["Dashboard"])
 
 
 class DayViewEventItem(BaseModel):
-    id: uuid.UUID | str
+    id: UUIDStr
     event_type: str
     title: str
     time: str | None = None  # HH:MM format from timestamp
@@ -38,7 +38,7 @@ class DayViewEventItem(BaseModel):
 
 
 class DayViewTodoItem(BaseModel):
-    id: uuid.UUID | str
+    id: UUIDStr
     title: str
     todo_type: str
     action_type: str | None = None
@@ -61,7 +61,7 @@ class DayViewSummary(BaseModel):
 
 
 class DayViewScheduledItem(BaseModel):
-    id: uuid.UUID | str
+    id: UUIDStr
     topic: str
     scheduled_at: datetime
     event_type: str

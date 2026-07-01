@@ -9,6 +9,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.api.dependencies import rate_limit_dependency
+from promiselink.api.v1.schemas import UUIDStr
 from promiselink.core.auth import get_current_user_id
 from promiselink.core.exceptions import NotFoundError, ValidationError
 from promiselink.core.logging import get_logger, new_request_id
@@ -24,7 +25,7 @@ logger = get_logger("promiselink.api.reminders")
 
 
 class ReminderItem(BaseModel):
-    todo_id: str
+    todo_id: UUIDStr
     todo_type: str
     title: str
     description: str | None = None
@@ -32,7 +33,7 @@ class ReminderItem(BaseModel):
     dynamic_score: float | None = None
     due_date: datetime | None = None
     reminder_type: str
-    related_entity_id: str | None = None
+    related_entity_id: UUIDStr | None = None
 
 
 class DailyReminderResponse(BaseModel):
@@ -48,13 +49,13 @@ class ReminderActionRequest(BaseModel):
 
 
 class ReminderActionResponse(BaseModel):
-    todo_id: str
+    todo_id: UUIDStr
     action: str
     new_status: str
 
 
 class PreferenceResponse(BaseModel):
-    user_id: str
+    user_id: UUIDStr
     preferred_times: list[str]
     fatigue_threshold: int
     quiet_hours_start: str
@@ -295,7 +296,7 @@ async def get_preferences(
         )
 
     return PreferenceResponse(
-        user_id=pref.user_id,  # type: ignore[arg-type]
+        user_id=pref.user_id,
         preferred_times=pref.preferred_times or ["09:00", "20:00"],
         fatigue_threshold=pref.fatigue_threshold,
         quiet_hours_start=pref.quiet_hours_start.strftime("%H:%M") if pref.quiet_hours_start else "22:00",
@@ -350,7 +351,7 @@ async def update_preferences(
     await session.refresh(pref)
 
     return PreferenceResponse(
-        user_id=pref.user_id,  # type: ignore[arg-type]
+        user_id=pref.user_id,
         preferred_times=pref.preferred_times or ["09:00", "20:00"],
         fatigue_threshold=pref.fatigue_threshold,
         quiet_hours_start=pref.quiet_hours_start.strftime("%H:%M") if pref.quiet_hours_start else "22:00",

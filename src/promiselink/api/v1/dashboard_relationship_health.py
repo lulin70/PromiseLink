@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from promiselink.api.v1.schemas import UUIDStr
 from promiselink.core.auth import get_current_user_id
 from promiselink.core.logging import get_logger, new_request_id
 from promiselink.database import get_async_session
@@ -21,7 +22,7 @@ router = APIRouter(tags=["Dashboard"])
 
 
 class HealthItem(BaseModel):
-    entity_id: str
+    entity_id: UUIDStr
     name: str
     company: str | None = None
     stage: str
@@ -47,7 +48,7 @@ class RelationshipHealthResponse(BaseModel):
 
 
 class CareReminderItem(BaseModel):
-    entity_id: str
+    entity_id: UUIDStr
     name: str
     company: str | None = None
     concern_category: str = ""

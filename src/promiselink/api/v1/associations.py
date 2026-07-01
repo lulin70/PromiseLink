@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.api.dependencies import rate_limit_dependency
-from promiselink.api.v1.schemas import PaginatedResponse
+from promiselink.api.v1.schemas import PaginatedResponse, UUIDStr
 from promiselink.core.auth import get_current_user_id
 from promiselink.core.exceptions import NotFoundError
 from promiselink.core.logging import get_logger, new_request_id
@@ -25,10 +25,10 @@ router = APIRouter(dependencies=[Depends(rate_limit_dependency)])
 
 
 class AssociationResponse(BaseModel):
-    id: uuid.UUID | str
-    user_id: uuid.UUID | str
-    source_entity_id: uuid.UUID | str
-    target_entity_id: uuid.UUID | str
+    id: UUIDStr
+    user_id: UUIDStr
+    source_entity_id: UUIDStr
+    target_entity_id: UUIDStr
     association_type: str
     strength: float
     confidence: float

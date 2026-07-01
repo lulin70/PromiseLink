@@ -11,6 +11,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.api.dependencies import rate_limit_dependency
+from promiselink.api.v1.schemas import UUIDStr
 from promiselink.core.auth import get_current_user_id
 from promiselink.core.exceptions import NotFoundError, ValidationError
 from promiselink.core.logging import get_logger, new_request_id
@@ -23,15 +24,15 @@ logger = get_logger("promiselink.api.promises")
 
 
 class PromiseItem(BaseModel):
-    todo_id: str
-    entity_id: str | None = None
+    todo_id: UUIDStr
+    entity_id: UUIDStr | None = None
     entity_name: str | None = None
     action_type: str
     description: str | None = None
     due_date: datetime | None = None
     fulfillment_status: str
     confirmation_status: str | None = None
-    source_event_id: str | None = None
+    source_event_id: UUIDStr | None = None
     source_event_title: str | None = None
     source_event_date: str | None = None
     created_at: datetime | None = None
@@ -233,7 +234,7 @@ async def promise_stats(
 
 
 class NudgeDraftResponse(BaseModel):
-    todo_id: str
+    todo_id: UUIDStr
     nudge_text: str
     is_fallback: bool = False
 
