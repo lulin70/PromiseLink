@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { loginViaUi, waitForPageReady } from './helpers'
+import { loginViaUi, waitForPageReady, TOKEN_KEY } from './helpers'
 
 /**
  * 跨页面跳转测试：验证事件/人脉/待办详情间的关联导航。
@@ -8,6 +8,7 @@ import { loginViaUi, waitForPageReady } from './helpers'
  *   1. 事件详情 → 点击关联人脉（EntityLink .entity-link-card）→ 人脉详情页
  *   2. 人脉详情 → 点击关联事件（EventLink .event-link-card）→ 事件详情页
  *   3. 待办详情 → 点击来源事件（EventLink .event-link-card）→ 事件详情页
+ *   4. 人脉详情 → 点击关联待办（TodoLink .todo-link-card）→ 待办详情页
  *
  * 组件选择器（见 src/components/）：
  *   - EntityLink: .entity-link-card，点击 → navigateToEntityDetail → /pages/entities/detail
@@ -15,6 +16,11 @@ import { loginViaUi, waitForPageReady } from './helpers'
  *   - TodoLink:   .todo-link-card，点击 → navigateToTodoDetail    → /pages/todos/detail
  *
  * 前置：需登录 + 后端运行且有关联数据。无数据时相关用例 skip。
+ *
+ * 说明：事件详情页/人脉详情页的关联数据由后端 Pipeline 异步生成，
+ * 并非所有事件都有 related_entities。测试 1 通过 API 查找一个有
+ * related_entities 的事件，再通过 URL 直接访问其详情页，确保跳转
+ * 用例能在已有数据上稳定运行（而非依赖列表第一个事件是否有关联）。
  */
 test.describe('跨页面跳转 @navigation', () => {
   test.beforeEach(async ({ page }) => {
@@ -22,8 +28,8 @@ test.describe('跨页面跳转 @navigation', () => {
   })
 
   /**
-   * 辅助：从事件列表进入第一个事件详情页。
-   * 返回事件详情页是否成功打开。
+   * 辅助：从事件列表进入第一个事件详情页（旧路径，保留供调试用）。
+   * 当前测试 1 改用 findEventWithEntities + 直接访问 URL 的方式。
    */
   async function openFirstEventDetail(page: import('@playwright/test').Page): Promise<boolean> {
     await page.goto('/pages/events/index', { waitUntil: 'domcontentloaded' })
@@ -47,12 +53,44 @@ test.describe('跨页面跳转 @navigation', () => {
     return true
   }
 
+  /**
+   * 辅助：通过后端 API 查找第一个有 related_entities 的事件 ID。
+   * 在浏览器上下文中执行 fetch，自动携带 localStorage 中的 token。
+   * 返回事件 ID 或 null（无关联数据时）。
+   */
+  async function findEventWithEntities(page: import('@playwright/test').Page): Promise<string | null> {
+    return await page.evaluate(async (tokenKey) => {
+      const token = localStorage.getItem(tokenKey)
+      if (!token) return null
+      const resp = await fetch('/api/v1/events?limit=100', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!resp.ok) return null
+      const data = await resp.json()
+      const items = Array.isArray(data) ? data : data.items || []
+      // 优先找有 entities 字段的事件
+      for (const e of items) {
+        const ents = e.entities || []
+        if (Array.isArray(ents) && ents.length > 0) return e.id
+      }
+      return null
+    }, TOKEN_KEY)
+  }
+
   test('事件详情 → 点击关联人脉 → 人脉详情页', async ({ page }) => {
-    const opened = await openFirstEventDetail(page)
-    test.skip(!opened, '后端无事件数据或无法进入事件详情，跳过')
+    // 通过 API 找一个有 related_entities 的事件，确保跳转用例有数据支撑
+    const eventId = await findEventWithEntities(page)
+    test.skip(!eventId, '后端无带关联人脉的事件数据，跳过')
+
+    // 直接访问该事件详情页 URL（navigation.ts: /pages/events/detail?id=xxx）
+    await page.goto(`/pages/events/detail?id=${eventId}`, { waitUntil: 'domcontentloaded' })
+    await waitForPageReady(page, '.page-event-detail')
+    await expect(page.locator('.page-event-detail')).toBeVisible({ timeout: 10000 })
 
     // 事件详情页应有「关联人脉」分区，内含 EntityLink 卡片
     const entityLinks = page.locator('.entity-link-card')
+    // 等待详情页 related_entities 异步加载（详情页在 useEffect 中调用 getEventDetail）
+    await expect(entityLinks.first()).toBeVisible({ timeout: 8000 })
     const count = await entityLinks.count()
     test.skip(count === 0, '该事件无关联人脉，跳过跨页跳转用例')
 
@@ -76,14 +114,18 @@ test.describe('跨页面跳转 @navigation', () => {
 
     // 人脉列表点击会打开 modal；点击「查看完整详情」进入人脉详情页
     await entityCards.first().evaluate((el: HTMLElement) => el.click())
+    // 等待 modal 出现 + getEntityDetail 异步加载完成（handleEntityTap 是异步的）
     const viewDetailBtn = page.locator('.view-detail-btn').first()
+    await expect(viewDetailBtn).toBeVisible({ timeout: 8000 })
     test.skip((await viewDetailBtn.count()) === 0, '人脉 modal 无「查看完整详情」按钮，跳过')
     await viewDetailBtn.evaluate((el: HTMLElement) => el.click())
 
     await expect(page.locator('.page-entity-detail'), '应进入人脉详情页').toBeVisible({ timeout: 10000 })
 
     // 人脉详情页应有「相关事件」分区，内含 EventLink 卡片
+    // history API 异步加载，等待 EventLink 渲染
     const eventLinks = page.locator('.event-link-card')
+    await expect(eventLinks.first()).toBeVisible({ timeout: 10000 })
     const count = await eventLinks.count()
     test.skip(count === 0, '该人脉无关联事件，跳过跨页跳转用例')
 
@@ -132,12 +174,16 @@ test.describe('跨页面跳转 @navigation', () => {
 
     await entityCards.first().evaluate((el: HTMLElement) => el.click())
     const viewDetailBtn = page.locator('.view-detail-btn').first()
+    // 等待 modal 出现 + getEntityDetail 异步加载完成
+    await expect(viewDetailBtn).toBeVisible({ timeout: 8000 })
     test.skip((await viewDetailBtn.count()) === 0, '人脉 modal 无「查看完整详情」按钮，跳过')
     await viewDetailBtn.evaluate((el: HTMLElement) => el.click())
 
     await expect(page.locator('.page-entity-detail')).toBeVisible({ timeout: 10000 })
 
     const todoLinks = page.locator('.todo-link-card')
+    // 等待 history API 异步加载 TodoLink 渲染
+    await expect(todoLinks.first()).toBeVisible({ timeout: 10000 })
     const count = await todoLinks.count()
     test.skip(count === 0, '该人脉无关联待办，跳过跨页跳转用例')
 
