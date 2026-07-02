@@ -145,21 +145,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: promiselink
-          POSTGRES_PASSWORD: promiselink_test
-          POSTGRES_DB: promiselink_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
     steps:
       - uses: actions/checkout@v4
 
@@ -184,7 +169,7 @@ jobs:
 
       - name: Start PromiseLink backend
         env:
-          DATABASE_URL: postgresql+asyncpg://promiselink:promiselink_test@localhost:5432/promiselink_test
+          DATABASE_URL: sqlite:///./playwright_test.db
           TEST_MODE: "true"
           LLM_API_KEY: "test-key-for-ci"
           SECRET_KEY: "ci-test-secret-key-min-32-chars-long"
