@@ -696,26 +696,15 @@ async def step_todos_list(runner: TestRunner, r: StepResult) -> None:
         r.detail = "todos page not loaded"
         return
 
-    # 1) 状态筛选切换
+    # 1) action_type 维度 Tab 切换（2.2 改进后：5 维度单行 Tab）
     status_filters = {}
-    for label in ["待处理", "已完成", "已忽略", "全部"]:
+    for label in ["我的承诺", "等待回应", "跟进事项", "已完成", "全部"]:
         ok = await text_click(page, label, timeout=2500)
         status_filters[label] = ok
         await asyncio.sleep(SETTLE_DELAY)
 
-    # 切到"待处理"以便找到可操作的 todo
-    await text_click(page, "待处理", timeout=2500)
-    await asyncio.sleep(SETTLE_DELAY * 2)
-
-    # 2) 类型筛选切换
-    type_filters = {}
-    for label in ["关注", "跟进", "全部"]:
-        ok = await text_click(page, label, timeout=2000)
-        type_filters[label] = ok
-        await asyncio.sleep(SETTLE_DELAY)
-    # 回到"全部"类型
-    await text_click(page, "全部", timeout=2000)
-    await text_click(page, "待处理", timeout=2000)
+    # 切到"全部"以便找到可操作的 todo（"全部"显示所有非 completed 待办）
+    await text_click(page, "全部", timeout=2500)
     await asyncio.sleep(SETTLE_DELAY * 2)
 
     # 3) 待办操作：完成 / 忽略（注意：基础版 UI 没有"推迟"按钮）
