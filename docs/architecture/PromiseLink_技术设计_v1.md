@@ -2197,15 +2197,15 @@ Todo表新增字段：
 
 ```sql
 ALTER TABLE todos ADD COLUMN fulfillment_status VARCHAR(15) NOT NULL DEFAULT 'pending'
-    CHECK (fulfillment_status IN ('pending', 'fulfilled', 'overdue', 'broken'));
+    CHECK (fulfillment_status IN ('pending', 'fulfilled', 'overdue', 'expired'));
 ALTER TABLE todos ADD COLUMN fulfilled_at TIMESTAMP;
 ALTER TABLE todos ADD COLUMN overdue_notified_at TIMESTAMP;
 ```
 
 **fulfillment_status与Todo.status正交设计**：
 - `status`：任务执行状态（pending/in_progress/completed/cancelled/snoozed）
-- `fulfillment_status`：承诺兑现语义（pending/fulfilled/overdue/broken）
-- 两者独立变化：一个completed的Todo，其fulfillment_status可以是fulfilled或broken
+- `fulfillment_status`：承诺兑现语义（pending/fulfilled/overdue/expired）
+- 两者独立变化：一个completed的Todo，其fulfillment_status可以是fulfilled或expired
 
 #### 4.14.2 Pipeline变更
 

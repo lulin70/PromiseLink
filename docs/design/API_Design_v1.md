@@ -3095,7 +3095,7 @@ GDPR合规端点，支持数据查看、导出、删除。
   - `pending` — 待兑现
   - `fulfilled` — 已兑现
   - `overdue` — 已逾期
-  - `broken` — 已违约
+  - `expired` — 已失效
 - `page`: 页码（默认1）
 - `page_size`: 每页数量（默认20）
 
@@ -3122,7 +3122,7 @@ GDPR合规端点，支持数据查看、导出、删除。
 
 **安全约束**:
 - `user_id` 从JWT提取，结果按 `user_id` 过滤
-- `their-promises` 视角下的 `overdue`/`broken` 状态仅允许用户手动标记，AI不可自动标记
+- `their-promises` 视角下的 `overdue`/`expired` 状态仅允许用户手动标记，AI不可自动标记
 
 #### 3.24.2 PATCH /api/v1/todos/{todo_id}/fulfillment 📋 **定制版**
 
@@ -3141,7 +3141,7 @@ GDPR合规端点，支持数据查看、导出、删除。
 **fulfillment_status枚举值**:
 - `fulfilled` — 已兑现
 - `overdue` — 已逾期
-- `broken` — 已违约
+- `expired` — 已失效
 
 **Response 200**:
 ```json
@@ -3154,7 +3154,7 @@ GDPR合规端点，支持数据查看、导出、删除。
 
 **安全约束**:
 - `user_id` 从JWT提取，仅允许操作自己的Todo
-- `their_promise` 类型只允许 `pending` → `fulfilled` 的转换（用户确认对方已兑现），不允许AI自动标记 `overdue`/`broken`
+- `their_promise` 类型只允许 `pending` → `fulfilled` 的转换（用户确认对方已兑现），不允许AI自动标记 `overdue`/`expired`
 
 #### 3.24.3 GET /api/v1/promises/stats 📋 **定制版**
 
@@ -3168,13 +3168,13 @@ GDPR合规端点，支持数据查看、导出、删除。
     "pending": 5,
     "fulfilled": 8,
     "overdue": 2,
-    "broken": 0
+    "expired": 0
   },
   "their_promises": {
     "pending": 4,
     "fulfilled": 3,
     "overdue": 2,
-    "broken": 1
+    "expired": 1
   },
   "fulfillment_rate": 0.68
 }
@@ -4989,7 +4989,7 @@ X-Cache-Hit: true
 | **v2.9** | **2026-06-08** | **Media API + Privacy API (v2.9)：**<br/>**① 新增§3.22 Media API(PRD v4.8)**: POST /api/v1/media/asr(语音识别) + POST /api/v1/media/tts(文字转语音) + POST /api/v1/media/ocr(图片文字识别) + POST /api/v1/media/ocr-event(OCR+自动创建Event) + 安全约束(仅内存处理/不持久化/JWT认证/文件大小限制)<br/>**② 新增§3.23 Privacy API(GDPR合规)**: GET /api/v1/privacy/data-summary(数据统计摘要) + DELETE /api/v1/privacy/user-data(被遗忘权删除) + POST /api/v1/privacy/export(全量数据导出) |
 | **v2.10** | **2026-06-08** | **文档一致性修复与实现状态标注 (v2.10)：**<br/>**① D4 版本号格式统一**: 头部版本从"0.2.9"修正为"v2.10"，阶段标识从"0.2.x series"修正为"v2.x series"<br/>**② D1 API端点实现状态标注**: 为所有端点添加实现状态标签(✅已实现/📋定制版/⚠️路径差异)，每个API章节添加实现状态统计摘要<br/>**③ D5 认证部分更新**: 新增§2.0当前实现(PoC登录+微信登录)，原§2.1临时授权码模式标记为📋定制版规划，JWT Payload新增aud:"promiselink-api"声明<br/>**④ D6 Privacy API响应格式更新**: data-summary删除user_id字段、user-data响应改为deleted+各类型计数、export响应新增message字段 |
 | **v2.11** | **2026-06-09** | **托管PoC模式备注 (v2.11)：**<br/>**① §2.0.1 PoC登录新增备注**: 托管PoC模式下poc_secret由服务方管理，用户通过微信小程序登录<br/>**② §3.22.3 OCR端点新增备注**: 数字名片API对接预留端点在PoC阶段不启用，专业版再评估 |
-| **v3.0** | **2026-06-11** | **v3.0大版本升级 — Promise追踪 + 智能提醒 + 前端修复 (v3.0)：**<br/>**① 新增§3.24 Promise兑现状态追踪 API(F-68)**:<br/>　- GET /api/v1/promises — 承诺列表(view=my-promises\|their-promises, status=pending\|fulfilled\|overdue\|broken)<br/>　- PATCH /api/v1/todos/{todo_id}/fulfillment — 更新兑现状态(their_promise仅允许pending→fulfilled)<br/>　- GET /api/v1/promises/stats — 兑现统计(my_promises/their_promises分项+fulfillment_rate)<br/>**② 新增§3.25 智能跟进提醒 API(F-69)**:<br/>　- GET /api/v1/reminders/daily — 每日提醒(date, fatigue_remaining)<br/>　- POST /api/v1/reminders/{todo_id}/action — 提醒操作(completed/snoozed/dismissed)<br/>　- GET /api/v1/reminders/preferences — 提醒偏好查询<br/>　- PATCH /api/v1/reminders/preferences — 提醒偏好更新<br/>**③ 新增§3.26 F-67关系推进卡前端修复备注**: 已有端点无需变更，小程序需修正API路径 |
+| **v3.0** | **2026-06-11** | **v3.0大版本升级 — Promise追踪 + 智能提醒 + 前端修复 (v3.0)：**<br/>**① 新增§3.24 Promise兑现状态追踪 API(F-68)**:<br/>　- GET /api/v1/promises — 承诺列表(view=my-promises\|their-promises, status=pending\|fulfilled\|overdue\|expired)<br/>　- PATCH /api/v1/todos/{todo_id}/fulfillment — 更新兑现状态(their_promise仅允许pending→fulfilled)<br/>　- GET /api/v1/promises/stats — 兑现统计(my_promises/their_promises分项+fulfillment_rate)<br/>**② 新增§3.25 智能跟进提醒 API(F-69)**:<br/>　- GET /api/v1/reminders/daily — 每日提醒(date, fatigue_remaining)<br/>　- POST /api/v1/reminders/{todo_id}/action — 提醒操作(completed/snoozed/dismissed)<br/>　- GET /api/v1/reminders/preferences — 提醒偏好查询<br/>　- PATCH /api/v1/reminders/preferences — 提醒偏好更新<br/>**③ 新增§3.26 F-67关系推进卡前端修复备注**: 已有端点无需变更，小程序需修正API路径 |
 
 ---
 

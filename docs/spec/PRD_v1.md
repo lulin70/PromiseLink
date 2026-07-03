@@ -2367,7 +2367,7 @@ IAMHERE名片JSON ──→  Event标准化管道 ──→  实体归一引擎 
 | promise\_type        | enum     | 是  | my\_promise / their\_promise — 承诺方向（我答应 / 对方答应，对应 Todo.action\_type） |
 | content              | text     | 是  | 承诺内容（对应 Todo.title）                                  |
 | due\_date            | ISO 8601 | 否  | 截止日期（对应 Todo.due\_date）                              |
-| status               | enum     | 是  | pending / fulfilled / broken / dismissed — 承诺状态（broken 映射 Todo.fulfillment\_status='broken'） |
+| status               | enum     | 是  | pending / fulfilled / expired / dismissed — 承诺状态（expired 映射 Todo.fulfillment\_status='expired'） |
 | confirmation\_status | enum     | 否  | pending / confirmed / rejected — 用户确认状态（对应 Todo.confirmation\_status） |
 | action\_type         | string   | 否  | AI识别的动作类型：my\_promise（我答应）/ their\_promise（对方答应）（对应 Todo.action\_type） |
 | evidence\_quote      | text     | 否  | 原文引用（对应 Todo.evidence\_quote）                        |
@@ -2378,8 +2378,8 @@ IAMHERE名片JSON ──→  Event标准化管道 ──→  实体归一引擎 
 **Promise 与 Todo 的关系**：
 
 - **物理存储**：Promise 不单独建表，复用 `todos` 表。当 `todos.todo_type='promise'` 时，该记录即一条承诺。
-- **履约跟踪字段**：复用 Todo 的 `action_type`（承诺方向）、`promisor_id`（承诺人）、`beneficiary_id`（受益人）、`confirmation_status`（确认状态）、`evidence_quote`（原文引用）、`fulfillment_status`（履约状态：pending/fulfilled/overdue/broken）、`fulfilled_at`（兑现时间）。
-- **状态映射**：Promise 的 `status` 是 Todo.status 的语义子集——`pending`（待兑现）→ Todo.status='pending'；`fulfilled`（已兑现）→ Todo.status='done' + `fulfillment_status='fulfilled'`；`broken`（已违约）→ `fulfillment_status='broken'`；`dismissed`（已忽略）→ Todo.status='dismissed'。
+- **履约跟踪字段**：复用 Todo 的 `action_type`（承诺方向）、`promisor_id`（承诺人）、`beneficiary_id`（受益人）、`confirmation_status`（确认状态）、`evidence_quote`（原文引用）、`fulfillment_status`（履约状态：pending/fulfilled/overdue/expired）、`fulfilled_at`（兑现时间）。
+- **状态映射**：Promise 的 `status` 是 Todo.status 的语义子集——`pending`（待兑现）→ Todo.status='pending'；`fulfilled`（已兑现）→ Todo.status='done' + `fulfillment_status='fulfilled'`；`expired`（已失效）→ `fulfillment_status='expired'`；`dismissed`（已忽略）→ Todo.status='dismissed'。
 - **详见**：§5.18.4 确认提交流程、F-45 Promise双向动作模型、F-68 Promise兑现状态追踪。
 
 ***

@@ -183,7 +183,7 @@ async def get_day_view(
 
     # ── Fetch todos due on target date ──
     # Todos with due_date falling on target_date (compare as dates, not datetimes)
-    # Exclude fulfilled/broken promises (they're tracked in promises page)
+    # Exclude fulfilled/expired promises (they're tracked in promises page)
     todo_result = await session.execute(
         select(Todo)
         .where(Todo.user_id == user_id)
@@ -192,7 +192,7 @@ async def get_day_view(
         .where(
             or_(
                 Todo.todo_type != "promise",
-                Todo.fulfillment_status.notin_(["fulfilled", "broken"]),
+                Todo.fulfillment_status.notin_(["fulfilled", "expired"]),
             )
         )
         .order_by(Todo.due_date.asc(), Todo.priority.asc())
@@ -208,7 +208,7 @@ async def get_day_view(
         .where(
             or_(
                 Todo.todo_type != "promise",
-                Todo.fulfillment_status.notin_(["fulfilled", "broken"]),
+                Todo.fulfillment_status.notin_(["fulfilled", "expired"]),
             )
         )
         .where(

@@ -12,14 +12,14 @@ const STATUS_LABELS: Record<string, string> = {
   pending: '待兑现',
   fulfilled: '已兑现',
   overdue: '已逾期',
-  broken: '已违背',
+  expired: '已失效',
 }
 
 const STATUS_COLORS: Record<string, string> = {
   pending: '#C4C0A0',
   fulfilled: '#A0C4A8',
   overdue: '#C4A7A0',
-  broken: '#8c8c8c',
+  expired: '#8c8c8c',
 }
 
 export default function PromiseDetailPage() {
@@ -176,9 +176,9 @@ export default function PromiseDetailPage() {
             <View className='action-bar'>
               <View
                 className={`action-btn danger ${actionLoading ? 'disabled' : ''}`}
-                onClick={() => !actionLoading && handleStatusChange('broken')}
+                onClick={() => !actionLoading && handleStatusChange('expired')}
               >
-                <Text>已违背</Text>
+                <Text>已失效</Text>
               </View>
               <View
                 className={`action-btn primary ${actionLoading ? 'disabled' : ''}`}
@@ -189,7 +189,7 @@ export default function PromiseDetailPage() {
             </View>
           )}
 
-          {(fulfillmentStatus === 'fulfilled' || fulfillmentStatus === 'broken') && (
+          {(fulfillmentStatus === 'fulfilled' || fulfillmentStatus === 'expired') && (
             <View className='action-bar'>
               <View
                 className={`action-btn secondary ${actionLoading ? 'disabled' : ''}`}

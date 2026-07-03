@@ -1,0 +1,46 @@
+// ============================================
+// PromiseLink 基础版主题配色变量 — 莫兰迪色系
+// 与小程序版 (PromiseLink-miniapp/src/styles/theme.scss) 保持一致
+// 适配宽屏 H5（≥1024px），单位使用 px
+// ============================================
+
+// 品牌主题色：雾蓝（与 Todo care 类型一致）
+$color-primary: #A0B0C4;
+$color-primary-light: #B8C8D8;
+$color-primary-dark: #8A9AB0;
+
+// Todo 类型色（莫兰迪色系）
+$color-todo-promise: #A0C4A8; // 雾绿 - 承诺
+$color-todo-help: #B0A0C4;    // 雾紫 - 帮助
+$color-todo-care: #A0B0C4;    // 雾蓝 - 关注
+$color-todo-followup: #C4C0A0; // 雾金 - 跟进
+$color-todo-cooperation: #B8C4C0; // 雾白 - 合作信号
+$color-todo-risk: #C4A7A0;    // 烟粉 - 风险
+
+// 优先级分数色（与 Todo 类型色系协调，仅用色点+数字，不抢标签底色）
+$color-priority-urgent: #C4A7A0;   // 烟粉 - 紧急（≥85）
+$color-priority-important: #C4C0A0; // 雾金 - 重要（60-84）
+$color-priority-normal: #A0B0C4;    // 雾蓝 - 一般（40-59）
+$color-priority-low: #A0C4A8;       // 雾绿 - 低优（<40）
+
+// 功能色
+$color-success: #A0C4A8;
+$color-warning: #C4C0A0;
+$color-error: #C4A0A0;
+$color-info: #A0B0C4;
+
+// 背景色
+$color-bg-page: #F5F3F0;
+$color-bg-card: #FFFFFF;
+$color-bg-hover: #F0EDEA;
+
+// 文本色
+$color-text-primary: #2C3E50;
+$color-text-secondary: #5D6D7E;
+$color-text-tertiary: #95A5A6;
+$color-text-disabled: #BDC3C7;
+$color-text-white: #FFFFFF;
+
+// 边框色
+$color-border: #E8E4E0;
+$color-divider: #F0EDEA;

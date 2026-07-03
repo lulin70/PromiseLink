@@ -47,13 +47,13 @@ class PromiseListResponse(BaseModel):
 
 class PromiseStatsResponse(BaseModel):
     total: int
-    my_promises: dict[str, int]  # {pending, fulfilled, overdue, broken}
+    my_promises: dict[str, int]  # {pending, fulfilled, overdue, expired}
     their_promises: dict[str, int]
     fulfillment_rate: float
 
 
 class FulfillmentUpdateRequest(BaseModel):
-    fulfillment_status: str  # "fulfilled" | "overdue" | "broken"
+    fulfillment_status: str  # "fulfilled" | "overdue" | "expired"
 
 
 @router.get("", response_model=PromiseListResponse)
@@ -156,20 +156,20 @@ async def update_fulfillment(
     """Update fulfillment status of a promise.
 
     Security: their_promise type only allows pending->fulfilled (user confirms).
-    AI cannot auto-mark their_promise as overdue/broken.
+    AI cannot auto-mark their_promise as overdue/expired.
     """
     new_request_id()
 
-    if req.fulfillment_status not in ("fulfilled", "overdue", "broken", "pending"):
-        raise ValidationError("Invalid fulfillment_status. Must be fulfilled/overdue/broken/pending")
+    if req.fulfillment_status not in ("fulfilled", "overdue", "expired", "pending"):
+        raise ValidationError("Invalid fulfillment_status. Must be fulfilled/overdue/expired/pending")
 
     q = select(Todo).where(Todo.id == str(todo_id), Todo.user_id == user_id)
     todo = (await session.execute(q)).scalar_one_or_none()
     if not todo:
         raise NotFoundError("Todo not found")
 
-    # Security constraint: their_promise cannot be auto-marked overdue/broken
-    if todo.action_type == "their_promise" and req.fulfillment_status in ("overdue", "broken"):
+    # Security constraint: their_promise cannot be auto-marked overdue/expired
+    if todo.action_type == "their_promise" and req.fulfillment_status in ("overdue", "expired"):
         # Allow user to manually mark, but log it
         logger.info(
             "their_promise_manual_mark",
@@ -206,7 +206,7 @@ async def promise_stats(
         .group_by(Todo.fulfillment_status)
     )
     my_results = (await session.execute(my_q)).all()
-    my_promises = {"pending": 0, "fulfilled": 0, "overdue": 0, "broken": 0}
+    my_promises = {"pending": 0, "fulfilled": 0, "overdue": 0, "expired": 0}
     for status_val, count in my_results:
         my_promises[status_val or "pending"] = count
 
@@ -217,7 +217,7 @@ async def promise_stats(
         .group_by(Todo.fulfillment_status)
     )
     their_results = (await session.execute(their_q)).all()
-    their_promises = {"pending": 0, "fulfilled": 0, "overdue": 0, "broken": 0}
+    their_promises = {"pending": 0, "fulfilled": 0, "overdue": 0, "expired": 0}
     for status_val, count in their_results:
         their_promises[status_val or "pending"] = count
 

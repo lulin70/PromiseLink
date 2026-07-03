@@ -173,7 +173,7 @@ class Todo(Base):
             name="priority_source_check",
         ),
         CheckConstraint(
-            "fulfillment_status IN ('pending', 'fulfilled', 'overdue', 'broken')",
+            "fulfillment_status IN ('pending', 'fulfilled', 'overdue', 'expired')",
             name="fulfillment_status_check",
         ),
     )

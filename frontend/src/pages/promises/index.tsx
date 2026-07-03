@@ -16,21 +16,21 @@ const STATUS_FILTERS = [
   { value: 'pending', label: '待兑现' },
   { value: 'fulfilled', label: '已兑现' },
   { value: 'overdue', label: '已逾期' },
-  { value: 'broken', label: '已违背' },
+  { value: 'expired', label: '已失效' },
 ]
 
 const STATUS_COLORS: Record<string, string> = {
   pending: '#C4C0A0',
   fulfilled: '#A0C4A8',
   overdue: '#C4A7A0',
-  broken: '#8c8c8c',
+  expired: '#8c8c8c',
 }
 
 const STATUS_LABELS: Record<string, string> = {
   pending: '待兑现',
   fulfilled: '已兑现',
   overdue: '已逾期',
-  broken: '已违背',
+  expired: '已失效',
 }
 
 export default function PromisesPage() {
@@ -188,8 +188,8 @@ export default function PromisesPage() {
       <View className='view-tabs'>
         {VIEW_TABS.map((tab, idx) => {
           const count = idx === 0
-            ? (stats?.my_promises.pending || 0) + (stats?.my_promises.fulfilled || 0) + (stats?.my_promises.overdue || 0) + (stats?.my_promises.broken || 0)
-            : (stats?.their_promises.pending || 0) + (stats?.their_promises.fulfilled || 0) + (stats?.their_promises.overdue || 0) + (stats?.their_promises.broken || 0)
+            ? (stats?.my_promises.pending || 0) + (stats?.my_promises.fulfilled || 0) + (stats?.my_promises.overdue || 0) + (stats?.my_promises.expired || 0)
+            : (stats?.their_promises.pending || 0) + (stats?.their_promises.fulfilled || 0) + (stats?.their_promises.overdue || 0) + (stats?.their_promises.expired || 0)
           return (
             <View
               key={tab.value}
@@ -329,10 +329,10 @@ export default function PromisesPage() {
                     e.stopPropagation()
                     updatePromiseStatus(promise.todo_id, 'fulfilled').then(() => loadData())
                   }}>已兑现</Text>
-                  <Text className='action-btn broken-btn' onClick={(e) => {
+                  <Text className='action-btn expired-btn' onClick={(e) => {
                     e.stopPropagation()
-                    updatePromiseStatus(promise.todo_id, 'broken').then(() => loadData())
-                  }}>已违背</Text>
+                    updatePromiseStatus(promise.todo_id, 'expired').then(() => loadData())
+                  }}>已失效</Text>
                 </View>
               )}
               {promise.fulfillment_status === 'overdue' && (
@@ -341,13 +341,13 @@ export default function PromisesPage() {
                     e.stopPropagation()
                     updatePromiseStatus(promise.todo_id, 'fulfilled').then(() => loadData())
                   }}>已兑现</Text>
-                  <Text className='action-btn broken-btn' onClick={(e) => {
+                  <Text className='action-btn expired-btn' onClick={(e) => {
                     e.stopPropagation()
-                    updatePromiseStatus(promise.todo_id, 'broken').then(() => loadData())
-                  }}>已违背</Text>
+                    updatePromiseStatus(promise.todo_id, 'expired').then(() => loadData())
+                  }}>已失效</Text>
                 </View>
               )}
-              {(promise.fulfillment_status === 'fulfilled' || promise.fulfillment_status === 'broken') && (
+              {(promise.fulfillment_status === 'fulfilled' || promise.fulfillment_status === 'expired') && (
                 <View className='promise-action-btns'>
                   <Text className='action-btn revert-btn' onClick={(e) => {
                     e.stopPropagation()

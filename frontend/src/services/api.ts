@@ -361,6 +361,7 @@ export interface TodoResponse {
   created_at?: string
   action_type?: string
   fulfillment_status?: string
+  dynamic_score?: number
 }
 
 export async function getTodos(

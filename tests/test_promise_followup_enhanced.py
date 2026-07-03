@@ -4,7 +4,7 @@ Covers 10 prioritized gaps (5 high + 5 medium) for the promise follow-up feature
   G3-01: nudge-draft endpoint (their_promise draft, my_promise 400, cache hit, fallback)
   G3-02: their_promise fulfillment lifecycle (pending→fulfilled, list query)
   G3-03: overdue status (PATCH overdue, overdue_notified_at field)
-  G3-04: broken status (PATCH broken)
+  G3-04: expired status (PATCH expired)
   G3-05: security constraint (their_promise manual mark vs AI auto-mark)
   G3-06: pending reset (fulfilled_at cleared on pending)
   G3-07: fulfilled_at field validation (fulfilled sets fulfilled_at)
@@ -517,21 +517,21 @@ class TestG303OverdueStatus:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# G3-04: broken status tests
+# G3-04: expired status tests
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-class TestG304BrokenStatus:
-    """G3-04: PATCH fulfillment_status=broken."""
+class TestG304ExpiredStatus:
+    """G3-04: PATCH fulfillment_status=expired."""
 
     @pytest.mark.asyncio
-    async def test_fulfillment_status_broken(
+    async def test_fulfillment_status_expired(
         self, client: AsyncClient, db_session: AsyncSession
     ):
-        """Verify: my_promise可标记为broken.
+        """Verify: my_promise可标记为expired.
 
-        Scenario: PATCH /promises/{id}/fulfillment fulfillment_status=broken
-        Expected: 200响应，状态变为broken
+        Scenario: PATCH /promises/{id}/fulfillment fulfillment_status=expired
+        Expected: 200响应，状态变为expired
         """
         todo = await insert_promise_todo(
             db_session,
@@ -543,23 +543,23 @@ class TestG304BrokenStatus:
 
         resp = await client.patch(
             f"{API_PREFIX}/promises/{todo.id}/fulfillment",
-            json={"fulfillment_status": "broken"},
+            json={"fulfillment_status": "expired"},
         )
 
         assert resp.status_code == 200
-        assert resp.json()["fulfillment_status"] == "broken"
+        assert resp.json()["fulfillment_status"] == "expired"
 
         db_todo = await get_todo_from_db(db_session, str(todo.id))
-        assert db_todo.fulfillment_status == "broken"
+        assert db_todo.fulfillment_status == "expired"
 
     @pytest.mark.asyncio
-    async def test_broken_does_not_set_fulfilled_at(
+    async def test_expired_does_not_set_fulfilled_at(
         self, client: AsyncClient, db_session: AsyncSession
     ):
-        """Verify: 标记broken时fulfilled_at保持None.
+        """Verify: 标记expired时fulfilled_at保持None.
 
-        Scenario: PATCH fulfillment_status=broken
-        Expected: fulfilled_at为None（broken不是兑现）
+        Scenario: PATCH fulfillment_status=expired
+        Expected: fulfilled_at为None（expired不是兑现）
         """
         todo = await insert_promise_todo(
             db_session,
@@ -571,7 +571,7 @@ class TestG304BrokenStatus:
 
         resp = await client.patch(
             f"{API_PREFIX}/promises/{todo.id}/fulfillment",
-            json={"fulfillment_status": "broken"},
+            json={"fulfillment_status": "expired"},
         )
         assert resp.status_code == 200
 
@@ -585,7 +585,7 @@ class TestG304BrokenStatus:
 
 
 class TestG305SecurityConstraint:
-    """G3-05: their_promise安全约束（仅用户手动可标记overdue/broken）."""
+    """G3-05: their_promise安全约束（仅用户手动可标记overdue/expired）."""
 
     @pytest.mark.asyncio
     async def test_their_promise_user_can_mark_overdue(
@@ -614,12 +614,12 @@ class TestG305SecurityConstraint:
         assert resp.json()["fulfillment_status"] == "overdue"
 
     @pytest.mark.asyncio
-    async def test_their_promise_user_can_mark_broken(
+    async def test_their_promise_user_can_mark_expired(
         self, client: AsyncClient, db_session: AsyncSession
     ):
-        """Verify: 用户通过API可手动标记their_promise为broken.
+        """Verify: 用户通过API可手动标记their_promise为expired.
 
-        Scenario: PATCH /promises/{id}/fulfillment 对their_promise设置broken
+        Scenario: PATCH /promises/{id}/fulfillment 对their_promise设置expired
         Expected: 200响应（用户手动操作被允许）
         """
         todo = await insert_promise_todo(
@@ -632,11 +632,11 @@ class TestG305SecurityConstraint:
 
         resp = await client.patch(
             f"{API_PREFIX}/promises/{todo.id}/fulfillment",
-            json={"fulfillment_status": "broken"},
+            json={"fulfillment_status": "expired"},
         )
 
         assert resp.status_code == 200
-        assert resp.json()["fulfillment_status"] == "broken"
+        assert resp.json()["fulfillment_status"] == "expired"
 
     @pytest.mark.asyncio
     async def test_their_promise_user_can_mark_fulfilled(
@@ -904,7 +904,7 @@ class TestG309TheirPromisesStats:
         """Verify: /promises/stats返回their_promises字典正确计数.
 
         Scenario: 创建2个their_promise（1 pending, 1 fulfilled），查询stats
-        Expected: their_promises={pending:1, fulfilled:1, overdue:0, broken:0}
+        Expected: their_promises={pending:1, fulfilled:1, overdue:0, expired:0}
         """
         await insert_promise_todo(
             db_session,
@@ -931,7 +931,7 @@ class TestG309TheirPromisesStats:
         assert their["pending"] == 1
         assert their["fulfilled"] == 1
         assert their["overdue"] == 0
-        assert their["broken"] == 0
+        assert their["expired"] == 0
 
     @pytest.mark.asyncio
     async def test_stats_my_and_their_separate(
@@ -1223,8 +1223,8 @@ class TestFulfillmentBoundaryCases:
         assert data["total"] == 0
         assert data["fulfillment_rate"] == 0.0
         assert data["my_promises"] == {
-            "pending": 0, "fulfilled": 0, "overdue": 0, "broken": 0
+            "pending": 0, "fulfilled": 0, "overdue": 0, "expired": 0
         }
         assert data["their_promises"] == {
-            "pending": 0, "fulfilled": 0, "overdue": 0, "broken": 0
+            "pending": 0, "fulfilled": 0, "overdue": 0, "expired": 0
         }

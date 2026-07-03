@@ -631,7 +631,7 @@ ALTER TABLE todos ADD CONSTRAINT check_score_timestamp_valid
 **CHECK约束（v2.9新增, F-68）**:
 ```sql
 ALTER TABLE todos ADD COLUMN fulfillment_status VARCHAR(20) DEFAULT 'pending'
-  CHECK (fulfillment_status IN ('pending', 'fulfilled', 'overdue', 'broken'));
+  CHECK (fulfillment_status IN ('pending', 'fulfilled', 'overdue', 'expired'));
 ALTER TABLE todos ADD COLUMN fulfilled_at TIMESTAMP;
 ALTER TABLE todos ADD COLUMN overdue_notified_at TIMESTAMP;
 -- 注意：due_date字段已存在，无需新增
@@ -639,7 +639,7 @@ ALTER TABLE todos ADD COLUMN overdue_notified_at TIMESTAMP;
 
 **fulfillment_status与status正交说明（F-68, v2.9新增）**:
 - **status**: 任务执行状态(pending/in_progress/done/dismissed/snoozed)
-- **fulfillment_status**: 承诺兑现语义(pending/fulfilled/overdue/broken)
+- **fulfillment_status**: 承诺兑现语义(pending/fulfilled/overdue/expired)
 - 仅action_type为promise/their_promise的Todo有fulfillment_status语义
 
 **action_type枚举说明（F-45，v2.0新增）**:
@@ -2195,7 +2195,7 @@ CREATE INDEX idx_vec_cosine ON vector_embeddings
 | **v2.6** | **2026-06-06** | **F-55/F-56 评分审计扩展：①score_audit_logs.calculation_factors JSONB结构扩展，新增dependency_score/context_score/dependency_raw/context_raw字段，用于审计依赖性全图谱路径分析(F-55)和场景匹配Event表驱动(F-56)的计算因子②todos表确认已有dynamic_score/score_calculated_at/completed_rank字段（F-51/F-52已加），无需新增DDL变更③Phase1启用四维模型后审计日志将完整记录四维得分及原始计算因子** |
 | **v2.7** | **2026-06-06** | **F-57/F-58 语义搜索与关联发现增强：①新增vector_embeddings表（8字段+2索引+唯一约束，target_type枚举entity/event，embedding BLOB存储API模式768维/本地降级384维float32向量，source_text用于缓存校验，user_id数据隔离）②新增vec_entities虚拟表（sqlite-vec vec0扩展，embedding float[384]（PoC本地模型），可选创建，不可用时Python余弦降级）③Phase2迁移DDL（PostgreSQL+pgvector，vector(768)列类型+IVFFlat索引）** |
 | **v2.8** | **2026-06-07** | **F-08/F-21/F-36/F-39/EmailAdapter/WeChatForwardAdapter 数据库变更：①events表event_type枚举扩展新增'email'和'wechat_forward'（无需DDL变更，VARCHAR(20)足够）②events表source枚举扩展新增'csv_import'/'email'/'wechat_forward'（无需DDL变更）③todos表properties JSONB新增resource_overuse子类型结构（risk_type/target_entity_id/request_count/window_days/severity，无需DDL变更）④ER图EVENTS节点event_type注释更新** |
-| **v2.9** | **2026-06-11** | **F-68/F-69 承诺兑现追踪与智能提醒引擎：①todos表新增3字段：fulfillment_status(承诺兑现状态pending/fulfilled/overdue/broken, CHECK约束)、fulfilled_at(兑现时间)、overdue_notified_at(逾期通知时间)（F-68）②fulfillment_status与status正交说明：status为任务执行状态，fulfillment_status为承诺兑现语义，仅action_type为promise/their_promise的Todo有fulfillment_status语义（F-68）③新增reminder_preferences提醒偏好表（6字段，user_id主键，preferred_times JSONB偏好时间列表，fatigue_threshold疲劳阈值，quiet_hours免打扰时段）（F-69）④新增reminder_logs提醒日志表（7字段+1索引，reminder_type枚举4值promise_due/followup/stage_suggestion/dormant_contact，action_taken枚举4值completed/snoozed/dismissed/ignored，response_latency_seconds响应延迟）（F-69）⑤ER图新增REMINDER_PREFERENCES/REMINDER_LOGS节点及关系线⑥score_audit_logs表新增score_version字段（VARCHAR(20)，评分模型版本poc_v1/phase1_v1）⑦新增calculated_by字段（VARCHAR(50)，计算器标识PriorityScorer/PriorityScorerV2）⑧triggered_by枚举新增scorer_update值⑨主键改为INTEGER AUTOINCREMENT（SQLite兼容）⑩标记实现状态为已实现** |
+| **v2.9** | **2026-06-11** | **F-68/F-69 承诺兑现追踪与智能提醒引擎：①todos表新增3字段：fulfillment_status(承诺兑现状态pending/fulfilled/overdue/expired, CHECK约束)、fulfilled_at(兑现时间)、overdue_notified_at(逾期通知时间)（F-68）②fulfillment_status与status正交说明：status为任务执行状态，fulfillment_status为承诺兑现语义，仅action_type为promise/their_promise的Todo有fulfillment_status语义（F-68）③新增reminder_preferences提醒偏好表（6字段，user_id主键，preferred_times JSONB偏好时间列表，fatigue_threshold疲劳阈值，quiet_hours免打扰时段）（F-69）④新增reminder_logs提醒日志表（7字段+1索引，reminder_type枚举4值promise_due/followup/stage_suggestion/dormant_contact，action_taken枚举4值completed/snoozed/dismissed/ignored，response_latency_seconds响应延迟）（F-69）⑤ER图新增REMINDER_PREFERENCES/REMINDER_LOGS节点及关系线⑥score_audit_logs表新增score_version字段（VARCHAR(20)，评分模型版本poc_v1/phase1_v1）⑦新增calculated_by字段（VARCHAR(50)，计算器标识PriorityScorer/PriorityScorerV2）⑧triggered_by枚举新增scorer_update值⑨主键改为INTEGER AUTOINCREMENT（SQLite兼容）⑩标记实现状态为已实现** |
 | **v3.0** | **2026-06-11** | **三级产品模型重构：①数据库策略重构为三级产品模型（基础版SQLite/专业版SQLite+网关中继/定制版PG+Redis）②Phase1→专业版、Phase2→定制版全量术语替换③新增relay_connections网关中继连接表（6字段+3索引，专业版使用，WebSocket连接管理+心跳检测）④新增ai_usage_logs AI用量日志表（6字段+2索引，专业版/定制版使用，10种action_type枚举，token消耗+成本记录）⑤ER图新增RELAY_CONNECTIONS/AI_USAGE_LOGS节点及关系线⑥resource/demand字段标注从Phase2更新为定制版⑦SQLite确认为基础版+专业版长期方案，PG/Redis仅定制版** |
 | v2.1 | TBD | 添加用户反馈表 |
 

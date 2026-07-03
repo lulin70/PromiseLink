@@ -1,0 +1,157 @@
+// 必须转发和使用 theme.scss
+@forward './theme.scss';
+@use './theme.scss' as *;
+
+// ============================================
+// PromiseLink 基础版全局 SCSS 变量
+// 与小程序版 (PromiseLink-miniapp/src/styles/variables.scss) 对齐
+// 适配宽屏 H5（≥1024px），rpx → px 转换（1rpx ≈ 0.5px，PC 上取整为 8px 网格）
+// ============================================
+
+// 页面布局（宽屏 PC）
+$page-padding: 24px;        // 页面左右安全边距
+$page-spacing: 24px;
+$max-content-width: 1200px; // 内容最大宽度（居中布局）
+$sidebar-width: 240px;      // 左侧导航栏宽度
+$detail-panel-width: 360px; // 右侧详情面板宽度（三栏布局）
+
+// 响应式断点（PC 宽屏专用）
+$breakpoint-tablet: 768px;     // 平板（基础版不优先支持，但需降级处理）
+$breakpoint-two-column: 1024px; // 两栏布局触发点
+$breakpoint-three-column: 1440px; // 三栏布局触发点
+$breakpoint-wide: 1920px;      // 超宽屏
+
+// 间距（8px 网格系统）
+$spacing-xs: 4px;
+$spacing-sm: 8px;
+$spacing-md: 12px;
+$spacing-lg: 16px;
+$spacing-xl: 24px;
+$spacing-xxl: 32px;
+
+// 圆角（语义化）
+$radius-xs: 2px;   // 小元素：标签、徽章
+$radius-sm: 4px;   // 卡片内小元素
+$radius-md: 6px;   // 常规卡片
+$radius-lg: 8px;   // 大卡片
+$radius-xl: 10px;  // 特大卡片
+$radius-button: 24px; // 按钮专用（全圆角）
+$radius-round: 999px; // 完全圆形
+
+// 按钮高度（PC 比移动端略小）
+$button-height-sm: 32px;  // 小按钮（次要操作）
+$button-height-md: 40px;  // 常规按钮
+$button-height-lg: 48px;  // 大按钮（主要操作、底部固定）
+
+// 阴影（语义化）
+$shadow-card: 0 1px 6px rgba(0, 0, 0, 0.08);
+$shadow-card-hover: 0 2px 10px rgba(0, 0, 0, 0.12);
+$shadow-float: 0 2px 8px rgba(0, 0, 0, 0.1);
+$shadow-popup: 0 4px 16px rgba(0, 0, 0, 0.15);
+
+// 字体大小（PC 适配）
+$font-size-xs: 12px;
+$font-size-sm: 13px;
+$font-size-md: 14px;
+$font-size-lg: 16px;
+$font-size-xl: 18px;
+$font-size-xxl: 20px;
+$font-size-title: 24px; // 页面标题专用
+
+// 字体栈（PC 优先）
+$font-family-base: -apple-system, BlinkMacSystemFont, 'PingFang SC',
+  'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+$font-family-mono: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+
+// 行高
+$line-height-tight: 1.3;
+$line-height-normal: 1.5;
+$line-height-loose: 1.8;
+
+// 字重
+$font-weight-normal: 400;
+$font-weight-medium: 500;
+$font-weight-semibold: 600;
+$font-weight-bold: 700;
+
+// 过渡动画
+$transition-fast: 0.15s ease;
+$transition-base: 0.25s ease;
+$transition-slow: 0.35s ease;
+
+// ============================================
+// 常用 Mixin
+// ============================================
+
+// 单行文本省略
+@mixin text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// 多行文本省略
+@mixin text-ellipsis-multi($lines: 2) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: $lines;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+// 清除浮动
+@mixin clearfix {
+  &::after {
+    content: '';
+    display: table;
+    clear: both;
+  }
+}
+
+// 水平垂直居中
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// Button 样式重置（H5 适配）
+@mixin button-reset {
+  padding: 0;
+  margin: 0;
+  line-height: normal;
+  text-align: inherit;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  cursor: pointer;
+  outline: none;
+  border: none;
+  background: transparent;
+}
+
+// 响应式断点 Mixin
+@mixin respond-to($breakpoint) {
+  @if $breakpoint == 'tablet' {
+    @media (min-width: $breakpoint-tablet) { @content; }
+  } @else if $breakpoint == 'two-column' {
+    @media (min-width: $breakpoint-two-column) { @content; }
+  } @else if $breakpoint == 'three-column' {
+    @media (min-width: $breakpoint-three-column) { @content; }
+  } @else if $breakpoint == 'wide' {
+    @media (min-width: $breakpoint-wide) { @content; }
+  }
+}
+
+// 骨架屏闪烁动画（供 4.2 骨架屏组件使用）
+@mixin skeleton-pulse {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.4; }
+  100% { opacity: 1; }
+}

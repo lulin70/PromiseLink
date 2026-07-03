@@ -15,14 +15,14 @@ const STATUS_LABELS: Record<string, string> = {
   pending: '待兑现',
   fulfilled: '已兑现',
   overdue: '已逾期',
-  broken: '已违背',
+  expired: '已失效',
 }
 
 const STATUS_COLORS: Record<string, string> = {
   pending: '#C4C0A0',
   fulfilled: '#A0C4A8',
   overdue: '#C4A7A0',
-  broken: '#8c8c8c',
+  expired: '#8c8c8c',
 }
 
 function formatDueDate(dueDate?: string): string {

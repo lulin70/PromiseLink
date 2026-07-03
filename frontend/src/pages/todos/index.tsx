@@ -6,20 +6,14 @@ import { navigateToEntity, navigateToEvent, navigateToTodoDetail } from '../../s
 import Taro from '@tarojs/taro'
 import './index.scss'
 
-const STATUS_TABS = [
+// action_type 维度 Tab（2.2 改进：用 followup_needed 替代提案的 my_followup）
+// 架构师审议：现有 action_type 枚举为 my_promise/their_promise/help_provided/care_expression/cooperation_signal/followup_needed
+const ACTION_TYPE_TABS = [
   { value: '', label: '全部' },
-  { value: 'pending', label: '待处理' },
+  { value: 'my_promise', label: '我的承诺' },
+  { value: 'their_promise', label: '等待回应' },
+  { value: 'followup_needed', label: '跟进事项' },
   { value: 'done', label: '已完成' },
-  { value: 'dismissed', label: '已忽略' },
-  { value: 'snoozed', label: '已推迟' },
-]
-
-const TYPE_TABS = [
-  { value: '', label: '全部' },
-  { value: 'care', label: '关注' },
-  { value: 'followup', label: '跟进' },
-  { value: 'cooperation_signal', label: '合作' },
-  { value: 'risk', label: '风险' },
 ]
 
 const TYPE_COLORS: Record<string, string> = {
@@ -28,6 +22,15 @@ const TYPE_COLORS: Record<string, string> = {
   cooperation_signal: '#B8C4C0',
   risk: '#C4A7A0',
   promise: '#A0C4A8',
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  care: '关注',
+  followup: '跟进',
+  cooperation_signal: '合作',
+  risk: '风险',
+  promise: '承诺',
+  help: '帮助',
 }
 
 const PRIORITY_MAP: Record<number, { label: string; color: string }> = {
@@ -41,7 +44,6 @@ const PRIORITY_MAP: Record<number, { label: string; color: string }> = {
 export default function TodosPage() {
   const [todos, setTodos] = useState<TodoResponse[]>([])
   const [activeTab, setActiveTab] = useState(0)
-  const [activeTypeTab, setActiveTypeTab] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   // Inline login state
@@ -61,7 +63,7 @@ export default function TodosPage() {
       loadTodos()
     }, 300)
     return () => clearTimeout(timer)
-  }, [activeTab, activeTypeTab, searchQuery])
+  }, [activeTab, searchQuery])
 
   async function handleInlineLogin() {
     if (!loginSecret.trim()) { setLoginError('请输入PoC密钥'); return }
@@ -100,11 +102,17 @@ export default function TodosPage() {
     try {
       setLoading(true)
       setError('')
-      const status = STATUS_TABS[activeTab].value || undefined
-      const todo_type = TYPE_TABS[activeTypeTab].value || undefined
-      const res = await getTodos(status, 50, 0, 'urgency', searchQuery || undefined, todo_type)
-      // "全部"标签下排除承诺类型（承诺有专门页面）
-      const filtered = todo_type ? res.items : res.items.filter(t => t.todo_type !== 'promise')
+      const tabValue = ACTION_TYPE_TABS[activeTab].value
+      // "已完成" Tab 用 status='done' 过滤；其余 Tab 取全部非完成态后前端按 action_type 过滤
+      const status = tabValue === 'done' ? 'done' : undefined
+      const res = await getTodos(status, 50, 0, 'urgency', searchQuery || undefined, undefined)
+      let filtered = res.items
+      if (tabValue && tabValue !== 'done') {
+        // action_type 前端过滤（API 暂不支持 action_type 参数）
+        filtered = res.items.filter(t => t.action_type === tabValue)
+      }
+      // 按动态优先级分数排序（高分在前）
+      filtered = [...filtered].sort((a, b) => (b.dynamic_score ?? 0) - (a.dynamic_score ?? 0))
       setTodos(filtered)
     } catch (err) {
       const msg = err instanceof Error ? err.message : '加载失败'
@@ -166,26 +174,13 @@ export default function TodosPage() {
         <Text className='header-title'>待办事项</Text>
       </View>
 
-      {/* Status Tabs */}
+      {/* action_type Tabs（2.2 改进：单行 5 维度） */}
       <View className='tabs'>
-        {STATUS_TABS.map((tab, idx) => (
+        {ACTION_TYPE_TABS.map((tab, idx) => (
           <View
             key={tab.value}
             className={`tab ${activeTab === idx ? 'active' : ''}`}
             onClick={() => setActiveTab(idx)}
-          >
-            <Text>{tab.label}</Text>
-          </View>
-        ))}
-      </View>
-
-      {/* Type Tabs */}
-      <View className='tabs type-tabs'>
-        {TYPE_TABS.map((tab, idx) => (
-          <View
-            key={tab.value}
-            className={`tab type-tab ${activeTypeTab === idx ? 'active' : ''}`}
-            onClick={() => setActiveTypeTab(idx)}
           >
             <Text>{tab.label}</Text>
           </View>
@@ -220,7 +215,7 @@ export default function TodosPage() {
                     <Text className='priority-text'>{pri.label}</Text>
                   </View>
                   <View className='type-badge' style={{ background: TYPE_COLORS[todo.todo_type] || '#ccc' }}>
-                    <Text className='type-badge-text'>{TYPE_TABS.find(t => t.value === todo.todo_type)?.label || todo.todo_type}</Text>
+                    <Text className='type-badge-text'>{TYPE_LABELS[todo.todo_type] || todo.todo_type}</Text>
                   </View>
                 </View>
                 <Text

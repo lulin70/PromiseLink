@@ -422,7 +422,7 @@ else:
     log_fail(f"对方承诺加载失败: {status}")
 
 # 状态筛选
-for status_filter in ["pending", "fulfilled", "overdue", "broken"]:
+for status_filter in ["pending", "fulfilled", "overdue", "expired"]:
     status, data = api_call("GET", f"/promises?status={status_filter}&limit=20")
     if status == 200:
         items = data.get("items", []) if isinstance(data, dict) else data

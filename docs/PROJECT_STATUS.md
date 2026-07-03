@@ -1,7 +1,7 @@
 # PromiseLink 项目生命周期状态总览
 
-> **更新时间**: 2026-07-03 (小程序 CI Playwright UI E2E 修复：62/62 测试 CI 通过)
-> **当前阶段**: 基础版 Staging 就绪；代码完成度100%，基础版1378测试收集/1353通过/45跳过/0失败，E2E 15/0通过，专业版339测试通过，小程序62 E2E+8单元=70测试通过（CI 全绿），tsc/mypy零错误
+> **更新时间**: 2026-07-03 (UI 整改 Batch 1 完成：4.1 轻量化 + 2.2 Todo action_type + 4.3 枚举统一 broken→expired)
+> **当前阶段**: 基础版 Staging 就绪；代码完成度100%，基础版1378测试收集/1353通过/45跳过/0失败，E2E 15/0通过，专业版339测试通过，小程序63 E2E+8单元=71测试通过（CI 全绿），tsc/mypy零错误；UI 整改 Batch 1 已完成（4.1+2.2+4.3），Batch 2 待推进
 > **产品定位**: AI驱动的个人商务关系经营助手
 > **产品层级**: 基础版(本地免费) / 专业版(网关中继) / 定制版(团队)
 > **负责人**: 林总 (CarryMem 团队)
@@ -784,6 +784,8 @@ PromiseLink/
 | 2026-06-09 | **安全检查8/8通过** | 安全审查全项验证通过 | 无P0/P1漏洞，PoC安全基线达标 |
 | 2026-06-09 | **名片扫描采用OCR+LLM方案** | PoC不对接IAMHERE，自建OCR+LLM名片解析链路 | F-61 OCR服务+LLM结构化提取，独立于第三方 |
 | 2026-07-03 | **小程序 CI Playwright UI E2E 根因修复** | Taro 4.1.9 DefinePlugin 在 Linux+Node20(CI) 下未替换 `process.env.TARO_APP_API_URL`，运行时 `process` 未定义导致 ReferenceError，app 崩溃白屏（本地 macOS+Node24 替换正常，掩盖问题） | 所有 `process.env` 引用加 `typeof process !== 'undefined'` 守卫；移除 `continue-on-error` 让 UI 失败真正阻塞 CI；62/62 测试 CI 全绿 |
+| 2026-07-03 | **UI 整改方案形成（DevSquad 7 角色共识）** | 外部 UI 改进提案（13 项改进 + 3 项共通问题，预估 9 天）经 DevSquad 7 角色并行审议 + ConsensusEngine 加权投票，重估工作量 13 天（提案偏低 44%） | 形成 [UI_Rectification_Plan_2026-07-03.md](./design/UI_Rectification_Plan_2026-07-03.md)：1.0 必需 6 项（6.25 天）+ 1.1 延后 7 项（6.75 天）；关键决策：1.2 全局搜索延后到 1.1、4.1/2.1/1.1/2.3 拆分执行、2.2 用 `followup_needed` 替代 `my_followup`、3.1 禁用 🔒 emoji 改 SVG 锁图标；6 批次分阶段实施，1.0 发布版本 v0.8.0，1.1 发布版本 v0.9.0 |
+| 2026-07-03 | **UI 整改 Batch 1 完成（4.1+2.2+4.3）** | 4.1 轻量化：新建基础版 `theme.scss`+`variables.scss`（莫兰迪色系+PC 适配）；2.2 Todo action_type：两端 Tab 改为 5 维度（全部/我的承诺/等待回应/跟进事项/已完成），用 `followup_needed` 替代提案的 `my_followup`；4.3 枚举统一：`broken`→`expired` 完整迁移（关键发现：小程序已用 `expired` 但后端只接受 `broken`，意味着小程序"已失效"按钮被 422 拒绝——4.3 修复了此 bug） | 新建 alembic 迁移 `k1f2a3b4c5d6`；后端 5 文件+前端 5 文件+E2E 2 文件+pytest 1 文件（25 处）+文档 4 文件全部更新；CSS 类名 `broken-btn`→`expired-btn`；文案"已违背"/"已违约"统一为"已失效"；1290 pytest + 63 E2E 全绿；TypeScript 零错误 |
 
 ---
 

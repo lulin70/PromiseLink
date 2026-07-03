@@ -72,7 +72,7 @@ async def get_morning_brief(
         .where(
             or_(
                 Todo.todo_type != "promise",
-                Todo.fulfillment_status.notin_(["fulfilled", "broken"]),
+                Todo.fulfillment_status.notin_(["fulfilled", "expired"]),
             )
         )
         .where(Todo.due_date.isnot(None))

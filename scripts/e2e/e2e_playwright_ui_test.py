@@ -815,7 +815,7 @@ async def step_promises_list(runner: TestRunner, r: StepResult) -> None:
 
     # 2) 状态筛选切换
     status_results = {}
-    for label in ["待兑现", "已兑现", "已违背", "全部"]:
+    for label in ["待兑现", "已兑现", "已失效", "全部"]:
         ok = await text_click(page, label, timeout=2500)
         status_results[label] = ok
         await asyncio.sleep(SETTLE_DELAY)
@@ -823,7 +823,7 @@ async def step_promises_list(runner: TestRunner, r: StepResult) -> None:
     await asyncio.sleep(SETTLE_DELAY)
 
     # 3) 承诺操作：确认 / 忽略（针对未确认承诺）
-    action_results = {"confirm": False, "ignore": False, "fulfill": False, "broken": False, "nudge": False}
+    action_results = {"confirm": False, "ignore": False, "fulfill": False, "expired": False, "nudge": False}
 
     # 找未确认承诺的"确认"按钮（native click）
     confirm_btn = await page.query_selector(".ai-confirm-btn.confirm-btn:has-text('确认'), .confirm-btn")
