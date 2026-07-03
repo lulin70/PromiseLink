@@ -1,7 +1,7 @@
 # PromiseLink 项目生命周期状态总览
 
-> **更新时间**: 2026-07-01 (Phase 1-3 Staging 修复完成：E2E/PromptInjection/CI-CD 硬约束)
-> **当前阶段**: 基础版 Staging 就绪；代码完成度100%，基础版1378测试收集/1353通过/45跳过/0失败，E2E 15/0通过，专业版339测试通过，小程序14测试通过，tsc/mypy零错误
+> **更新时间**: 2026-07-03 (小程序 CI Playwright UI E2E 修复：62/62 测试 CI 通过)
+> **当前阶段**: 基础版 Staging 就绪；代码完成度100%，基础版1378测试收集/1353通过/45跳过/0失败，E2E 15/0通过，专业版339测试通过，小程序62 E2E+8单元=70测试通过（CI 全绿），tsc/mypy零错误
 > **产品定位**: AI驱动的个人商务关系经营助手
 > **产品层级**: 基础版(本地免费) / 专业版(网关中继) / 定制版(团队)
 > **负责人**: 林总 (CarryMem 团队)
@@ -579,7 +579,7 @@ PromiseLink/
 | **F-66 安全修复** | ✅ 完成 | poc_secret登录+get_current_user_id+动态salt+poc_anonymous_access | Security_Design v2.9 |
 | **代码审查通过** | ✅ 完成 | P0-P3修复+CI收紧+tsc/mypy零错误 | DevSquad 7维度审查 |
 
-**P8 Gate 判定**: **✅ 三仓库代码完成，可发布** — 基础版1353测试通过+tsc/mypy零错误，专业版339测试通过+14路由挂载，小程序14测试通过+secureStorage整改完成。三级产品模型：基础版(本地免费)+专业版(网关中继)+定制版(团队)。基础版通过relay_client连接专业版网关。
+**P8 Gate 判定**: **✅ 三仓库代码完成，可发布** — 基础版1353测试通过+tsc/mypy零错误，专业版339测试通过+14路由挂载，小程序62 E2E+8单元=70测试通过（CI 全绿）+secureStorage整改完成。三级产品模型：基础版(本地免费)+专业版(网关中继)+定制版(团队)。基础版通过relay_client连接专业版网关。
 
 **当前状态**:
 - ✅ 0.1.x 初始化阶段完成
@@ -783,6 +783,7 @@ PromiseLink/
 | 2026-06-09 | **性能基准验证通过** | 所有API端点P95延迟<500ms | 性能达标，可支撑PoC演示 |
 | 2026-06-09 | **安全检查8/8通过** | 安全审查全项验证通过 | 无P0/P1漏洞，PoC安全基线达标 |
 | 2026-06-09 | **名片扫描采用OCR+LLM方案** | PoC不对接IAMHERE，自建OCR+LLM名片解析链路 | F-61 OCR服务+LLM结构化提取，独立于第三方 |
+| 2026-07-03 | **小程序 CI Playwright UI E2E 根因修复** | Taro 4.1.9 DefinePlugin 在 Linux+Node20(CI) 下未替换 `process.env.TARO_APP_API_URL`，运行时 `process` 未定义导致 ReferenceError，app 崩溃白屏（本地 macOS+Node24 替换正常，掩盖问题） | 所有 `process.env` 引用加 `typeof process !== 'undefined'` 守卫；移除 `continue-on-error` 让 UI 失败真正阻塞 CI；62/62 测试 CI 全绿 |
 
 ---
 
