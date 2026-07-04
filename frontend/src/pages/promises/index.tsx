@@ -251,7 +251,11 @@ export default function PromisesPage() {
         {promises.map(promise => {
           const isUnconfirmed = promise.confirmation_status === 'pending' || promise.confirmation_status === 'auto_set'
           return (
-          <View key={promise.todo_id} className={`promise-card ${isUnconfirmed ? 'unconfirmed' : ''}`}>
+          <View
+            key={promise.todo_id}
+            className={`promise-card ${isUnconfirmed ? 'unconfirmed' : ''}`}
+            onClick={() => navigateToPromiseDetail(promise.todo_id)}
+          >
             {isUnconfirmed && (
               <View className='ai-confirm-banner'>
                 <Text className='ai-confirm-text'>AI生成，待用户确认</Text>

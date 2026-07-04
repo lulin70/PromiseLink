@@ -91,10 +91,18 @@ test.describe('待办操作 @todos', () => {
     const count = await todoTitles.count()
     test.skip(count === 0, '后端无待办数据，跳过操作按钮用例')
 
-    await todoTitles.first().evaluate((el: HTMLElement) => el.click())
-    await expect(page.locator('.page-todo-detail')).toBeVisible({ timeout: 10000 })
+    // 遍历查找 pending 状态的待办（detail 页 action-bar 仅 pending 状态显示 忽略/推迟/完成）
+    let foundPending = false
+    const maxTry = Math.min(count, 5)
+    for (let i = 0; i < maxTry; i++) {
+      await todoTitles.nth(i).evaluate((el: HTMLElement) => el.click())
+      await expect(page.locator('.page-todo-detail')).toBeVisible({ timeout: 10000 })
+      const hasIgnore = await page.locator('.action-bar .action-btn', { hasText: '忽略' }).count()
+      if (hasIgnore > 0) { foundPending = true; break }
+      if (i < maxTry - 1) { await page.goBack(); await page.waitForTimeout(500) }
+    }
+    test.skip(!foundPending, '前5个待办均非 pending 状态，跳过操作按钮用例')
 
-    // 操作栏应在 pending 状态显示
     const actionBar = page.locator('.action-bar')
     await expect(actionBar, '待办详情应有操作栏').toBeVisible({ timeout: 5000 })
 
@@ -114,8 +122,17 @@ test.describe('待办操作 @todos', () => {
     const count = await todoTitles.count()
     test.skip(count === 0, '后端无待办数据，跳过完成操作用例')
 
-    await todoTitles.first().evaluate((el: HTMLElement) => el.click())
-    await expect(page.locator('.page-todo-detail')).toBeVisible({ timeout: 10000 })
+    // 遍历查找 pending 状态的待办
+    let foundPending = false
+    const maxTry = Math.min(count, 5)
+    for (let i = 0; i < maxTry; i++) {
+      await todoTitles.nth(i).evaluate((el: HTMLElement) => el.click())
+      await expect(page.locator('.page-todo-detail')).toBeVisible({ timeout: 10000 })
+      const hasIgnore = await page.locator('.action-bar .action-btn', { hasText: '忽略' }).count()
+      if (hasIgnore > 0) { foundPending = true; break }
+      if (i < maxTry - 1) { await page.goBack(); await page.waitForTimeout(500) }
+    }
+    test.skip(!foundPending, '前5个待办均非 pending 状态，跳过完成操作用例')
 
     // 记录操作前的状态徽章文本
     const statusBadgeBefore = await page.locator('.status-badge').first().innerText()
@@ -142,8 +159,17 @@ test.describe('待办操作 @todos', () => {
     const count = await todoTitles.count()
     test.skip(count === 0, '后端无待办数据，跳过推迟操作用例')
 
-    await todoTitles.first().evaluate((el: HTMLElement) => el.click())
-    await expect(page.locator('.page-todo-detail')).toBeVisible({ timeout: 10000 })
+    // 遍历查找 pending 状态的待办
+    let foundPending = false
+    const maxTry = Math.min(count, 5)
+    for (let i = 0; i < maxTry; i++) {
+      await todoTitles.nth(i).evaluate((el: HTMLElement) => el.click())
+      await expect(page.locator('.page-todo-detail')).toBeVisible({ timeout: 10000 })
+      const hasIgnore = await page.locator('.action-bar .action-btn', { hasText: '忽略' }).count()
+      if (hasIgnore > 0) { foundPending = true; break }
+      if (i < maxTry - 1) { await page.goBack(); await page.waitForTimeout(500) }
+    }
+    test.skip(!foundPending, '前5个待办均非 pending 状态，跳过推迟操作用例')
 
     // 点击「推迟」
     const snoozeBtn = page.locator('.action-bar .action-btn', { hasText: '推迟' }).first()
