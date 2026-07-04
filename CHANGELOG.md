@@ -2,6 +2,34 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [0.8.0-rc2] - 2026-07-03
+
+### Added — UI 整改 Batch 2（1.0 核心功能补齐）
+
+- **1.3 基础版每日提醒页**：新建 `/pages/reminders/index` 页面，4 级优先级分组（P0 紧急/P1 重要/P2 一般/P3 低优，Morandi 雾色系），单项/批量操作（完成/推迟/忽略），提醒偏好面板（提醒时间、每日上限、免打扰时段），状态条（待处理/剩余配额/免打扰）；首页新增"今日提醒"摘要条入口（F-69），点击跳转提醒页
+- **1.1 设置页核心项**：扩展 `/pages/mine/index`：隐私数据删除二次确认 modal（输入 `DELETE` 短语才能执行，含数据摘要展示），提醒偏好快捷入口跳转提醒页，专业版功能入口（语音录入/邮件同步/OCR/CSV 导入/微信小程序端）可点击但提示"专业版功能"
+- **2.3 引导内容重写**：`Guide.tsx` 4 步引导从"讲布局"改为"讲场景"——场景一：刚见完一位朋友；场景二：让 AI 帮你拆解；场景三：每天打开就知道做什么
+
+### Added — 后端 API
+
+- **POST /api/v1/reminders/batch-action**：批量提醒操作端点，IDOR 防护（服务端校验 todo 归属权），action 枚举白名单（completed/snoozed/dismissed），最多 50 条/请求，部分失败收集返回
+- **DELETE /api/v1/privacy/user-data**：隐私数据删除端点，`confirm: "DELETE"` 二次确认，跨 9 表硬删除（依赖表先删主表后删），审计日志记录
+- **GET /api/v1/privacy/data-summary**：返回各类业务数据计数，供前端二次确认 modal 展示
+
+### Tests
+
+- 后端：11 新测试（7 batch-action + 4 privacy），覆盖 IDOR/枚举白名单/snooze 必填/cascade 删除/多租户隔离
+- 前端 E2E：21 新测试（`batch2.spec.ts`），覆盖 1.1 设置/1.3 提醒/2.3 引导/集成旅程，超过计划 14-18 条要求
+- TypeScript：tsc --noEmit 零错误（含 reminders/mine/Guide/api.ts 全部改动）
+
+### Changed
+
+- 版本号全局同步到 `0.8.0-rc2`：VERSION/`__init__.py`/`config.py`/`pyproject.toml`/`package.json`/`package-lock.json`/3 语 README/`mine/index.tsx` About 弹窗
+
+### Deviation from Plan
+
+- **隐私删除策略**：UI 整改方案 §4.1 要求"30 天软删除保留 + 审计日志"，但 30 天软删除为专业版功能；基础版实施为"立即硬删除 + 审计日志"，已在 `privacy.py` 与二次确认 modal 文案中明确说明。专业版软删除需独立实现保留期+到期清理任务。
+
 ## [0.7.0] - 2026-06-28
 
 ### Fixed — P0 阻断项修复

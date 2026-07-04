@@ -116,7 +116,7 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50 security tests
 | Service modules     | **38**                                                          |
 | Data models     | **8 files, 11 model classes**                                                  |
 | Documentation version     | PRD v5.7 / Tech v3.2                                             |
-| Software version     | v0.7.0                                                           |
+| Software version     | v0.8.0-rc2                                                       |
 | Product tier     | Basic edition (local free) / Pro edition (gateway relay) / Mini-program (mobile portrait) / Custom edition (team)                      |
 | Overall progress     | **85%**                                                          |
 

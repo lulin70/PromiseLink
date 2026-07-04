@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { View, Text, ScrollView, Button, Input } from '@tarojs/components'
 import Taro from '@tarojs/taro'
-import { getDashboard, DayViewResponse, login as apiLogin, SupplyDemandMatch, getSupplyDemand, RelationshipHealthResponse, getRelationshipHealth, CareRemindersResponse, getCareReminders, exportData } from '../../services/api'
+import { getDashboard, DayViewResponse, login as apiLogin, SupplyDemandMatch, getSupplyDemand, RelationshipHealthResponse, getRelationshipHealth, CareRemindersResponse, getCareReminders, exportData, getDailyReminders, DailyReminderResponse } from '../../services/api'
 import { isLoggedIn, setToken, setUserId, saveLoginCredentials, getUserId } from '../../services/auth'
 import { navigateToEvent } from '../../services/navigation'
 import './index.scss'
@@ -23,6 +23,8 @@ export default function Index() {
   // F-G3: Care Reminders
   const [careData, setCareData] = useState<CareRemindersResponse | null>(null)
   const [showAllCare, setShowAllCare] = useState(false)
+  // F-69: Daily Reminders summary bar (1.3 提醒页入口)
+  const [reminderData, setReminderData] = useState<DailyReminderResponse | null>(null)
 
   useEffect(() => {
     if (!isLoggedIn()) {
@@ -47,6 +49,8 @@ export default function Index() {
       getRelationshipHealth(20).then(setHealthData).catch(() => {})
       // F-G3: Load care reminders (non-blocking)
       getCareReminders(10).then(setCareData).catch(() => {})
+      // F-69: Load daily reminders summary (non-blocking, for 1.3 提醒页入口)
+      getDailyReminders().then(setReminderData).catch(() => {})
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       console.error('[Dashboard] Load failed:', msg)
@@ -211,6 +215,24 @@ export default function Index() {
               <Text className='quick-input-placeholder'>快速录入事件、待办、承诺...</Text>
             </View>
           </View>
+
+          {/* F-69 今日提醒摘要条（1.3 提醒页入口） */}
+          {reminderData && reminderData.total_pending > 0 && (
+            <View className='section'>
+              <View
+                className='reminder-summary-bar'
+                onClick={() => Taro.navigateTo({ url: '/pages/reminders/index' })}
+              >
+                <View className='reminder-summary-info'>
+                  <Text className='reminder-summary-title'>今日提醒</Text>
+                  <Text className='reminder-summary-desc'>
+                    {reminderData.total_pending} 条待处理 · 剩余配额 {reminderData.fatigue_remaining}
+                  </Text>
+                </View>
+                <Text className='reminder-summary-arrow'>查看 ›</Text>
+              </View>
+            </View>
+          )}
 
           {/* Data Export */}
           <View className='section'>

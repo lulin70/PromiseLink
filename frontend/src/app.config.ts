@@ -10,6 +10,7 @@ export default defineAppConfig({
     'pages/entities/detail',
     'pages/promises/index',
     'pages/promises/detail',
+    'pages/reminders/index',
     'pages/mine/index',
   ],
   tabBar: {

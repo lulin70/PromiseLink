@@ -87,6 +87,27 @@
   color: var(--pl-text-secondary);
 }
 
+// 1.1 隐私删除菜单项 — 危险样式
+.mine-menu-danger {
+  .mine-menu-label {
+    color: var(--pl-danger);
+  }
+
+  .mine-menu-arrow {
+    color: var(--pl-danger);
+  }
+}
+
+// 1.1 Pro 功能标签
+.mine-menu-tag {
+  font-size: 22px;
+  color: #fff;
+  background-color: var(--pl-primary);
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
 .mine-pro-features {
   padding: 12px 24px 24px;
   display: flex;
@@ -112,4 +133,130 @@
   background-color: var(--pl-bg-white);
   color: var(--pl-danger);
   font-size: 30px;
+}
+
+// ── 1.1 隐私数据删除二次确认 Modal ──
+.privacy-delete-modal-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 40px;
+}
+
+.privacy-delete-modal {
+  background-color: var(--pl-bg-white);
+  border-radius: var(--pl-radius-card);
+  padding: 40px 32px;
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.pd-modal-title {
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--pl-danger);
+  text-align: center;
+}
+
+.pd-modal-warning {
+  font-size: 26px;
+  color: var(--pl-text);
+  line-height: 1.5;
+}
+
+.pd-modal-summary {
+  font-size: 24px;
+  color: var(--pl-text-secondary);
+  background-color: var(--pl-bg-gray);
+  padding: 16px 20px;
+  border-radius: 12px;
+  line-height: 1.5;
+}
+
+.pd-modal-instruction {
+  font-size: 26px;
+  color: var(--pl-text);
+  line-height: 1.5;
+}
+
+.pd-phrase {
+  font-weight: 700;
+  color: var(--pl-danger);
+  letter-spacing: 1px;
+}
+
+.pd-modal-input {
+  width: 100%;
+  height: 80px;
+  border: 2px solid var(--pl-danger);
+  border-radius: 12px;
+  padding: 0 20px;
+  font-size: 32px;
+  letter-spacing: 2px;
+  text-align: center;
+  font-weight: 600;
+  color: var(--pl-danger);
+  box-sizing: border-box;
+}
+
+.pd-modal-actions {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.pd-modal-btn {
+  flex: 1;
+  height: 80px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  Text {
+    color: #fff;
+  }
+}
+
+.pd-modal-btn-ghost {
+  background-color: var(--pl-text-secondary);
+
+  Text {
+    color: #fff;
+  }
+}
+
+.pd-modal-btn-danger {
+  background-color: var(--pl-danger);
+
+  Text {
+    color: #fff;
+  }
+}
+
+.pd-modal-audit-hint {
+  font-size: 22px;
+  color: var(--pl-text-secondary);
+  line-height: 1.4;
+  font-style: italic;
+  margin-top: 4px;
 }

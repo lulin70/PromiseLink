@@ -84,6 +84,8 @@ htmlcov/
 .ruff_cache/
 .mypy_cache/
 *.mp4
+frontend/test-results/
+frontend/playwright-report/
 
 # Debug scripts
 debug_batch.py

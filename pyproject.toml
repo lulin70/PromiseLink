@@ -1,6 +1,6 @@
 [project]
 name = "promiselink"
-version = "0.7.0"
+version = "0.8.0-rc2"
 description = "AI-driven personal business relationship management assistant (PromiseLink)"
 authors = [{name = "CarryMem Team", email = "team@carrymem.com"}]
 readme = "README.md"

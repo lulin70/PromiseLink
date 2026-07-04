@@ -54,6 +54,28 @@ class ReminderActionResponse(BaseModel):
     new_status: str
 
 
+class BatchReminderActionRequest(BaseModel):
+    """Batch action payload for 1.3 提醒页批量操作.
+
+    Security: 每个 todo_id 服务端校验归属权（user_id 来自 JWT）；
+    action 枚举白名单 complete/snooze/dismiss。
+    """
+
+    todo_ids: list[UUIDStr] = Field(..., min_length=1, max_length=50)
+    action: str = Field(..., description="completed / snoozed / dismissed")
+    snooze_hours: int | None = Field(None, description="Required when action=snoozed")
+
+
+class BatchReminderActionItemResult(BaseModel):
+    todo_id: UUIDStr
+    new_status: str
+
+
+class BatchReminderActionResponse(BaseModel):
+    success: list[BatchReminderActionItemResult]
+    failed: list[dict[str, str]]  # {"todo_id": "...", "error": "..."}
+
+
 class PreferenceResponse(BaseModel):
     user_id: UUIDStr
     preferred_times: list[str]
@@ -270,6 +292,78 @@ async def take_reminder_action(
     )
 
     return ReminderActionResponse(todo_id=todo_id, action=req.action, new_status=new_status)
+
+
+@router.post("/batch-action", response_model=BatchReminderActionResponse)
+async def take_batch_reminder_action(
+    req: BatchReminderActionRequest,
+    user_id: str = Depends(get_current_user_id),
+    session: AsyncSession = Depends(get_async_session),
+) -> Any:
+    """Batch one-click action on multiple reminders (1.3 提醒页批量操作).
+
+    Security:
+    - action 枚举白名单：completed / snoozed / dismissed
+    - 每个 todo_id 服务端校验归属权（user_id 取自 JWT，IDOR 防护）
+    - 单次最多 50 条，防止滥用
+    - 部分失败不阻塞：成功的提交，失败的逐条返回原因
+    """
+    new_request_id()
+
+    if req.action not in ("completed", "snoozed", "dismissed"):
+        raise ValidationError("Invalid action. Must be completed/snoozed/dismissed")
+
+    if req.action == "snoozed" and req.snooze_hours is None:
+        raise ValidationError("snooze_hours is required when action=snoozed")
+
+    # 一次性查询当前用户的所有 todo_id（IDOR 防护：只查归属当前用户的）
+    result = await session.execute(
+        select(Todo).where(
+            and_(
+                Todo.user_id == user_id,
+                Todo.id.in_(req.todo_ids),
+            )
+        )
+    )
+    owned_todos: dict[str, Todo] = {str(t.id): t for t in result.scalars().all()}
+
+    success: list[BatchReminderActionItemResult] = []
+    failed: list[dict[str, str]] = []
+
+    now = datetime.now(UTC)
+    for raw_id in req.todo_ids:
+        todo_id = str(raw_id)
+        todo = owned_todos.get(todo_id)
+        if todo is None:
+            failed.append({"todo_id": todo_id, "error": "not_found_or_forbidden"})
+            continue
+        try:
+            if req.action == "completed":
+                todo.status = "done"
+                todo.completed_at = now
+                new_status = "done"
+            elif req.action == "snoozed":
+                todo.status = "snoozed"
+                todo.reminder_at = now + timedelta(hours=req.snooze_hours or 24)
+                new_status = "snoozed"
+            else:  # dismissed
+                todo.status = "dismissed"
+                new_status = "dismissed"
+            success.append(BatchReminderActionItemResult(todo_id=todo_id, new_status=new_status))
+        except Exception as e:  # noqa: BLE001 — 批量操作需收集失败而非中断
+            failed.append({"todo_id": todo_id, "error": str(e)[:120]})
+
+    await session.commit()
+
+    logger.info(
+        "reminder_batch_action_taken",
+        user_id=user_id,
+        action=req.action,
+        success_count=len(success),
+        failed_count=len(failed),
+    )
+
+    return BatchReminderActionResponse(success=success, failed=failed)
 
 
 @router.get("/preferences", response_model=PreferenceResponse)

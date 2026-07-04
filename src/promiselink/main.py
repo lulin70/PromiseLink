@@ -23,6 +23,7 @@ from promiselink.api.v1 import (
     export,
     health,
     metrics,
+    privacy,
     promises,
     relationship_briefs,
     reminders,
@@ -396,11 +397,13 @@ app.include_router(export.router, prefix=settings.api_prefix, tags=["Export"])
 app.include_router(promises.router, prefix=settings.api_prefix, tags=["Promises"])
 app.include_router(reminders.router, prefix=settings.api_prefix, tags=["Reminders"])
 app.include_router(scheduled_events.router, prefix=settings.api_prefix, tags=["ScheduledEvents"])
+app.include_router(privacy.router, prefix=settings.api_prefix, tags=["Privacy"])
 
-# Pro-only routes (voice/media/email_sync/wechat_forward/import_csv/privacy)
+# Pro-only routes (voice/media/email_sync/wechat_forward/import_csv)
 # have been migrated to the PromiseLink-Pro repository.
 # Basic edition no longer registers them via APP_EDITION switch.
 # See docs/architecture/Repo_Split_Decision.md §5.2 for details.
+# Note: basic edition keeps a lightweight /privacy endpoint for PIPL/GDPR compliance.
 
 
 # ── Static Files (H5 Frontend) ──

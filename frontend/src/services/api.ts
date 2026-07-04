@@ -1144,6 +1144,58 @@ export async function actionReminder(todoId: string, action: string, snoozeHours
   })
 }
 
+// ── Batch Reminder Action (1.3 提醒页批量操作) ──
+
+export interface BatchReminderActionItemResult {
+  todo_id: string
+  new_status: string
+}
+
+export interface BatchReminderActionResponse {
+  success: BatchReminderActionItemResult[]
+  failed: Array<{ todo_id: string; error: string }>
+}
+
+export async function batchActionReminders(
+  todoIds: string[],
+  action: 'completed' | 'snoozed' | 'dismissed',
+  snoozeHours?: number,
+): Promise<BatchReminderActionResponse> {
+  return request<BatchReminderActionResponse>({
+    method: 'POST',
+    path: '/reminders/batch-action',
+    body: { todo_ids: todoIds, action, snooze_hours: snoozeHours },
+  })
+}
+
+// ── Privacy / Data Delete (1.1 设置页核心项) ──
+
+export interface PrivacyDeleteResponse {
+  deleted: Record<string, number>
+  audit_id: string
+  deleted_at: string
+}
+
+export interface PrivacyDataSummary {
+  user_id: string
+  counts: Record<string, number>
+}
+
+export async function deleteMyData(confirm: string): Promise<PrivacyDeleteResponse> {
+  return request<PrivacyDeleteResponse>({
+    method: 'DELETE',
+    path: '/privacy/user-data',
+    body: { confirm },
+  })
+}
+
+export async function getPrivacyDataSummary(): Promise<PrivacyDataSummary> {
+  return request<PrivacyDataSummary>({
+    method: 'GET',
+    path: '/privacy/data-summary',
+  })
+}
+
 // ── Credit Scores List (P2) ──
 
 export interface CreditScoreListResponse {

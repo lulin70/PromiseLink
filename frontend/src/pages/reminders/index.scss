@@ -1,0 +1,409 @@
+// 1.3 基础版每日提醒页样式 — 莫兰迪色系（与 theme.scss 一致）
+
+.page-reminders {
+  min-height: 100vh;
+  background-color: #F5F3F0;
+  padding-bottom: 120px; // 给底部批量操作栏留空间
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px 32px 16px;
+    background-color: #FFFFFF;
+    border-bottom: 1px solid #E8E4E0;
+
+    .header-title {
+      font-size: 36px;
+      font-weight: 600;
+      color: #2C3E50;
+    }
+
+    .pref-toggle {
+      font-size: 26px;
+      color: #A0B0C4;
+      padding: 8px 16px;
+      border-radius: 8px;
+      background-color: #F0EDEA;
+
+      &.active {
+        background-color: #A0B0C4;
+        color: #FFFFFF;
+      }
+    }
+  }
+
+  // ── 提醒偏好面板 ──
+  .pref-panel {
+    background-color: #FFFFFF;
+    padding: 24px 32px;
+    border-bottom: 1px solid #E8E4E0;
+
+    .pref-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .pref-label {
+      width: 140px;
+      font-size: 26px;
+      color: #5D6D7E;
+    }
+
+    .pref-input {
+      flex: 1;
+      height: 64px;
+      padding: 0 16px;
+      border: 1px solid #E8E4E0;
+      border-radius: 8px;
+      font-size: 26px;
+      color: #2C3E50;
+      background-color: #F5F3F0;
+    }
+
+    .pref-actions {
+      display: flex;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .pref-btn {
+      flex: 1;
+      height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      font-size: 28px;
+
+      &.pref-btn-ghost {
+        background-color: #F0EDEA;
+        color: #5D6D7E;
+      }
+
+      &.pref-btn-primary {
+        background-color: #A0B0C4;
+        color: #FFFFFF;
+
+        &.disabled {
+          opacity: 0.6;
+        }
+      }
+    }
+  }
+
+  // ── 状态条 ──
+  .stats-bar {
+    display: flex;
+    padding: 20px 32px;
+    background-color: #FFFFFF;
+    border-bottom: 1px solid #E8E4E0;
+
+    .stat-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+
+      .stat-num {
+        font-size: 36px;
+        font-weight: 600;
+        color: #2C3E50;
+      }
+
+      .stat-label {
+        font-size: 22px;
+        color: #95A5A6;
+      }
+
+      &.stat-quiet .stat-num {
+        color: #C4A7A0;
+      }
+    }
+  }
+
+  // ── 列表 ──
+  .reminder-list {
+    padding: 16px 32px;
+  }
+
+  .priority-group {
+    margin-bottom: 24px;
+
+    &.priority-1 .group-label { color: #C4A7A0; }
+    &.priority-2 .group-label { color: #C4C0A0; }
+    &.priority-3 .group-label { color: #A0B0C4; }
+    &.priority-4 .group-label { color: #A0C4A8; }
+
+    .group-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid #E8E4E0;
+
+      .group-label {
+        font-size: 28px;
+        font-weight: 600;
+      }
+
+      .group-desc {
+        flex: 1;
+        font-size: 22px;
+        color: #95A5A6;
+      }
+
+      .group-count {
+        font-size: 24px;
+        color: #5D6D7E;
+        background-color: #F0EDEA;
+        padding: 4px 12px;
+        border-radius: 12px;
+      }
+    }
+  }
+
+  .reminder-card {
+    background-color: #FFFFFF;
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    transition: background-color 0.15s;
+
+    &.selected {
+      background-color: #F0EDEA;
+      border-left: 4px solid #A0B0C4;
+    }
+
+    .card-main {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .card-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .card-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .card-title {
+      font-size: 28px;
+      font-weight: 500;
+      color: #2C3E50;
+      flex: 1;
+    }
+
+    .card-type-tag {
+      font-size: 22px;
+      color: #5D6D7E;
+      background-color: #F0EDEA;
+      padding: 4px 12px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    .card-desc {
+      font-size: 24px;
+      color: #5D6D7E;
+      line-height: 1.5;
+    }
+
+    .card-meta {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+
+      .meta-due, .meta-score {
+        font-size: 22px;
+        color: #95A5A6;
+      }
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #F0EDEA;
+
+      .action-btn {
+        flex: 1;
+        height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        font-size: 24px;
+
+        &.action-complete {
+          background-color: #A0C4A8;
+          color: #FFFFFF;
+        }
+
+        &.action-snooze {
+          background-color: #C4C0A0;
+          color: #FFFFFF;
+        }
+
+        &.action-dismiss {
+          background-color: #F0EDEA;
+          color: #5D6D7E;
+        }
+      }
+    }
+  }
+
+  // ── 底部批量操作栏 ──
+  .batch-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: #FFFFFF;
+    border-top: 1px solid #E8E4E0;
+    padding: 16px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+    z-index: 100;
+
+    .batch-info {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+
+      .batch-count {
+        font-size: 28px;
+        font-weight: 600;
+        color: #2C3E50;
+      }
+
+      .batch-clear {
+        font-size: 22px;
+        color: #95A5A6;
+      }
+    }
+
+    .batch-actions {
+      display: flex;
+      gap: 12px;
+
+      .batch-btn {
+        height: 64px;
+        padding: 0 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        font-size: 24px;
+        color: #FFFFFF;
+
+        &.batch-complete { background-color: #A0C4A8; }
+        &.batch-snooze { background-color: #C4C0A0; }
+        &.batch-dismiss { background-color: #C4A7A0; }
+      }
+    }
+  }
+
+  // ── 空状态 ──
+  .empty-state {
+    padding: 120px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+
+    .empty-icon {
+      font-size: 80px;
+      color: #A0C4A8;
+    }
+
+    .empty-title {
+      font-size: 32px;
+      font-weight: 500;
+      color: #2C3E50;
+    }
+
+    .empty-desc {
+      font-size: 24px;
+      color: #95A5A6;
+      text-align: center;
+    }
+  }
+
+  // ── 通用状态 ──
+  .loading, .error-container {
+    padding: 80px 32px;
+    text-align: center;
+
+    .error-text {
+      font-size: 26px;
+      color: #C4A0A0;
+      display: block;
+      margin-bottom: 16px;
+    }
+
+    .retry-btn {
+      display: inline-block;
+      padding: 12px 32px;
+      background-color: #A0B0C4;
+      color: #FFFFFF;
+      border-radius: 8px;
+      font-size: 26px;
+    }
+  }
+
+  // ── 登录内联 ──
+  &.login-inline {
+    .login-card {
+      background-color: #FFFFFF;
+      border-radius: 16px;
+      padding: 48px 32px;
+      margin: 80px 32px;
+      text-align: center;
+
+      .login-title {
+        display: block;
+        font-size: 48px;
+        font-weight: 600;
+        color: #2C3E50;
+        margin-bottom: 16px;
+      }
+
+      .login-subtitle {
+        display: block;
+        font-size: 26px;
+        color: #5D6D7E;
+        margin-bottom: 32px;
+      }
+
+      .login-btn {
+        height: 80px;
+        background-color: #A0B0C4;
+        color: #FFFFFF;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        .login-btn-text {
+          font-size: 28px;
+        }
+      }
+    }
+  }
+}
