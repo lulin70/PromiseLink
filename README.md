@@ -8,8 +8,8 @@
   <a href="https://promiselink.cn"><img src="https://img.shields.io/badge/🌐_官网-promiselink.cn-blue?style=for-the-badge" alt="Website"></a>
   <br/>
   <a href="https://github.com/lulin70/PromiseLink/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/lulin70/PromiseLink/ci.yml?branch=main&label=CI&logo=github" alt="CI"></a>
-  <img src="https://img.shields.io/badge/tests-1353%20passed-brightgreen" alt="Tests">
-  <img src="https://img.shields.io/badge/coverage-72%25-green" alt="Coverage">
+  <img src="https://img.shields.io/badge/tests-1364%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/coverage-71%25-green" alt="Coverage">
   <img src="https://img.shields.io/badge/mypy-0%20errors-brightgreen" alt="mypy">
   <img src="https://img.shields.io/badge/ruff-0%20errors-brightgreen" alt="ruff">
   <img src="https://img.shields.io/badge/security-50%20tests%20passed-blue" alt="Security">
@@ -38,7 +38,7 @@
 
 | 优势 | 数据证明 | 对比传统 CRM |
 |------|---------|-------------|
-| 🏭 **工业级质量** | 1353 测试通过 / 72% 覆盖率 / mypy 0 / ruff 0 / 50 安全测试 / 17 性能测试 | 多数开源 CRM < 30% 覆盖率 |
+| 🏭 **工业级质量** | 1364 测试通过 / 71% 覆盖率 / mypy 0 / ruff 0 / 50 安全测试 / 17 性能测试 | 多数开源 CRM < 30% 覆盖率 |
 | 🧠 **核心算法层不依赖 LLM** | 实体归一 / Todo 状态机 / 承诺履行 / 关联发现 / 动态评分 — 纯算法实现（NetworkX + RapidFuzz + numpy），可离线运行、可审计 | 主流 AI-CRM 全链路依赖 GPT API |
 | 🚀 **便携零部署** | `pip install -e .` + `bash scripts/start.sh` 即用，无需 Docker / K8s | 同类工具需 docker-compose |
 
@@ -94,7 +94,7 @@ bash scripts/start.sh
 git clone https://github.com/lulin70/PromiseLink
 cd PromiseLink
 pip install -e '.[dev]'
-pytest --co -q | tail -1   # 应显示 1378 tests collected
+pytest --co -q | tail -1   # 应显示 1389 tests collected
 pytest tests/test_security_comprehensive.py -q --no-cov   # 50 项安全测试
 ```
 
@@ -104,21 +104,21 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50 项安全测试
 
 | 指标       | 数值                                                               |
 | -------- | ---------------------------------------------------------------- |
-| 测试用例     | **1378 passed**, 45 skipped, 0 failed (含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏 + 50 安全 + 17 性能) |
-| 代码覆盖率    | **72%**                                                          |
-| mypy 类型检查 | **0 错误** (116 源文件全部通过)                                             |
+| 测试用例     | **1364 passed**, 24 skipped, 0 failed (含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏 + 50 安全 + 17 性能) |
+| 代码覆盖率    | **71%**                                                          |
+| mypy 类型检查 | **0 错误** (112 源文件全部通过)                                             |
 | ruff 代码检查 | **0 错误**                                                          |
 | 安全测试     | **50 项全通过** (SQL 注入 / XSS / 路径遍历 / JWT / 越权 / 输入验证 / 速率限制)         |
 | 性能测试     | **17 项全通过** (API 响应 < 50-500ms + 并发 + 内存)                         |
-| API 路由    | **26 个路由文件 / 72 个 API 端点**                                        |
+| API 路由    | **24 个路由文件 / 63 个 API 端点 / 53 paths**                              |
 | 服务模块     | **38 个**                                                          |
-| 数据模型     | **8 个文件，11 个模型类**                                                  |
-| 文档版本     | PRD v5.7 / Tech v3.2                                             |
+| 数据模型     | **8 个文件，10 个模型类**                                                  |
+| 文档版本     | PRD v5.8 / Tech v3.2                                             |
 | 软件版本     | v0.8.0-rc2                                                       |
 | 产品层级     | 基础版(本地免费) / 专业版(网关中继) / 小程序(手机竖屏) / 定制版(团队)                      |
-| 总体进度     | **85%**                                                          |
+| 总体进度     | **89%** (基础版 E2E 81/0/0 零 skip 达成)                              |
 
-> **分层覆盖率提示**：核心算法层（entity_resolution / todo_state_machine / promise_fulfillment / association_discovery / priority_scorer）覆盖率高于项目平均 72%，且不依赖 LLM，确定性可复现。
+> **分层覆盖率提示**：核心算法层（entity_resolution / todo_state_machine / promise_fulfillment / association_discovery / priority_scorer）覆盖率高于项目平均 71%，且不依赖 LLM，确定性可复现。
 
 ---
 
@@ -201,13 +201,13 @@ graph LR
 ```
 PromiseLink/
 ├── src/promiselink/              # 应用源码
-│   ├── models/                 # 数据模型（8 个模型文件，11 个模型类）
+│   ├── models/                 # 数据模型（8 个模型文件，10 个模型类）
 │   │   ├── entity.py           # 人物实体
 │   │   ├── event.py            # 互动事件
 │   │   ├── todo.py             # 行动提醒（6 类）
 │   │   ├── association.py      # 关联发现
 │   │   └── relationship_brief.py  # 关系简报
-│   ├── api/v1/                 # REST API（26 个路由文件）
+│   ├── api/v1/                 # REST API（24 个路由文件）
 │   │   ├── health.py           # 健康检查
 │   │   ├── events.py           # 事件 CRUD + Pipeline 触发
 │   │   ├── entities.py         # 实体管理
@@ -239,7 +239,7 @@ PromiseLink/
 │   ├── prompts/                # LLM Prompt 模板
 │   └── main.py                 # FastAPI 入口
 ├── docs/                       # 文档体系
-├── tests/                      # 测试（63 个文件 / 1378 用例）
+├── tests/                      # 测试（66 个文件 / 1389 用例）
 ├── data/                       # SQLite 数据存储
 ├── scripts/                    # 一键安装/启动脚本 + E2E 测试
 └── frontend/                   # Taro H5 前端
@@ -253,7 +253,7 @@ PromiseLink/
 
 ### 核心文档
 
-- [PRD v5.7](docs/spec/PRD_v1.md) - 产品需求文档
+- [PRD v5.8](docs/spec/PRD_v1.md) - 产品需求文档
 - [技术设计 v3.2](docs/architecture/PromiseLink_技术设计_v1.md) - 完整技术方案
 - [项目状态](docs/PROJECT_STATUS.md) - 11 阶段生命周期跟踪
 - [QUICKSTART](QUICKSTART.md) - 快速开始指南（含配置参考和 FAQ）
@@ -279,13 +279,13 @@ PromiseLink/
 - [x] PRD v5.2（关系经营核心闭环 + 向量化语义能力）
 - [x] 技术设计 v3.2（Insight Engine + DataSourceAdapter + 向量语义）
 - [x] P0 核心算法全部实现（实体归一 / 承诺履行 / 状态机 / 关联发现 / 动态评分）
-- [x] FastAPI 完整实现（26 个路由文件 / 72 个 API 端点）
+- [x] FastAPI 完整实现（24 个路由文件 / 63 个 API 端点 / 53 paths）
 - [x] 38 个服务模块（Pipeline / NLG / SemanticSearch / MemoryProvider 等）
 - [x] 8 个模型文件（entity / event / todo / association / relationship_brief / scheduled_event / reminder / score_audit_log）
 - [x] DataSourceAdapter 抽象层（手动 / CSV；语音 / 微信 / 邮件为专业版功能）
 - [x] CarryMem 协议解耦（NullMemoryProvider 优雅降级）
 - [x] 加密体系（HMAC-SHA256 + 字段级加密 + 行级安全）
-- [x] 63 个测试文件 / **1378 测试用例**（含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏）/ **72% 覆盖率**
+- [x] 66 个测试文件 / **1389 测试用例**（含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏）/ **71% 覆盖率**
 - [x] CI/CD + Alembic 就绪
 - [x] PoC Demo 4/4 场景通过
 - [x] 一键安装 / 启动脚本（本地直接运行，无需 Docker）

@@ -9,7 +9,7 @@
 
 | 文件名 | 版本 | 日期 | 状态 | 说明 |
 |--------|------|------|------|------|
-| **PromiseLink_技术设计_v1.md** | v2.2 | 2026-06-02 | ✅ 生效中 | 技术设计主文档（2137行）|
+| **PromiseLink_技术设计_v1.md** | v3.2 | 2026-06-17 | ✅ 生效中 | 技术设计主文档（含 F-67/F-68/F-69 + §4.13/4.14/4.15）|
 
 ---
 
@@ -43,7 +43,7 @@
 | 层级 | 技术选型 |
 |------|---------|
 | **API框架** | FastAPI (Python 3.11+) |
-| **数据库** | PostgreSQL 15 (生产) / SQLite (开发) |
+| **数据库** | SQLite (基础版长期方案，per-user asyncio.Lock 序列化写) |
 | **缓存** | Redis 7 |
 | **图计算** | NetworkX + igraph |
 | **LLM** | Moka AI (Claude Sonnet) + spaCy |
@@ -103,7 +103,7 @@ pending ⇄ in_progress ⇄ done
 ### 4. 安全设计（§6）
 
 - **传输加密**：TLS 1.3 + HSTS
-- **身份认证**：JWT（RS256，access:15min, refresh:7d）
+- **身份认证**：JWT（HS256，access:15min，iss/aud 校验）+ PoC secret 环境检查
 - **权限控制**：JWT认证 + 单用户数据隔离（无RBAC）
 - **数据加密**：AES-256-GCM字段级加密
 - **审计日志**：全写操作记录
@@ -141,4 +141,4 @@ pending ⇄ in_progress ⇄ done
 
 ---
 
-*最后更新: 2026-06-02*
+*最后更新: 2026-07-05 (v0.8.0-rc2 同步: 技术设计 v3.2 + JWT HS256 + SQLite 长期方案)*

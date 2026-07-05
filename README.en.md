@@ -10,8 +10,8 @@
   <a href="https://promiselink.cn"><img src="https://img.shields.io/badge/🌐_官网-promiselink.cn-blue?style=for-the-badge" alt="Website"></a>
   <br/>
   <a href="https://github.com/lulin70/PromiseLink/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/lulin70/PromiseLink/ci.yml?branch=main&label=CI&logo=github" alt="CI"></a>
-  <img src="https://img.shields.io/badge/tests-1353%20passed-brightgreen" alt="Tests">
-  <img src="https://img.shields.io/badge/coverage-72%25-green" alt="Coverage">
+  <img src="https://img.shields.io/badge/tests-1364%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/coverage-71%25-green" alt="Coverage">
   <img src="https://img.shields.io/badge/mypy-0%20errors-brightgreen" alt="mypy">
   <img src="https://img.shields.io/badge/ruff-0%20errors-brightgreen" alt="ruff">
   <img src="https://img.shields.io/badge/security-50%20tests%20passed-blue" alt="Security">
@@ -40,7 +40,7 @@
 
 | Advantage | Proof | vs. Traditional CRM |
 |------|---------|-------------|
-| 🏭 **Industrial-grade quality** | 1353 tests passed / 72% coverage / mypy 0 / ruff 0 / 50 security tests / 17 performance tests | Most open-source CRMs have < 30% coverage |
+| 🏭 **Industrial-grade quality** | 1364 tests passed / 71% coverage / mypy 0 / ruff 0 / 50 security tests / 17 performance tests | Most open-source CRMs have < 30% coverage |
 | 🧠 **Core algorithm layer does not depend on LLM** | Entity resolution / Todo state machine / promise fulfillment / association discovery / dynamic scoring — pure algorithm implementation (NetworkX + RapidFuzz + numpy), runs offline, auditable | Mainstream AI-CRMs depend on GPT API across the full chain |
 | 🚀 **Portable, zero deployment** | `pip install -e .` + `bash scripts/start.sh` ready to use, no Docker / K8s required | Similar tools require docker-compose |
 
@@ -96,7 +96,7 @@ bash scripts/start.sh
 git clone https://github.com/lulin70/PromiseLink
 cd PromiseLink
 pip install -e '.[dev]'
-pytest --co -q | tail -1   # Should show 1378 tests collected
+pytest --co -q | tail -1   # Should show 1389 tests collected
 pytest tests/test_security_comprehensive.py -q --no-cov   # 50 security tests
 ```
 
@@ -106,21 +106,21 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50 security tests
 
 | Metric       | Value                                                               |
 | -------- | ---------------------------------------------------------------- |
-| Test cases     | **1378 passed**, 45 skipped, 0 failed (incl. 50 relay_client robustness + 12 v5.6 corrections + 50 security + 17 performance) |
-| Code coverage    | **72%**                                                          |
-| mypy type checking | **0 errors** (all 116 source files passed)                                             |
-| ruff linting | **0 errors**                                                          |
+| Test cases     | **1364 passed**, 24 skipped, 0 failed (incl. 50 relay_client robustness + 12 v5.6 corrections + 50 security + 17 performance) |
+| Code coverage    | **71%**                                                          |
+| mypy type check | **0 errors** (112 source files all passed)                                             |
+| ruff code check | **0 errors**                                                          |
 | Security tests     | **50 all passed** (SQL injection / XSS / path traversal / JWT / privilege escalation / input validation / rate limiting)         |
 | Performance tests     | **17 all passed** (API response < 50-500ms + concurrency + memory)                         |
-| API routes    | **26 route files / 72 API endpoints**                                        |
+| API routes    | **24 route files / 63 API endpoints / 53 paths**                              |
 | Service modules     | **38**                                                          |
-| Data models     | **8 files, 11 model classes**                                                  |
-| Documentation version     | PRD v5.7 / Tech v3.2                                             |
+| Data models     | **8 files, 10 model classes**                                                  |
+| Documentation version     | PRD v5.8 / Tech v3.2                                             |
 | Software version     | v0.8.0-rc2                                                       |
-| Product tier     | Basic edition (local free) / Pro edition (gateway relay) / Mini-program (mobile portrait) / Custom edition (team)                      |
-| Overall progress     | **85%**                                                          |
+| Product tier     | Basic (local free) / Pro (gateway relay) / Mini-program (mobile) / Custom (team)                      |
+| Overall progress     | **89%** (Basic E2E 81/0/0 zero skip achieved)                              |
 
-> **Layered coverage note**: The core algorithm layer (entity_resolution / todo_state_machine / promise_fulfillment / association_discovery / priority_scorer) has coverage higher than the project average of 72%, and does not depend on LLM — deterministic and reproducible.
+> **Layered coverage note**: The core algorithm layer (entity_resolution / todo_state_machine / promise_fulfillment / association_discovery / priority_scorer) has coverage higher than the project average of 71%, and does not depend on LLM — deterministic and reproducible.
 
 ---
 
@@ -203,13 +203,13 @@ graph LR
 ```
 PromiseLink/
 ├── src/promiselink/              # Application source code
-│   ├── models/                 # Data models (8 model files, 11 model classes)
+│   ├── models/                 # Data models (8 model files, 10 model classes)
 │   │   ├── entity.py           # Person entity
 │   │   ├── event.py            # Interaction event
 │   │   ├── todo.py             # Action reminder (6 types)
 │   │   ├── association.py      # Association discovery
 │   │   └── relationship_brief.py  # Relationship brief
-│   ├── api/v1/                 # REST API (26 route files)
+│   ├── api/v1/                 # REST API (24 route files)
 │   │   ├── health.py           # Health check
 │   │   ├── events.py           # Event CRUD + Pipeline trigger
 │   │   ├── entities.py         # Entity management
@@ -241,7 +241,7 @@ PromiseLink/
 │   ├── prompts/                # LLM Prompt templates
 │   └── main.py                 # FastAPI entry
 ├── docs/                       # Documentation
-├── tests/                      # Tests (63 files / 1378 cases)
+├── tests/                      # Tests (66 files / 1389 cases)
 ├── data/                       # SQLite data storage
 ├── scripts/                    # One-click install/start scripts + E2E tests
 └── frontend/                   # Taro H5 frontend
@@ -255,7 +255,7 @@ PromiseLink/
 
 ### Core Documents
 
-- [PRD v5.7](docs/spec/PRD_v1.md) - Product Requirements Document
+- [PRD v5.8](docs/spec/PRD_v1.md) - Product Requirements Document
 - [Technical Design v3.2](docs/architecture/PromiseLink_技术设计_v1.md) - Complete technical solution
 - [Project Status](docs/PROJECT_STATUS.md) - 11-stage lifecycle tracking
 - [QUICKSTART](QUICKSTART.md) - Quick start guide (incl. config reference and FAQ)
@@ -281,13 +281,13 @@ PromiseLink/
 - [x] PRD v5.2 (relationship management core loop + vectorized semantic capability)
 - [x] Technical design v3.2 (Insight Engine + DataSourceAdapter + vector semantics)
 - [x] P0 core algorithms fully implemented (entity resolution / promise fulfillment / state machine / association discovery / dynamic scoring)
-- [x] FastAPI complete implementation (26 route files / 72 API endpoints)
+- [x] FastAPI complete implementation (24 route files / 63 API endpoints / 53 paths)
 - [x] 38 service modules (Pipeline / NLG / SemanticSearch / MemoryProvider, etc.)
 - [x] 8 model files (entity / event / todo / association / relationship_brief / scheduled_event / reminder / score_audit_log)
 - [x] DataSourceAdapter abstraction layer (manual / CSV; voice / WeChat / email are Pro edition features)
 - [x] CarryMem protocol decoupling (NullMemoryProvider graceful degradation)
 - [x] Encryption system (HMAC-SHA256 + field-level encryption + row-level security)
-- [x] 63 test files / **1378 test cases** (incl. 50 relay_client robustness + 12 v5.6 corrections) / **72% coverage**
+- [x] 66 test files / **1389 test cases** (incl. 50 relay_client robustness + 12 v5.6 corrections) / **71% coverage**
 - [x] CI/CD + Alembic ready
 - [x] PoC Demo 4/4 scenarios passed
 - [x] One-click install / start scripts (run locally directly, no Docker required)

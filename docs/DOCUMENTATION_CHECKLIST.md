@@ -1,7 +1,7 @@
 # PromiseLink 文档一致性检查清单
 
-> **更新时间**: 2026-06-20
-> **阶段**: v0.6.5 基础版内部灰度就绪 — 三仓库独立（PromiseLink + PromiseLink-Pro + PromiseLink-miniapp）
+> **更新时间**: 2026-07-05
+> **阶段**: v0.8.0-rc2 基础版 E2E 零 skip 达成 — 三仓库独立（PromiseLink + PromiseLink-Pro + PromiseLink-miniapp）
 > **目的**: 确认所有设计文档版本一致性，验证跨文档引用一致性
 
 ---
@@ -10,7 +10,7 @@
 
 | # | 文档 | 路径 | 当前版本 | 更新日期 | 状态 |
 |---|------|------|----------|----------|------|
-| 1 | **PRD** | `spec/PRD_v1.md` | **v5.7** | 2026-06-20 | ✅ 生效 |
+| 1 | **PRD** | `spec/PRD_v1.md` | **v5.8** | 2026-06-22 | ✅ 生效 |
 | 2 | **技术设计** | `architecture/PromiseLink_技术设计_v1.md` | **v3.2** | 2026-06-14 | ✅ 生效 |
 | 3 | **数据库设计** | `design/Database_Design_v1.md` | **v3.0** | 2026-06-14 | ✅ 生效 |
 | 4 | **API设计** | `design/API_Design_v1.md` | **v3.1** | 2026-06-14 | ✅ 生效 |
@@ -20,8 +20,8 @@
 | 8 | **集成设计** | `design/Integration_Design_v1.md` | **v2.9** | 2026-06-09 | ✅ 生效 |
 | 9 | **部署指南** | `design/Deployment_Guide.md` | **v0.5.0** | 2026-06-20 | ✅ 生效（小程序路径已修正） |
 | 10 | **UI/UX设计** | `design/UI_UX_Design_v1.md` | **v3.1** | 2026-06-14 | ✅ 生效 |
-| 11 | **规格说明README** | `spec/README.md` | **v5.7** | 2026-06-20 | ✅ 同步 |
-| 12 | **项目状态** | `PROJECT_STATUS.md` | **已同步** | 2026-06-20 | ✅ 最新 |
+| 11 | **规格说明README** | `spec/README.md` | **v5.8** | 2026-07-05 | ✅ 同步 |
+| 12 | **项目状态** | `PROJECT_STATUS.md` | **已同步** | 2026-07-05 | ✅ 最新 |
 | 13 | **托管PoC Docker Compose** | `docker-compose.hosted-poc.yml` | **v1.0** | 2026-06-09 | ✅ 已验证 |
 | 14 | **nginx配置** | `nginx/` | **v1.0** | 2026-06-09 | ✅ 已验证 |
 | 15 | **PoC环境变量** | `.env.poc.hosted` | **v1.0** | 2026-06-09 | ✅ 已验证 |
@@ -33,11 +33,12 @@
 
 ### 版本对照总结
 
-- **需求层 (P1)**: PRD v5.7 ←→ 技术设计 v3.2（双主文档对齐）
+- **需求层 (P1)**: PRD v5.8 ←→ 技术设计 v3.2（双主文档对齐）
 - **设计层 (P3-P7)**: 集成设计 v2.9 / API设计 v3.1 / 测试计划 v5.1 / 算法设计 v2.8（安全设计系列已迁Pro）
 - **部署层**: 部署指南 v0.5.0 / docker-compose.hosted-poc.yml v1.0 / nginx v1.0 / deploy-staging.sh v1.0 / backup.sh v1.0
 - **运维层**: Prometheus配置 v1.0 / 备份脚本 v1.0
 - **UI层**: UI/UX设计 v3.1（基础版宽屏H5；小程序UI独立仓库 PromiseLink-miniapp）
+- **软件版本**: v0.8.0-rc2（VERSION/pyproject.toml/__init__.py/config.py/package.json/三语README 8处一致）
 
 ---
 
@@ -222,7 +223,7 @@ ACTION_TYPES = ["follow_up", "introduce", "collaborate", "provide_help",
 
 | 文档 | 快速跳转 |
 |------|----------|
-| PRD v5.2 | [查看](./spec/PRD_v1.md) |
+| PRD v5.8 | [查看](./spec/PRD_v1.md) |
 | 技术设计 v3.2 | [查看](./architecture/PromiseLink_技术设计_v1.md) |
 | 数据库设计 v3.0 | [查看](./design/Database_Design_v1.md) |
 | API设计 v3.1 | [查看](./design/API_Design_v1.md) |
@@ -239,4 +240,4 @@ ACTION_TYPES = ["follow_up", "introduce", "collaborate", "provide_help",
 
 > **维护说明**: 本文档是PromiseLink进入Sprint 0编码前的最终文档质量门禁。每次文档更新后应重新运行此检查清单。
 >
-> **最后审核**: 2026-06-14 (文档版本同步至PRD v5.2/技术设计 v3.2/API设计 v3.1)
+> **最后审核**: 2026-07-05 (文档版本同步至 PRD v5.8 / 技术设计 v3.2 / API设计 v3.1 / 软件 v0.8.0-rc2)

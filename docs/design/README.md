@@ -1,103 +1,50 @@
 # PromiseLink 详细设计文档
 
-> **目录**: `docs/design/`  
+> **目录**: `docs/design/`
 > **用途**: 存放详细设计文档、UI/UX设计、数据库设计、API设计等
+> **最后更新**: 2026-07-05 (v0.8.0-rc2)
 
 ---
 
-## 📋 说明
+## 📋 文档清单（全部已完成 ✅）
 
-此目录用于存放比技术设计更细化的详细设计文档，包括但不限于：
+| # | 文件名 | 版本 | 日期 | 状态 | 说明 |
+|---|--------|------|------|------|------|
+| 1 | **API_Design_v1.md** | v3.1 | 2026-06-11 | ✅ 生效 | Semantic Search API + Insight Engine API + DataSourceAdapter API + Media API + Privacy API + 前端集成 API |
+| 2 | **Database_Design_v1.md** | v3.0 | 2026-06-11 | ✅ 生效 | 三级产品模型 + relay_connections + ai_usage_logs + 基础版/专业版/定制版 |
+| 3 | **Algorithm_Design_v1.md** | v2.8 | 2026-06-07 | ✅ 生效 | DependencyAnalyzer + ContextMatcher + SemanticSearch + PriorityScorerV2 + 关联发现增强 |
+| 4 | **Test_Plan_v1.md** | v5.1 | 2026-06-14 | ✅ 生效 | 托管PoC部署验证 + 23个新测试用例 + Media + Privacy + Rate Limiting |
+| 5 | **Integration_Design_v1.md** | v2.9 | 2026-06-14 | ✅ 生效 | 托管PoC + 数字名片对接 + 语义搜索集成 + DataSourceAdapter + Media 服务 |
+| 6 | **Deployment_Guide.md** | v0.5.0 | 2026-06-20 | ✅ 生效 | 向量存储部署 + sqlite-vec + pgcrypto + 监控指标 + Rate Limiting + nginx + HTTPS |
+| 7 | **UI_UX_Design_v1.md** | v3.1 | 2026-06-14 | ✅ 生效 | 语义搜索UI + 依赖性展示 + 场景匹配 + 动态优先级 + 小程序前端集成 |
+| 8 | **LLM_Prompt_Templates.md** | 0.4.1 | 2026-06-08 | ✅ 生效 | 语义搜索模板(24) + concern/capability提取(22) + Event标题生成(23) |
+| 9 | **Security_Design_v1.md** | v3.1 | 2026-06-14 | ✅ 生效 | 向量数据安全 + 语义搜索安全 + Insight安全 + Adapter安全 + Rate Limiting + 前端安全 |
+| 10 | **E2E_Full_Coverage_Plan_2026-07-03.md** | - | 2026-07-05 | ✅ 生效 | E2E 全覆盖计划 + Batch A-E 执行记录 + §8.10 零 skip 重写记录 |
+| 11 | **PromiseLink_UX_Review_2026-07-05.md** | - | 2026-07-05 | ✅ 生效 | UX 评审报告 |
 
-- UI/UX设计稿和交互流程
-- 数据库详细设计（ER图、表结构、索引策略）
-- API详细设计（OpenAPI规范）
-- 算法详细设计（伪代码、流程图）
-- 接口设计（外部系统对接）
-
----
-
-## 📝 待补充文档
-
-### 数据库设计
-- [ ] **ER图** - 完整的实体关系图
-- [ ] **表结构设计** - 每张表的详细字段定义
-- [ ] **索引策略** - 性能优化的索引设计
-- [ ] **数据迁移方案** - SQLite→PostgreSQL迁移脚本
-
-### API设计
-- [ ] **OpenAPI 3.0规范** - 机器可读的API文档
-- [ ] **API使用示例** - 各端点的调用示例
-- [ ] **错误码定义** - 统一的错误响应格式
-- [ ] **版本演进策略** - API向后兼容规则
-
-### UI/UX设计
-- [ ] **H5页面设计稿** - 小程序内嵌H5页面
-- [ ] **交互流程图** - 用户操作流程
-- [ ] **组件库** - 可复用的UI组件
-- [ ] **响应式设计规范** - 移动端适配规则
-
-### 算法设计
-- [ ] **实体归一流程图** - 5步算法可视化
-- [ ] **商机匹配算法** - 六维打分详细设计
-- [ ] **Todo路由策略** - 分发规则决策树
-- [ ] **关联发现算法** - 图算法详细设计
-
-### 集成设计
-- [ ] **IAMHERE对接设计** - 名片小程序集成方案
-- [ ] **LLM调用设计** - Moka AI接口封装
-- [ ] **CarryMem集成** - 协议接口设计
-- [ ] **第三方服务** - 工商查询、企查查等
-
----
-
-## 🔗 参考文档
-
-### 当前已有设计（嵌入在其他文档中）
-
-**数据模型**：
-- 位置：`../architecture/PromiseLink_技术设计_v1.md` §3
-- 内容：4张核心表（Event/Entity/Association/Todo）
-- 状态：基本完整，生产环境需补充ER图
-
-**P0核心算法**：
-- 位置：`../architecture/PromiseLink_技术设计_v1.md` §4
-- 内容：实体归一、商机匹配、Todo状态机
-- 状态：有完整Python代码，可直接实现
-
-**API设计**：
-- 位置：`../architecture/PromiseLink_技术设计_v1.md` §5
-- 内容：RESTful端点定义 + JSON示例
-- 状态：基本完整，需补充OpenAPI规范
-
-**安全设计**：
-- 位置：`../architecture/PromiseLink_技术设计_v1.md` §6
-- 内容：传输/认证/加密/审计
-- 状态：设计层面完成，实施后需安全测试
+> **注**: 安全设计文档（Security_Design_v1.md 等）已随专业版迁移至 [PromiseLink-Pro](https://github.com/lulin70/PromiseLink-Pro) 私有仓库 `docs/archive/design/` 目录，基础版保留引用。
 
 ---
 
 ## 📐 设计原则
 
 ### 1. 数据库设计原则
-- PoC阶段：实用主义优先，适度反范式化
-- 生产阶段：第三范式（3NF），必要时反范式化
+- 基础版：SQLite 长期方案（per-user asyncio.Lock 序列化写）
 - 索引策略：查询模式驱动，避免过度索引
-- 数据加密：敏感字段AES-256-GCM
+- 数据加密：敏感字段 AES-256-GCM
 
 ### 2. API设计原则
-- RESTful风格，资源导向
-- 版本管理：URL版本号（/api/v1/）
-- 响应格式：统一JSON结构
-- 错误处理：标准HTTP状态码 + 业务错误码
-- 幂等性：PUT/DELETE幂等，POST非幂等
+- RESTful 风格，资源导向
+- 版本管理：URL 版本号（/api/v1/）
+- 响应格式：统一 JSON 结构 `{error: {code, message, details}}`
+- 错误处理：5 层异常处理器（BusinessError / LLMError / PromiseLinkError / RequestValidationError / 兜底 Exception）
+- 幂等性：PUT/DELETE 幂等，POST 非幂等
 
 ### 3. UI/UX设计原则
-- 移动优先（Mobile First）
-- 单手操作友好
-- 信息层级清晰（信息型Todo vs 行动型Todo）
-- 快速响应（乐观更新）
-- 离线可用（关键功能）
+- 基础版：电脑宽屏两栏布局（≥1024px）
+- 专业版：微信小程序手机竖屏窄版
+- 莫兰迪色系（避免刺眼 emoji）
+- 信息层级清晰（信息型 Todo vs 行动型 Todo）
 
 ### 4. 算法设计原则
 - 置信度分级处理
@@ -108,29 +55,12 @@
 
 ---
 
-## 🎨 设计工具
-
-### 推荐工具
-- **ER图**: draw.io, dbdiagram.io
-- **API文档**: Swagger Editor, Postman
-- **UI设计**: Figma, Sketch
-- **流程图**: draw.io, Mermaid
-- **原型**: Figma, Axure
-
-### 文件格式
-- **图表**: PNG/SVG（可嵌入Markdown）
-- **设计稿**: Figma链接 + 导出PNG
-- **API规范**: YAML（OpenAPI 3.0）
-- **流程图**: Mermaid代码块（Markdown原生支持）
-
----
-
 ## 📚 相关文档
 
-- 技术设计：`../architecture/PromiseLink_技术设计_v1.md`
-- 产品需求：`../spec/PRD_v1.md`
-- 项目计划：`../planning/README.md`
+- 技术设计：`../architecture/PromiseLink_技术设计_v1.md` (v3.2)
+- 产品需求：`../spec/PRD_v1.md` (v5.8)
 - 项目状态：`../PROJECT_STATUS.md`
+- 修复计划：`../spec/P0_P1_FIX_PLAN_2026-07-05.md`
 
 ---
 
@@ -138,12 +68,7 @@
 
 ### 新增设计文档时请：
 1. 遵循文件命名规范：`模块_设计类型_版本.md`
-   - 例如：`Event_数据库设计_v1.md`
 2. 包含版本号和变更历史
 3. 提供清晰的图表和示例
-4. 更新本README的文档清单
+4. 更新本 README 的文档清单
 5. 关联相关的需求和技术设计
-
----
-
-*最后更新: 2026-06-02*
