@@ -152,16 +152,15 @@ class TestPipelineIntegration:
         # Wait for pipeline (LLM processing takes time)
         wait_for_pipeline(self.client, event_id, self.headers)
 
-        # Verify entity extracted (LLM-dependent, may fail if LLM is slow/unavailable)
+        # Verify entity extracted (LLM-dependent; if fails, surface as test failure, not skip)
         resp = self.client.get(f"{API_PREFIX}/entities", headers=self.headers)
         assert resp.status_code == 200, f"List entities failed: {resp.text}"
         entities = resp.json().get("items", [])
-        if len(entities) < 1:
-            pytest.skip(
-                f"No entities extracted after 30s wait (got {len(entities)}). "
-                "FINDING: LLM entity extraction may be slow or unavailable. "
-                "Event was created successfully but pipeline did not extract entities in time."
-            )
+        assert len(entities) >= 1, (
+            f"No entities extracted after 30s wait (got {len(entities)}). "
+            "LLM entity extraction failed — check LLM_API_KEY config or pipeline logs. "
+            "Event was created successfully but pipeline did not extract entities."
+        )
 
         # Verify event status updated
         resp = self.client.get(f"{API_PREFIX}/events", headers=self.headers)
@@ -214,12 +213,12 @@ class TestPipelineIntegration:
                     "title": f"会议{i+1}",
                 },
             )
-            # Server may return 500 under heavy load from background pipeline
-            if resp.status_code not in (200, 201):
-                pytest.skip(
-                    f"Event creation returned {resp.status_code}. "
-                    "Server may be overloaded from previous test's background pipeline processing."
-                )
+            # Server overload from background pipeline is a real failure — surface it
+            assert resp.status_code in (200, 201), (
+                f"Event creation returned {resp.status_code}. "
+                "Server is overloaded from previous test's background pipeline processing — "
+                "this is a capacity issue, not a flaky test."
+            )
             event_ids.append(resp.json()["id"])
 
         # Wait for all events to finish processing
@@ -227,18 +226,16 @@ class TestPipelineIntegration:
             wait_for_pipeline(self.client, eid, self.headers)
 
         resp = self.client.get(f"{API_PREFIX}/entities", headers=self.headers)
-        if resp.status_code != 200:
-            pytest.skip(
-                f"Entities list returned {resp.status_code}. "
-                "Server may be overloaded from background pipeline processing."
-            )
+        assert resp.status_code == 200, (
+            f"Entities list returned {resp.status_code}. "
+            "Server is overloaded from background pipeline processing — capacity issue."
+        )
         entities = resp.json().get("items", [])
-        # Entity extraction is LLM-dependent; skip if no entities extracted
-        if len(entities) < 1:
-            pytest.skip(
-                f"No entities extracted after 30s wait (got {len(entities)}). "
-                "FINDING: LLM entity extraction may be slow or unavailable."
-            )
+        # Entity extraction is LLM-dependent; surface as failure if no entities extracted
+        assert len(entities) >= 1, (
+            f"No entities extracted after 30s wait (got {len(entities)}). "
+            "LLM entity extraction failed — check LLM_API_KEY config or pipeline logs."
+        )
         # Entity resolution may merge similar entities, so at least 1 is acceptable
         if len(entities) == 1:
             aliases = entities[0].get("aliases", []) or []
@@ -315,13 +312,12 @@ class TestConcurrentStress:
             futures = [executor.submit(read_todos) for _ in range(20)]
             results = [f.result() for f in concurrent.futures.as_completed(futures)]
 
-        # Filter out timeouts (server may be busy with background pipeline)
+        # Filter out timeouts (server overload from background pipeline is a real failure)
         valid_results = [r for r in results if r is not None]
-        if len(valid_results) < 10:
-            pytest.skip(
-                f"Too many timeouts ({len(results) - len(valid_results)}/20). "
-                "Server may be overloaded with background pipeline processing."
-            )
+        assert len(valid_results) >= 10, (
+            f"Too many timeouts ({len(results) - len(valid_results)}/20). "
+            "Server is overloaded with background pipeline processing — capacity issue, not flaky."
+        )
         server_errors = sum(1 for r in valid_results if r.status_code >= 500)
         assert server_errors == 0, (
             f"Expected no 500 errors from concurrent reads, got {server_errors}. "
@@ -432,11 +428,11 @@ class TestSecurityDeep:
                 "title": "Private",
             },
         )
-        # Server may be overloaded
-        if resp.status_code not in (200, 201):
-            pytest.skip(
-                f"Event creation returned {resp.status_code}. Server may be overloaded."
-            )
+        # Server overload is a real failure — surface it
+        assert resp.status_code in (200, 201), (
+            f"Event creation returned {resp.status_code}. "
+            "Server is overloaded — capacity issue, not flaky test."
+        )
 
         # User B
         token_b, headers_b = _login_as(client)
@@ -838,11 +834,11 @@ class TestUserJourney:
                 "Todo state machine may not be working properly."
             )
         else:
-            # No todos generated yet — pipeline may still be processing
-            pytest.skip(
-                "No todos generated yet. Pipeline may still be processing or "
-                "todo generation is not triggered for this event type. "
-                "This is expected if LLM processing is slow."
+            # No todos generated — surface as failure (LLM/todo generation issue)
+            pytest.fail(
+                "No todos generated after pipeline wait. "
+                "Todo generation failed — check LLM_API_KEY config or todo_generator logs. "
+                "This is not a flaky test; the pipeline did not produce todos for this event."
             )
 
     def test_privacy_data_deletion(self, client):

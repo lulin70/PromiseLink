@@ -94,7 +94,7 @@ bash scripts/start.sh
 git clone https://github.com/lulin70/PromiseLink
 cd PromiseLink
 pip install -e '.[dev]'
-pytest --co -q | tail -1   # 应显示 1389 tests collected
+pytest --co -q | tail -1   # 应显示 1388 tests collected
 pytest tests/test_security_comprehensive.py -q --no-cov   # 50 项安全测试
 ```
 
@@ -239,7 +239,7 @@ PromiseLink/
 │   ├── prompts/                # LLM Prompt 模板
 │   └── main.py                 # FastAPI 入口
 ├── docs/                       # 文档体系
-├── tests/                      # 测试（66 个文件 / 1389 用例）
+├── tests/                      # 测试（66 个文件 / 1388 用例）
 ├── data/                       # SQLite 数据存储
 ├── scripts/                    # 一键安装/启动脚本 + E2E 测试
 └── frontend/                   # Taro H5 前端
@@ -285,7 +285,7 @@ PromiseLink/
 - [x] DataSourceAdapter 抽象层（手动 / CSV；语音 / 微信 / 邮件为专业版功能）
 - [x] CarryMem 协议解耦（NullMemoryProvider 优雅降级）
 - [x] 加密体系（HMAC-SHA256 + 字段级加密 + 行级安全）
-- [x] 66 个测试文件 / **1389 测试用例**（含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏）/ **71% 覆盖率**
+- [x] 66 个测试文件 / **1388 测试用例**（含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏）/ **71% 覆盖率**
 - [x] CI/CD + Alembic 就绪
 - [x] PoC Demo 4/4 场景通过
 - [x] 一键安装 / 启动脚本（本地直接运行，无需 Docker）

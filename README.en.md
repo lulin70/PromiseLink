@@ -96,7 +96,7 @@ bash scripts/start.sh
 git clone https://github.com/lulin70/PromiseLink
 cd PromiseLink
 pip install -e '.[dev]'
-pytest --co -q | tail -1   # Should show 1389 tests collected
+pytest --co -q | tail -1   # Should show 1388 tests collected
 pytest tests/test_security_comprehensive.py -q --no-cov   # 50 security tests
 ```
 
@@ -241,7 +241,7 @@ PromiseLink/
 │   ├── prompts/                # LLM Prompt templates
 │   └── main.py                 # FastAPI entry
 ├── docs/                       # Documentation
-├── tests/                      # Tests (66 files / 1389 cases)
+├── tests/                      # Tests (66 files / 1388 cases)
 ├── data/                       # SQLite data storage
 ├── scripts/                    # One-click install/start scripts + E2E tests
 └── frontend/                   # Taro H5 frontend
@@ -287,7 +287,7 @@ PromiseLink/
 - [x] DataSourceAdapter abstraction layer (manual / CSV; voice / WeChat / email are Pro edition features)
 - [x] CarryMem protocol decoupling (NullMemoryProvider graceful degradation)
 - [x] Encryption system (HMAC-SHA256 + field-level encryption + row-level security)
-- [x] 66 test files / **1389 test cases** (incl. 50 relay_client robustness + 12 v5.6 corrections) / **71% coverage**
+- [x] 66 test files / **1388 test cases** (incl. 50 relay_client robustness + 12 v5.6 corrections) / **71% coverage**
 - [x] CI/CD + Alembic ready
 - [x] PoC Demo 4/4 scenarios passed
 - [x] One-click install / start scripts (run locally directly, no Docker required)
