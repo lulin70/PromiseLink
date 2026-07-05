@@ -29,7 +29,6 @@ from promiselink.models.entity import Entity
 from promiselink.models.event import Event
 from promiselink.models.reminder import ReminderLog, ReminderPreference
 from promiselink.models.todo import Todo
-import promiselink.services.event_processor as processor_module
 
 # ── Constants ──
 
@@ -74,7 +73,7 @@ async def db_session(db_engine):
 
 
 @pytest_asyncio.fixture
-async def client(db_session):
+async def client(db_session, mock_pipeline):
     """Authenticated client for TEST_USER_ID."""
 
     async def override_get_async_session():
@@ -83,17 +82,10 @@ async def client(db_session):
     app.dependency_overrides[get_async_session] = override_get_async_session
     app.dependency_overrides[get_current_user_id] = lambda: TEST_USER_ID
 
-    async def mock_process_event(event_id):
-        pass
-
-    original_process = processor_module.process_event_background
-    processor_module.process_event_background = mock_process_event  # type: ignore[assignment]
-
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
-    processor_module.process_event_background = original_process  # type: ignore[assignment]
     app.dependency_overrides.clear()
 
 

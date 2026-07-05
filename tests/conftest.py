@@ -66,6 +66,28 @@ def auth_headers():
     return {"Authorization": f"Bearer {token}"}
 
 
+@pytest_asyncio.fixture
+async def mock_pipeline(monkeypatch):
+    """Stub process_event_background to avoid real LLM calls in API tests.
+
+    Mocks at promiselink.api.v1.events.process_event_background (where the
+    function is imported and captured by background_tasks.add_task). This
+    is the correct mock location — mocking at promiselink.services.event_processor
+    does NOT take effect because the events module already imported the function
+    by value via `from ... import process_event_background`.
+
+    Tests that need the real pipeline (e.g., test_real_pipeline_e2e.py,
+    test_poc_comprehensive.py) should NOT depend on this fixture.
+    """
+    from promiselink.api.v1 import events as events_module
+
+    async def _noop(event_id):
+        pass
+
+    monkeypatch.setattr(events_module, "process_event_background", _noop)
+    yield
+
+
 def make_user_id() -> str:
     return str(uuid.uuid4())
 

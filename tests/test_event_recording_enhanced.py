@@ -82,7 +82,7 @@ async def db_session(db_engine):
 
 
 @pytest_asyncio.fixture
-async def client(db_session, db_engine):
+async def client(db_session, db_engine, mock_pipeline):
     """Provide an httpx.AsyncClient with DB dependency overridden and pipeline mocked."""
     async def override_get_async_session():
         yield db_session
@@ -90,19 +90,10 @@ async def client(db_session, db_engine):
     app.dependency_overrides[get_async_session] = override_get_async_session
     app.dependency_overrides[get_current_user_id] = lambda: TEST_USER_ID
 
-    # Mock the background pipeline to avoid real LLM calls during event creation
-    async def mock_process_event(event_id):
-        pass
-
-    import promiselink.api.v1.events as events_module
-    original_process = events_module.process_event_background
-    events_module.process_event_background = mock_process_event
-
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
-    events_module.process_event_background = original_process
     app.dependency_overrides.clear()
 
 

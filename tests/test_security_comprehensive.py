@@ -77,7 +77,7 @@ async def db_session(db_engine):
 
 
 @pytest_asyncio.fixture
-async def client(db_session):
+async def client(db_session, mock_pipeline):
     """Authenticated client: overrides get_current_user_id to TEST_USER_ID.
 
     The rate_limit_dependency still calls get_optional_user_id (not overridden),
@@ -90,24 +90,15 @@ async def client(db_session):
     app.dependency_overrides[get_async_session] = override_get_async_session
     app.dependency_overrides[get_current_user_id] = lambda: TEST_USER_ID
 
-    # Mock the background pipeline to avoid real LLM calls
-    async def mock_process_event(event_id):
-        pass
-
-    import promiselink.services.event_processor as processor_module
-    original_process = processor_module.process_event_background
-    processor_module.process_event_background = mock_process_event
-
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
-    processor_module.process_event_background = original_process
     app.dependency_overrides.clear()
 
 
 @pytest_asyncio.fixture
-async def jwt_client(db_session):
+async def jwt_client(db_session, mock_pipeline):
     """Client WITHOUT get_current_user_id override — real JWT validation runs.
 
     Used for JWT security tests where invalid tokens must be rejected by the
@@ -119,18 +110,10 @@ async def jwt_client(db_session):
     app.dependency_overrides[get_async_session] = override_get_async_session
     # NOTE: get_current_user_id is NOT overridden — real JWT validation applies
 
-    async def mock_process_event(event_id):
-        pass
-
-    import promiselink.services.event_processor as processor_module
-    original_process = processor_module.process_event_background
-    processor_module.process_event_background = mock_process_event
-
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
-    processor_module.process_event_background = original_process
     app.dependency_overrides.clear()
 
 

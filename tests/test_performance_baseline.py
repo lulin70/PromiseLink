@@ -93,7 +93,7 @@ async def db_session(session_factory):
 
 
 @pytest_asyncio.fixture
-async def client(db_session):
+async def client(db_session, mock_pipeline):
     """httpx.AsyncClient with shared DB session and mocked pipeline.
 
     Use this for sequential request tests. The same DB session is reused
@@ -106,26 +106,15 @@ async def client(db_session):
     app.dependency_overrides[get_current_user_id] = lambda: TEST_USER_ID
     app.dependency_overrides[get_optional_user_id] = lambda: TEST_USER_ID
 
-    # Mock the background pipeline to avoid real LLM calls.
-    # Must patch the reference in events.py (where it's imported by name),
-    # NOT just the source module — otherwise the original function still runs.
-    async def mock_process_event(event_id):
-        pass
-
-    import promiselink.api.v1.events as events_module
-    original_process = events_module.process_event_background
-    events_module.process_event_background = mock_process_event
-
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
-    events_module.process_event_background = original_process
     app.dependency_overrides.clear()
 
 
 @pytest_asyncio.fixture
-async def concurrent_client(session_factory):
+async def concurrent_client(session_factory, mock_pipeline):
     """httpx.AsyncClient that creates a new DB session per request.
 
     Use this for concurrency tests. Each request gets its own session
@@ -139,19 +128,10 @@ async def concurrent_client(session_factory):
     app.dependency_overrides[get_current_user_id] = lambda: TEST_USER_ID
     app.dependency_overrides[get_optional_user_id] = lambda: TEST_USER_ID
 
-    # Mock the background pipeline (patch at import site — see client fixture)
-    async def mock_process_event(event_id):
-        pass
-
-    import promiselink.api.v1.events as events_module
-    original_process = events_module.process_event_background
-    events_module.process_event_background = mock_process_event
-
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
-    events_module.process_event_background = original_process
     app.dependency_overrides.clear()
 
 
