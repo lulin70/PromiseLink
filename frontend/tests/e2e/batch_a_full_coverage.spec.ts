@@ -1,6 +1,14 @@
 import { test, expect } from '@playwright/test'
 import { injectLoginState, setupMockApi, MOCK_EVENT_ID, MOCK_TODO_ID, MOCK_PROMISE_TODO_ID, MOCK_SCHEDULED_EVENT_ID, MOCK_SCHEDULED_EVENT_ID_2, MOCK_SCHEDULED_EVENT_ID_3 } from './mock_data'
-import { waitForPageReady } from './helpers'
+import {
+  waitForPageReady,
+  setupRealApi,
+  getApiToken,
+  createScheduledEventViaApi,
+  recordScheduledEventViaApi,
+  deleteScheduledEventViaApi,
+  getFirstPendingTodoViaApi,
+} from './helpers'
 
 /**
  * Batch A — E2E 全覆盖测试（v0.8.0-rc3 Batch A，零 skip 重构版）。
@@ -13,6 +21,11 @@ import { waitForPageReady } from './helpers'
  *   3. "系统有问题就优化系统" — mock 状态化（PATCH/POST 后 GET 返回更新后状态），
  *      真实反映后端语义；不通过 skip 绕过系统问题。
  *
+ * 批次 3.3 改造（mock → real backend）：
+ *   - scheduled_events 全组 (8 用例) → setupRealApi：真实后端有 overdue 数据，创建/录入通过 API 准备
+ *   - 待办详情推迟 (2 用例) → setupRealApi：真实后端有 pending todos
+ *   - AI 解析校正面板 + confirm_todo + 其他子操作 → 保留 mock：需要特定 LLM 输出/confirmation_status 状态
+ *
  * 覆盖范围：
  *   1. scheduled_events 全组 7 端点 E2E（创建/列表/详情/更新/删除/record/cancel）
  *   2. AI 解析校正面板 E2E（events/correct）— mock 返回 status=completed 触发 CorrectionPanel
@@ -23,10 +36,11 @@ import { waitForPageReady } from './helpers'
 // batch_a 涉及状态变更（创建/确认/取消），serial 模式确保串行执行避免 mock 状态竞态。
 test.describe.configure({ mode: 'serial' })
 
-test.describe('Batch A — scheduled_events 全组 E2E @scheduled', () => {
+test.describe('Batch A — scheduled_events 全组 E2E @scheduled @real-backend', () => {
   test.beforeEach(async ({ page }) => {
-    await injectLoginState(page)
-    await setupMockApi(page)
+    // 批次 3.3：改用真实后端。scheduled_events 测试验证 CRUD + record + cancel，
+    // 真实后端有 overdue 预定日程数据可用，recorded 状态通过 API 准备。
+    await setupRealApi(page)
   })
 
   test('切换到「预定日程」tab，加载列表（GET /scheduled-events）', async ({ page }) => {
@@ -113,9 +127,9 @@ test.describe('Batch A — scheduled_events 全组 E2E @scheduled', () => {
     await page.locator('.filter-tab', { hasText: '预定日程' }).first().evaluate((el: HTMLElement) => el.click())
     await page.waitForTimeout(1500)
 
-    // mock 返回 4 个预定日程，pending/overdue 状态有「录入」按钮
+    // 真实后端有 overdue 状态预定日程，overdue 状态有「录入」按钮
     const scheduledCards = page.locator('.event-card.scheduled-card')
-    await expect(scheduledCards.first(), 'mock API 应返回预定日程数据').toBeVisible({ timeout: 10000 })
+    await expect(scheduledCards.first(), '真实后端应返回预定日程数据').toBeVisible({ timeout: 10000 })
 
     const recordableCard = scheduledCards.filter({ hasText: '录入' }).first()
     await expect(recordableCard, '应有含「录入」按钮的预定日程卡片（pending/overdue 状态）').toBeVisible({ timeout: 5000 })
@@ -132,7 +146,7 @@ test.describe('Batch A — scheduled_events 全组 E2E @scheduled', () => {
     await page.waitForTimeout(1500)
 
     const scheduledCards = page.locator('.event-card.scheduled-card')
-    await expect(scheduledCards.first(), 'mock API 应返回预定日程数据').toBeVisible({ timeout: 10000 })
+    await expect(scheduledCards.first(), '真实后端应返回预定日程数据').toBeVisible({ timeout: 10000 })
 
     const cancelableCard = scheduledCards.filter({ hasText: '取消预定' }).first()
     await expect(cancelableCard, '应有含「取消预定」按钮的预定日程卡片').toBeVisible({ timeout: 5000 })
@@ -141,26 +155,38 @@ test.describe('Batch A — scheduled_events 全组 E2E @scheduled', () => {
     await expect(cancelBtn, '预定日程卡片应有「取消预定」按钮').toBeVisible()
   })
 
-  test('已录入预定卡片有「查看录入详情」按钮（GET /scheduled-events/{id} 入口）', async ({ page }) => {
+  test('已录入预定卡片有「查看录入详情」按钮（GET /scheduled-events/{id} 入口）', async ({ page, request }) => {
+    // 批次 3.3：通过 API 创建 recorded 状态预定日程（"没有数据创造数据"）
+    // 1. 创建一个 overdue 预定日程（scheduled_at 设为过去时间）
+    // 2. 调用 record API 录入内容，状态变为 recorded
+    const token = await getApiToken(request)
+    const yesterday = new Date(Date.now() - 86400000).toISOString()
+    const se = await createScheduledEventViaApi(request, token, {
+      topic: 'E2E recorded 测试-' + Date.now(),
+      scheduledAt: yesterday,
+      location: '测试会议室',
+    })
+    await recordScheduledEventViaApi(request, token, se.id, 'E2E 测试录入内容：与测试对象讨论了产品方案')
+
     await page.goto('/pages/events/index', { waitUntil: 'domcontentloaded' })
     await waitForPageReady(page, '.page-events')
 
     await page.locator('.filter-tab', { hasText: '预定日程' }).first().evaluate((el: HTMLElement) => el.click())
-    await page.waitForTimeout(1500)
+    await page.waitForTimeout(2000)
 
-    // mock 返回 recorded 状态的预定日程（MOCK_SCHEDULED_EVENT_ID_3）
+    // 真实后端应返回 recorded 状态预定日程（刚通过 API 创建）
     const recordedCard = page.locator('.event-card.scheduled-card.status-recorded').first()
-    await expect(recordedCard, 'mock API 应返回 recorded 状态预定日程').toBeVisible({ timeout: 10000 })
+    await expect(recordedCard, '真实后端应返回 recorded 状态预定日程').toBeVisible({ timeout: 15000 })
 
     const viewBtn = recordedCard.locator('.action-btn', { hasText: '查看录入详情' }).first()
     await expect(viewBtn, '已录入预定卡片应有「查看录入详情」按钮').toBeVisible()
   })
 
   test('GET /scheduled-events/{id} 详情 + PATCH 更新 + DELETE 删除 — ghost API 状态验证', async ({ page }) => {
-    // ghost API 已在批次 D 处置（见 E2E_Full_Coverage_Plan_2026-07-03.md）：
+    // 批次 3.3：改用真实后端。ghost API 已在批次 D 处置：
     // - 详情：通过卡片「查看录入详情」按钮入口（已在上一用例验证）
-    // - 更新/删除：mock API 已支持 PATCH/DELETE /scheduled-events/{id}
-    // 此用例验证 mock 端点可正常响应（不跳过，作为端点契约验证）
+    // - 更新/删除：真实后端 PATCH/DELETE /scheduled-events/{id} 端点可用
+    // 此用例验证真实后端返回预定日程数据可正常渲染（端点契约验证）
     await page.goto('/pages/events/index', { waitUntil: 'domcontentloaded' })
     await waitForPageReady(page, '.page-events')
 
@@ -168,9 +194,9 @@ test.describe('Batch A — scheduled_events 全组 E2E @scheduled', () => {
     await page.waitForTimeout(1500)
 
     const scheduledCards = page.locator('.event-card.scheduled-card')
-    await expect(scheduledCards.first(), 'mock API 应返回预定日程数据').toBeVisible({ timeout: 10000 })
-    // 验证 4 个预定日程全部渲染（覆盖 4 种状态）
-    expect(await scheduledCards.count(), '应有 4 个预定日程卡片（pending/overdue/recorded/cancelled）').toBeGreaterThanOrEqual(1)
+    await expect(scheduledCards.first(), '真实后端应返回预定日程数据').toBeVisible({ timeout: 10000 })
+    // 验证预定日程渲染（真实后端有 overdue/recorded 状态数据）
+    expect(await scheduledCards.count(), '应有至少 1 个预定日程卡片').toBeGreaterThanOrEqual(1)
   })
 })
 
@@ -451,67 +477,8 @@ test.describe('Batch A — 6 子操作缺口补全 @sub-ops', () => {
     await expect(page.locator('.page-reminders'), '批量操作后页面应仍可用').toBeVisible()
   })
 
-  // 2. 取消推迟（无 API 调用，仅验证 modal 可关闭）
-  test('待办详情「推迟」modal 可取消（无 API 调用）', async ({ page }) => {
-    await page.goto('/pages/todos/index', { waitUntil: 'domcontentloaded' })
-    await waitForPageReady(page, '.page-todos')
-    await page.waitForTimeout(1500)
-
-    const todoTitles = page.locator('.todo-title')
-    await expect(todoTitles.first(), 'mock API 应返回待办数据').toBeVisible({ timeout: 10000 })
-
-    // mockTodo 为 pending 状态，点击进入详情页应有「推迟」按钮
-    await todoTitles.first().evaluate((el: HTMLElement) => el.click())
-    await expect(page.locator('.page-todo-detail')).toBeVisible({ timeout: 10000 })
-
-    const snoozeBtn = page.locator('.action-bar .action-btn', { hasText: '推迟' }).first()
-    await expect(snoozeBtn, 'pending 待办应有「推迟」按钮').toBeVisible({ timeout: 5000 })
-    await snoozeBtn.evaluate((el: HTMLElement) => el.click())
-
-    const modal = page.locator('.taro-modal, .taromodal, [class*="modal"]').filter({ hasText: '推迟待办' }).first()
-    await expect(modal, '应弹出推迟 modal').toBeAttached({ timeout: 5000 })
-
-    const cancelBtn = modal.locator('button, [class*="btn"], [class*="cancel"]').filter({ hasText: '取消' }).first()
-    await cancelBtn.evaluate((el: HTMLElement) => el.click())
-    await page.waitForTimeout(800)
-
-    const restoredBtn = page.locator('.action-bar .action-btn', { hasText: '恢复待处理' })
-    await expect(restoredBtn, '取消推迟后状态应保持 pending').toBeHidden({ timeout: 2000 })
-  })
-
-  // 3. 推迟小时输入验证（POST /reminders/{id}/action snoozed）
-  test('待办详情「推迟」modal 输入小时数后提交（POST /reminders/{id}/action）', async ({ page }) => {
-    await page.goto('/pages/todos/index', { waitUntil: 'domcontentloaded' })
-    await waitForPageReady(page, '.page-todos')
-    await page.waitForTimeout(1500)
-
-    const todoTitles = page.locator('.todo-title')
-    await expect(todoTitles.first(), 'mock API 应返回待办数据').toBeVisible({ timeout: 10000 })
-
-    await todoTitles.first().evaluate((el: HTMLElement) => el.click())
-    await expect(page.locator('.page-todo-detail')).toBeVisible({ timeout: 10000 })
-
-    const snoozeBtn = page.locator('.action-bar .action-btn', { hasText: '推迟' }).first()
-    await expect(snoozeBtn, 'pending 待办应有「推迟」按钮').toBeVisible({ timeout: 5000 })
-    await snoozeBtn.evaluate((el: HTMLElement) => el.click())
-
-    const modal = page.locator('.taro-modal, .taromodal, [class*="modal"]').filter({ hasText: '推迟待办' }).first()
-    await expect(modal).toBeAttached({ timeout: 5000 })
-
-    const input = modal.locator('input, [class*="input"]').first()
-    const hasInput = await input.count()
-    if (hasInput > 0) {
-      await input.fill('48')
-    }
-
-    const confirmBtn = modal.locator('button, [class*="btn"], [class*="confirm"]').filter({ hasText: '推迟' }).last()
-    await confirmBtn.evaluate((el: HTMLElement) => el.click())
-
-    // mock POST /reminders/{id}/action snoozed 更新 todo 状态为 snoozed
-    // 随后 loadDetail 重新 GET /todos/{id} 返回 status=snoozed
-    await expect(page.locator('.action-bar .action-btn', { hasText: '恢复待处理' }),
-      '推迟成功后应显示「恢复待处理」按钮').toBeVisible({ timeout: 10000 })
-  })
+  // 2. 取消推迟 + 3. 推迟小时输入验证 → 已迁移到「真实后端待办详情 E2E」describe 块
+  //    批次 3.3：这两个测试改用真实后端（setupRealApi），真实后端有 pending todos 可用
 
   // 4. 承诺详情标记兑现（PATCH /promises/{id}/fulfillment）
   test('承诺详情页「标记为已兑现」按钮可点击（PATCH /promises/{id}/fulfillment）', async ({ page }) => {
@@ -572,4 +539,74 @@ test.describe('Batch A — 6 子操作缺口补全 @sub-ops', () => {
   //    （见 E2E_Full_Coverage_Plan_2026-07-03.md 与 todos/detail.tsx）
   //    原占位 test.skip 移除：ghost API 状态由文档记录，测试文件不再保留 skip 占位。
   //    若需验证删除功能，见 todos.spec.ts 中相关用例。
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 批次 3.3：真实后端待办详情 E2E
+// 从「6 子操作缺口补全」迁移 2 个推迟 modal 测试到真实后端。
+// 真实后端有 pending todos（poc-user 有 124 个 pending），无需 mock 数据。
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('Batch A — 真实后端待办详情 E2E @todo-detail @real-backend', () => {
+  test.beforeEach(async ({ page }) => {
+    // 批次 3.3：改用真实后端。待办详情测试验证推迟 modal 交互，
+    // 真实后端有 pending todos 可用，无需 mock。
+    await setupRealApi(page)
+  })
+
+  // 2. 取消推迟（无 API 调用，仅验证 modal 可关闭）
+  test('待办详情「推迟」modal 可取消（无 API 调用）', async ({ page, request }) => {
+    // 通过 API 获取一个 pending todo，确保有数据可测
+    const token = await getApiToken(request)
+    const todo = await getFirstPendingTodoViaApi(request, token)
+
+    // 直接导航到该 todo 的详情页
+    await page.goto(`/pages/todos/detail?id=${todo.id}`, { waitUntil: 'domcontentloaded' })
+    await expect(page.locator('.page-todo-detail')).toBeVisible({ timeout: 15000 })
+
+    const snoozeBtn = page.locator('.action-bar .action-btn', { hasText: '推迟' }).first()
+    await expect(snoozeBtn, 'pending 待办应有「推迟」按钮').toBeVisible({ timeout: 5000 })
+    await snoozeBtn.evaluate((el: HTMLElement) => el.click())
+
+    const modal = page.locator('.taro-modal, .taromodal, [class*="modal"]').filter({ hasText: '推迟待办' }).first()
+    await expect(modal, '应弹出推迟 modal').toBeAttached({ timeout: 5000 })
+
+    const cancelBtn = modal.locator('button, [class*="btn"], [class*="cancel"]').filter({ hasText: '取消' }).first()
+    await cancelBtn.evaluate((el: HTMLElement) => el.click())
+    await page.waitForTimeout(800)
+
+    const restoredBtn = page.locator('.action-bar .action-btn', { hasText: '恢复待处理' })
+    await expect(restoredBtn, '取消推迟后状态应保持 pending').toBeHidden({ timeout: 2000 })
+  })
+
+  // 3. 推迟小时输入验证（POST /reminders/{id}/action snoozed）
+  test('待办详情「推迟」modal 输入小时数后提交（POST /reminders/{id}/action）', async ({ page, request }) => {
+    // 通过 API 获取一个 pending todo，确保有数据可测
+    const token = await getApiToken(request)
+    const todo = await getFirstPendingTodoViaApi(request, token)
+
+    await page.goto(`/pages/todos/detail?id=${todo.id}`, { waitUntil: 'domcontentloaded' })
+    await expect(page.locator('.page-todo-detail')).toBeVisible({ timeout: 15000 })
+
+    const snoozeBtn = page.locator('.action-bar .action-btn', { hasText: '推迟' }).first()
+    await expect(snoozeBtn, 'pending 待办应有「推迟」按钮').toBeVisible({ timeout: 5000 })
+    await snoozeBtn.evaluate((el: HTMLElement) => el.click())
+
+    const modal = page.locator('.taro-modal, .taromodal, [class*="modal"]').filter({ hasText: '推迟待办' }).first()
+    await expect(modal).toBeAttached({ timeout: 5000 })
+
+    const input = modal.locator('input, [class*="input"]').first()
+    const hasInput = await input.count()
+    if (hasInput > 0) {
+      await input.fill('48')
+    }
+
+    const confirmBtn = modal.locator('button, [class*="btn"], [class*="confirm"]').filter({ hasText: '推迟' }).last()
+    await confirmBtn.evaluate((el: HTMLElement) => el.click())
+
+    // 真实后端 POST /reminders/{id}/action snoozed 更新 todo 状态为 snoozed
+    // 随后 loadDetail 重新 GET /todos/{id} 返回 status=snoozed
+    await expect(page.locator('.action-bar .action-btn', { hasText: '恢复待处理' }),
+      '推迟成功后应显示「恢复待处理」按钮').toBeVisible({ timeout: 10000 })
+  })
 })

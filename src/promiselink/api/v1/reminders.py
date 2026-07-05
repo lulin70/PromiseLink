@@ -279,7 +279,10 @@ async def take_reminder_action(
     log_entry = log_result.scalar_one_or_none()
     if log_entry:
         log_entry.action_taken = req.action
-        latency = (datetime.now(UTC) - log_entry.sent_at).total_seconds()
+        # sent_at 可能是 naive datetime（PostgreSQL timestamp without tz），
+        # 需补 tzinfo=UTC 才能与 datetime.now(UTC) 相减
+        sent_at = log_entry.sent_at.replace(tzinfo=UTC) if log_entry.sent_at.tzinfo is None else log_entry.sent_at
+        latency = (datetime.now(UTC) - sent_at).total_seconds()
         log_entry.response_latency_seconds = int(latency)
 
     await session.commit()

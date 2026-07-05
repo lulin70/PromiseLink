@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { injectLoginState, setupMockApi } from './mock_data'
-import { waitForPageReady } from './helpers'
+import { waitForPageReady, setupRealApi } from './helpers'
 
 /**
  * Batch 2 UI 整改 E2E 测试（v0.8.0-rc3 零 skip 重构版）。
@@ -12,6 +12,11 @@ import { waitForPageReady } from './helpers'
  *   3. "系统有问题就优化系统" — Guide 测试通过 injectLoginState({ showGuide: true })
  *      确保引导组件必定显示（登录态 + 移除 guide_shown），不通过 skip 绕过。
  *
+ * 批次 3.3 改造（mock → real backend）：
+ *   - 1.1 设置页核心项 (8 用例) → setupRealApi：modal/导航/UI 状态不依赖数据，真实后端可跑
+ *   - 2.3 引导内容重写 (4 用例) → setupRealApi({ showGuide: true })：Guide 组件纯前端，真实后端可跑
+ *   - 1.3 提醒页 + 1.3+1.1 集成 → 保留 mock：需要特定 reminder 数据状态（total_pending=2 等）
+ *
  * 覆盖范围：
  *   1. 1.1 设置页核心项：隐私删除二次确认 modal、提醒偏好入口、专业版功能 toast
  *   2. 1.3 基础版每日提醒页：4 级优先级分组、状态条、偏好面板、单项/批量操作
@@ -19,14 +24,12 @@ import { waitForPageReady } from './helpers'
  *   4. 1.3 + 1.1 集成：设置→提醒偏好→保存、首页摘要条→提醒页端到端
  */
 test.describe('Batch 2 UI 整改 @batch2', () => {
-  test.describe('1.1 设置页核心项 @settings', () => {
+  test.describe('1.1 设置页核心项 @settings @real-backend', () => {
     test.beforeEach(async ({ page }) => {
-      // 顺序关键：必须先 setupMockApi 再 injectLoginState。
-      // injectLoginState 会 page.goto('/pages/index/index')，触发 Index 组件挂载并发起
-      // getDashboard/getDailyReminders 等请求。若 mock 未就位，请求失败被 .catch 吞掉，
-      // reminderData 保持 null → 摘要条不渲染；dashboard 崩溃 → webpack overlay 拦截点击。
-      await setupMockApi(page)
-      await injectLoginState(page)
+      // 批次 3.3：改用真实后端。设置页测试只验证 modal/导航/UI 状态，
+      // 不依赖特定后端数据，真实后端可正常跑通。
+      // setupRealApi 通过 loginViaUi 获取真实 token，不注册 mock 拦截。
+      await setupRealApi(page)
     })
 
     test('我的页加载，账户菜单与专业版功能分区可见', async ({ page }) => {
@@ -271,17 +274,12 @@ test.describe('Batch 2 UI 整改 @batch2', () => {
     })
   })
 
-  test.describe('2.3 引导内容重写 @guide', () => {
+  test.describe('2.3 引导内容重写 @guide @real-backend', () => {
     test.beforeEach(async ({ page }) => {
-      // Guide 组件显示条件（app.tsx）：
-      //   1. isLoggedIn() 返回 true（token 存在）
-      //   2. guide_shown 不在 localStorage 中
-      // 通过 injectLoginState({ showGuide: true }) 确保：
-      //   - 注入 token（登录态）
-      //   - 移除 guide_shown（让 Guide 轮询检测到未展示过 → 自动弹出）
-      // 顺序关键：先 setupMockApi 再 injectLoginState（原因见其他 beforeEach 注释）
-      await setupMockApi(page)
-      await injectLoginState(page, undefined, undefined, { showGuide: true })
+      // 批次 3.3：改用真实后端。Guide 组件是纯前端逻辑（轮询 localStorage guide_shown），
+      // 不依赖后端数据，真实后端可正常跑通。
+      // setupRealApi({ showGuide: true }) 通过 loginViaUi 获取真实 token，并移除 guide_shown。
+      await setupRealApi(page, { showGuide: true })
     })
 
     test('引导组件：4 步内容包含"场景"关键字', async ({ page }) => {
