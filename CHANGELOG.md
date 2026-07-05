@@ -2,6 +2,24 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [Unreleased] - 2026-07-05
+
+### Fixed — 基础版 E2E 全量零 skip 达成
+
+- **batch2.spec.ts 零 skip 重写**：消除全部 7 处 `test.skip()`，20 个测试全部实际执行并通过。根因是 5 个 mock 数据契约与 TypeScript 接口不匹配：
+  - `/dashboard/day-view` 缺 `summary`/`date_label`/`adjacent_dates` 字段 → Index 组件访问 `dashboard.summary.total_events` 崩溃 → webpack-dev-server 错误 overlay 拦截所有点击
+  - `/privacy/data-summary` 返回 `{events_count}` 扁平字段而非 `{user_id, counts: {...}}` → `Object.entries(undefined)` 崩溃 → 隐私删除 modal 渲染失败
+  - `/privacy/user-data` DELETE 返回 `{deleted: true}` 而非 `{deleted: Record<string, number>, audit_id, deleted_at}`
+  - `/dashboard/supply-demand` 返回 `{items: []}` 而非 `{matches: []}` → `sdMatches.length` 崩溃
+  - `/dashboard/relationship-health` + `/dashboard/care-reminders` 字段缺失
+- **`beforeEach` 顺序修正**：`setupMockApi` 必须在 `injectLoginState` 前调用，否则导航期间 API 请求未被拦截，`getDailyReminders()` 失败被 `.catch` 吞掉导致摘要条不渲染
+- **Guide 测试读取范围修正**：验证"场景"关键字应读取 `.pl-guide-body`（含标题+正文+提示）而非仅 `.pl-guide-text`（正文），因为"场景"在标题中
+
+### Tests
+
+- 基础版 E2E：**81 passed / 0 fail / 0 skip**（4.5m），grep 确认无任何 `test.skip()` 调用
+- batch2.spec.ts：20 passed / 0 fail / 0 skip（1.0m）
+
 ## [0.8.0-rc2] - 2026-07-03
 
 ### Added — UI 整改 Batch 2（1.0 核心功能补齐）

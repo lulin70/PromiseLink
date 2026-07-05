@@ -276,13 +276,13 @@ jobs:
         run: python3 scripts/e2e/e2e_basic_test.py
 
       - name: Run E2E smoke test
-        run: python3 scripts/e2e/e2e_smoke_test.py || true
+        run: python3 scripts/e2e/e2e_smoke_test.py
 
       - name: Run E2E user journey
-        run: python3 scripts/e2e/e2e_user_journey.py || true
+        run: python3 scripts/e2e/e2e_user_journey.py
 
       - name: Run E2E full user journey
-        run: python3 scripts/e2e/e2e_full_user_journey.py || true
+        run: python3 scripts/e2e/e2e_full_user_journey.py
 
       - name: Display server logs
         if: always()

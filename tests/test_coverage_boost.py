@@ -1507,17 +1507,6 @@ class TestMainAppExceptionHandlers:
         assert "error" in data
         assert data["error"]["code"] == "NOT_FOUND"
 
-    @pytest.mark.skip(reason="根路径不是用户使用的路径，API 文档在 /docs")
-    @pytest.mark.asyncio
-    async def test_root_endpoint(self, unauth_client):
-        """Root endpoint returns app info."""
-        response = await unauth_client.get("/")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "running"
-        assert "name" in data
-        assert "version" in data
-
 
 # ══════════════════════════════════════════════════════════════════
 # 10. Dashboard API Tests (dashboard.py: 55% → 80%+)

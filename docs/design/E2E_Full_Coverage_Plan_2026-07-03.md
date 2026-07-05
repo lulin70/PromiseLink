@@ -465,3 +465,26 @@ export function setupProApiMocks(page: Page) {
 - 基础版 E2E: 13 passed / 19 skipped / 0 failed（todos.spec.ts + batch_a_full_coverage.spec.ts 子集）
 - TypeScript: 小程序 + 基础版 tsc --noEmit 全部通过
 
+### 8.10 Batch 2 零 skip 重写 (2026-07-05)
+
+**目标**: 落实用户硬约束"Skip的测试都不合理" — 消除 batch2.spec.ts 中全部 7 处 test.skip，打造可自信发布的基础版 E2E 套件。
+
+**根因分析与修复**:
+1. **mock `/dashboard/day-view` 缺 `summary` 字段** — 前端 `index.tsx` 直接读 `dashboard.summary.total_events`，缺失触发 TypeError → Index 组件崩溃 → webpack-dev-server 错误 overlay 拦截所有点击 → 隐私删除 modal 等 5 个交互测试全部失败。补齐 `summary`/`date_label`/`adjacent_dates` 三个契约必需字段。
+2. **mock `/privacy/data-summary` 返回形状错误** — 返回 `{events_count, ...}` 扁平字段，但 `PrivacyDataSummary` 契约要求 `{user_id, counts: Record<string, number>}`。`renderSummaryText()` 调 `Object.entries(summary.counts)` → `Object.entries(undefined)` 抛 TypeError → modal 渲染崩溃。修正为完整 `{user_id, counts: {events, todos, promises, ...}}` 形状。
+3. **mock `/privacy/user-data` DELETE 形状错误** — 返回 `{deleted: true}` 但契约要求 `{deleted: Record<string, number>, audit_id, deleted_at}`。修正。
+4. **mock `/dashboard/supply-demand` 字段名错误** — 返回 `{items: []}` 但 `SupplyDemandResponse` 契约要求 `{matches: []}`。`setSdMatches(res.matches)` 传入 undefined → `sdMatches.length` 抛 TypeError → Index 崩溃 → 摘要条不渲染。修正为 `{matches: [], total: 0}`。
+5. **mock `/dashboard/relationship-health` + `/dashboard/care-reminders` 字段缺失** — 均返回 `{items: [], total: 0}` 但契约要求完整字段（`total_entities`/`healthy_count`/`personal_items`/`business_items`/`summary_text` 等）。补齐完整字段。
+6. **`beforeEach` 顺序错误** — `injectLoginState` 先导航触发 API 调用，`setupMockApi` 后设置 mock → 请求未被拦截 → `getDailyReminders()` 失败被 `.catch` 吞掉 → `reminderData` 保持 null → 摘要条不渲染。修正为 `setupMockApi` → `injectLoginState` 顺序。
+7. **Guide 测试读取范围错误** — 测试读 `.pl-guide-text`（正文），但"场景"关键字在 `.pl-guide-title`（标题）中。修正为读取 `.pl-guide-body`（含标题+正文+提示）。
+
+**验证结果**:
+- batch2.spec.ts: 20 passed / 0 fail / 0 skip（1.0m）
+- 全量基础版 E2E: **81 passed / 0 fail / 0 skip**（4.5m）
+- grep 确认无任何 `test.skip()` 调用（5 处匹配全为注释中的设计原则说明）
+
+**设计原则沉淀**:
+- mock 数据必须严格匹配 TypeScript 接口契约，否则前端访问 undefined 属性会崩溃
+- `page.route()` 必须在 `page.goto()` 前设置，否则导航期间的 API 请求不被拦截
+- 测试读取元素范围应与断言意图一致（验证"内容"应读取包含标题的容器，非仅正文）
+

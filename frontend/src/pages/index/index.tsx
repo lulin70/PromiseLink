@@ -39,9 +39,7 @@ export default function Index() {
     try {
       setLoading(true)
       setError('')
-      console.log('[Dashboard] Loading dashboard...')
       const data = await getDashboard()
-      console.log('[Dashboard] Loaded:', JSON.stringify(data).slice(0, 200))
       setDashboard(data)
       // F-E4: Also load supply-demand matches (non-blocking)
       getSupplyDemand(5).then(res => setSdMatches(res.matches)).catch(() => {})

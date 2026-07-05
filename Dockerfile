@@ -48,7 +48,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 FROM python:3.11-slim AS runtime
 
 # Build-time version label (kept in sync with VERSION file and pyproject.toml)
-ARG VERSION=0.7.0
+ARG VERSION=0.8.0-rc2
 
 # OCI-standard image labels for registry indexing and traceability
 LABEL org.opencontainers.image.title="PromiseLink" \

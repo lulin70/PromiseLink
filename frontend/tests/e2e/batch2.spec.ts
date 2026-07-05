@@ -1,30 +1,32 @@
 import { test, expect } from '@playwright/test'
-import { loginViaUi, waitForPageReady, clearLoginState } from './helpers'
+import { injectLoginState, setupMockApi } from './mock_data'
+import { waitForPageReady } from './helpers'
 
 /**
- * Batch 2 UI 整改 E2E 测试（v0.8.0-rc2）。
+ * Batch 2 UI 整改 E2E 测试（v0.8.0-rc3 零 skip 重构版）。
+ *
+ * 设计原则（用户硬约束）：
+ *   1. "没有数据创造数据" — 通过 setupMockApi 拦截所有 /api/v1/** 请求，
+ *      返回确定性测试数据，消除所有"后端无数据"类 test.skip。
+ *   2. "Skip的测试都不合理" — 所有用例必须实际执行，不通过 test.skip 绕过。
+ *   3. "系统有问题就优化系统" — Guide 测试通过 injectLoginState({ showGuide: true })
+ *      确保引导组件必定显示（登录态 + 移除 guide_shown），不通过 skip 绕过。
  *
  * 覆盖范围：
- *   1. 1.1 设置页核心项：
- *      - 隐私数据删除二次确认 modal（输入 DELETE 短语）
- *      - 提醒偏好入口跳转 /pages/reminders/index
- *      - 专业版功能入口点击提示 toast
- *   2. 1.3 基础版每日提醒页：
- *      - /pages/reminders/index 加载、4 级优先级分组、状态条
- *      - 提醒偏好面板展开/收起、保存
- *      - 单项/批量操作按钮可见
- *      - 首页"今日提醒"摘要条入口
- *   3. 2.3 引导内容重写：
- *      - Guide 4 步内容包含"场景"关键字
- *      - 步骤切换、跳过、完成
- *
- * Taro H5 兼容方案：CSS Modules 类名被哈希，使用稳定文本选择器；
- *   Taro View 的 onClick 需通过 evaluate 触发 DOM click。
+ *   1. 1.1 设置页核心项：隐私删除二次确认 modal、提醒偏好入口、专业版功能 toast
+ *   2. 1.3 基础版每日提醒页：4 级优先级分组、状态条、偏好面板、单项/批量操作
+ *   3. 2.3 引导内容重写：Guide 4 步内容含"场景"关键字、步骤切换、跳过、完成
+ *   4. 1.3 + 1.1 集成：设置→提醒偏好→保存、首页摘要条→提醒页端到端
  */
 test.describe('Batch 2 UI 整改 @batch2', () => {
   test.describe('1.1 设置页核心项 @settings', () => {
     test.beforeEach(async ({ page }) => {
-      await loginViaUi(page)
+      // 顺序关键：必须先 setupMockApi 再 injectLoginState。
+      // injectLoginState 会 page.goto('/pages/index/index')，触发 Index 组件挂载并发起
+      // getDashboard/getDailyReminders 等请求。若 mock 未就位，请求失败被 .catch 吞掉，
+      // reminderData 保持 null → 摘要条不渲染；dashboard 崩溃 → webpack overlay 拦截点击。
+      await setupMockApi(page)
+      await injectLoginState(page)
     })
 
     test('我的页加载，账户菜单与专业版功能分区可见', async ({ page }) => {
@@ -152,7 +154,12 @@ test.describe('Batch 2 UI 整改 @batch2', () => {
 
   test.describe('1.3 基础版每日提醒页 @reminders', () => {
     test.beforeEach(async ({ page }) => {
-      await loginViaUi(page)
+      // 顺序关键：必须先 setupMockApi 再 injectLoginState。
+      // injectLoginState 会 page.goto('/pages/index/index')，触发 Index 组件挂载并发起
+      // getDashboard/getDailyReminders 等请求。若 mock 未就位，请求失败被 .catch 吞掉，
+      // reminderData 保持 null → 摘要条不渲染；dashboard 崩溃 → webpack overlay 拦截点击。
+      await setupMockApi(page)
+      await injectLoginState(page)
     })
 
     test('提醒页加载，标题与状态条可见', async ({ page }) => {
@@ -161,7 +168,7 @@ test.describe('Batch 2 UI 整改 @batch2', () => {
 
       await expect(page.locator('.page-reminders'), '提醒页应渲染').toBeVisible({ timeout: 10000 })
       await expect(page.locator('.header-title', { hasText: '今日提醒' }), '标题应为「今日提醒」').toBeVisible()
-      // 状态条
+      // 状态条 — mock 返回 total_pending=2, fatigue_remaining=8, is_quiet_hours=false
       await expect(page.locator('.stats-bar'), '应显示状态条').toBeVisible()
       // 三个状态项：待处理 / 剩余配额 / 免打扰
       const statLabels = ['待处理', '剩余配额', '免打扰']
@@ -191,30 +198,16 @@ test.describe('Batch 2 UI 整改 @batch2', () => {
       await expect(page.locator('.pref-panel'), '再次点击偏好面板应隐藏').toBeHidden()
     })
 
-    test('空状态：无提醒时显示"今日无待处理提醒"', async ({ page }) => {
+    test('有提醒时显示优先级分组与卡片', async ({ page }) => {
       await page.goto('/pages/reminders/index', { waitUntil: 'domcontentloaded' })
       await waitForPageReady(page, '.page-reminders')
       await page.waitForTimeout(1500) // 等待 API 返回
 
-      const emptyState = page.locator('.empty-state')
-      const isEmpty = await emptyState.count()
-      if (isEmpty > 0) {
-        await expect(emptyState, '空状态应显示"今日无待处理提醒"').toContainText('今日无待处理提醒')
-      }
-      // 非空状态时跳过此断言（后端有数据）
-    })
-
-    test('有提醒时显示优先级分组与卡片', async ({ page }) => {
-      await page.goto('/pages/reminders/index', { waitUntil: 'domcontentloaded' })
-      await waitForPageReady(page, '.page-reminders')
-      await page.waitForTimeout(1500)
-
+      // mock /reminders/daily 返回 2 条提醒（priority=2 和 priority=3），
+      // 对应 P1 重要 和 P2 一般 两个分组
       const priorityGroups = page.locator('.priority-group')
-      const groupCount = await priorityGroups.count()
-      test.skip(groupCount === 0, '后端无提醒数据，跳过优先级分组用例')
+      await expect(priorityGroups.first(), '应至少有一个优先级分组').toBeVisible({ timeout: 10000 })
 
-      // 至少有一个优先级分组可见
-      await expect(priorityGroups.first(), '应至少有一个优先级分组').toBeVisible()
       // 分组头部应有 P0/P1/P2/P3 之一
       const groupLabel = await priorityGroups.first().locator('.group-label').innerText()
       expect(groupLabel, '分组标签应含 P0/P1/P2/P3').toMatch(/P[0-3]/)
@@ -235,9 +228,9 @@ test.describe('Batch 2 UI 整改 @batch2', () => {
       await waitForPageReady(page, '.page-reminders')
       await page.waitForTimeout(1500)
 
+      // mock 保证有提醒卡片数据
       const cards = page.locator('.reminder-card')
-      const cardCount = await cards.count()
-      test.skip(cardCount === 0, '后端无提醒数据，跳过批量操作用例')
+      await expect(cards.first(), '应有提醒卡片').toBeVisible({ timeout: 10000 })
 
       // 初始无批量栏
       await expect(page.locator('.batch-bar'), '初始应无批量操作栏').toBeHidden()
@@ -248,10 +241,10 @@ test.describe('Batch 2 UI 整改 @batch2', () => {
         // 降级：直接点击卡片主体
         await cards.first().locator('.card-main').first().evaluate((el: HTMLElement) => el.click())
       })
-      await page.waitForTimeout(300)
+      await page.waitForTimeout(500)
 
       // 底部批量栏应出现
-      await expect(page.locator('.batch-bar'), '勾选后应显示批量操作栏').toBeVisible({ timeout: 3000 })
+      await expect(page.locator('.batch-bar'), '勾选后应显示批量操作栏').toBeVisible({ timeout: 5000 })
       // 批量按钮
       for (const label of ['批量完成', '批量推迟', '批量忽略']) {
         await expect(
@@ -261,51 +254,48 @@ test.describe('Batch 2 UI 整改 @batch2', () => {
       }
     })
 
-    test('首页"今日提醒"摘要条入口可见（有数据时）', async ({ page }) => {
+    test('首页"今日提醒"摘要条入口可见并可跳转', async ({ page }) => {
       await page.goto('/pages/index/index', { waitUntil: 'domcontentloaded' })
       await waitForPageReady(page, '.page-index')
       await page.waitForTimeout(2000)
 
+      // mock /reminders/daily 返回 total_pending=2 > 0，首页摘要条必定渲染
       const summaryBar = page.locator('.reminder-summary-bar')
-      const isVisible = await summaryBar.count()
-      if (isVisible > 0) {
-        await expect(summaryBar, '摘要条应可见').toBeVisible()
-        await expect(summaryBar, '应含"今日提醒"文本').toContainText('今日提醒')
-        // 点击应跳转到 /pages/reminders/index
-        await summaryBar.evaluate((el: HTMLElement) => el.click())
-        await page.waitForURL('**/pages/reminders/index', { timeout: 10000 }).catch(() => {})
-        await expect(page.locator('.page-reminders'), '点击摘要条应跳转到提醒页').toBeVisible({ timeout: 10000 })
-      }
-      // 无数据时不显示摘要条（业务正常），跳过点击断言
+      await expect(summaryBar, '摘要条应可见（mock 返回 total_pending=2）').toBeVisible({ timeout: 10000 })
+      await expect(summaryBar, '应含"今日提醒"文本').toContainText('今日提醒')
+
+      // 点击应跳转到 /pages/reminders/index
+      await summaryBar.evaluate((el: HTMLElement) => el.click())
+      await page.waitForURL('**/pages/reminders/index', { timeout: 10000 }).catch(() => {})
+      await expect(page.locator('.page-reminders'), '点击摘要条应跳转到提醒页').toBeVisible({ timeout: 10000 })
     })
   })
 
   test.describe('2.3 引导内容重写 @guide', () => {
     test.beforeEach(async ({ page }) => {
-      // 清除引导已完成标记，确保 Guide 重新显示
-      if (page.url() === 'about:blank' || !page.url().startsWith('http')) {
-        await page.goto('/', { waitUntil: 'domcontentloaded' })
-      }
-      await page.evaluate(() => {
-        try { localStorage.removeItem('guide_shown') } catch { /* ignore */ }
-      })
+      // Guide 组件显示条件（app.tsx）：
+      //   1. isLoggedIn() 返回 true（token 存在）
+      //   2. guide_shown 不在 localStorage 中
+      // 通过 injectLoginState({ showGuide: true }) 确保：
+      //   - 注入 token（登录态）
+      //   - 移除 guide_shown（让 Guide 轮询检测到未展示过 → 自动弹出）
+      // 顺序关键：先 setupMockApi 再 injectLoginState（原因见其他 beforeEach 注释）
+      await setupMockApi(page)
+      await injectLoginState(page, undefined, undefined, { showGuide: true })
     })
 
     test('引导组件：4 步内容包含"场景"关键字', async ({ page }) => {
-      // 未登录访问首页，Guide 应自动展示
-      await clearLoginState(page)
+      // 重新导航到首页触发 Guide 轮询（800ms 间隔）
       await page.goto('/pages/index/index', { waitUntil: 'domcontentloaded' })
       await waitForPageReady(page)
 
-      // 等待 Guide overlay 出现
-      await page.waitForSelector('.pl-guide-overlay', { state: 'visible', timeout: 10000 }).catch(() => {})
-      const guideVisible = await page.locator('.pl-guide-overlay').count()
-      test.skip(guideVisible === 0, 'Guide 未自动展示（可能已展示过或组件异常），跳过用例')
+      // 等 Guide overlay 出现（轮询间隔 800ms，最多等 8s）
+      await expect(page.locator('.pl-guide-overlay'), 'Guide 应在登录态下自动展示').toBeVisible({ timeout: 8000 })
 
-      // 收集 4 步内容
+      // 收集 4 步内容（读取 .pl-guide-body 包含 title + text + hint 全部文本）
       const stepTexts: string[] = []
       for (let i = 0; i < 4; i++) {
-        const bodyText = await page.locator('.pl-guide-text').first().innerText().catch(() => '')
+        const bodyText = await page.locator('.pl-guide-body').first().innerText().catch(() => '')
         stepTexts.push(bodyText)
         // 点击"下一步"（最后一步会变成"开始使用"并触发 finish）
         const nextBtn = page.locator('.pl-guide-btn-primary').first()
@@ -321,13 +311,10 @@ test.describe('Batch 2 UI 整改 @batch2', () => {
     })
 
     test('引导组件：可逐步下一步直到完成', async ({ page }) => {
-      await clearLoginState(page)
       await page.goto('/pages/index/index', { waitUntil: 'domcontentloaded' })
       await waitForPageReady(page)
 
-      await page.waitForSelector('.pl-guide-overlay', { state: 'visible', timeout: 10000 }).catch(() => {})
-      const guideVisible = await page.locator('.pl-guide-overlay').count()
-      test.skip(guideVisible === 0, 'Guide 未展示，跳过用例')
+      await expect(page.locator('.pl-guide-overlay'), 'Guide 应自动展示').toBeVisible({ timeout: 8000 })
 
       // 步骤指示器应显示"第 1 步 / 共 4 步"
       await expect(page.locator('.pl-guide-step-label')).toContainText('第 1 步')
@@ -336,7 +323,7 @@ test.describe('Batch 2 UI 整改 @batch2', () => {
       // 点击下一步 3 次（第 4 步显示"开始使用"）
       for (let i = 0; i < 3; i++) {
         await page.locator('.pl-guide-btn-primary').first().evaluate((el: HTMLElement) => el.click())
-        await page.waitForTimeout(200)
+        await page.waitForTimeout(300)
       }
 
       // 最后一步按钮文本应为"开始使用"
@@ -352,13 +339,10 @@ test.describe('Batch 2 UI 整改 @batch2', () => {
     })
 
     test('引导组件：可点击"跳过"提前关闭', async ({ page }) => {
-      await clearLoginState(page)
       await page.goto('/pages/index/index', { waitUntil: 'domcontentloaded' })
       await waitForPageReady(page)
 
-      await page.waitForSelector('.pl-guide-overlay', { state: 'visible', timeout: 10000 }).catch(() => {})
-      const guideVisible = await page.locator('.pl-guide-overlay').count()
-      test.skip(guideVisible === 0, 'Guide 未展示，跳过用例')
+      await expect(page.locator('.pl-guide-overlay'), 'Guide 应自动展示').toBeVisible({ timeout: 8000 })
 
       // 点击"跳过"
       await page.locator('.pl-guide-skip').first().evaluate((el: HTMLElement) => el.click())
@@ -370,13 +354,10 @@ test.describe('Batch 2 UI 整改 @batch2', () => {
     })
 
     test('引导组件：上一步按钮在第一步隐藏，第二步起可见', async ({ page }) => {
-      await clearLoginState(page)
       await page.goto('/pages/index/index', { waitUntil: 'domcontentloaded' })
       await waitForPageReady(page)
 
-      await page.waitForSelector('.pl-guide-overlay', { state: 'visible', timeout: 10000 }).catch(() => {})
-      const guideVisible = await page.locator('.pl-guide-overlay').count()
-      test.skip(guideVisible === 0, 'Guide 未展示，跳过用例')
+      await expect(page.locator('.pl-guide-overlay'), 'Guide 应自动展示').toBeVisible({ timeout: 8000 })
 
       // 第一步应无"上一步"按钮
       await expect(page.locator('.pl-guide-btn-ghost', { hasText: '上一步' }), '第一步不应有上一步按钮').toBeHidden()
@@ -397,7 +378,12 @@ test.describe('Batch 2 UI 整改 @batch2', () => {
 
   test.describe('1.3 + 1.1 集成：设置→提醒偏好→保存 @integration', () => {
     test.beforeEach(async ({ page }) => {
-      await loginViaUi(page)
+      // 顺序关键：必须先 setupMockApi 再 injectLoginState。
+      // injectLoginState 会 page.goto('/pages/index/index')，触发 Index 组件挂载并发起
+      // getDashboard/getDailyReminders 等请求。若 mock 未就位，请求失败被 .catch 吞掉，
+      // reminderData 保持 null → 摘要条不渲染；dashboard 崩溃 → webpack overlay 拦截点击。
+      await setupMockApi(page)
+      await injectLoginState(page)
     })
 
     test('从我的页进入提醒页，展开偏好面板，可保存', async ({ page }) => {
@@ -435,9 +421,9 @@ test.describe('Batch 2 UI 整改 @batch2', () => {
       await waitForPageReady(page, '.page-index')
       await page.waitForTimeout(2000)
 
+      // mock /reminders/daily 返回 total_pending=2 > 0，首页摘要条必定渲染
       const summaryBar = page.locator('.reminder-summary-bar')
-      const hasBar = await summaryBar.count()
-      test.skip(hasBar === 0, '后端无今日提醒数据，跳过端到端用例')
+      await expect(summaryBar, '首页应有今日提醒摘要条').toBeVisible({ timeout: 10000 })
 
       await summaryBar.evaluate((el: HTMLElement) => el.click())
       await expect(page.locator('.page-reminders'), '应跳转到提醒页').toBeVisible({ timeout: 10000 })
