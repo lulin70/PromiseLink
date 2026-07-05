@@ -4,6 +4,7 @@
 from sqlalchemy import Integer, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from promiselink.models.entity import Entity
 from promiselink.models.todo import Todo
 
 
@@ -48,7 +49,7 @@ class CreditScoreService:
             )
             .group_by(Todo.related_entity_id)
         )
-        my_rows = dict((await session.execute(my_promises_q)).all())
+        my_rows = {row[0]: (row[1], row[2]) for row in (await session.execute(my_promises_q)).all()}
         # my_rows: entity_id -> (total, fulfilled)
 
         # ── Batch query 2: Their promises (total + fulfilled) ──
@@ -67,7 +68,7 @@ class CreditScoreService:
             )
             .group_by(Todo.related_entity_id)
         )
-        their_rows = dict((await session.execute(their_promises_q)).all())
+        their_rows = {row[0]: (row[1], row[2]) for row in (await session.execute(their_promises_q)).all()}
         # their_rows: entity_id -> (total, fulfilled)
 
         # ── Batch query 3: Total interactions (all todos per entity) ──
@@ -147,7 +148,24 @@ class CreditScoreService:
         entity_id: str,
         user_id: str,
     ) -> dict:
-        """Calculate credit score for a single entity (convenience wrapper)."""
+        """Calculate credit score for a single entity (convenience wrapper).
+
+        Returns default zero-score dict if the entity does not exist in DB.
+        """
+        # Verify entity exists; otherwise return default (avoids treating
+        # non-existent entities as "no todos" which would yield score=50)
+        exists = (await session.execute(
+            select(Entity.id).where(Entity.id == entity_id)
+        )).scalar_one_or_none()
+        if not exists:
+            return {
+                "score": 0,
+                "grade": "D",
+                "my_fulfillment_rate": 0.5,
+                "their_fulfillment_rate": 0.5,
+                "interaction_consistency": 50,
+                "total_interactions": 0,
+            }
         results = await CreditScoreService.batch_calculate(
             session, [entity_id], user_id
         )
