@@ -341,7 +341,9 @@ jobs:
           path: bandit-report.json
 
   build-and-push:
-    needs: [test, e2e, frontend]
+    # 批次3.4: 完整依赖链 — test(单测+覆盖率) + e2e(集成) + frontend(tsc+build) + security(bandit+pip-audit) + playwright-ui(UI E2E)
+    # 任一前置失败则不构建推送镜像，避免 broken image 进入 registry
+    needs: [test, e2e, frontend, security, playwright-ui]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
