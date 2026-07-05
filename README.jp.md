@@ -96,7 +96,7 @@ bash scripts/start.sh
 git clone https://github.com/lulin70/PromiseLink
 cd PromiseLink
 pip install -e '.[dev]'
-pytest --co -q | tail -1   # 1388 tests collected と表示されるはず
+pytest --co -q | tail -1   # 1394 tests collected と表示されるはず
 pytest tests/test_security_comprehensive.py -q --no-cov   # 50件のセキュリティテスト
 ```
 
@@ -106,7 +106,7 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50件のセキュリ
 
 | 指標       | 値                                                               |
 | -------- | ---------------------------------------------------------------- |
-| テストケース     | **1364 passed**, 24 skipped, 0 failed（50件の relay_client 堅牢性 + 12件の v5.6 修正 + 50セキュリティ + 17パフォーマンスを含む） |
+| テストケース     | **1364 passed**, 30 skipped, 0 failed（50件の relay_client 堅牢性 + 12件の v5.6 修正 + 50セキュリティ + 17パフォーマンス + 6件のリアル LLM E2E を含む） |
 | コードカバレッジ    | **71%**                                                          |
 | mypy 型チェック | **0 エラー**（112ソースファイルすべて合格）                                             |
 | ruff リント | **0 エラー**                                                          |
@@ -241,7 +241,7 @@ PromiseLink/
 │   ├── prompts/                # LLM Promptテンプレート
 │   └── main.py                 # FastAPIエントリ
 ├── docs/                       # ドキュメント
-├── tests/                      # テスト（66ファイル / 1388ケース）
+├── tests/                      # テスト（67ファイル / 1394ケース）
 ├── data/                       # SQLiteデータストレージ
 ├── scripts/                    # ワンクリックインストール/起動スクリプト + E2Eテスト
 └── frontend/                   # Taro H5フロントエンド
@@ -287,7 +287,7 @@ PromiseLink/
 - [x] DataSourceAdapter 抽象層（手動 / CSV；音声 / WeChat / メールはプロ版の機能）
 - [x] CarryMem プロトコル分離（NullMemoryProvider グレースフルデグラデーション）
 - [x] 暗号化体系（HMAC-SHA256 + フィールドレベル暗号化 + 行レベルセキュリティ）
-- [x] 66 テストファイル / **1388 テストケース**（50件の relay_client 堅牢性 + 12件の v5.6 修正を含む）/ **71% カバレッジ**
+- [x] 67 テストファイル / **1394 テストケース**（50件の relay_client 堅牢性 + 12件の v5.6 修正 + 6件のリアル LLM E2E を含む）/ **71% カバレッジ**
 - [x] CI/CD + Alembic 対応完了
 - [x] PoC Demo 4/4 シナリオ合格
 - [x] ワンクリックインストール / 起動スクリプト（ローカルで直接実行、Docker不要）
