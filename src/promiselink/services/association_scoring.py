@@ -107,7 +107,7 @@ class AssociationScoringMixin:
         history_a = (a.properties or {}).get("work_history", [])
         history_b = (b.properties or {}).get("work_history", [])
 
-        def _normalize_entry(entry) -> dict:
+        def _normalize_entry(entry: Any) -> dict:
             """Normalize work_history entry to dict.
 
             LLM may return work_history as list of strings (company names)
