@@ -111,14 +111,15 @@ def _classify_reminder_type(todo: Todo) -> str:
         due = todo.due_date.replace(tzinfo=UTC) if todo.due_date.tzinfo is None else todo.due_date
         if due <= now:
             return "promise_due"
-    if todo.todo_type == "followup":
-        return "followup"
-    # Check properties for stage_suggestion / dormant_contact hints
+    # Check properties for stage_suggestion / dormant_contact hints first,
+    # so explicit hints take precedence over the todo_type default.
     props = todo.properties or {}
     if props.get("reminder_hint") == "dormant_contact":
         return "dormant_contact"
     if props.get("reminder_hint") == "stage_suggestion":
         return "stage_suggestion"
+    if todo.todo_type == "followup":
+        return "followup"
     # Default classification by todo_type
     type_map = {
         "care": "stage_suggestion",
