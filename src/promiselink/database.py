@@ -104,8 +104,8 @@ def get_async_engine() -> Any:
             echo=settings.debug,
             connect_args={"check_same_thread": False, "timeout": 30},
             poolclass=AsyncAdaptedQueuePool,
-            pool_size=20,
-            max_overflow=30,
+            pool_size=5,
+            max_overflow=10,
             pool_timeout=60,
             pool_pre_ping=True,
         )

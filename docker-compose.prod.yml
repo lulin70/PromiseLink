@@ -4,9 +4,19 @@
 
 version: "3.8"
 
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-security: &default-security
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
 services:
   promiselink-api:
-    image: ghcr.io/${REGISTRY_OWNER:-lin-aotp}/promiselink:${VERSION:-latest}
+    image: ghcr.io/${REGISTRY_OWNER:-lulin70}/promiselink:${VERSION:-latest}
     container_name: promiselink-api
     restart: unless-stopped
     env_file: .env.prod
@@ -14,15 +24,18 @@ services:
       - DATABASE_URL=sqlite+aiosqlite:////app/data/promiselink.db
       - REDIS_ENABLED=false
     volumes:
-      - promiselink-data:/app/data
+      - /opt/promiselink/data:/app/data
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 15s
+    logging: *default-logging
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
 
   nginx:
     image: nginx:alpine
@@ -32,22 +45,29 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d
-      - certbot-www:/var/www/certbot
-      - certbot-conf:/etc/letsencrypt
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - /opt/promiselink/certbot/www:/var/www/certbot:ro
+      - /opt/promiselink/certbot/conf:/etc/letsencrypt:ro
     depends_on:
       promiselink-api:
         condition: service_healthy
+    logging: *default-logging
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
 
   certbot:
     image: certbot/certbot
     container_name: promiselink-certbot
+    restart: unless-stopped
     volumes:
-      - certbot-www:/var/www/certbot
-      - certbot-conf:/etc/letsencrypt
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
-
-volumes:
-  promiselink-data:
-  certbot-www:
-  certbot-conf:
+      - /opt/promiselink/certbot/www:/var/www/certbot
+      - /opt/promiselink/certbot/conf:/etc/letsencrypt
+    entrypoint: >
+      /bin/sh -c 'trap exit TERM;
+      while :; do
+        certbot renew --deploy-hook "docker kill -s HUP promiselink-nginx 2>/dev/null || true";
+        sleep 12h & wait $${!};
+      done;'
+    logging: *default-logging
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]

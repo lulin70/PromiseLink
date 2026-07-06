@@ -28,6 +28,19 @@ echo "Domain: ${DOMAIN}"
 echo "Email:  ${EMAIL}"
 echo "=========================================="
 
+# Step 0: Idempotency check — skip if cert already exists and is valid
+CERT_PATH="${CERT_DIR}/live/${DOMAIN}/fullchain.pem"
+KEY_PATH="${CERT_DIR}/live/${DOMAIN}/privkey.pem"
+if [ -f "${CERT_PATH}" ] && [ -f "${KEY_PATH}" ]; then
+    if openssl x509 -checkend 2592000 -noout -in "${CERT_PATH}" 2>/dev/null; then
+        echo "--- Certificate already exists and is valid for >30 days. Skipping. ---"
+        echo "  Cert: ${CERT_PATH}"
+        echo "If you want to force re-issuance, delete the cert files first."
+        exit 0
+    fi
+    echo "--- Certificate exists but expires soon. Re-issuing. ---"
+fi
+
 # Step 1: Stop nginx if running (free port 80)
 echo "--- Step 1: Stop nginx container (free port 80) ---"
 if docker ps --format '{{.Names}}' | grep -q promiselink-nginx; then
@@ -50,7 +63,7 @@ docker run --rm \
     --agree-tos \
     --email "${EMAIL}" \
     -d "${DOMAIN}" \
-    -d "${DOMAIN#www.}" 2>/dev/null || \
+    -d "${DOMAIN#www.}" || \
 docker run --rm \
     -p 80:80 \
     -v "${CERT_DIR}:/etc/letsencrypt" \

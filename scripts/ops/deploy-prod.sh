@@ -112,7 +112,17 @@ fi
 export VERSION="\$PREV_VERSION"
 docker compose -f "${COMPOSE_FILE}" pull promiselink-api || echo "WARNING: Pull previous image failed"
 docker compose -f "${COMPOSE_FILE}" up -d --remove-orphans
-sleep 5
+
+echo "--- Step 5b: Restore database backup ---"
+LATEST_BACKUP=\$(ls -t "${BACKUP_DIR}"/pre_deploy_*.db.gz 2>/dev/null | head -1)
+if [ -n "\$LATEST_BACKUP" ]; then
+    gunzip -c "\$LATEST_BACKUP" > "${DB_PATH}"
+    echo "DB restored from \$LATEST_BACKUP"
+    docker compose -f "${COMPOSE_FILE}" restart promiselink-api
+    sleep 5
+else
+    echo "WARNING: No backup found — cannot restore DB. Schema may be inconsistent."
+fi
 
 # Verify rollback health
 ROLLBACK_OK=false

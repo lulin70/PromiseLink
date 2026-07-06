@@ -28,7 +28,7 @@ from promiselink.core.rate_limiter import reset_rate_limits
 
 # ── Constants ──
 
-BASE_URL = "http://localhost:8001"
+BASE_URL = os.environ.get("E2E_BASE_URL", "http://localhost:8001")
 API_PREFIX = "/api/v1"
 POC_SECRET = os.environ.get("POC_SECRET", "promiselink2026")
 

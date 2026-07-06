@@ -4,9 +4,23 @@ All notable changes to PromiseLink will be documented in this file.
 
 ## [Unreleased] - 2026-07-06
 
+### Fixed — DevSquad 7角色评审修复 (BLOCKER + HIGH)
+
+- **`nginx/conf.d/default.conf` SSL 证书路径修复 [BLOCKER]**：nginx 引用 `live/promiselink.cn/`（无 www），但 init-ssl.sh 签发到 `live/www.promiselink.cn/`，导致 nginx 启动找不到证书。统一为 `live/www.promiselink.cn/`。
+- **`docker-compose.prod.yml` volume 修复 [BLOCKER]**：原用命名卷 `promiselink-data`/`certbot-www`/`certbot-conf`，但 init-ssl.sh 和 deploy-prod.sh 用宿主路径 `/opt/promiselink/`，导致证书进不了 nginx 容器、DB 备份静默跳过。改为 bind mount 统一路径。
+- **`docker-compose.prod.yml` 镜像名修复 [BLOCKER]**：CI 推送到 `ghcr.io/lulin70/promiselink`，但 compose 默认拉取 `ghcr.io/lin-aotp/promiselink`。改为 `REGISTRY_OWNER=lulin70`。
+- **`docker-compose.prod.yml` 端口绑定修复 [HIGH]**：`"8000:8000"` 绑定 0.0.0.0，API 绕过 nginx 直暴公网。改为 `"127.0.0.1:8000:8000"`。
+- **`docker-compose.prod.yml` 容器安全加固 [HIGH]**：所有容器添加 `cap_drop: [ALL]` + `security_opt: ["no-new-privileges:true"]` + 日志轮转 `max-size=10m max-file=3`。
+- **`docker-compose.prod.yml` certbot nginx reload [HIGH]**：certbot 续期后无 nginx reload 机制。添加 `--deploy-hook "docker kill -s HUP promiselink-nginx"`。
+- **`deploy-prod.sh` 回滚 DB 恢复 [HIGH]**：原回滚仅切换镜像，未恢复 DB，schema 不一致风险。添加 DB 备份恢复步骤。
+- **`init-ssl.sh` 幂等性 + 错误输出 [MEDIUM]**：添加证书存在性+有效性检查（>30天则跳过），防止重复触发 Let's Encrypt 速率限制。移除 `2>/dev/null` 保留错误输出。
+- **`database.py` SQLite 池参数调优 [MEDIUM]**：`pool_size=20/max_overflow=30` 对 SQLite 单写者模型过大。降为 `pool_size=5/max_overflow=10`（仍支持 15 并发连接，配合 WAL + busy_timeout 30s + per-user pipeline lock）。
+- **`test_poc_comprehensive.py` E2E_BASE_URL 支持 [HIGH]**：原 `BASE_URL = "http://localhost:8001"` 硬编码，24 个安全/压力测试无法跑向 staging。改为 `os.environ.get("E2E_BASE_URL", "http://localhost:8001")`。
+- **`STAGING_DEPLOYMENT_CHECKLIST.md` 全面更新**：新增 Phase 0（CI 镜像验证）、Phase 5.5（API 端口暴露检查）、staging E2E 含 POC 综合测试、SSH 防火墙限制建议。
+
 ### Fixed — 后端集成测试零 skip + Staging 部署就绪
 
-- **`database.py` 连接池修复**：SQLite 异步引擎默认使用 StaticPool（不支持 pool_size 参数），导致 QueuePool 耗尽（`TimeoutError: QueuePool limit reached`）。改用 `AsyncAdaptedQueuePool` + `pool_size=20, max_overflow=30, pool_timeout=60, pool_pre_ping=True`，POC 测试时间从 498s 降至 67s（7x 加速）。
+- **`database.py` 连接池修复**：SQLite 异步引擎默认使用 StaticPool（不支持 pool_size 参数），导致 QueuePool 耗尽（`TimeoutError: QueuePool limit reached`）。改用 `AsyncAdaptedQueuePool` + `pool_size=5, max_overflow=10, pool_timeout=60, pool_pre_ping=True`，POC 测试时间从 498s 降至 67s（7x 加速）。
 - **`step_05_promise.py` UnboundLocalError 修复**：`fresh_todos` 在 try 块内定义，DB 查询失败时 except 块后访问未定义变量。在 try 前初始化 `fresh_todos: list[Todo] = []`。
 - **`association_scoring.py` 类型安全修复**：`_discover_ex_colleague` 方法假设 `work_history` 为字典列表，但 LLM 可能返回字符串列表（公司名）。添加 `_normalize_entry()` 函数兼容 dict 和 string 格式，修复 `AttributeError: 'str' object has no attribute 'get'`。
 - **`test_poc_comprehensive.py` wait_for_pipeline 竞态修复**：原逻辑 `status != "processing"` 在事件刚创建（status="pending"）时立即返回，导致测试看到 0 实体。改为等待终态 `{completed, degraded_completed, failed, awaiting_retry}`，timeout 从 60s 提升至 90s。
