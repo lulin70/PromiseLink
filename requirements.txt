@@ -5,6 +5,8 @@ sqlalchemy>=2.0.25
 alembic>=1.13.1
 psycopg2-binary>=2.9.9
 asyncpg>=0.29.0
+aiosqlite>=0.20.0
+greenlet>=3.0.0
 redis[hiredis]>=5.0.0
 pydantic>=2.5.3
 pydantic-settings>=2.1.0
@@ -22,6 +24,9 @@ rapidfuzz>=3.6.1
 numpy>=1.26.3
 
 cryptography>=42.0.0
+
+# Monitoring
+prometheus-client>=0.20.0
 
 # LLM providers
 anthropic>=0.18.0

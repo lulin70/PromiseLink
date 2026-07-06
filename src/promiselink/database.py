@@ -56,6 +56,8 @@ def get_sync_engine() -> Any:
     """Get synchronous engine for Alembic migrations."""
     url = settings.database_url
     if url.startswith("sqlite"):
+        # Strip async dialect — sync engine needs plain sqlite:// URL
+        url = url.replace("+aiosqlite", "")
         # SQLite-specific settings: WAL mode + busy_timeout for concurrency
         engine = create_engine(url, connect_args={"check_same_thread": False}, echo=settings.debug)
 
