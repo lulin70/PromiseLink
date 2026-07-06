@@ -18,6 +18,14 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 import pytest_asyncio
+
+# These tests verify the REAL local embedding model (sentence_transformers).
+# When the library is not installed, skip gracefully instead of FAILing —
+# the EmbeddingProvider falls back to pseudo-embeddings which these tests
+# are explicitly NOT testing. CI should install sentence_transformers to
+# run these tests for real.
+pytest.importorskip("sentence_transformers")
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from promiselink.database import Base

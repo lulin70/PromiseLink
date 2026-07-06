@@ -61,7 +61,20 @@ jobs:
           REDIS_ENABLED: "false"
           TZ: Asia/Shanghai
         run: |
-          pytest tests/ -v --cov=src/promiselink --cov-report=xml --cov-report=term-missing --cov-fail-under=80 -k "not embedding_provider_local and not embedding_provider_similar and not full_embedding_to_similarity"
+          # 排除负载测试:coverage 插桩会使性能测量失效 (100 并发 P95 从 10ms 膨胀到 1185ms)
+          # 负载测试在下方 "Run load tests" step 单独无 coverage 执行
+          pytest tests/ -v --cov=src/promiselink --cov-report=xml --cov-report=term-missing --cov-fail-under=80 --ignore=tests/test_load_real.py -k "not embedding_provider_local and not embedding_provider_similar and not full_embedding_to_similarity"
+
+      - name: Run load tests (no coverage — performance measurements require clean instrumentation)
+        env:
+          DATABASE_URL: postgresql+asyncpg://promiselink:promiselink_test@localhost:5432/promiselink_test
+          TEST_MODE: "true"
+          LLM_API_KEY: "test-key-for-ci"
+          SECRET_KEY: "ci-test-secret-key-min-32-chars-long"
+          REDIS_ENABLED: "false"
+          TZ: Asia/Shanghai
+        run: |
+          pytest tests/test_load_real.py -v --no-cov -o addopts="" --tb=short
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
