@@ -689,7 +689,7 @@ class TestSustainedLoad:
         p99 = _percentile(response_times, 99)
         stats = _format_stats(response_times)
 
-        print(f"\n  Sustained 5s GET /todos:")
+        print("\n  Sustained 5s GET /todos:")
         print(f"    Throughput: {throughput:.1f} req/s ({request_count} requests in {actual_duration}s)")
         print(f"    Response: {stats}")
         print(f"    200={ok_count}, 429={rate_limited}, 5xx={server_errors}")
@@ -737,7 +737,7 @@ class TestSustainedLoad:
         ok_count = sum(1 for s in all_status if s == 200)
         rate_limited = sum(1 for s in all_status if s == 429)
 
-        print(f"\n  Sustained 5s (10 workers) GET /todos:")
+        print("\n  Sustained 5s (10 workers) GET /todos:")
         print(f"    Throughput: {throughput:.1f} req/s ({total_requests} requests in {duration_sec}s)")
         print(f"    Response: {stats}")
         print(f"    200={ok_count}, 429={rate_limited}, 5xx={server_errors}")
