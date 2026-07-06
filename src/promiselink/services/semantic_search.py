@@ -97,8 +97,11 @@ class SemanticSearchEngine:
         from promiselink.config import get_settings
         settings = get_settings()
         url = settings.database_url
+        # Strip async dialect — sqlite3.connect needs plain path, not +aiosqlite
+        url = url.replace("+aiosqlite", "").replace("+asyncpg", "")
         # sqlite:///./data/promiselink.db → ./data/promiselink.db
         # sqlite:///data/promiselink.db → data/promiselink.db
+        # sqlite:////app/data/promiselink.db → /app/data/promiselink.db
         if url.startswith("sqlite:///"):
             return url[len("sqlite:///"):]
         if url.startswith("sqlite://"):
