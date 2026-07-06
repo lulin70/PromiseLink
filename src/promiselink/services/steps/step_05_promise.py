@@ -30,6 +30,7 @@ class Step05_PromiseAnalysis(PipelineStep):
         assert context.result is not None
         assert llm_client is not None
 
+        fresh_todos: list[Todo] = []
         try:
             promise_handler = PromiseBidirectionalHandler(llm_client=llm_client)
             async with AsyncSessionLocal() as session:

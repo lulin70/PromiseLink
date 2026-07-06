@@ -106,8 +106,25 @@ class AssociationScoringMixin:
         """Ex-colleague: same company with overlapping time periods."""
         history_a = (a.properties or {}).get("work_history", [])
         history_b = (b.properties or {}).get("work_history", [])
-        for ha in history_a:
-            for hb in history_b:
+
+        def _normalize_entry(entry) -> dict:
+            """Normalize work_history entry to dict.
+
+            LLM may return work_history as list of strings (company names)
+            instead of list of dicts. Handle both formats gracefully.
+            """
+            if isinstance(entry, dict):
+                return entry
+            if isinstance(entry, str) and entry.strip():
+                return {"company": entry.strip()}
+            return {}
+
+        for ha_raw in history_a:
+            ha = _normalize_entry(ha_raw)
+            if not ha.get("company"):
+                continue
+            for hb_raw in history_b:
+                hb = _normalize_entry(hb_raw)
                 if (ha.get("company") or "") == (hb.get("company") or "") and ha.get("company"):
                     confidence = 0.9 if ha.get("end") and hb.get("end") else 0.7
                     return confidence, {"company": ha["company"]}

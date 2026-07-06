@@ -24,6 +24,8 @@ import httpx
 import pytest
 from jose import jwt
 
+from promiselink.core.rate_limiter import reset_rate_limits
+
 # ── Constants ──
 
 BASE_URL = "http://localhost:8001"
@@ -57,6 +59,17 @@ def client():
     """Provide a synchronous httpx.Client pointed at the running backend."""
     with httpx.Client(base_url=BASE_URL, timeout=120.0) as c:
         yield c
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limits_per_test():
+    """Reset in-memory rate limiter before each test for isolation.
+
+    Without this, earlier tests (e.g. test_rate_limiting_login) exhaust the
+    rate limit window and cause later tests (e.g. test_no_auth_returns_401)
+    to receive 429 instead of the expected status code.
+    """
+    reset_rate_limits()
 
 
 def _login_with_retry(client, uid=None, max_retries=5):
@@ -95,24 +108,33 @@ def _login_as(client, uid=None):
 logger = logging.getLogger(__name__)
 
 
-def wait_for_pipeline(client, event_id, headers, timeout=60, interval=2):
-    """Poll the API until the event status changes from 'processing'.
+def wait_for_pipeline(client, event_id, headers, timeout=90, interval=2):
+    """Poll the API until the event reaches a terminal status.
 
-    Returns the event dict when pipeline completes.
+    Event status transitions: pending → processing → completed | degraded_completed | failed | awaiting_retry.
+
+    Returns the event dict when pipeline reaches a terminal status.
     Raises AssertionError on timeout.
+
+    NOTE: We must wait for terminal status (not just `!= "processing"`),
+    because a freshly-created event is "pending" and the pipeline may not
+    have started yet — returning on "pending" would race the background
+    pipeline and cause tests to see 0 entities/todos.
     """
+    terminal_statuses = {"completed", "degraded_completed", "failed", "awaiting_retry"}
     start = time.time()
     while time.time() - start < timeout:
         resp = client.get(f"{API_PREFIX}/events", headers=headers)
         if resp.status_code == 200:
             events = resp.json().get("items", [])
             event = next((e for e in events if e["id"] == event_id), None)
-            if event and event.get("status") != "processing":
+            if event and event.get("status") in terminal_statuses:
                 logger.info("Pipeline completed for event %s in %.1fs (status=%s)",
                             event_id, time.time() - start, event.get("status"))
                 return event
         elapsed = time.time() - start
-        logger.debug("Pipeline still processing event %s (%.1fs elapsed)", event_id, elapsed)
+        logger.debug("Pipeline still processing event %s (%.1fs elapsed, status=%s)",
+                     event_id, elapsed, event.get("status") if event else "NOT_FOUND")
         time.sleep(interval)
     raise AssertionError(
         f"Pipeline did not complete for event {event_id} within {timeout}s. "
@@ -465,8 +487,8 @@ class TestSecurityDeep:
         assert resp.status_code in (200, 201)
         event_id = resp.json()["id"]
 
-        # Wait for pipeline to extract entities
-        wait_for_pipeline(client, event_id, _headers, timeout=30, interval=2)
+        # Wait for pipeline to extract entities (LLM calls take 25-40s with retries)
+        wait_for_pipeline(client, event_id, _headers, timeout=90, interval=2)
 
         # Check entities don't expose raw encrypted values
         resp = client.get(f"{API_PREFIX}/entities", headers=_headers)
@@ -611,7 +633,11 @@ class TestSecurityDeep:
 
     def test_no_auth_returns_401(self, client):
         """无认证应返回401"""
-        resp = client.get(f"{API_PREFIX}/events")
+        # Use unique X-Forwarded-For to avoid rate-limit carryover from prior tests
+        resp = client.get(
+            f"{API_PREFIX}/events",
+            headers={"X-Forwarded-For": f"10.99.99.{uuid.uuid4().int % 250}"},
+        )
         assert resp.status_code == 401, (
             f"Expected 401 for unauthenticated request, got {resp.status_code}. "
             "API may be allowing unauthenticated access."
@@ -779,13 +805,15 @@ class TestUserJourney:
             "Privacy API may not be fully implemented."
         )
         data = resp.json()
-        assert "events" in data, "Data summary should include events count"
-        assert data["events"] >= 1, "Data summary should reflect created event"
+        assert "counts" in data, "Data summary should include counts dict"
+        assert "events" in data["counts"], "Data summary counts should include events"
+        assert data["counts"]["events"] >= 1, "Data summary should reflect created event"
 
-        # Export (POST endpoint per privacy.py)
+        # Export — basic edition does not implement /privacy/export (Pro-only feature)
+        # 405 Method Not Allowed is the expected response when the endpoint is absent
         resp = client.post(f"{API_PREFIX}/privacy/export", headers=_headers)
-        assert resp.status_code in (200, 404), (
-            f"Privacy export should return 200 or 404, got {resp.status_code}. "
+        assert resp.status_code in (200, 404, 405), (
+            f"Privacy export should return 200/404/405, got {resp.status_code}. "
             "Privacy export API may not be fully implemented."
         )
 
@@ -793,7 +821,7 @@ class TestUserJourney:
         """Todo完成工作流：创建→查看→完成→验证"""
         _headers = auth_headers(client)
         # Create event that should generate todos
-        client.post(
+        resp = client.post(
             f"{API_PREFIX}/events",
             headers=_headers,
             json={
@@ -803,6 +831,11 @@ class TestUserJourney:
                 "title": "承诺测试",
             },
         )
+        assert resp.status_code in (200, 201), f"Create event failed: {resp.text}"
+        event_id = resp.json()["id"]
+
+        # Wait for pipeline to finish (LLM-based todo generation takes 25-40s)
+        wait_for_pipeline(client, event_id, _headers, timeout=90, interval=2)
 
         # Get todos
         resp = client.get(f"{API_PREFIX}/todos", headers=_headers)
@@ -861,10 +894,11 @@ class TestUserJourney:
         # Verify data exists
         resp = client.get(f"{API_PREFIX}/privacy/data-summary", headers=h)
         assert resp.status_code == 200
-        assert resp.json()["events"] >= 1
+        assert resp.json()["counts"]["events"] >= 1
 
-        # Delete all user data
-        resp = client.delete(f"{API_PREFIX}/privacy/user-data", headers=h)
+        # Delete all user data (requires confirm="DELETE" per API contract)
+        # httpx.Client.delete() does not accept json=; use request() instead
+        resp = client.request("DELETE", f"{API_PREFIX}/privacy/user-data", headers=h, json={"confirm": "DELETE"})
         assert resp.status_code == 200, (
             f"Privacy data deletion should return 200, got {resp.status_code}. "
             "GDPR right-to-be-forgotten endpoint may not be working."
@@ -873,7 +907,7 @@ class TestUserJourney:
         # Verify data is gone
         resp = client.get(f"{API_PREFIX}/privacy/data-summary", headers=h)
         assert resp.status_code == 200
-        assert resp.json()["events"] == 0, (
+        assert resp.json()["counts"]["events"] == 0, (
             "Events should be 0 after privacy data deletion. "
             "GDPR right-to-be-forgotten may not be fully deleting data."
         )

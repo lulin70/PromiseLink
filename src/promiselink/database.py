@@ -10,6 +10,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.pool import AsyncAdaptedQueuePool
 
 from promiselink.config import get_settings
 from promiselink.core.logging import get_logger
@@ -98,7 +99,16 @@ def get_async_engine() -> Any:
     if url.startswith("sqlite"):
         if "+aiosqlite" not in url:
             url = url.replace("sqlite://", "sqlite+aiosqlite://")
-        engine = create_async_engine(url, echo=settings.debug, connect_args={"check_same_thread": False})
+        engine = create_async_engine(
+            url,
+            echo=settings.debug,
+            connect_args={"check_same_thread": False, "timeout": 30},
+            poolclass=AsyncAdaptedQueuePool,
+            pool_size=20,
+            max_overflow=30,
+            pool_timeout=60,
+            pool_pre_ping=True,
+        )
 
         @event.listens_for(engine.sync_engine, "connect")
         def set_sqlite_pragma(dbapi_conn: Any, connection_record: Any) -> None:

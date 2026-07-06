@@ -6,6 +6,7 @@
 !.env.poc.example
 !.env.basic.example
 !.env.poc.hosted.example
+!.env.prod.example
 *.key
 *.pem
 *.p12
