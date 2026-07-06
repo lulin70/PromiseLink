@@ -100,3 +100,15 @@ addopts = "--cov=promiselink --cov-report=term-missing --cov-report=html --conti
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
+
+[tool.coverage.run]
+concurrency = ["greenlet", "thread"]
+source = ["promiselink"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
