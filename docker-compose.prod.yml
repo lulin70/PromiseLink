@@ -1,0 +1,53 @@
+# PromiseLink 生产环境部署配置
+# 使用预构建镜像（由 CI build-and-push job 推送到 ghcr.io）
+# 部署方式: VERSION=0.8.0 docker compose -f docker-compose.prod.yml up -d
+
+version: "3.8"
+
+services:
+  promiselink-api:
+    image: ghcr.io/${REGISTRY_OWNER:-lin-aotp}/promiselink:${VERSION:-latest}
+    container_name: promiselink-api
+    restart: unless-stopped
+    env_file: .env.prod
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/promiselink.db
+      - REDIS_ENABLED=false
+    volumes:
+      - promiselink-data:/app/data
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  nginx:
+    image: nginx:alpine
+    container_name: promiselink-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - certbot-www:/var/www/certbot
+      - certbot-conf:/etc/letsencrypt
+    depends_on:
+      promiselink-api:
+        condition: service_healthy
+
+  certbot:
+    image: certbot/certbot
+    container_name: promiselink-certbot
+    volumes:
+      - certbot-www:/var/www/certbot
+      - certbot-conf:/etc/letsencrypt
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+volumes:
+  promiselink-data:
+  certbot-www:
+  certbot-conf:
