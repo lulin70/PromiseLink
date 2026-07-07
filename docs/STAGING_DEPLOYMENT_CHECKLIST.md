@@ -1,7 +1,7 @@
 # PromiseLink Staging 部署清单
 
 > 创建时间: 2026-07-06
-> 更新时间: 2026-07-06 (Phase 5 完成 — ICP 阻塞发现 + E2E 修复)
+> 更新时间: 2026-07-07 (Phase 6 完成 — CI 镜像部署 + E2E 全通过)
 > 目标服务器: 47.116.219.15
 > 目标域名: www.promiselink.cn
 > 版本: v0.8.0-rc2
@@ -180,6 +180,25 @@ curl -sf --connect-timeout 3 http://47.116.219.15:8000/ && echo "WARNING: API po
 - ⚠️ 域名访问: ICP 备案未完成，域名被阿里云拦截 (见上方"已知阻塞")
 - ✅ IP 直连: http://47.116.219.15/api/* 正常工作 (nginx 配置 HTTP API 代理)
 
+### Phase 6: CI 镜像部署 + E2E 全通过 (2026-07-07)
+
+**根因修复**: QueuePool 耗尽导致 500 错误
+- 问题: Pipeline 步骤在 LLM 调用期间持有 DB session (最长 300s)，QueuePool (15 连接) 在并发 pipeline 下耗尽
+- 修复: SQLite 引擎从 `AsyncAdaptedQueuePool` 改为 `NullPool` (commit 0d5bfe2)
+- 效果: 每次会话创建新连接，用完即关，无连接池耗尽风险
+
+**部署方式**: CI 构建镜像直接部署 (不再使用 volume mount 补丁)
+- 镜像: `ghcr.io/lulin70/promiselink:0.8.0-rc2` (CI build ID de0c315dcdc7)
+- 包含 3 项修复: NullPool (database.py) + commit_with_retry (events.py) + TRUSTED_PROXIES CIDR (dependencies.py)
+- 验证: `docker run --rm ghcr.io/lulin70/promiselink:0.8.0-rc2 sh -c 'grep -c NullPool /app/src/promiselink/database.py'` → 4
+
+**E2E 测试结果 (2026-07-07, CI 镜像)**:
+- Pipeline E2E: 6/6 PASSED ✅ (132.65s)
+- POC 综合: 24/24 PASSED ✅ (95.67s)
+- 本地单元测试: 55/55 PASSED ✅ (8.50s)
+- CI 核心任务: security ✓ / test (3.11) ✓ / frontend ✓ / build-and-push ✓
+- CI E2E 任务: X (预期失败 — CI 使用假 LLM_API_KEY, 需后续添加 LLM mock)
+
 ## Staging E2E 测试
 
 部署成功后, 执行真实用户场景 E2E 测试:
@@ -191,21 +210,30 @@ POC_SECRET=$(ssh root@47.116.219.15 "grep POC_SECRET /opt/promiselink/.env.prod"
 # 注意: 因 ICP 备案阻塞，使用 IP 直连而非域名
 # nginx 已配置 HTTP /api/ 代理 (不重定向 HTTPS)，支持 E2E 测试
 
-# E2E 测试 1: 真实 LLM Pipeline E2E (6 个用例, ~90s)
+# E2E 测试 1: 真实 LLM Pipeline E2E (6 个用例, ~2min)
 E2E_BASE_URL=http://47.116.219.15 \
 POC_SECRET=${POC_SECRET} \
 .venv/bin/python -m pytest tests/test_real_pipeline_e2e.py -v --tb=short
 
-# E2E 测试 2: POC 综合测试 (24 个用例, 安全/压力/用户旅程, ~60s)
+# E2E 测试 2: POC 综合测试 (24 个用例, 安全/压力/用户旅程, ~2min)
 E2E_BASE_URL=http://47.116.219.15 \
 POC_SECRET=${POC_SECRET} \
-.venv/bin/python -m pytest tests/test_poc_comprehensive.py -v --tb=short
+.venv/bin/python -m pytest tests/test_poc_comprehensive.py -v --tb=short -m "not skip"
 ```
 
-**E2E 测试结果 (2026-07-06)**:
-- Pipeline E2E: 6/6 PASSED ✅
-- POC 综合: 24/24 PASSED ✅ (修复 TRUSTED_PROXIES 后 rate limiting 问题解决)
-- 修复内容: 配置 TRUSTED_PROXIES 使 rate limiter 信任 nginx 转发的 X-Forwarded-For
+**E2E 测试结果汇总**:
+- 2026-07-07 (NullPool 修复后, CI 镜像):
+  - Pipeline E2E: 6/6 PASSED ✅ (132.65s)
+  - POC 综合: 24/24 PASSED ✅ (95.67s)
+- 2026-07-06 (Volume mount 补丁):
+  - Pipeline E2E: 3/6 PASSED (QueuePool 耗尽)
+  - POC 综合: 18/24 PASSED (QueuePool 耗尽 + UnboundLocalError + 超时)
+- 修复内容:
+  1. NullPool 替代 QueuePool (database.py) — 根因修复
+  2. commit_with_retry (events.py) — SQLite 锁重试
+  3. TRUSTED_PROXIES CIDR (dependencies.py) — rate limiter 信任 nginx
+  4. wait_for_pipeline 超时 90s→180s — LLM 处理可达 76s
+  5. wait_for_pipeline event=None 初始化 — 修复 UnboundLocalError
 
 ## 回滚方案
 
