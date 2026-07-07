@@ -136,6 +136,40 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _pending_tasks.add(_se_task)
     _se_task.add_done_callback(_pending_tasks.discard)
 
+    # Start Pro edition WSS long-connection to cloud gateway (if configured).
+    # The WSS connection allows the mini-app to relay HTTP business
+    # requests through the gateway to this local instance, so user data
+    # stays on the user's computer while still being accessible from
+    # the mini-app on the phone.
+    if (
+        settings.relay_gateway_url
+        and settings.pro_license_key
+        and settings.relay_wss_enabled
+    ):
+        try:
+            from promiselink.services.relay_wss_client import RelayWSSClient
+
+            relay_wss = RelayWSSClient(
+                gateway_url=settings.relay_gateway_url,
+                license_key=settings.pro_license_key,
+                local_api_url=settings.relay_local_api_url,
+                heartbeat_interval=settings.relay_heartbeat_interval,
+                reconnect_interval=settings.relay_reconnect_interval,
+                reconnect_max=settings.relay_reconnect_max,
+                http_request_timeout=settings.relay_http_request_timeout,
+            )
+            await relay_wss.start()
+            app.state.relay_wss_client = relay_wss
+            logger.info(
+                "relay_wss_started",
+                gateway=settings.relay_gateway_url,
+                local_api_url=settings.relay_local_api_url,
+            )
+        except Exception as exc:
+            # WSS failure must NOT block basic-edition startup — the
+            # local UI and API still work without relay. Log and continue.
+            logger.error("relay_wss_start_failed", error=str(exc)[:200])
+
     yield
 
     # Shutdown — drain pending tasks
@@ -181,6 +215,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await close_relay_client()
     except Exception as e:  # Startup/shutdown — keep broad catch for resilience
         logger.warning("relay_client_close_error", error=str(e))
+
+    # Stop the WSS long-connection background task if it was started
+    relay_wss = getattr(app.state, "relay_wss_client", None)
+    if relay_wss is not None:
+        try:
+            await relay_wss.stop()
+            logger.info("relay_wss_stopped")
+        except Exception as e:  # Startup/shutdown — keep broad catch for resilience
+            logger.warning("relay_wss_stop_error", error=str(e))
 
     await close_db()
     logger.info("shutdown_complete")

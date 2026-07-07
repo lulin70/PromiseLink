@@ -16,6 +16,77 @@ import pytest
 from promiselink.core.exceptions import LLMResponseParseError
 from promiselink.services.relay_endpoints import RelayEndpointsMixin
 
+# ── Extended host class for X-AI-Call header tests ──
+
+
+class _MockRelayClientWithHTTP(RelayEndpointsMixin):
+    """Extended host class that captures HTTP requests for header inspection.
+
+    Implements _get_client/_auth_headers/_ensure_token so we can verify
+    that _post_with_auth/_post_multipart_with_auth/_stream_llm attach
+    the X-AI-Call: true header for gateway billing attribution.
+    """
+
+    def __init__(self) -> None:
+        self.gateway_url = "http://test-gateway.example.com"
+        self.timeout = 10
+        self.max_retries = 1
+
+        # Capture all HTTP calls
+        self.captured_posts: list[dict] = []
+        self.captured_streams: list[dict] = []
+
+        # Build a mock httpx.AsyncClient that records calls
+        self._mock_client = MagicMock()
+        self._mock_client.is_closed = False
+
+        async def _post_side_effect(url, **kwargs):
+            self.captured_posts.append({"url": url, **kwargs})
+            resp = MagicMock()
+            resp.status_code = 200
+            resp.json = lambda: {"data": {"content": "ok"}}
+            resp.aread = AsyncMock(return_value=b"{}")
+            resp.text = "{}"
+            return resp
+
+        def _stream_side_effect(method, url, **kwargs):
+            self.captured_streams.append({"method": method, "url": url, **kwargs})
+
+            class _Ctx:
+                async def __aenter__(self_inner):
+                    resp = MagicMock()
+                    resp.status_code = 200
+                    resp.aiter_lines = self._aiter_lines
+                    return resp
+
+                async def __aexit__(self_inner, *args):
+                    return False
+
+            return _Ctx()
+
+        def _aiter_lines():
+            async def _gen():
+                if False:
+                    yield ""  # pragma: no cover - empty generator
+            return _gen()
+
+        self._aiter_lines = _aiter_lines
+        self._mock_client.post = MagicMock(side_effect=_post_side_effect)
+        self._mock_client.stream = MagicMock(side_effect=_stream_side_effect)
+
+    async def _get_client(self):
+        return self._mock_client
+
+    def _auth_headers(self) -> dict:
+        return {"Authorization": "Bearer fake-jwt"}
+
+    async def _ensure_token(self) -> str:
+        return "fake-jwt"
+
+    async def refresh_token(self) -> str:
+        return "fake-jwt-refreshed"
+
+
 # ── Test host class ──
 
 
@@ -331,3 +402,99 @@ class TestRelayEndpointsMixinStructure:
         assert hasattr(RelayEndpointsMixin, "_post_multipart_with_auth")
         assert hasattr(RelayEndpointsMixin, "_stream_llm")
         assert hasattr(RelayEndpointsMixin, "_parse_llm_response")
+
+
+# ═══════════════════════════════════════════════════════════════
+# X-AI-Call header — 网关计费归属区分
+# ═══════════════════════════════════════════════════════════════
+
+
+class TestXAICallHeader:
+    """验证所有发往网关的 HTTP 请求都携带 X-AI-Call: true 标头。
+
+    网关用此标头区分"基础版发起的 AI 调用"vs"小程序发起的 AI 调用"，
+    用于计费归属。基础版 relay_endpoints.py 在 6 处 HTTP 请求位置添加此标头。
+    """
+
+    @pytest.mark.asyncio
+    async def test_post_with_auth_includes_x_ai_call_header(self):
+        """_post_with_auth 应携带 X-AI-Call: true."""
+        client = _MockRelayClientWithHTTP()
+        await client._post_with_auth(
+            "http://gateway/api/v1/pro/relay/llm",
+            {"messages": [{"role": "user", "content": "hi"}]},
+        )
+        assert len(client.captured_posts) == 1
+        headers = client.captured_posts[0]["headers"]
+        assert headers.get("X-AI-Call") == "true"
+
+    @pytest.mark.asyncio
+    async def test_post_with_auth_preserves_auth_header(self):
+        """_post_with_auth 同时应保留 Authorization 标头."""
+        client = _MockRelayClientWithHTTP()
+        await client._post_with_auth("http://gateway/x", {})
+        headers = client.captured_posts[0]["headers"]
+        assert headers.get("Authorization") == "Bearer fake-jwt"
+        assert headers.get("X-AI-Call") == "true"
+
+    @pytest.mark.asyncio
+    async def test_post_multipart_with_auth_includes_x_ai_call_header(self):
+        """_post_multipart_with_auth 应携带 X-AI-Call: true."""
+        client = _MockRelayClientWithHTTP()
+        files = {"audio": ("test.wav", b"fake-audio", "audio/wav")}
+        data = {"model": "whisper"}
+        await client._post_multipart_with_auth(
+            "http://gateway/api/v1/pro/relay/asr",
+            files=files,
+            data=data,
+        )
+        assert len(client.captured_posts) == 1
+        headers = client.captured_posts[0]["headers"]
+        assert headers.get("X-AI-Call") == "true"
+
+    @pytest.mark.asyncio
+    async def test_stream_llm_includes_x_ai_call_header(self):
+        """_stream_llm 应携带 X-AI-Call: true."""
+        client = _MockRelayClientWithHTTP()
+        gen = await client._stream_llm(
+            "http://gateway/api/v1/pro/relay/llm",
+            {"stream": True, "messages": []},
+        )
+        # Drain the generator to trigger the stream call
+        async for _ in gen:  # noqa: F841
+            pass
+        assert len(client.captured_streams) == 1
+        headers = client.captured_streams[0]["headers"]
+        assert headers.get("X-AI-Call") == "true"
+
+    @pytest.mark.asyncio
+    async def test_chat_completion_via_post_includes_x_ai_call_header(self):
+        """chat_completion (non-stream) 应经 _post_with_auth 携带 X-AI-Call."""
+        client = _MockRelayClientWithHTTP()
+        await client.chat_completion(
+            messages=[{"role": "user", "content": "hi"}],
+            model="moka/claude",
+            stream=False,
+        )
+        assert len(client.captured_posts) == 1
+        headers = client.captured_posts[0]["headers"]
+        assert headers.get("X-AI-Call") == "true"
+
+    @pytest.mark.asyncio
+    async def test_chat_completion_stream_via_stream_llm_includes_x_ai_call_header(self):
+        """chat_completion (stream) 应经 _stream_llm 携带 X-AI-Call."""
+        client = _MockRelayClientWithHTTP()
+        result = await client.chat_completion(
+            messages=[{"role": "user", "content": "hi"}],
+            model="moka/claude",
+            stream=True,
+        )
+        # chat_completion(stream=True) returns {"stream": <coroutine>}
+        # The coroutine must be awaited to get the async generator.
+        stream_coro = result["stream"]
+        async_gen = await stream_coro
+        async for _ in async_gen:  # noqa: F841
+            pass
+        assert len(client.captured_streams) >= 1
+        headers = client.captured_streams[0]["headers"]
+        assert headers.get("X-AI-Call") == "true"

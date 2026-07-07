@@ -119,7 +119,11 @@ class RelayEndpointsMixin:
                     "POST",
                     url,
                     json=payload,
-                    headers={**self._auth_headers(), "Content-Type": "application/json"},
+                    headers={
+                        **self._auth_headers(),
+                        "Content-Type": "application/json",
+                        "X-AI-Call": "true",
+                    },
                     timeout=httpx.Timeout(self.timeout, connect=10.0),
                 ) as response:
                     if response.status_code == 401 and not retried:
@@ -248,7 +252,11 @@ class RelayEndpointsMixin:
             response = await client.post(
                 url,
                 json=payload,
-                headers={**self._auth_headers(), "Content-Type": "application/json"},
+                headers={
+                    **self._auth_headers(),
+                    "Content-Type": "application/json",
+                    "X-AI-Call": "true",
+                },
                 timeout=httpx.Timeout(self.timeout, connect=10.0),
             )
         except httpx.TimeoutException as exc:
@@ -267,7 +275,11 @@ class RelayEndpointsMixin:
             response = await client.post(
                 url,
                 json=payload,
-                headers={**self._auth_headers(), "Content-Type": "application/json"},
+                headers={
+                    **self._auth_headers(),
+                    "Content-Type": "application/json",
+                    "X-AI-Call": "true",
+                },
                 timeout=httpx.Timeout(self.timeout, connect=10.0),
             )
 
@@ -440,7 +452,14 @@ class RelayEndpointsMixin:
                 response = await client.post(
                     url,
                     json=payload,
-                    headers={**self._auth_headers(), "Content-Type": "application/json"},
+                    headers={
+                        **self._auth_headers(),
+                        "Content-Type": "application/json",
+                        # Mark as an AI call so the gateway can attribute
+                        # usage/billing to the calling basic-edition
+                        # rather than the mini-app.
+                        "X-AI-Call": "true",
+                    },
                     timeout=httpx.Timeout(self.timeout, connect=10.0),
                 )
             except httpx.TimeoutException:
@@ -550,7 +569,11 @@ class RelayEndpointsMixin:
                 url,
                 files=files,
                 data=data,
-                headers=self._auth_headers(),
+                headers={
+                    **self._auth_headers(),
+                    # Mark as an AI call for gateway billing attribution.
+                    "X-AI-Call": "true",
+                },
                 timeout=httpx.Timeout(self.timeout, connect=10.0),
             )
         except httpx.TimeoutException as exc:
@@ -573,7 +596,10 @@ class RelayEndpointsMixin:
                     url,
                     files=files,
                     data=data,
-                    headers=self._auth_headers(),
+                    headers={
+                        **self._auth_headers(),
+                        "X-AI-Call": "true",
+                    },
                     timeout=httpx.Timeout(self.timeout, connect=10.0),
                 )
             except httpx.HTTPError as exc:
