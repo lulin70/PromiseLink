@@ -199,6 +199,31 @@ curl -sf --connect-timeout 3 http://47.116.219.15:8000/ && echo "WARNING: API po
 - CI 核心任务: security ✓ / test (3.11) ✓ / frontend ✓ / build-and-push ✓
 - CI E2E 任务: X (预期失败 — CI 使用假 LLM_API_KEY, 需后续添加 LLM mock)
 
+### Phase 7: 前端部署 + 完整用户旅程验证 (2026-07-07)
+
+**部署内容**: 前端静态文件部署到 nginx，实现完整系统跑通
+- 上传: `frontend/dist/*` → `/opt/promiselink/frontend/` (Taro H5 构建产物)
+- docker-compose: nginx 服务增加 volume 挂载 `/opt/promiselink/frontend:/usr/share/nginx/html:ro`
+- nginx 配置: HTTP/HTTPS `/` 服务前端静态文件，`/api/` 代理后端，`try_files $uri $uri/ /index.html` 支持 SPA 路由
+- HTTP 不再强制跳转 HTTPS (ICP 拦截域名，IP 直连需 HTTP)
+
+**完整用户旅程验证** (登录 → 创建事件 → Pipeline → 结果展示):
+- 登录: JWT token 正常签发 ✓
+- 事件创建: event_id=6939fa24... ✓
+- Pipeline 完成: 13s (Moka AI LLM) ✓
+- 结果: 1 人脉 (王总) + 1 承诺 (明天发送技术方案) + 3 待办 (合作信号/承诺/关注) ✓
+
+**E2E 测试结果 (2026-07-07, 前端部署后)**:
+- 后端 Pipeline E2E: 6/6 PASSED ✅ (61.15s)
+- 后端 POC 综合: 24/24 PASSED ✅ (138.70s)
+- 前端 Playwright (auth+home): 12/12 PASSED ✅ (49.5s)
+- 前端 Playwright (events+input+todos+navigation): 27/27 PASSED ✅ (3.3m)
+- **总计: 69/69 PASSED ✅**
+
+**访问方式**:
+- IP 直连: `http://47.116.219.15/` (前端 + API，ICP 备案期间可用)
+- 域名: `https://www.promiselink.cn/` (ICP 备案完成后可用，当前被拦截)
+
 ## Staging E2E 测试
 
 部署成功后, 执行真实用户场景 E2E 测试:
