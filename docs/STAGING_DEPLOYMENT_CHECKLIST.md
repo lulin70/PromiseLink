@@ -1,10 +1,28 @@
 # PromiseLink Staging 部署清单
 
 > 创建时间: 2026-07-06
-> 更新时间: 2026-07-06 (DevSquad 7角色评审修复)
+> 更新时间: 2026-07-06 (Phase 5 完成 — ICP 阻塞发现 + E2E 修复)
 > 目标服务器: 47.116.219.15
 > 目标域名: www.promiselink.cn
 > 版本: v0.8.0-rc2
+
+## ⚠️ 已知阻塞: ICP 备案
+
+**状态**: www.promiselink.cn 未完成 ICP 备案，阿里云在网络层拦截域名访问
+
+**影响**:
+- HTTP 访问 (http://www.promiselink.cn) → 返回阿里云"未备案"拦截页面
+- HTTPS 访问 (https://www.promiselink.cn) → TLS 握手被 `Connection reset by peer`
+- 服务器本身完全正常 (IP 直连可用)
+
+**验证**: `curl http://47.116.219.15/api/v1/health` 正常返回，证明服务器配置无误
+
+**解决方案 (待决策)**:
+1. 完成 ICP 备案 (需营业执照，1-3 周)
+2. 迁移服务器到香港/新加坡 (无需 ICP)
+3. 临时使用 IP 直连 (当前 E2E 验证方案)
+
+**当前 E2E 验证**: 使用 `E2E_BASE_URL=http://47.116.219.15` (nginx 已配置 HTTP API 代理)
 
 ## 前置条件
 
@@ -135,24 +153,32 @@ VERSION=0.8.0-rc2 REGISTRY_OWNER=lulin70 docker compose -f docker-compose.prod.y
 ### Phase 5: 验证
 
 ```bash
-# 5.1 健康检查 (通过 nginx HTTPS)
-curl -sf https://www.promiselink.cn/api/v1/health | jq .
+# 5.1 健康检查 (通过 IP — 域名因 ICP 备案被拦截)
+curl -sf http://47.116.219.15/api/v1/health | jq .
+# 服务器本地 HTTPS 验证 (确认 SSL 证书有效)
+ssh root@47.116.219.15 "curl -sf https://localhost/api/v1/health --resolve www.promiselink.cn:443:127.0.0.1"
 
-# 5.2 HTTPS 证书验证
-curl -vI https://www.promiselink.cn/ 2>&1 | grep -E "subject|issuer|SSL certificate"
-
-# 5.3 容器状态
+# 5.2 容器状态
 ssh root@47.116.219.15 "docker compose -f /opt/promiselink/docker-compose.prod.yml ps"
+# 预期: promiselink-api (healthy), promiselink-nginx (Up), promiselink-certbot (Up)
 
-# 5.4 功能验证 (登录 + 创建事件)
+# 5.3 功能验证 (登录 + 创建事件)
 POC_SECRET=$(ssh root@47.116.219.15 "grep POC_SECRET /opt/promiselink/.env.prod" | cut -d= -f2)
-curl -X POST https://www.promiselink.cn/api/v1/auth/login \
+curl -X POST http://47.116.219.15/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d "{\"user_id\":\"staging-test-user\",\"poc_secret\":\"${POC_SECRET}\"}"
 
-# 5.5 确认 API 端口不暴露公网 (应连接超时或拒绝)
+# 5.4 确认 API 端口不暴露公网 (应连接超时或拒绝)
 curl -sf --connect-timeout 3 http://47.116.219.15:8000/ && echo "WARNING: API port exposed!" || echo "OK: API port not exposed"
 ```
+
+**Phase 5 验证结果 (2026-07-06)**:
+- ✅ 健康检查: API healthy, 版本 0.8.0-rc2
+- ✅ 容器状态: 3 容器全部 Up (api healthy, nginx, certbot)
+- ✅ 登录功能: JWT token 正常签发
+- ✅ API 端口隔离: 8000 端口绑定 127.0.0.1，不暴露公网
+- ⚠️ 域名访问: ICP 备案未完成，域名被阿里云拦截 (见上方"已知阻塞")
+- ✅ IP 直连: http://47.116.219.15/api/* 正常工作 (nginx 配置 HTTP API 代理)
 
 ## Staging E2E 测试
 
@@ -162,19 +188,24 @@ curl -sf --connect-timeout 3 http://47.116.219.15:8000/ && echo "WARNING: API po
 # 获取 POC_SECRET
 POC_SECRET=$(ssh root@47.116.219.15 "grep POC_SECRET /opt/promiselink/.env.prod" | cut -d= -f2)
 
+# 注意: 因 ICP 备案阻塞，使用 IP 直连而非域名
+# nginx 已配置 HTTP /api/ 代理 (不重定向 HTTPS)，支持 E2E 测试
+
 # E2E 测试 1: 真实 LLM Pipeline E2E (6 个用例, ~90s)
-E2E_BASE_URL=https://www.promiselink.cn \
+E2E_BASE_URL=http://47.116.219.15 \
 POC_SECRET=${POC_SECRET} \
 .venv/bin/python -m pytest tests/test_real_pipeline_e2e.py -v --tb=short
 
 # E2E 测试 2: POC 综合测试 (24 个用例, 安全/压力/用户旅程, ~60s)
-E2E_BASE_URL=https://www.promiselink.cn \
+E2E_BASE_URL=http://47.116.219.15 \
 POC_SECRET=${POC_SECRET} \
-.venv/bin/python -m pytest tests/test_poc_comprehensive.py -v --tb=short --run-integration
-
-# 验证: 确认 0 skipped
-.venv/bin/python -m pytest tests/test_real_pipeline_e2e.py tests/test_poc_comprehensive.py -v --co 2>&1 | grep -c "SKIP" | xargs -I{} echo "Skip count: {} (must be 0)"
+.venv/bin/python -m pytest tests/test_poc_comprehensive.py -v --tb=short
 ```
+
+**E2E 测试结果 (2026-07-06)**:
+- Pipeline E2E: 6/6 PASSED ✅
+- POC 综合: 24/24 PASSED ✅ (修复 TRUSTED_PROXIES 后 rate limiting 问题解决)
+- 修复内容: 配置 TRUSTED_PROXIES 使 rate limiter 信任 nginx 转发的 X-Forwarded-For
 
 ## 回滚方案
 

@@ -23,7 +23,7 @@ from promiselink.core.auth import get_current_user_id
 from promiselink.core.exceptions import NotFoundError, ValidationError
 from promiselink.core.file_utils import decode_content
 from promiselink.core.logging import get_logger, new_request_id
-from promiselink.database import get_async_session
+from promiselink.database import commit_with_retry, get_async_session
 from promiselink.models import Entity, Event
 from promiselink.models.association import Association
 from promiselink.models.todo import Todo as _Todo
@@ -210,7 +210,7 @@ async def create_event(
     )
 
     session.add(event)
-    await session.commit()
+    await commit_with_retry(session)
     await session.refresh(event)
 
     logger.info(
@@ -305,7 +305,7 @@ async def upload_event_file(
     )
 
     session.add(event)
-    await session.commit()
+    await commit_with_retry(session)
     await session.refresh(event)
 
     logger.info(
@@ -454,7 +454,7 @@ async def delete_event(
     await delete_event_cascade(session, str(event_id), user_id)
 
     await session.delete(event)
-    await session.commit()
+    await commit_with_retry(session)
 
     return None
 

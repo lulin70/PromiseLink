@@ -608,8 +608,10 @@ class TestSecurityDeep:
     def test_rate_limiting_login(self, client):
         """登录端点应有速率限制"""
         # Rapid login attempts with wrong password
-        # Use a unique IP-like key pattern to avoid interference from other tests
-        # The unauthenticated rate limit is 10 req/min, so 80 attempts should trigger 429
+        # Use a FIXED unique X-Forwarded-For to isolate this test's rate limit
+        # from other tests. The unauthenticated rate limit is 30 req/min,
+        # so 80 attempts should trigger 429.
+        rate_test_ip = f"10.88.88.{uuid.uuid4().int % 250 + 1}"
         results = []
         for i in range(80):
             resp = client.post(
@@ -618,6 +620,7 @@ class TestSecurityDeep:
                     "user_id": f"rate_test_{i}_{uuid.uuid4()}",
                     "poc_secret": "wrong_password",
                 },
+                headers={"X-Forwarded-For": rate_test_ip},
             )
             results.append(resp.status_code)
 
@@ -633,10 +636,12 @@ class TestSecurityDeep:
 
     def test_no_auth_returns_401(self, client):
         """无认证应返回401"""
-        # Use unique X-Forwarded-For to avoid rate-limit carryover from prior tests
+        # Use a fully random IP to avoid rate-limit carryover from prior tests
+        uid = uuid.uuid4().int
+        unique_ip = f"10.{uid % 256}.{(uid >> 8) % 256}.{(uid >> 16) % 250 + 1}"
         resp = client.get(
             f"{API_PREFIX}/events",
-            headers={"X-Forwarded-For": f"10.99.99.{uuid.uuid4().int % 250}"},
+            headers={"X-Forwarded-For": unique_ip},
         )
         assert resp.status_code == 401, (
             f"Expected 401 for unauthenticated request, got {resp.status_code}. "
