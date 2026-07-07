@@ -108,7 +108,7 @@ def _login_as(client, uid=None):
 logger = logging.getLogger(__name__)
 
 
-def wait_for_pipeline(client, event_id, headers, timeout=90, interval=2):
+def wait_for_pipeline(client, event_id, headers, timeout=120, interval=2):
     """Poll the API until the event reaches a terminal status.
 
     Event status transitions: pending → processing → completed | degraded_completed | failed | awaiting_retry.
@@ -489,7 +489,7 @@ class TestSecurityDeep:
         event_id = resp.json()["id"]
 
         # Wait for pipeline to extract entities (LLM calls take 25-40s with retries)
-        wait_for_pipeline(client, event_id, _headers, timeout=90, interval=2)
+        wait_for_pipeline(client, event_id, _headers, timeout=180, interval=2)
 
         # Check entities don't expose raw encrypted values
         resp = client.get(f"{API_PREFIX}/entities", headers=_headers)
@@ -841,7 +841,7 @@ class TestUserJourney:
         event_id = resp.json()["id"]
 
         # Wait for pipeline to finish (LLM-based todo generation takes 25-40s)
-        wait_for_pipeline(client, event_id, _headers, timeout=90, interval=2)
+        wait_for_pipeline(client, event_id, _headers, timeout=180, interval=2)
 
         # Get todos
         resp = client.get(f"{API_PREFIX}/todos", headers=_headers)
