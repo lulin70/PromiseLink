@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # Application
     app_name: str = "PromiseLink"
-    app_version: str = "0.8.0-rc2"
+    app_version: str = "0.8.0"
     app_env: str = "development"
     debug: bool = False
     log_level: str = "INFO"
@@ -139,6 +139,18 @@ class Settings(BaseSettings):
     relay_reconnect_max: int = 30  # 最大重连间隔(秒)
     relay_heartbeat_interval: int = 30  # 心跳间隔(秒)
     relay_token_refresh_interval: int = 900  # relay token刷新间隔(秒)
+    relay_wss_enabled: bool = Field(
+        default=True,
+        description="是否启用WSS长连接（专业版自动启动，基础版设为False则仅HTTP relay）",
+    )
+    relay_local_api_url: str = Field(
+        default="http://localhost:8000",
+        description="本地API基础URL，用于WSS中继转发业务请求到本地FastAPI",
+    )
+    relay_http_request_timeout: int = Field(
+        default=30,
+        description="WSS HTTP请求中继超时(秒)，网关→用户本地→响应的总超时",
+    )
 
     # ── Pro Edition: License Verification ──
     pro_license_key: str = Field(default="", description="专业版许可证密钥")
