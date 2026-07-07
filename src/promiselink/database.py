@@ -10,7 +10,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
-from sqlalchemy.pool import AsyncAdaptedQueuePool
+from sqlalchemy.pool import NullPool
 
 from promiselink.config import get_settings
 from promiselink.core.logging import get_logger
@@ -101,15 +101,15 @@ def get_async_engine() -> Any:
     if url.startswith("sqlite"):
         if "+aiosqlite" not in url:
             url = url.replace("sqlite://", "sqlite+aiosqlite://")
+        # NullPool: each session creates a fresh connection and closes it when done.
+        # QueuePool exhausted under concurrent pipeline load (steps hold sessions
+        # during slow LLM calls, up to 300s each, consuming all 15 pooled connections).
+        # NullPool + WAL mode + busy_timeout=30s handles concurrency correctly.
         engine = create_async_engine(
             url,
             echo=settings.debug,
             connect_args={"check_same_thread": False, "timeout": 30},
-            poolclass=AsyncAdaptedQueuePool,
-            pool_size=5,
-            max_overflow=10,
-            pool_timeout=60,
-            pool_pre_ping=True,
+            poolclass=NullPool,
         )
 
         @event.listens_for(engine.sync_engine, "connect")

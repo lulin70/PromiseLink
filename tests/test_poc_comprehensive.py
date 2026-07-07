@@ -123,6 +123,7 @@ def wait_for_pipeline(client, event_id, headers, timeout=90, interval=2):
     """
     terminal_statuses = {"completed", "degraded_completed", "failed", "awaiting_retry"}
     start = time.time()
+    event = None  # Initialize to avoid UnboundLocalError when first request fails
     while time.time() - start < timeout:
         resp = client.get(f"{API_PREFIX}/events", headers=headers)
         if resp.status_code == 200:
