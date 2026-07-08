@@ -97,14 +97,12 @@ Docker 是一个免费的软件，用来在电脑上运行 PromiseLink。
 
 想在手机上也能访问？需要用微信小程序：
 
-1. 在电脑上安装**微信开发者工具**（PC 端工具，不是手机 App）：
-   - 下载地址：https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html
-2. 打开微信开发者工具，用 AppID `wxa8704555bc066773` 导入 PromiseLink-miniapp 项目
-3. 点击工具栏的 **"预览"** 按钮，生成二维码
-4. 打开手机微信，**扫一扫** 这个二维码
-5. 手机上即可打开 PromiseLink 小程序，访问你电脑上的数据
+- **小程序正式发布后**：打开手机微信，在搜索框输入"PromiseLink"，点击搜索结果中的小程序即可使用
+- **发布前内测阶段**：请联系 support@promiselink.cn 获取内测二维码，用微信扫一扫打开
 
-> **详细的小程序使用说明**：请参阅 [小程序用户指南](../../PromiseLink-miniapp/docs/USER_GUIDE.md)
+> **前提**：你的电脑必须保持开机且 PromiseLink 服务正在运行（第 3 步启动的服务）。手机小程序通过云端网关中继访问你电脑上的数据，关闭电脑则手机无法访问。
+
+> **详细的小程序使用说明**：请参阅 [小程序用户指南](https://promiselink.cn/docs/miniapp-user-guide)
 
 ---
 
@@ -148,13 +146,26 @@ docker compose restart
 
 ## 数据备份
 
-你的所有数据存储在：`~/promiselink/data/promiselink.db`
+你的所有数据存储在 Docker 卷中，对应宿主机路径：`~/promiselink/data/promiselink.db`
 
-建议每周备份一次：
+> **重要**：PromiseLink 运行在 Docker 容器内，直接 `cp` 宿主机文件可能在容器写入时获取到不一致的快照。请使用下面的 Docker 原生方式备份。
+
+建议每周备份一次（在终端运行）：
 
 ```bash
+cd ~/promiselink
+
+# 方法 1（推荐）：通过 Docker 执行 SQLite 在线备份，保证数据一致性
+docker compose exec -T promiselink sqlite3 /data/promiselink.db ".backup /data/promiselink-backup-$(date +%Y%m%d).db"
+docker compose cp promiselink:/data/promiselink-backup-$(date +%Y%m%d).db ~/promiselink-backup-$(date +%Y%m%d).db
+
+# 方法 2（简单）：先停止服务再复制文件，避免写入冲突
+docker compose down
 cp ~/promiselink/data/promiselink.db ~/promiselink-backup-$(date +%Y%m%d).db
+docker compose up -d
 ```
+
+> **恢复方法**：如需从备份恢复，先 `docker compose down`，然后用 `cp ~/promiselink-backup-YYYYMMDD.db ~/promiselink/data/promiselink.db` 覆盖，再 `docker compose up -d`。
 
 ---
 

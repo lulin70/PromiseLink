@@ -3308,111 +3308,184 @@ GDPR合规端点，支持数据查看、导出、删除。
 
 ---
 
-### §3.27 Relay Gateway API (v3.1新增) 📋 **专业版（尚未实现）**
+### §3.27 Relay Gateway API (v3.1新增, v3.2更新) ✅ **专业版已实现**
 
-> **产品层级说明**: Relay Gateway API 仅在 **专业版** 中使用。基础版为本地运行，无需中继网关；定制版为自部署服务，不使用共享网关。
+> **产品层级说明**: Relay Gateway API 仅在 **专业版网关** 中提供（独立仓库 `PromiseLink-Pro`）。基础版通过 `relay_client` 连接专业版网关使用以下端点；定制版为自部署服务，不使用共享网关。
+> **实现状态**: ✅已实现 6 个端点 | 实现文件: `PromiseLink-Pro/gateway/api/v1/relay.py`
+> **认证**: 所有端点需 `verify_relay_token`（Relay JWT，由许可证激活后签发，非普通用户 JWT）
 
-**说明**: 专业版通过云中继网关（Relay Gateway）实现微信小程序访问和AI调用代理。以下5个端点定义了本地服务与中继网关之间的通信协议。
+**说明**: 专业版网关提供 6 个中继端点，覆盖 LLM/ASR/TTS/OCR 四类 AI 能力中继、WebSocket 实时通道、以及 HTTP→WSS 业务请求转发。基础版用户无需持有 LLM API Key，所有 AI 调用通过网关代理到 Moka AI。
 
-#### 3.27.1 WebSocket 中继连接 📋 **专业版（尚未实现）**
+#### 3.27.1 POST /api/v1/pro/relay/llm ✅ **已实现**
 
-**端点**: `WSS /relay`
+LLM 中继：基础版/小程序将 LLM 调用请求发送到网关，网关代理调用 Moka AI 后返回结果。支持流式（SSE）和非流式两种模式。
 
-**说明**: 本地 relay_client 通过 WebSocket 连接到云中继网关，建立双向通信通道。小程序请求通过网关中继转发到本地服务。
+**认证**: `verify_relay_token`（Relay JWT）
 
-**协议**: WebSocket over TLS (WSS)
+**请求体** (`LLMRelayRequest`):
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| messages | array | ✅ | OpenAI 格式消息数组 |
+| model | string | ❌ | 模型名，默认网关配置 |
+| stream | boolean | ❌ | 是否流式返回，默认 false |
+| max_tokens | integer | ❌ | 最大 token 数 |
+| temperature | float | ❌ | 温度参数，0-1 |
 
-**认证**: 连接时携带 `RELAY_TOKEN` 进行身份验证
+**响应（非流式）200**: `UnifiedResponse` 包裹的 LLM 结果
+**响应（流式 SSE）200**: `text/event-stream`
+```
+event: token
+data: {"content": "...", "index": N}
 
-**消息类型**:
-- `ping` / `pong` — 心跳保活（默认30秒间隔）
-- `request` — 小程序→本地服务的API请求转发
-- `response` — 本地服务→小程序的API响应转发
-- `ai_proxy_request` — 本地服务→网关的AI调用请求
-- `ai_proxy_response` — 网关→本地服务的AI调用响应
-
-#### 3.27.2 AI调用代理 📋 **专业版（尚未实现）**
-
-**端点**: 通过WebSocket中继通道发送 `ai_proxy_request` 消息
-
-**说明**: 本地服务将LLM API调用请求发送到中继网关，网关代理调用LLM API后返回结果。专业版用户无需自行配置LLM API Key。
-
-**请求消息格式**:
-```json
-{
-  "type": "ai_proxy_request",
-  "request_id": "uuid",
-  "provider": "anthropic",
-  "model": "claude-sonnet-4-20250514",
-  "messages": [...],
-  "max_tokens": 2000,
-  "temperature": 0.3
-}
+event: done
+data: {"usage": {...}, "billing": {...}}
 ```
 
-**响应消息格式**:
+**计费**: 按实际 token 用量计费，计入用户月度配额
+
+#### 3.27.2 POST /api/v1/pro/relay/asr ✅ **已实现**
+
+ASR 中继：语音转文字，通过 Moka AI Whisper 实现。
+
+**认证**: `verify_relay_token`
+
+**请求** (`multipart/form-data`):
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| audio | file | ✅ | 音频文件 (mp3/wav/m4a)，最大 25MB |
+| model | string | ❌ | 模型名，默认 `whisper-1` |
+| language | string | ❌ | 语言代码，默认 `zh` |
+
+**响应 200** (`UnifiedResponse[ASRRelayResponse]`):
 ```json
 {
-  "type": "ai_proxy_response",
-  "request_id": "uuid",
-  "status": "success",
-  "content": "...",
-  "tokens_used": 500,
-  "cost": 0.05
-}
-```
-
-#### 3.27.3 中继连接状态查询 📋 **专业版（尚未实现）**
-
-**端点**: `GET /api/v1/relay/status`
-
-**说明**: 查询本地relay_client与中继网关的连接状态。
-
-**响应**:
-```json
-{
-  "connected": true,
-  "gateway_url": "wss://api.promiselink.cn/relay",
-  "connected_at": "2026-06-11T10:00:00Z",
-  "last_heartbeat": "2026-06-11T10:05:00Z",
-  "reconnect_count": 0
-}
-```
-
-#### 3.27.4 AI用量查询 📋 **专业版（尚未实现）**
-
-**端点**: `GET /api/v1/relay/usage`
-
-**说明**: 查询当前计费周期内的AI调用量和费用统计。
-
-**响应**:
-```json
-{
-  "period": "2026-06",
-  "total_tokens": 150000,
-  "total_cost": 15.0,
-  "breakdown": {
-    "entity_extraction": {"tokens": 50000, "cost": 5.0},
-    "todo_generation": {"tokens": 30000, "cost": 3.0},
-    "semantic_search": {"tokens": 20000, "cost": 2.0}
+  "success": true,
+  "data": {
+    "text": "我今天有几个待办",
+    "confidence": 0.95,
+    "provider": "moka_ai"
   }
 }
 ```
 
-#### 3.27.5 中继连接重连 📋 **专业版（尚未实现）**
+#### 3.27.3 POST /api/v1/pro/relay/tts ✅ **已实现**
 
-**端点**: `POST /api/v1/relay/reconnect`
+TTS 中继：文字转语音，返回音频流。
 
-**说明**: 手动触发relay_client重新连接中继网关。通常在连接异常时使用，正常情况下relay_client自动重连（指数退避）。
+**认证**: `verify_relay_token`
 
-**响应**:
+**请求体** (`TTSRelayRequest`):
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| text | string | ✅ | 待合成文字，最大 4096 字符 |
+| model | string | ❌ | 模型名 |
+| voice | string | ❌ | 语音风格，默认 `alloy` |
+| speed | float | ❌ | 语速，0.5-4.0 |
+| response_format | string | ❌ | 输出格式，`mp3` 或 `wav`，默认 `mp3` |
+
+**响应 200**: `audio/mpeg` 或 `audio/wav` 二进制流
+
+**响应头**: `X-Billing-TTS-Used` / `X-Billing-TTS-Remaining`（本月用量/剩余）
+
+#### 3.27.4 POST /api/v1/pro/relay/ocr ✅ **已实现**
+
+OCR 中继：图片文字识别，通过 Moka AI Vision 实现。
+
+**认证**: `verify_relay_token`
+
+**请求** (`multipart/form-data`):
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| image | file | ✅ | 图片文件 (jpg/png)，最大 10MB |
+| task | string | ❌ | 识别任务类型，默认 `general` |
+| model | string | ❌ | 模型名，默认 `moka-vision` |
+
+**响应 200** (`UnifiedResponse[OCRRelayResponse]`):
 ```json
 {
-  "status": "reconnecting",
-  "gateway_url": "wss://api.promiselink.cn/relay",
-  "attempt": 1
+  "success": true,
+  "data": {
+    "text": "张三\nCTO\nABC科技有限公司",
+    "structured_data": {
+      "names": ["张三"],
+      "companies": ["ABC科技有限公司"],
+      "titles": ["CTO"],
+      "phone": ["13800138000"],
+      "email": ["zhangsan@abc.com"]
+    },
+    "provider": "moka_ai"
+  }
 }
 ```
+
+#### 3.27.5 WS /api/v1/pro/relay/ws ✅ **已实现**
+
+WebSocket 中继端点，支持两种用途：
+1. **实时语音助手交互**：小程序通过 WSS 与网关进行实时 LLM/ASR/TTS 交互
+2. **基础版 WSS 长连接**：基础版 `relay_client` 通过 WSS 长连接到网关，小程序 HTTP 请求经网关转发到用户本地基础版
+
+**认证**: JWT token 通过 `token` 查询参数传递（浏览器 WebSocket 客户端无法使用 Authorization 头）
+
+**连接**: `wss://gateway.promiselink.cn/api/v1/pro/relay/ws?token={relay_jwt}`
+
+**消息协议（JSON）**:
+
+客户端 → 服务端:
+| type | 说明 |
+|------|------|
+| `llm` | LLM 请求，data 为 `LLMRelayRequest` |
+| `asr` | ASR 请求，data 含 base64 音频 |
+| `tts` | TTS 请求，data 为 `TTSRelayRequest` |
+| `ping` | 心跳保活 |
+| `http_request` | 基础版 WSS 长连接：转发 HTTP 业务请求到用户本地 |
+
+服务端 → 客户端:
+| type | 说明 |
+|------|------|
+| `connected` | 连接成功，含 `user_id` |
+| `token` | LLM 流式 token，含 `content` 和 `index` |
+| `done` | LLM 流式结束，含 `usage` 和 `billing` |
+| `asr_result` | ASR 结果，含 `text` |
+| `tts_result` | TTS 结果，含 base64 音频 |
+| `http_response` | 基础版 WSS 长连接：HTTP 请求的响应 |
+| `error` | 错误，含 `code` 和 `message` |
+| `pong` | 心跳响应 |
+
+#### 3.27.6 * /api/v1/pro/relay/request ✅ **已实现**
+
+HTTP→WSS 业务请求中继：小程序通过 HTTP 调用网关，网关通过 WSS 长连接转发到用户本地基础版 Docker，返回响应。这是小程序访问用户本地数据的核心通道。
+
+**认证**: `verify_relay_token`
+
+**支持方法**: `GET` / `POST` / `PUT` / `DELETE` / `PATCH`
+
+**查询参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| path | string | ✅ | 本地 API 路径，如 `/api/v1/events` |
+
+**请求体**: 原样转发到本地 API，Content-Type 保留
+
+**响应 200** (`UnifiedResponse`):
+```json
+{
+  "success": true,
+  "data": {
+    "status": 200,
+    "headers": {"Content-Type": "application/json"},
+    "body": "..."
+  }
+}
+```
+
+**错误响应**:
+| HTTP 状态 | 说明 |
+|-----------|------|
+| 503 | 无活跃 WSS 会话（用户电脑离线或基础版未运行） |
+| 504 | 本地基础版响应超时 |
+| 502 | WSS 发送失败（连接中断） |
+
+> **架构说明**: 此端点是三层架构 L1→L2→L3 的核心：L1 小程序 HTTP → L2 网关 `/relay/request` → L2 网关通过 WSS 转发 → L3 用户本地基础版 Docker。用户电脑必须保持开机且基础版服务运行中。
 
 ---
 

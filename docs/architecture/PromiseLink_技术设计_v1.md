@@ -3927,7 +3927,7 @@ curl -f https://promiselink.example.com/health || echo "HEALTH CHECK FAILED"
 |------|--------|--------|------|
 | `promiselink-api` | ✅ | ✅ | FastAPI业务服务（专业版内含relay_client后台Task） |
 | `promiselink-web` | ✅ | ✅ | Nginx托管H5前端 |
-| 环境变量 `RELAY_GATEWAY_URL` | 无 | `wss://gw.promiselink.ai/relay` | 设置即启用relay_client后台Task |
+| 环境变量 `RELAY_GATEWAY_URL` | 无 | `https://gateway.promiselink.cn` | 设置即启用relay_client后台Task（WSS连接到 `/api/v1/pro/relay/ws`） |
 | 环境变量 `RELAY_USER_TOKEN` | 无 | JWT签名token | 用户身份凭证 |
 | 环境变量 `AI_MODE` | `local` | `relay` | AI调用模式 |
 | 环境变量 `DEEPSEEK_API_KEY` | 用户自填 | 无（网关代理） | API Key存储位置 |
@@ -4020,7 +4020,7 @@ curl -f https://promiselink.example.com/health || echo "HEALTH CHECK FAILED"
                     ↓
           标注"AI调用"请求头 X-AI-Call: true
                     ↓
-          relay_client → 中继网关(AI代理) → DeepSeek API → 返回
+          relay_client → 中继网关(AI代理) → Moka AI API → 返回
                     ↓
           本地Docker组装响应 → 浏览器
 ```
