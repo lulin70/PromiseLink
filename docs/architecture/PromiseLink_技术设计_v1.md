@@ -3938,7 +3938,7 @@ curl -f https://promiselink.example.com/health || echo "HEALTH CHECK FAILED"
 
 **WebSocket长连接**：
 - 方向：用户PC **主动连**网关（出站连接，无需公网IP）
-- 协议：`wss://gw.promiselink.ai/relay`
+- 协议：`wss://gateway.promiselink.cn/relay`
 - 认证：连接时携带 `user_token`（JWT签名），网关验证后建立映射
 
 **消息格式**：

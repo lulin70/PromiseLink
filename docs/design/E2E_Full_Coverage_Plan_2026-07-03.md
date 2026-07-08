@@ -122,7 +122,7 @@
 
 ```typescript
 // tests/e2e/helpers_pro.ts (新建)
-export const PRO_LICENSE_KEY = process.env.TARO_APP_PRO_API_KEY || 'PL-PRO-TEST-0001'
+export const PRO_LICENSE_KEY = process.env.TARO_APP_PRO_API_KEY || 'PL-PRO-TEST-0001-0001'
 export const PRO_RELAY_TOKEN_KEY = 'pro_relay_token'
 export const PRO_LICENSE_KEY_STORAGE = 'pro_license_key'
 
