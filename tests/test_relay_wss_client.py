@@ -60,13 +60,13 @@ class _FakeWebSocket:
 
 def test_ws_url_uses_ws_scheme_for_http_gateway():
     client = RelayWSSClient(
-        gateway_url="http://47.116.219.15:8001",
+        gateway_url="http://staging-gateway.example.com:8001",
         license_key="PL-PRO-aaaa-bbbb-cccc",
         relay_client=_FakeRelayClient(token="jwt-123"),  # type: ignore[arg-type]
     )
     url = client.ws_url
     assert url.startswith("ws://")
-    assert "47.116.219.15:8001" in url
+    assert "staging-gateway.example.com:8001" in url
     assert "token=jwt-123" in url
 
 

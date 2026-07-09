@@ -129,7 +129,8 @@ services:
     environment:
       POSTGRES_DB: promiselink
       POSTGRES_USER: promiselink
-      POSTGRES_PASSWORD: ${PG_PASSWORD:-promiselink_dev}
+      # 密码必须通过 .env.poc 注入，禁止弱默认值（A-3 修复）
+      POSTGRES_PASSWORD: ${PG_PASSWORD:?PG_PASSWORD must be set in .env.poc (see .env.poc.example)}
     ports:
       - "5432:5432"
     volumes:

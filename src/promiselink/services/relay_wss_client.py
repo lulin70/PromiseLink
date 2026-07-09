@@ -78,8 +78,8 @@ class RelayWSSClient:
     """Persistent WSS client bridging local FastAPI to the cloud gateway.
 
     Args:
-        gateway_url: Gateway base URL, e.g. ``http://47.116.219.15:8001``
-            or ``https://gw.promiselink.cn``. The scheme is rewritten
+        gateway_url: Gateway base URL, e.g. ``https://gateway.promiselink.cn``
+            or ``http://staging-gateway:8001``. The scheme is rewritten
             to ``ws://`` or ``wss://`` automatically.
         license_key: Pro license key (``PL-PRO-xxxx-xxxx-xxxx``).
         local_api_url: Local FastAPI base URL for forwarding

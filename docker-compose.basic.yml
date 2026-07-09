@@ -18,7 +18,7 @@
 #   4. 手机扫码小程序，小程序经云端网关 WSS 中继访问本地数据
 #
 # 专业版 relay 关键环境变量（在 .env.basic 中配置）：
-#   RELAY_GATEWAY_URL=http://47.116.219.15:8001  云端网关地址
+#   RELAY_GATEWAY_URL=https://gateway.promiselink.cn  云端网关地址
 #   PRO_LICENSE_KEY=PL-PRO-xxxx-xxxx-xxxx         许可证密钥
 #   RELAY_WSS_ENABLED=true                         启用WSS长连接
 #   RELAY_LOCAL_API_URL=http://localhost:8000      本地API地址（WSS中继转发目标）

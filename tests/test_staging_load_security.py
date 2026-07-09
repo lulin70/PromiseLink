@@ -1,12 +1,12 @@
 """Staging 真实 HTTP 并发与安全测试
 
-针对部署的 staging 服务器 (http://47.116.219.15) 执行：
+针对部署的 staging 服务器 (通过 E2E_BASE_URL 环境变量指定) 执行：
   1. 100 并发用户测试 — 登录、事件创建、读取混合场景
   2. 安全渗透测试 — 认证绕过、越权、注入、JWT 篡改、速率限制
   3. 边缘情况测试 — 超长文本、特殊字符、空字段、畸形 JSON
 
 运行方式:
-  E2E_BASE_URL=http://47.116.219.15 \
+  E2E_BASE_URL=https://gateway.promiselink.cn \
   POC_SECRET=<secret> \
   .venv/bin/python -m pytest tests/test_staging_load_security.py -v --tb=short
 
@@ -29,7 +29,7 @@ import pytest
 
 # ── Constants ──
 
-BASE_URL = os.environ.get("E2E_BASE_URL", "http://47.116.219.15")
+BASE_URL = os.environ.get("E2E_BASE_URL", "https://gateway.promiselink.cn")
 API_PREFIX = "/api/v1"
 POC_SECRET = os.environ.get("POC_SECRET", "promiselink2026")
 

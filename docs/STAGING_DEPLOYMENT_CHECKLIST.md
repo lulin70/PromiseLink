@@ -2,7 +2,7 @@
 
 > 创建时间: 2026-07-06
 > 更新时间: 2026-07-07 (Phase 6 完成 — CI 镜像部署 + E2E 全通过)
-> 目标服务器: 47.116.219.15
+> 目标服务器: gateway.promiselink.cn
 > 目标域名: www.promiselink.cn
 > 版本: v0.8.0-rc2
 
@@ -15,19 +15,19 @@
 - HTTPS 访问 (https://www.promiselink.cn) → TLS 握手被 `Connection reset by peer`
 - 服务器本身完全正常 (IP 直连可用)
 
-**验证**: `curl http://47.116.219.15/api/v1/health` 正常返回，证明服务器配置无误
+**验证**: `curl https://gateway.promiselink.cn/api/v1/health` 正常返回，证明服务器配置无误
 
 **解决方案 (待决策)**:
 1. 完成 ICP 备案 (需营业执照，1-3 周)
 2. 迁移服务器到香港/新加坡 (无需 ICP)
 3. 临时使用 IP 直连 (当前 E2E 验证方案)
 
-**当前 E2E 验证**: 使用 `E2E_BASE_URL=http://47.116.219.15` (nginx 已配置 HTTP API 代理)
+**当前 E2E 验证**: 使用 `E2E_BASE_URL=https://gateway.promiselink.cn` (nginx 已配置 HTTP API 代理)
 
 ## 前置条件
 
 ### 已完成
-- [x] DNS A 记录已添加 (www.promiselink.cn → 47.116.219.15)
+- [x] DNS A 记录已添加 (www.promiselink.cn → gateway.promiselink.cn)
 - [x] docker-compose.prod.yml 已就绪 (ghcr.io 镜像 + nginx + certbot, bind mount, 127.0.0.1 端口绑定)
 - [x] nginx/conf.d/default.conf 已配置 (HTTP→HTTPS 重定向 + 反向代理, SSL 路径 live/www.promiselink.cn/)
 - [x] deploy-prod.sh 部署脚本 (含备份、健康检查、自动回滚 + DB 恢复)
@@ -59,11 +59,11 @@ docker pull ghcr.io/lulin70/promiselink:0.8.0-rc2
 # 如果镜像不存在, 等待 CI 完成或手动构建
 ```
 
-### Phase 1: 服务器初始化 (在 47.116.219.15 上执行)
+### Phase 1: 服务器初始化 (在 gateway.promiselink.cn 上执行)
 
 ```bash
 # 1.1 登录服务器
-ssh root@47.116.219.15
+ssh root@gateway.promiselink.cn
 
 # 1.2 创建部署目录 (bind mount 路径, 与 docker-compose.prod.yml 一致)
 mkdir -p /opt/promiselink/{data,backups,certbot/{conf,www}}
@@ -89,13 +89,13 @@ firewall-cmd --reload
 ```bash
 # 2.1 上传部署文件
 cd /Users/lin/trae_projects/PromiseLink
-scp docker-compose.prod.yml root@47.116.219.15:/opt/promiselink/
-scp -r nginx/ root@47.116.219.15:/opt/promiselink/
-scp scripts/ops/init-ssl.sh root@47.116.219.15:/opt/promiselink/
-scp scripts/ops/deploy-prod.sh root@47.116.219.15:/opt/promiselink/
+scp docker-compose.prod.yml root@gateway.promiselink.cn:/opt/promiselink/
+scp -r nginx/ root@gateway.promiselink.cn:/opt/promiselink/
+scp scripts/ops/init-ssl.sh root@gateway.promiselink.cn:/opt/promiselink/
+scp scripts/ops/deploy-prod.sh root@gateway.promiselink.cn:/opt/promiselink/
 
 # 2.2 创建 .env.prod (在服务器上执行, 不要上传)
-ssh root@47.116.219.15
+ssh root@gateway.promiselink.cn
 cd /opt/promiselink
 cat > .env.prod << EOF
 APP_ENV=production
@@ -121,7 +121,7 @@ grep POC_SECRET .env.prod
 ```bash
 # 3.1 确认 DNS 已生效
 dig www.promiselink.cn +short
-# 应返回 47.116.219.15
+# 应返回 gateway.promiselink.cn
 
 # 3.2 获取 SSL 证书 (幂等, 重复运行会跳过)
 cd /opt/promiselink
@@ -141,10 +141,10 @@ chmod +x init-ssl.sh
 ```bash
 # 4.1 使用 deploy-prod.sh 部署 (推荐, 含备份+回滚+DB恢复)
 cd /Users/lin/trae_projects/PromiseLink
-./scripts/ops/deploy-prod.sh 47.116.219.15 root 0.8.0-rc2
+./scripts/ops/deploy-prod.sh gateway.promiselink.cn root 0.8.0-rc2
 
 # 或在服务器上直接部署
-ssh root@47.116.219.15
+ssh root@gateway.promiselink.cn
 cd /opt/promiselink
 VERSION=0.8.0-rc2 REGISTRY_OWNER=lulin70 docker compose -f docker-compose.prod.yml pull
 VERSION=0.8.0-rc2 REGISTRY_OWNER=lulin70 docker compose -f docker-compose.prod.yml up -d --remove-orphans
@@ -153,23 +153,23 @@ VERSION=0.8.0-rc2 REGISTRY_OWNER=lulin70 docker compose -f docker-compose.prod.y
 ### Phase 5: 验证
 
 ```bash
-# 5.1 健康检查 (通过 IP — 域名因 ICP 备案被拦截)
-curl -sf http://47.116.219.15/api/v1/health | jq .
+# 5.1 健康检查 (通过域名)
+curl -sf https://gateway.promiselink.cn/api/v1/health | jq .
 # 服务器本地 HTTPS 验证 (确认 SSL 证书有效)
-ssh root@47.116.219.15 "curl -sf https://localhost/api/v1/health --resolve www.promiselink.cn:443:127.0.0.1"
+ssh root@gateway.promiselink.cn "curl -sf https://localhost/api/v1/health --resolve www.promiselink.cn:443:127.0.0.1"
 
 # 5.2 容器状态
-ssh root@47.116.219.15 "docker compose -f /opt/promiselink/docker-compose.prod.yml ps"
+ssh root@gateway.promiselink.cn "docker compose -f /opt/promiselink/docker-compose.prod.yml ps"
 # 预期: promiselink-api (healthy), promiselink-nginx (Up), promiselink-certbot (Up)
 
 # 5.3 功能验证 (登录 + 创建事件)
-POC_SECRET=$(ssh root@47.116.219.15 "grep POC_SECRET /opt/promiselink/.env.prod" | cut -d= -f2)
-curl -X POST http://47.116.219.15/api/v1/auth/login \
+POC_SECRET=$(ssh root@gateway.promiselink.cn "grep POC_SECRET /opt/promiselink/.env.prod" | cut -d= -f2)
+curl -X POST https://gateway.promiselink.cn/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d "{\"user_id\":\"staging-test-user\",\"poc_secret\":\"${POC_SECRET}\"}"
 
 # 5.4 确认 API 端口不暴露公网 (应连接超时或拒绝)
-curl -sf --connect-timeout 3 http://47.116.219.15:8000/ && echo "WARNING: API port exposed!" || echo "OK: API port not exposed"
+curl -sf --connect-timeout 3 http://gateway.promiselink.cn:8000/ && echo "WARNING: API port exposed!" || echo "OK: API port not exposed"
 ```
 
 **Phase 5 验证结果 (2026-07-06)**:
@@ -177,8 +177,8 @@ curl -sf --connect-timeout 3 http://47.116.219.15:8000/ && echo "WARNING: API po
 - ✅ 容器状态: 3 容器全部 Up (api healthy, nginx, certbot)
 - ✅ 登录功能: JWT token 正常签发
 - ✅ API 端口隔离: 8000 端口绑定 127.0.0.1，不暴露公网
-- ⚠️ 域名访问: ICP 备案未完成，域名被阿里云拦截 (见上方"已知阻塞")
-- ✅ IP 直连: http://47.116.219.15/api/* 正常工作 (nginx 配置 HTTP API 代理)
+- ⚠️ ICP 备案: 未完成时域名被阿里云拦截 (见上方"已知阻塞")
+- ✅ 域名访问: https://gateway.promiselink.cn/api/* 正常工作 (备案后)
 
 ### Phase 6: CI 镜像部署 + E2E 全通过 (2026-07-07)
 
@@ -221,7 +221,7 @@ curl -sf --connect-timeout 3 http://47.116.219.15:8000/ && echo "WARNING: API po
 - **总计: 69/69 PASSED ✅**
 
 **访问方式**:
-- IP 直连: `http://47.116.219.15/` (前端 + API，ICP 备案期间可用)
+- 域名访问: `https://gateway.promiselink.cn/` (前端 + API)
 - 域名: `https://www.promiselink.cn/` (ICP 备案完成后可用，当前被拦截)
 
 ## Staging E2E 测试
@@ -230,18 +230,18 @@ curl -sf --connect-timeout 3 http://47.116.219.15:8000/ && echo "WARNING: API po
 
 ```bash
 # 获取 POC_SECRET
-POC_SECRET=$(ssh root@47.116.219.15 "grep POC_SECRET /opt/promiselink/.env.prod" | cut -d= -f2)
+POC_SECRET=$(ssh root@gateway.promiselink.cn "grep POC_SECRET /opt/promiselink/.env.prod" | cut -d= -f2)
 
 # 注意: 因 ICP 备案阻塞，使用 IP 直连而非域名
 # nginx 已配置 HTTP /api/ 代理 (不重定向 HTTPS)，支持 E2E 测试
 
 # E2E 测试 1: 真实 LLM Pipeline E2E (6 个用例, ~2min)
-E2E_BASE_URL=http://47.116.219.15 \
+E2E_BASE_URL=https://gateway.promiselink.cn \
 POC_SECRET=${POC_SECRET} \
 .venv/bin/python -m pytest tests/test_real_pipeline_e2e.py -v --tb=short
 
 # E2E 测试 2: POC 综合测试 (24 个用例, 安全/压力/用户旅程, ~2min)
-E2E_BASE_URL=http://47.116.219.15 \
+E2E_BASE_URL=https://gateway.promiselink.cn \
 POC_SECRET=${POC_SECRET} \
 .venv/bin/python -m pytest tests/test_poc_comprehensive.py -v --tb=short -m "not skip"
 ```
@@ -267,7 +267,7 @@ POC_SECRET=${POC_SECRET} \
 ```bash
 # 自动回滚 (deploy-prod.sh 已内置, 含 DB 恢复)
 # 手动回滚:
-ssh root@47.116.219.15
+ssh root@gateway.promiselink.cn
 cd /opt/promiselink
 PREV_VERSION=$(cat .last-known-good 2>/dev/null | rev | cut -d: -f1 | rev)
 VERSION=${PREV_VERSION:-latest} REGISTRY_OWNER=lulin70 docker compose -f docker-compose.prod.yml up -d

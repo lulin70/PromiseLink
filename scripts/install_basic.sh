@@ -15,15 +15,17 @@
 # 部署架构：
 #   用户电脑（本脚本）         云端网关              手机微信小程序
 #   ┌─────────────────┐       ┌──────────┐         ┌──────────┐
-#   │ 基础版 Docker    │ ─WSS→ │ 网关8001 │ ←HTTP── │ 小程序   │
-#   │ localhost:8000  │       │ 47.116.  │         │ 扫码预览 │
-#   │ SQLite 数据     │       │ 219.15   │         └──────────┘
-#   └─────────────────┘       └──────────┘
+#   │ 基础版 Docker    │ ─WSS→ │ 网关     │ ←HTTP── │ 小程序   │
+#   │ localhost:8000  │       │ gateway. │         │ 扫码预览 │
+#   │ SQLite 数据     │       │ promisel │         └──────────┘
+#   └─────────────────┘       │ ink.cn   │
+#                             └──────────┘
 # =============================================================================
 set -e
 
-# 默认配置
-DEFAULT_GATEWAY_URL="http://47.116.219.15:8001"
+# 默认配置：网关地址优先读环境变量，否则用正式域名
+# ICP 备案完成前，用户运行脚本时可手动输入临时地址
+DEFAULT_GATEWAY_URL="${GATEWAY_URL:-https://gateway.promiselink.cn}"
 DEFAULT_IMAGE="ghcr.io/lulin70/promiselink:0.8.0"
 INSTALL_DIR="${PROMISELINK_INSTALL_DIR:-$HOME/promiselink}"
 

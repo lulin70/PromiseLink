@@ -1,10 +1,10 @@
 import { defineConfig, devices } from '@playwright/test'
 
 /**
- * Staging E2E config — runs against deployed frontend at http://47.116.219.15
- * No webServer (uses deployed frontend), no API mock (uses real backend).
+ * Staging E2E config — runs against deployed frontend.
+ * Base URL from STAGING_BASE_URL env var (ICP备案前用临时IP, 备案后用正式域名).
  *
- * Run: npx playwright test --config=playwright.staging.config.ts
+ * Run: STAGING_BASE_URL=https://gateway.promiselink.cn npx playwright test --config=playwright.staging.config.ts
  */
 export default defineConfig({
   testDir: './tests/e2e',
@@ -15,7 +15,7 @@ export default defineConfig({
   reporter: 'list',
   expect: { timeout: 15000 },
   use: {
-    baseURL: 'http://47.116.219.15',
+    baseURL: process.env.STAGING_BASE_URL || 'https://gateway.promiselink.cn',
     viewport: { width: 1280, height: 800 },
     actionTimeout: 15000,
     navigationTimeout: 30000,
