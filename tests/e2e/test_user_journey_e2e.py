@@ -1002,6 +1002,7 @@ class TestSessionExpiry:
 
         # 篡改的 token（修改 iss/aud，校验失败）
         import jwt as pyjwt
+
         from promiselink.config import get_settings
 
         settings = get_settings()

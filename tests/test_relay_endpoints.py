@@ -53,13 +53,13 @@ class _MockRelayClientWithHTTP(RelayEndpointsMixin):
             self.captured_streams.append({"method": method, "url": url, **kwargs})
 
             class _Ctx:
-                async def __aenter__(self_inner):
+                async def __aenter__(self_inner):  # noqa: N805
                     resp = MagicMock()
                     resp.status_code = 200
                     resp.aiter_lines = self._aiter_lines
                     return resp
 
-                async def __aexit__(self_inner, *args):
+                async def __aexit__(self_inner, *args):  # noqa: N805
                     return False
 
             return _Ctx()

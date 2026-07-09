@@ -159,7 +159,7 @@ class RelayWSSClient:
         if self._task is not None and not self._task.done():
             try:
                 await asyncio.wait_for(self._task, timeout=5.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 self._task.cancel()
                 try:
                     await self._task
@@ -207,17 +207,14 @@ class RelayWSSClient:
                     self._stop_event.wait(), timeout=backoff
                 )
                 break  # stop_event set during sleep
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass
             backoff = min(backoff * 2, self.reconnect_max)
 
     async def _connect_and_serve(self) -> None:
         """Connect to the gateway, register, and serve until disconnect."""
         # 1. Ensure we have a valid JWT (refresh if needed).
-        token = await self._relay_client._ensure_token()  # noqa: SLF001
-        # If the cached token will expire soon, refresh proactively.
-        # The RelayClient._ensure_token already handles refresh, so we
-        # can use the token directly.
+        await self._relay_client._ensure_token()  # noqa: SLF001
 
         # 2. Open WSS connection.
         url = self.ws_url
