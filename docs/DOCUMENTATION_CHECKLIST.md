@@ -1,7 +1,7 @@
 # PromiseLink 文档一致性检查清单
 
-> **更新时间**: 2026-07-05
-> **阶段**: v0.8.0-rc2 基础版 E2E 零 skip 达成 — 三仓库独立（PromiseLink + PromiseLink-Pro + PromiseLink-miniapp）
+> **更新时间**: 2026-07-09
+> **阶段**: v0.8.0 基础版许可证迁移至 MPL 2.0 — 三仓库独立（PromiseLink + PromiseLink-Pro + PromiseLink-miniapp）
 > **目的**: 确认所有设计文档版本一致性，验证跨文档引用一致性
 
 ---
@@ -38,7 +38,8 @@
 - **部署层**: 部署指南 v0.5.0 / docker-compose.hosted-poc.yml v1.0 / nginx v1.0 / deploy-staging.sh v1.0 / backup.sh v1.0
 - **运维层**: Prometheus配置 v1.0 / 备份脚本 v1.0
 - **UI层**: UI/UX设计 v3.1（基础版宽屏H5；小程序UI独立仓库 PromiseLink-miniapp）
-- **软件版本**: v0.8.0-rc2（VERSION/pyproject.toml/__init__.py/config.py/package.json/三语README 8处一致）
+- **软件版本**: v0.8.0（VERSION/pyproject.toml/__init__.py/config.py/package.json/三语README 8处一致）
+- **许可证**: MPL 2.0（基础版，2026-07-09 从 AGPL v3 迁移；详见 `docs/legal/MPL_BOUNDARY.md`）
 
 ---
 
