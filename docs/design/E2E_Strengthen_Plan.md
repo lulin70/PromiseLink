@@ -4,7 +4,7 @@
 > **日期**: 2026-07-01
 > **生命周期阶段**: P7 测试计划
 > **作者**: DevSquad 测试专家
-> **适用范围**: 基础版（PromiseLink AGPL）+ 专业版（PromiseLink-Pro 商业许可）
+> **适用范围**: 基础版（PromiseLink MPL）+ 专业版（PromiseLink-Pro 商业许可）
 > **硬约束**: 发布前必须做模拟真实用户使用的测试（用户规则 3）
 
 ---

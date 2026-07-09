@@ -18,10 +18,10 @@
   <img src="https://img.shields.io/badge/perf-17%20tests%20passed-blue" alt="Performance">
   <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python">
   <img src="https://img.shields.io/badge/deploy-Local%20No%20Docker-success" alt="Deploy">
-  <img src="https://img.shields.io/badge/license-AGPL%20v3-red" alt="License">
+  <img src="https://img.shields.io/badge/license-MPL%202.0-blue" alt="License">
 </p>
 
-> **PromiseLink** is the **open-source basic edition** (AGPL v3) of the AI-driven personal business relationship management assistant.
+> **PromiseLink** is the **open-source basic edition** (MPL 2.0) of the AI-driven personal business relationship management assistant.
 > It provides the core loop: event entry → entity extraction → Todo generation → promise tracking → association discovery → dashboard.
 >
 > **Architectural layering**:
@@ -32,7 +32,7 @@
 > The basic edition can optionally connect to the Pro edition cloud gateway via `relay_client` to use cloud AI capabilities (requires Pro License).
 > The frontend is Taro H5 (desktop browser widescreen first, mobile compatible).
 
-**Topics**: `crm` `relationship-management` `ai-assistant` `fastapi` `taro` `sqlite-vec` `local-first` `agpl`
+**Topics**: `crm` `relationship-management` `ai-assistant` `fastapi` `taro` `sqlite-vec` `local-first` `mpl`
 
 ---
 
@@ -191,7 +191,7 @@ graph LR
 | Promise / Todo relationship tracking | ✅ 6-type Todo state machine | ❌ Tasks only | ⚠️ Simple |
 | Association discovery | ✅ 3 strategies | ❌ | ⚠️ LLM-generated |
 | Data ownership | ✅ 100% local SQLite | ⚠️ | ❌ Cloud |
-| Price | Free (AGPL v3) | $$$$ | $$$/month |
+| Price | Free (MPL 2.0) | $$$$ | $$$/month |
 
 ---
 
@@ -350,7 +350,7 @@ curl "http://localhost:8000/api/v1/entities?search=technical cooperation" \
 
 | Edition | Repository | Positioning | Price | Deployment |
 |------|------|------|------|----------|
-| **Basic Edition** | [PromiseLink](https://github.com/lulin70/PromiseLink) (🌐 public AGPL v3) | Local free, plain-text interaction, desktop widescreen | Free | Run locally directly (no Docker) |
+| **Basic Edition** | [PromiseLink](https://github.com/lulin70/PromiseLink) (🌐 public MPL 2.0) | Local free, plain-text interaction, desktop widescreen | Free | Run locally directly (no Docker) |
 | **Pro Edition** | [PromiseLink-Pro](https://github.com/lulin70/PromiseLink-Pro) (🔒 private commercial License) | Cloud AI gateway + voice / email / OCR / privacy management | ¥29/month (early bird) / ¥49/month (regular) | Docker + cloud gateway |
 | **Mini-Program** | [PromiseLink-miniapp](https://github.com/lulin70/PromiseLink-miniapp) (🔒 private commercial License) | WeChat mini-program, mobile portrait, Pro edition mobile client | Bundled with Pro | WeChat mini-program platform |
 | **Custom Edition** | (not public) | Sales team collaboration, multi-tenant | Custom quote | Cloud Docker Compose + K8s |
@@ -373,4 +373,4 @@ curl "http://localhost:8000/api/v1/entities?search=technical cooperation" \
 
 ## License
 
-AGPL-3.0 — see the [LICENSE](LICENSE) file for details
+MPL-2.0 — see the [LICENSE](LICENSE) file for details

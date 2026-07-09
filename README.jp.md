@@ -18,10 +18,10 @@
   <img src="https://img.shields.io/badge/perf-17%20tests%20passed-blue" alt="Performance">
   <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python">
   <img src="https://img.shields.io/badge/deploy-Local%20No%20Docker-success" alt="Deploy">
-  <img src="https://img.shields.io/badge/license-AGPL%20v3-red" alt="License">
+  <img src="https://img.shields.io/badge/license-MPL%202.0-blue" alt="License">
 </p>
 
-> **PromiseLink** は、AI駆動の個人ビジネス関係構築アシスタントの**オープンソース基本版**（AGPL v3）です。
+> **PromiseLink** は、AI駆動の個人ビジネス関係構築アシスタントの**オープンソース基本版**（MPL 2.0）です。
 > イベント入力 → エンティティ抽出 → Todo生成 → 約束追跡 → 関連発見 → ダッシュボード、というコアループを提供します。
 >
 > **アーキテクチャの階層化**:
@@ -32,7 +32,7 @@
 > 基本版は `relay_client` を介してプロ版のクラウドゲートウェイにオプションで接続し、クラウドAI機能を利用できます（プロ版ライセンスが必要）。
 > フロントエンドは Taro H5 です（デスクトップブラウザのワイド画面を優先、モバイル互換）。
 
-**Topics**: `crm` `relationship-management` `ai-assistant` `fastapi` `taro` `sqlite-vec` `local-first` `agpl`
+**Topics**: `crm` `relationship-management` `ai-assistant` `fastapi` `taro` `sqlite-vec` `local-first` `mpl`
 
 ---
 
@@ -191,7 +191,7 @@ graph LR
 | 約束 / Todo関係追跡 | ✅ 6種Todo状態機械 | ❌ タスクのみ | ⚠️ 単純 |
 | 関連発見 | ✅ 3戦略 | ❌ | ⚠️ LLM生成 |
 | データ所有権 | ✅ 100% ローカルSQLite | ⚠️ | ❌ クラウド |
-| 価格 | 無料（AGPL v3） | $$$$ | $$$/月 |
+| 価格 | 無料（MPL 2.0） | $$$$ | $$$/月 |
 
 ---
 
@@ -350,7 +350,7 @@ curl "http://localhost:8000/api/v1/entities?search=technical cooperation" \
 
 | エディション | リポジトリ | ポジショニング | 価格 | デプロイ方式 |
 |------|------|------|------|----------|
-| **基本版** | [PromiseLink](https://github.com/lulin70/PromiseLink) (🌐 公開 AGPL v3) | ローカル無料、プレーンテキストインタラクション、デスクトップワイド画面 | 無料 | ローカル直接実行（Docker不要） |
+| **基本版** | [PromiseLink](https://github.com/lulin70/PromiseLink) (🌐 公開 MPL 2.0) | ローカル無料、プレーンテキストインタラクション、デスクトップワイド画面 | 無料 | ローカル直接実行（Docker不要） |
 | **プロ版** | [PromiseLink-Pro](https://github.com/lulin70/PromiseLink-Pro) (🔒 プライベート 商用ライセンス) | クラウドAIゲートウェイ + 音声 / メール / OCR / プライバシー管理 | ¥29/月（アーリーバード） / ¥49/月（通常） | Docker + クラウドゲートウェイ |
 | **ミニプログラム** | [PromiseLink-miniapp](https://github.com/lulin70/PromiseLink-miniapp) (🔒 プライベート 商用ライセンス) | WeChatミニプログラム、モバイル縦画面、プロ版モバイルクライアント | プロ版に同梱 | WeChatミニプログラムプラットフォーム |
 | **カスタム版** | (非公開) | 営業チーム協業、マルチテナント | カスタム見積もり | クラウド Docker Compose + K8s |
@@ -373,4 +373,4 @@ curl "http://localhost:8000/api/v1/entities?search=technical cooperation" \
 
 ## License
 
-AGPL-3.0 — 詳細は [LICENSE](LICENSE) ファイルを参照してください
+MPL-2.0 — 詳細は [LICENSE](LICENSE) ファイルを参照してください

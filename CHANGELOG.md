@@ -4,6 +4,32 @@ All notable changes to PromiseLink will be documented in this file.
 
 ## [Unreleased] - 2026-07-06
 
+### Changed — 许可证迁移 AGPL v3 → MPL 2.0 (2026-07-09)
+
+**背景**：基础版原采用 GNU AGPL v3，由于第 13 条"远程网络交互"条款的法律争议性和商业用户接受度低，迁移至 Mozilla Public License 2.0（MPL 2.0）。MPL 2.0 采用文件级 copyleft，无网络服务触发条款，允许与闭源代码组合成 Larger Work，更适合双版本商业模式。
+
+**迁移内容**：
+- `LICENSE`：AGPL v3 全文替换为 MPL 2.0 官方全文
+- `README.md` / `README.en.md` / `README.jp.md`：三语 README 许可证声明、badge、topics 更新
+- `pyproject.toml`：`license = "AGPL-3.0"` → `"MPL-2.0"`（SPDX 标识符）
+- `Dockerfile`：OCI label `org.opencontainers.image.licenses` 更新
+- `src/promiselink/main.py`：启动日志许可证字符串更新
+- `src/promiselink/services/relay_client.py`：模块 docstring 许可证声明更新
+- `frontend/src/pages/mine/index.tsx`：关于对话框许可证显示更新
+- `scripts/install.sh` / `scripts/start.sh`：脚本头部注释和 ASCII 横幅许可证更新
+- `.env.poc.example` / `.env.basic.example` / `.env.poc.hosted.example`：环境变量模板许可证 URL 更新
+- `QUICKSTART.md` / `CONTRIBUTING.md` / `.github/CLA.md`：社区文档许可证引用更新
+- `docs/spec/PRD_v1.md` / `docs/architecture/PromiseLink_技术设计_v1.md` / `docs/design/E2E_Strengthen_Plan.md` / `docs/design/Competitive_Research_AgentReach_Cognee.md`：设计文档许可证引用更新
+- `docs/legal/DMCA_TAKEDOWN_TEMPLATE.md`：DMCA 模板许可证名称和条款编号修正（MPL 2.0 无 §13 网络交互条款，修正为 §3.1/§3.2/§3.4/§5）
+
+**新增法务文档**：
+- `docs/legal/MPL_BOUNDARY.md`：MPL 2.0 传染边界法律确认（替代原 `AGPL_BOUNDARY.md`），9 章节覆盖文件级 copyleft、无网络条款、Larger Work、pip import 隔离、AGPL→MPL 迁移说明
+- `docs/legal/TERMS_OF_SERVICE.md`：服务条款/用户协议（10 章节），覆盖用户行为准则、知识产权、订阅计费、数据隐私、免责声明
+- `docs/legal/PRO_LICENSE_AGREEMENT.md`：专业版商业许可协议（13 章节），覆盖单设备绑定、使用量限制、退款政策、责任上限
+- `docs/legal/PRIVACY_POLICY.md` v1.1：补充个人信息处理者主体信息（PIPL §17）和投诉渠道（12377/12315/12321）
+
+**总计**：18 个文件修改 53 处许可证引用 + 4 个法务文档新增/更新。
+
 ### Fixed — 第三方审核 P1 阻断项修复 (2026-07-09)
 
 - **P1-4 测试数字4份文档不一致**：README(中/英/日)/CHANGELOG/STAGING_DEPLOYMENT_CHECKLIST 测试数与覆盖率互相矛盾（1364/1394/1823/71% 等）。运行 `pytest --collect-only` 实测 1907 collected；运行 `pytest --cov=promiselink` 实测 **1858 passed / 49 skipped / 0 failed / 88% coverage**。三语 README 与部署清单已统一为实测数字。

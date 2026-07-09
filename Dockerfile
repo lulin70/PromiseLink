@@ -52,10 +52,10 @@ ARG VERSION=0.8.0-rc2
 
 # OCI-standard image labels for registry indexing and traceability
 LABEL org.opencontainers.image.title="PromiseLink" \
-      org.opencontainers.image.description="AI-driven personal business relationship management assistant (base edition, AGPL v3)" \
+      org.opencontainers.image.description="AI-driven personal business relationship management assistant (base edition, MPL 2.0)" \
       org.opencontainers.image.source="https://github.com/lulin70/PromiseLink" \
       org.opencontainers.image.version="${VERSION}" \
-      org.opencontainers.image.licenses="AGPL-3.0" \
+      org.opencontainers.image.licenses="MPL-2.0" \
       org.opencontainers.image.authors="CarryMem Team <team@carrymem.com>"
 
 # Install runtime-only dependencies

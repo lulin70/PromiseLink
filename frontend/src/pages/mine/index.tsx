@@ -37,7 +37,7 @@ export default function MinePage() {
   function handleAbout() {
     Taro.showModal({
       title: '关于 PromiseLink',
-      content: 'PromiseLink v0.8.0-rc2\n\nAI 驱动的个人商务关系经营助手\n基础版（AGPL v3）\n\n© 2026 PromiseLink',
+      content: 'PromiseLink v0.8.0-rc2\n\nAI 驱动的个人商务关系经营助手\n基础版（MPL 2.0）\n\n© 2026 PromiseLink',
       showCancel: false,
     })
   }

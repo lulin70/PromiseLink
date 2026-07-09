@@ -26,7 +26,7 @@
 
 2. **关系图谱不需要图数据库**。PromiseLink 的 `associations` 表已是标准的图边表（source + target + type + confidence + evidence），已有索引，已有 Python BFS 遍历。Codebase-Memory 项目证明 SQLite 单文件可实现亚毫秒图谱查询。迁移 Neo4j 会破坏"基础版本地运行、无 Docker"的硬约束，收益不抵成本。真正的差距是多跳查询模式（recursive CTE）和图算法（NetworkX），这些都不需要换存储。
 
-3. **Agent-Reach 是"能力层"不是"工具"，借鉴方式要分层**。基础版（AGPL、本地、无 Docker）不应捆绑 Agent-Reach（它依赖 Node.js、mcporter、多个 CLI 工具），但应借鉴其"首选+备选"路由模式构建自己的轻量 channels。专业版（Docker、云端网关）可以直接集成 Agent-Reach 作为互联网感知后端。
+3. **Agent-Reach 是"能力层"不是"工具"，借鉴方式要分层**。基础版（MPL、本地、无 Docker）不应捆绑 Agent-Reach（它依赖 Node.js、mcporter、多个 CLI 工具），但应借鉴其"首选+备选"路由模式构建自己的轻量 channels。专业版（Docker、云端网关）可以直接集成 Agent-Reach 作为互联网感知后端。
 
 ---
 
@@ -219,7 +219,7 @@ cognee 通过 Claude Code 插件实现 session memory 自动捕获（PostToolUse
 
 #### 4.1.4 基础版 vs 专业版的功能划分
 
-| 功能 | 基础版（AGPL、本地、免费） | 专业版（Docker、云端、付费） |
+| 功能 | 基础版（MPL、本地、免费） | 专业版（Docker、云端、付费） |
 |------|------------------------|--------------------------|
 | **手动 URL 粘贴** | ✅ 用户粘贴联系人文章链接，LLM 提取摘要+实体 | ✅ |
 | **RSS 订阅** | ✅ 订阅联系人博客/公司 RSS，定时拉取 | ✅ |
@@ -401,9 +401,9 @@ Codebase-Memory 项目证明：SQLite 单文件可索引 Linux 内核（28M LOC,
 | **运维成本** | 高 | 低 | 中 |
 | **学习曲线** | Cypher 查询语言 | Cypher（OpenCypher） | Cypher |
 | **与现有代码兼容** | 需重写 AssociationEngine | 需适配 | 需适配 |
-| **AGPL 兼容性** | 社区版 GPL，商业版付费 | MIT | SSPL（争议） |
+| **MPL 兼容性** | 社区版 GPL，商业版付费 | MIT | SSPL（争议） |
 
-**关键约束冲突**: 基础版要求"本地运行、无 Docker、AGPL 开源"。Neo4j 社区版是 GPL（与 AGPL 兼容但需开源），商业版付费；FalkorDB 是 SSPL（MongoDB 协议，开源争议）。任何图数据库都会破坏基础版的轻量定位。
+**关键约束冲突**: 基础版要求"本地运行、无 Docker、MPL 开源"。Neo4j 社区版是 GPL（与 MPL 兼容但需开源），商业版付费；FalkorDB 是 SSPL（MongoDB 协议，开源争议）。任何图数据库都会破坏基础版的轻量定位。
 
 #### 5.2.3 cognee 迁移引擎的警示
 
@@ -511,7 +511,7 @@ class RelationshipBriefRefiner:
 
 ## 六、对 PromiseLink 的建议（分基础版/专业版）
 
-### 6.1 基础版建议（AGPL、本地、免费）
+### 6.1 基础版建议（MPL、本地、免费）
 
 | 编号 | 建议 | 借鉴来源 | 优先级 | 开发量 | 风险 |
 |------|------|---------|--------|--------|------|

@@ -5,7 +5,7 @@
 # 适用人群：技术人员/自托管用户/开源社区
 # 自动完成：环境检查→venv创建→依赖安装→前端构建→数据库迁移→配置检查→健康验证
 #
-# 许可证：GNU AGPL v3 — 详见 LICENSE 文件
+# 许可证：MPL 2.0 — 详见 LICENSE 文件
 # =============================================================================
 set -euo pipefail
 
@@ -30,7 +30,7 @@ print_title() {
     echo ""
     echo -e "${COLOR_TITLE}╔══════════════════════════════════════════════╗${COLOR_RESET}"
     echo -e "${COLOR_TITLE}║   PromiseLink 基础版 安装向导                 ║${COLOR_RESET}"
-    echo -e "${COLOR_TITLE}║   AI 驱动的关系管理 · 开源版 (AGPL v3)        ║${COLOR_RESET}"
+    echo -e "${COLOR_TITLE}║   AI 驱动的关系管理 · 开源版 (MPL 2.0)        ║${COLOR_RESET}"
     echo -e "${COLOR_TITLE}╚══════════════════════════════════════════════╝${COLOR_RESET}"
     echo ""
 }

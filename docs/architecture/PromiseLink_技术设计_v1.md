@@ -4,7 +4,7 @@
 > **日期**: 2026-06-17
 > **对应PRD**: v5.2
 > **架构师**: CarryMem团队
-> **变更说明**: v3.2: §8.7.4 AI调用路径升级为三场景模型（基础版离线/专业版浏览器/专业版小程序）+专业版身份验证流程（JWT 5步验证+隐私声明）+§8.7.6新增Open Core模型说明（基础版AGPL v3开源/专业版闭源/开源是隐私技术保证）
+> **变更说明**: v3.2: §8.7.4 AI调用路径升级为三场景模型（基础版离线/专业版浏览器/专业版小程序）+专业版身份验证流程（JWT 5步验证+隐私声明）+§8.7.6新增Open Core模型说明（基础版MPL 2.0开源/专业版闭源/开源是隐私技术保证）
 
 ---
 
@@ -4195,12 +4195,12 @@ JWT刷新失败:
 
 | 层级 | 开源状态 | 许可证 | 包含组件 |
 |------|----------|--------|----------|
-| 基础版 | ✅ 开源 | AGPL v3 | 本地Docker全部代码（FastAPI+5步引擎+数据模型+H5前端） |
+| 基础版 | ✅ 开源 | MPL 2.0 | 本地Docker全部代码（FastAPI+5步引擎+数据模型+H5前端） |
 | 专业版 | 🔒 闭源 | 商业许可 | 中继网关+微信小程序+云端AI代理 |
 
 > 🔑 **开源是隐私声明的技术保证**
 >
-> 基础版以 AGPL v3 开源，用户可自行审计以下关键行为：
+> 基础版以 MPL 2.0 开源，用户可自行审计以下关键行为：
 > - 本地Docker **不会**在用户不知情的情况下向外部发送数据
 > - AI调用路径明确：基础版仅走本地Key，专业版经网关代理时仅传输JWT+AI请求
 > - 所有数据存储在本地SQLite，无隐藏外传逻辑
@@ -4593,7 +4593,7 @@ class SemanticSearchEngine:
 |------|------|----------|------|
 | v2.6 | 2026-06-06 | 新增洞察引擎层+数据接入层架构：①§2.1架构图新增Insight Engine服务②§2.2服务拆分表新增Insight Engine行③§3.1 todos表DDL新增completed_rank/dynamic_score/score_calculated_at字段+索引④§4.10新增洞察引擎设计（动态评分器PriorityScorer+隐式反馈收集器ImplicitFeedbackCollector+Todo模型扩展+API变更）⑤§4.11新增数据接入层设计（DataSourceAdapter接口+邮件场景数据流+微信生态约束） | CarryMem团队 |
 | v2.7 | 2026-06-06 | Phase 1动态优先级四维演进：①§4.10.1a新增Phase 1四维评分器详细设计（依赖性全图谱路径分析+场景匹配Event表驱动）②依赖性算法：有向依赖图+阻塞链检测+3跳间接依赖+dependency_score=Σ(1/depth)×blocked_weight③场景匹配算法：未来24h meeting/call扫描+Entity匹配+context_score=max(0,1-hours/24)④权重配置Phase1(0.3/0.35/0.2/0.15) | CarryMem团队 |
-| v3.2 | 2026-06-11 | §8.7.4 AI调用路径升级为三场景模型+专业版身份验证流程+§8.7.6 Open Core模型：①§8.7.4 AI调用路径从双路径升级为三场景模型（场景1:纯基础版未付费→浏览器局域网→本地模型/自带Key→完全离线；场景2:已购专业版+在家用浏览器→浏览器局域网→云端AI我方Key→身份已激活；场景3:已购专业版+出门用小程序→微信小程序→云端AI我方Key→正常路径）②§8.7.4新增专业版身份验证流程子节（JWT验证5步流程:付费→登录同步→/auth/verify→缓存JWT→自动刷新+JWT payload结构+隐私声明:联网仅验证付费身份不传关系数据）③§8.7.6安全约束新增Open Core模型与隐私保证（基础版开源AGPL v3代码可审计+专业版闭源中继网关/小程序/云端AI+开源是隐私声明的技术保证） | CarryMem团队 |
+| v3.2 | 2026-06-11 | §8.7.4 AI调用路径升级为三场景模型+专业版身份验证流程+§8.7.6 Open Core模型：①§8.7.4 AI调用路径从双路径升级为三场景模型（场景1:纯基础版未付费→浏览器局域网→本地模型/自带Key→完全离线；场景2:已购专业版+在家用浏览器→浏览器局域网→云端AI我方Key→身份已激活；场景3:已购专业版+出门用小程序→微信小程序→云端AI我方Key→正常路径）②§8.7.4新增专业版身份验证流程子节（JWT验证5步流程:付费→登录同步→/auth/verify→缓存JWT→自动刷新+JWT payload结构+隐私声明:联网仅验证付费身份不传关系数据）③§8.7.6安全约束新增Open Core模型与隐私保证（基础版开源MPL 2.0代码可审计+专业版闭源中继网关/小程序/云端AI+开源是隐私声明的技术保证） | CarryMem团队 |
 | v3.1 | 2026-06-11 | 网关中继架构（专业版）设计：①§8.7.1架构概览（三层产品模型L1基础版/L2专业版/L3定制版+用户PC←WSS→云VPS网关←HTTPS→微信小程序架构图+网关不存业务数据只做加密转发+AI代理+计数限流）②§8.7.2基础版vs专业版Docker区别（专业版新增relay_client+Docker Compose差异表）③§8.7.3网关中继协议（WebSocket长连接出站+request/response/ping消息格式+user_token路由映射+30s心跳+60s超时+指数退避重连）④§8.7.4 AI调用路径（基础版本地Key vs 专业版网关代理DeepSeek+X-AI-Call标记+绿灯/黄灯/红灯状态不暴露Token数）⑤§8.7.5网关高可用与降级（网关故障自动降级基础版H5+本地AI Key回退+网关恢复自动重连）⑥§8.7.6安全约束（数据不落地+WSS加密+JWT签名防伪造+API Key隔离） | CarryMem团队 |
 | v3.0 | 2026-06-11 | F-67/F-68/F-69三大功能设计：①§4.13新增F-67 RelationshipBrief关系推进卡前端对接（API路径修正/类型定义对齐/去除Mock回退/数据流说明）②§4.14新增F-68 Promise兑现状态追踪（Todo新增fulfillment_status/fulfilled_at/overdue_notified_at字段+fulfillment_status与status正交设计+step_05/step_08 Pipeline扩展+my_promise自动overdue/their_promise手动标记安全约束+PromiseBoardService+FulfillmentTracker模块+明确不实现关系信用分）③§4.15新增F-69智能跟进提醒（reminder_preferences表+reminder_logs表+提醒时机算法+疲劳度控制≤5条/日+静默时段22:00-08:00+APScheduler调度架构+4种提醒类型+ReminderEngine+FatigueController模块） | CarryMem团队 |
 | v2.9 | 2026-06-09 | 托管PoC部署模式设计：①§8.6.2部署架构图更新为双路径（自助PoC+托管PoC）②§8.6.3a新增托管PoC部署模式（云服务器2C4G+Docker Compose+Nginx反向代理+Let's Encrypt HTTPS+SQLite+微信小程序接入）③新增自助PoC vs 托管PoC对比表（部署位置/访问方式/运维责任/成本/数据存储/TLS/域名）④§8.6.6新增托管PoC→Phase1迁移路径（SQLite导出→SQL方言转换→PG导入→docker-compose切换→DNS切换+零停机+回滚方案） | CarryMem团队 |

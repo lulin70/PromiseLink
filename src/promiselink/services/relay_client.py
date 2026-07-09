@@ -22,7 +22,7 @@ The endpoint methods (LLM/ASR/TTS/OCR + HTTP helpers) live in
 :mod:`relay_endpoints` (``RelayEndpointsMixin``); constants and
 exceptions live in :mod:`relay_models`.
 
-License: GNU AGPL v3 — see LICENSE file for details.
+License: MPL 2.0 — see LICENSE file for details.
 """
 
 from __future__ import annotations

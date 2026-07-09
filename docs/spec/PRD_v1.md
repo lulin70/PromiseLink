@@ -6,10 +6,10 @@
 > **负责人**: CarryMem 团队
 > **变更说明**: v5.0: 新增F-67关系推进卡前端对接+F-68 Promise兑现状态追踪+F-69智能跟进提醒，增强F-45兑现闭环+F-50语音管家快捷指令，明确不做关系信用分/企业版团队协作(除非定制版)，基于brainstorm Top5用例+WorkBuddy关系推进卡补充+推广文承诺验证+DevSquad 7角色CONDITIONAL_PASS门禁
 > **v5.3变更说明**: ①新增§1.5.7 UI布局策略（基础版电脑宽屏三栏+专业版微信小程序手机竖屏单栏，两版UI完全独立）②新增§5.18录入事件画面设计与解析纠偏（大文本框+分区展示+人脉/关系/待办/承诺四类纠偏+确认提交）③新增§3.0.2功能重点与优先级（会后纪要→待办提醒→承诺跟进核心三件套，按生命周期推进，其他为辅助）④新增§5.8.4详情页跳转设计（事件/人脉/待办/承诺四类详情页互相跳转）⑤更新§1.5.3专业版一键安装流程（下载小程序→微信授权→输入邀请码→激活→使用，无需API Key配置）+桥接监控（网关记录Token/次数/费用）+降级策略⑥更新§1.5.6 repo分开策略（基础版公开仓库PromiseLink+专业版私有仓库PromiseLink-Pro）
-> **v5.4变更说明**: ①B8 补充§5.3 Promise数据模型定义（逻辑视图，复用todos表）②B9 补充§5.18.6录入纠偏API契约（POST /events/{event_id}/correct）③I1 定价统一为¥29/月(早鸟)/¥49/月(常规)，消除"待定"和"PoC验证后定价"④I2 仓库名统一为PromiseLink(基础版)+PromiseLink-Pro(专业版)，基础版仓库统一命名为PromiseLink，miniapp合并到PromiseLink-Pro/miniapp/⑤I9 Repo_Split_Decision.md补充§7 AGPL v3法律合规分析⑥I10 edition_architecture.md补充§6 UI架构⑦I11 §1.5.3新增7天免费试用机制⑧I12 §1.5.3b新增网关宕机补偿机制
+> **v5.4变更说明**: ①B8 补充§5.3 Promise数据模型定义（逻辑视图，复用todos表）②B9 补充§5.18.6录入纠偏API契约（POST /events/{event_id}/correct）③I1 定价统一为¥29/月(早鸟)/¥49/月(常规)，消除"待定"和"PoC验证后定价"④I2 仓库名统一为PromiseLink(基础版)+PromiseLink-Pro(专业版)，基础版仓库统一命名为PromiseLink，miniapp合并到PromiseLink-Pro/miniapp/⑤I9 Repo_Split_Decision.md补充§7 MPL 2.0法律合规分析⑥I10 edition_architecture.md补充§6 UI架构⑦I11 §1.5.3新增7天免费试用机制⑧I12 §1.5.3b新增网关宕机补偿机制
 > **v5.5变更说明**: ①新增§1.8 MVP策略决策（打法B确认：专业版早鸟¥29/月MVP，语音录入为核心入口，三个场景闭环）②更新§3.0.2明确打法B=MVP范围（会后记录+待办提醒+承诺跟进，语音录入P0）③更新F-10语音录入优先级为P0（MVP核心，非Phase 1扩展）④排除功能清单：care/risk/cooperation_signal三种Todo移入Phase 2，MVP仅保留promise/followup两种）
 > **v5.6变更说明**: ①§5.18.2解析结果展示增强：承诺区新增[+添加承诺]按钮+内联纠偏视觉提示（下划线可点击）②新增§5.18.3纠偏5：承诺添加（+添加承诺纠偏）③新增§5.18.7内联纠偏交互设计（点击文本直接纠偏，替代弹表单）④新增§5.18.8全局撤销Undo设计（每步纠偏支持撤销，含小程序适配）⑤更新§5.18.6录入纠偏API契约：corrected_promises支持add动作
-> **v5.7变更说明**: §1.5.6a更新为三仓库独立策略（PromiseLink基础版公开AGPL v3 + PromiseLink-Pro专业版私有商业License + PromiseLink-miniapp小程序私有商业License），撤销v5.4中"PromiseLink-miniapp合并到PromiseLink-Pro/miniapp/目录"的决策，小程序代码独立仓库维护。同步更新Deployment_Guide.md小程序编译路径
+> **v5.7变更说明**: §1.5.6a更新为三仓库独立策略（PromiseLink基础版公开MPL 2.0 + PromiseLink-Pro专业版私有商业License + PromiseLink-miniapp小程序私有商业License），撤销v5.4中"PromiseLink-miniapp合并到PromiseLink-Pro/miniapp/目录"的决策，小程序代码独立仓库维护。同步更新Deployment_Guide.md小程序编译路径
 
 ***
 
@@ -612,7 +612,7 @@ Docker如何"知道"用户买了专业版：
 - 🔒 关系图谱融合
 - 🔒 定制版全栈
 
-**License选择**：AGPL v3
+**License选择**：MPL 2.0
 - 最严格，云服务提供者也要开源修改
 - 防止别人拿开源代码做SaaS竞争
 - 在隐私敏感场景下是加分项——"我们连代码都给你看"
@@ -635,7 +635,7 @@ Docker如何"知道"用户买了专业版：
 
 | 仓库 | 可见性 | 内容 | License | 目标用户 |
 |------|--------|------|---------|----------|
-| `PromiseLink` | 🌐 公开 | 基础版全部代码（管线+实体+Todo+Promise+关联+Docker+H5+适配器） | AGPL v3 | 技术用户/自托管/开源社区 |
+| `PromiseLink` | 🌐 公开 | 基础版全部代码（管线+实体+Todo+Promise+关联+Docker+H5+适配器） | MPL 2.0 | 技术用户/自托管/开源社区 |
 | `PromiseLink-Pro` | 🔒 私有 | 专业版增量代码（网关+语音云端+图谱融合+一键安装+计费） | 商业License | 付费用户/许总们 |
 | `PromiseLink-miniapp` | 🔒 私有 | 微信小程序（Taro 手机竖屏版，独立 UI） | 商业License | 专业版小程序用户 |
 
@@ -644,7 +644,7 @@ Docker如何"知道"用户买了专业版：
 | 维度 | 单仓库多分支 | 双仓库物理分开（采纳） |
 |------|-------------|----------------------|
 | 开源清晰度 | 公开仓库含闭源分支，社区困惑 | 公开仓库纯净，社区信任度高 |
-| License合规 | AGPL与商业License混在一起，易出错 | 物理隔离，License边界清晰 |
+| License合规 | MPL与商业License混在一起，易出错 | 物理隔离，License边界清晰 |
 | 贡献流程 | 外部PR可能触及闭源代码 | 外部PR只能进Standard仓库 |
 | 安全性 | 闭源代码可能误推到公开分支 | 物理隔离杜绝泄露风险 |
 | CI/CD | 单一流水线需条件判断 | 各自独立流水线，互不干扰 |
@@ -659,7 +659,7 @@ Docker如何"知道"用户买了专业版：
 
 ```
 GitHub组织: promiselink
-├── promiselink (🌐 公开, AGPL v3) — 基础版仓库
+├── promiselink (🌐 公开, MPL 2.0) — 基础版仓库
 │   ├── src/promiselink/       # 基础版后端
 │   ├── frontend/              # Taro H5 前端
 │   ├── docker/                # Docker部署
@@ -4182,10 +4182,10 @@ AI推断关系 → 展示推断结果 + 置信度
 | v4.6 | 2026-06-06 | Phase 1动态优先级四维演进详细设计：①§1.7.5扩展Phase 1四维模型完整设计②新增维度3依赖性：全图谱路径分析算法（有向依赖图+阻塞链检测+3跳间接依赖+dependency_score=Σ(1/depth)×blocked_weight）③新增维度4场景匹配：Event表驱动算法（未来24h meeting/call扫描+Entity匹配+context_score=max(0,1-hours/24)）④权重配置从PoC(0.4/0.6/0/0)演进为Phase1(0.3/0.35/0.2/0.15)⑤新增F-55依赖性全图谱路径分析⑥新增F-56场景匹配Event表驱动 |
 | v4.7 | 2026-06-06 | Phase 1向量化功能设计：①新增§1.7.7向量化语义能力②新增F-57语义搜索（embedding向量化Entity/Event，支持自然语言查询）③新增F-58关联发现增强（embedding余弦相似度补充结构化匹配，混合得分0.7×structured+0.3×semantic）④技术选型：text-embedding-3-small（Moka AI API，API模式768维/本地降级384维，兼容OpenAI SDK）+sqlite-vec扩展（零额外依赖）⑤向量化对象：Entity(concern+capability+basic)+Event(raw_text摘要)⑥性能目标：embedding<500ms/条，语义搜索<200ms(100条以内)⑦Phase 2迁移路径：sqlite-vec→pgvector | CarryMem团队 |
 | v4.3 | 2026-06-04 | 7角色Review融合+许总PoC反馈修订版：**A组（P0阻塞修复）**：①F-45新增evidence_quote PII脱敏策略（BLK-1：sanitize_llm_input清洗/API返回脱敏/不参与搜索索引/crypto.py加密引用）②F-44新增input_scope服务端校验规则（BLK-2：仅接受auto/InputClassifier强制覆盖/hint参考/400错误码）③F-45 action_type枚举从5种统一为6种（BLK-3：my_promise/their_promise/my_followup/mutual_action/system_reminder/unclear）+Todo模型新增evidence_event_id外键字段（Arch意见C2）。**B组（许总PoC反馈）**：④新增F-49日视图（今日议程）作为首页子模块⑤F-04关联发现引擎增加"主题互通"用户视角语言+D3.js Phase 1 Plus计划⑥产品愿景增加"终身关系经营智能体"长期愿景（CarryMem 7种记忆类型支撑）+数据导出提前到Phase 1⑦F-10/F-41语音交互增加许总确认为刚需注释+Mock TTS端点。**C组（7角色Review意见采纳）**：⑧PM意见C1：PoC退出条件增加测试方法学表（100条脱敏数据/PM+Arch双签/Sprint 2窗口）⑨Tester意见C3：F-47增加回归测试策略标注（2正向+1异常用例/E2E场景/Sprint阻塞）⑩DevOps意见C4：新增§4.5运维监控指标（6项P0指标含延迟/分布/覆盖率）⑪UI意见C5：F-47推进卡12模块展示优先级（P0首屏/P1展开/P2详情页） | CarryMem团队 |
-| v5.2 | 2026-06-11 | 专业版AI路径一致性+基础版Open Core开源策略：①§1.5.3专业版AI调用路径更新为三种场景（纯基础版离线/专业版浏览器云端AI/专业版小程序云端AI），确保专业用户无论访问方式均走云端AI，体验一致②§1.5.3新增专业版身份验证流程（JWT+网关验证+隐私声明）③新增§1.5.6基础版开源策略（Open Core）：开源PromiseLink（13步管线+实体提取+记忆+Todo+Promise+关联发现+Docker+H5+适配器），闭源PromiseLink Pro（网关+小程序+语音云端+图谱融合+定制版），License选AGPL v3，开源节奏M1-M2私有分发→M3-M4开源+Product Hunt/Hacker News | PromiseLink团队 |
-| v5.3 | 2026-06-18 | 用户7项新需求融合修订版：**①Repo分开**：新增§1.5.6a Repo分开策略（基础版公开仓库PromiseLink AGPL v3 + 专业版私有仓库PromiseLink-Pro商业License，物理分开而非单仓库多分支，共享协议层promiselink-contracts+工具层promiselink-utils MIT License）。**②UI布局策略**：新增§1.5.7 UI布局策略（基础版电脑宽屏三栏布局min-width 1024px左侧导航200px+中间内容自适应+右侧详情360px；专业版微信小程序手机竖屏375px单栏滚动；两版UI完全独立不共享样式/组件库/布局逻辑，仅共享API+数据模型+业务逻辑）。**③录入事件画面+解析纠偏**：新增§5.18录入事件画面设计与解析纠偏（5子节：录入画面布局基础版宽屏+专业版竖屏/解析结果分区显示人脉关系待办承诺四类/四类纠偏功能人脉多候选选择+关系AI推断可改+待办编辑删除添加+承诺确认忽略修改/确认提交流程校验+摘要+写入数据库/纠偏数据反馈闭环）。**④功能重点调整**：新增§3.0.2功能重点与优先级（核心三件套按生命周期推进：会后纪要→待办提醒→承诺跟进，P0最高优先级占研发资源70%；人脉管理/日程/仪表盘等辅助功能P1-P2占25%；按生命周期推进设计含义：录入即解析/待办即提醒/承诺即跟踪/推进即闭环）。**⑤详情页跳转**：新增§5.8.4详情页跳转设计（事件/人脉/待办/承诺四类详情页互相跳转形成关系网络导航，每类详情页展示3类关联+跳转入口，跳转逻辑navigateTo+navigateBack，最大跳转深度5层，基础版右侧详情区切换vs专业版跳转新页面）。**⑥专业版一键安装+桥接监控**：新增§1.5.3a专业版一键安装流程（5步：下载小程序→微信授权→输入邀请码→激活本地Docker→开始使用，无需API Key配置，邀请码6位一码一用户有效期30天）+§1.5.3b桥接监控与用量计费（8项监控指标request_count/token_input/token_output/token_total/estimated_cost/relay_latency_p95/error_count/active_days，3档计费套餐，5种降级策略，运营监控看板）。**⑦按生命周期推进**：融入§3.0.2功能重点，关系生命周期见面→记录→提醒→兑现→推进驱动核心三件套设计 | PromiseLink团队 |
-| v5.4 | 2026-06-18 | 文档一致性修订版（8项）：**①B8** §5.3补充Promise数据模型定义（逻辑视图复用todos表，说明Promise与Todo关系）**②B9** §5.18.6补充录入纠偏API契约（POST /events/{event_id}/correct，人脉/待办/承诺三类纠偏）+Pro_Edition_Tech_Design_Phase0.md §4.4补充中继业务接口示例**③I1** 定价统一为¥29/月(早鸟价)/¥49/月(常规价)，消除所有"待定"和"PoC验证后定价"**④I2** 仓库名统一为PromiseLink(基础版)+PromiseLink-Pro(专业版)，基础版仓库统一命名为PromiseLink，PromiseLink-miniapp合并到PromiseLink-Pro/miniapp/目录**⑤I9** Repo_Split_Decision.md补充§7 AGPL v3法律合规分析（pip安装不传染/submodule传染/推荐pip方案/免责声明）**⑥I10** edition_architecture.md补充§6 UI架构（基础版宽屏H5+专业版竖屏小程序，代码组织/构建流程/部署差异）**⑦I11** §1.5.3新增7天免费试用机制（无需付费需注册，每日100次AI调用，试用结束引导¥29/月早鸟价）**⑧I12** §1.5.3b新增网关宕机补偿机制（4h延1天/24h延7天+邮件/月度<99.5%减半，admin监控自动触发） | PromiseLink团队 |
-| v5.7 | 2026-06-20 | 仓库策略修订：§1.5.6a更新为三仓库独立策略（PromiseLink基础版公开AGPL v3 + PromiseLink-Pro专业版私有商业License + PromiseLink-miniapp小程序私有商业License），撤销v5.4中"PromiseLink-miniapp合并到PromiseLink-Pro/miniapp/目录"的决策，小程序代码独立仓库维护。同步更新Deployment_Guide.md小程序编译路径 | PromiseLink团队 |
+| v5.2 | 2026-06-11 | 专业版AI路径一致性+基础版Open Core开源策略：①§1.5.3专业版AI调用路径更新为三种场景（纯基础版离线/专业版浏览器云端AI/专业版小程序云端AI），确保专业用户无论访问方式均走云端AI，体验一致②§1.5.3新增专业版身份验证流程（JWT+网关验证+隐私声明）③新增§1.5.6基础版开源策略（Open Core）：开源PromiseLink（13步管线+实体提取+记忆+Todo+Promise+关联发现+Docker+H5+适配器），闭源PromiseLink Pro（网关+小程序+语音云端+图谱融合+定制版），License选MPL 2.0，开源节奏M1-M2私有分发→M3-M4开源+Product Hunt/Hacker News | PromiseLink团队 |
+| v5.3 | 2026-06-18 | 用户7项新需求融合修订版：**①Repo分开**：新增§1.5.6a Repo分开策略（基础版公开仓库PromiseLink MPL 2.0 + 专业版私有仓库PromiseLink-Pro商业License，物理分开而非单仓库多分支，共享协议层promiselink-contracts+工具层promiselink-utils MIT License）。**②UI布局策略**：新增§1.5.7 UI布局策略（基础版电脑宽屏三栏布局min-width 1024px左侧导航200px+中间内容自适应+右侧详情360px；专业版微信小程序手机竖屏375px单栏滚动；两版UI完全独立不共享样式/组件库/布局逻辑，仅共享API+数据模型+业务逻辑）。**③录入事件画面+解析纠偏**：新增§5.18录入事件画面设计与解析纠偏（5子节：录入画面布局基础版宽屏+专业版竖屏/解析结果分区显示人脉关系待办承诺四类/四类纠偏功能人脉多候选选择+关系AI推断可改+待办编辑删除添加+承诺确认忽略修改/确认提交流程校验+摘要+写入数据库/纠偏数据反馈闭环）。**④功能重点调整**：新增§3.0.2功能重点与优先级（核心三件套按生命周期推进：会后纪要→待办提醒→承诺跟进，P0最高优先级占研发资源70%；人脉管理/日程/仪表盘等辅助功能P1-P2占25%；按生命周期推进设计含义：录入即解析/待办即提醒/承诺即跟踪/推进即闭环）。**⑤详情页跳转**：新增§5.8.4详情页跳转设计（事件/人脉/待办/承诺四类详情页互相跳转形成关系网络导航，每类详情页展示3类关联+跳转入口，跳转逻辑navigateTo+navigateBack，最大跳转深度5层，基础版右侧详情区切换vs专业版跳转新页面）。**⑥专业版一键安装+桥接监控**：新增§1.5.3a专业版一键安装流程（5步：下载小程序→微信授权→输入邀请码→激活本地Docker→开始使用，无需API Key配置，邀请码6位一码一用户有效期30天）+§1.5.3b桥接监控与用量计费（8项监控指标request_count/token_input/token_output/token_total/estimated_cost/relay_latency_p95/error_count/active_days，3档计费套餐，5种降级策略，运营监控看板）。**⑦按生命周期推进**：融入§3.0.2功能重点，关系生命周期见面→记录→提醒→兑现→推进驱动核心三件套设计 | PromiseLink团队 |
+| v5.4 | 2026-06-18 | 文档一致性修订版（8项）：**①B8** §5.3补充Promise数据模型定义（逻辑视图复用todos表，说明Promise与Todo关系）**②B9** §5.18.6补充录入纠偏API契约（POST /events/{event_id}/correct，人脉/待办/承诺三类纠偏）+Pro_Edition_Tech_Design_Phase0.md §4.4补充中继业务接口示例**③I1** 定价统一为¥29/月(早鸟价)/¥49/月(常规价)，消除所有"待定"和"PoC验证后定价"**④I2** 仓库名统一为PromiseLink(基础版)+PromiseLink-Pro(专业版)，基础版仓库统一命名为PromiseLink，PromiseLink-miniapp合并到PromiseLink-Pro/miniapp/目录**⑤I9** Repo_Split_Decision.md补充§7 MPL 2.0法律合规分析（pip安装不传染/submodule传染/推荐pip方案/免责声明）**⑥I10** edition_architecture.md补充§6 UI架构（基础版宽屏H5+专业版竖屏小程序，代码组织/构建流程/部署差异）**⑦I11** §1.5.3新增7天免费试用机制（无需付费需注册，每日100次AI调用，试用结束引导¥29/月早鸟价）**⑧I12** §1.5.3b新增网关宕机补偿机制（4h延1天/24h延7天+邮件/月度<99.5%减半，admin监控自动触发） | PromiseLink团队 |
+| v5.7 | 2026-06-20 | 仓库策略修订：§1.5.6a更新为三仓库独立策略（PromiseLink基础版公开MPL 2.0 + PromiseLink-Pro专业版私有商业License + PromiseLink-miniapp小程序私有商业License），撤销v5.4中"PromiseLink-miniapp合并到PromiseLink-Pro/miniapp/目录"的决策，小程序代码独立仓库维护。同步更新Deployment_Guide.md小程序编译路径 | PromiseLink团队 |
 | v5.8 | 2026-06-22 | 新增v0.7.0 Phase 2两项功能（借鉴AI运营大脑5个可借鉴概念PM评估）：①新增F-71关系健康度提醒（v0.7.0 P1，借鉴"信息找人"理念，基于关系图谱主动提醒长期未联系的重要人脉，触发条件N天可配置30/60/90，站内通知+邮件可选）②新增F-72 AI关系经营建议（v0.7.0 P2，借鉴"知识沉淀/关联/创造/传承"闭环理念，补全"知识创造"环节，AI基于人脉图谱+交流历史+承诺履约生成个性化建议，覆盖话题/行动/价值提供三类建议）。来源：PDF分析报告5个可借鉴概念PM评估（docs/planning/PM评估_5借鉴概念_PRD反映.md）。不扩大MVP范围，新功能均归入v0.7.0 Phase 2 | PromiseLink团队 |
 
 ### 7角色评审共识整合清单

@@ -16,10 +16,10 @@
   <img src="https://img.shields.io/badge/perf-17%20tests%20passed-blue" alt="Performance">
   <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python">
   <img src="https://img.shields.io/badge/deploy-Local%20No%20Docker-success" alt="Deploy">
-  <img src="https://img.shields.io/badge/license-AGPL%20v3-red" alt="License">
+  <img src="https://img.shields.io/badge/license-MPL%202.0-blue" alt="License">
 </p>
 
-> **PromiseLink** 是 AI 驱动的个人商务关系经营助手的**开源基础版**（AGPL v3）。
+> **PromiseLink** 是 AI 驱动的个人商务关系经营助手的**开源基础版**（MPL 2.0）。
 > 提供事件录入 → 实体提取 → Todo 生成 → 承诺追踪 → 关联发现 → 仪表盘的核心闭环。
 >
 > **架构分层**：
@@ -30,7 +30,7 @@
 > 基础版可通过 `relay_client` 可选连接专业版云端网关以使用云端 AI 能力（需专业版 License）。
 > 前端为 Taro H5（桌面浏览器宽屏优先，兼容移动端）。
 
-**Topics**: `crm` `relationship-management` `ai-assistant` `fastapi` `taro` `sqlite-vec` `local-first` `agpl`
+**Topics**: `crm` `relationship-management` `ai-assistant` `fastapi` `taro` `sqlite-vec` `local-first` `mpl`
 
 ---
 
@@ -189,7 +189,7 @@ graph LR
 | 承诺 / Todo 关系追踪 | ✅ 6 类 Todo 状态机 | ❌ 仅任务 | ⚠️ 简单 |
 | 关联发现 | ✅ 3 策略 | ❌ | ⚠️ LLM 生成 |
 | 数据所有权 | ✅ 100% 本地 SQLite | ⚠️ | ❌ 云端 |
-| 价格 | 免费 (AGPL v3) | $$$$ | $$$/月 |
+| 价格 | 免费 (MPL 2.0) | $$$$ | $$$/月 |
 
 ---
 
@@ -348,7 +348,7 @@ curl "http://localhost:8000/api/v1/entities?search=技术合作" \
 
 | 版本 | 仓库 | 定位 | 价格 | 部署方式 |
 |------|------|------|------|----------|
-| **基础版** | [PromiseLink](https://github.com/lulin70/PromiseLink) (🌐 公开 AGPL v3) | 本地免费，纯文本交互，电脑宽屏 | 免费 | 本地直接运行（无需 Docker） |
+| **基础版** | [PromiseLink](https://github.com/lulin70/PromiseLink) (🌐 公开 MPL 2.0) | 本地免费，纯文本交互，电脑宽屏 | 免费 | 本地直接运行（无需 Docker） |
 | **专业版** | [PromiseLink-Pro](https://github.com/lulin70/PromiseLink-Pro) (🔒 私有 商业 License) | 云端 AI 网关 + 语音 / 邮件 / OCR / 隐私管理 | ¥29/月(早鸟) / ¥49/月(常规) | Docker + 云端网关 |
 | **小程序** | [PromiseLink-miniapp](https://github.com/lulin70/PromiseLink-miniapp) (🔒 私有 商业 License) | 微信小程序，手机竖屏，专业版移动端 | 随专业版 | 微信小程序平台 |
 | **定制版** | (未公开) | 销售团队协作，多租户 | 按需定制 | 云端 Docker Compose + K8s |
@@ -371,4 +371,4 @@ curl "http://localhost:8000/api/v1/entities?search=技术合作" \
 
 ## License
 
-AGPL-3.0 — 详见 [LICENSE](LICENSE) 文件
+MPL-2.0 — 详见 [LICENSE](LICENSE) 文件

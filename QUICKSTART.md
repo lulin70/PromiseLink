@@ -2,7 +2,7 @@
 
 > **官网**: [https://promiselink.cn](https://promiselink.cn)  
 > **GitHub**: [https://github.com/lulin70/PromiseLink](https://github.com/lulin70/PromiseLink)  
-> **License**: AGPL v3
+> **License**: MPL 2.0
 
 ## 前置条件
 

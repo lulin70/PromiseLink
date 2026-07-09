@@ -10,7 +10,7 @@
 #   bash scripts/start.sh --status     # 查看服务状态
 #   bash scripts/start.sh --restart    # 重启服务
 #
-# 许可证：GNU AGPL v3 — 详见 LICENSE 文件
+# 许可证：MPL 2.0 — 详见 LICENSE 文件
 # =============================================================================
 set -euo pipefail
 
