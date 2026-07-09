@@ -4,6 +4,7 @@
 pytest>=7.4.4
 pytest-asyncio>=0.23.3
 pytest-cov>=4.1.0
+PyJWT>=2.8.0  # tests/e2e/test_user_journey_e2e.py test_session_expiry decodes JWT to simulate expiry
 
 # Code quality
 black>=23.12.1

@@ -4,6 +4,13 @@ All notable changes to PromiseLink will be documented in this file.
 
 ## [Unreleased] - 2026-07-06
 
+### Fixed — 第三方审核 P1 阻断项修复 (2026-07-09)
+
+- **P1-4 测试数字4份文档不一致**：README(中/英/日)/CHANGELOG/STAGING_DEPLOYMENT_CHECKLIST 测试数与覆盖率互相矛盾（1364/1394/1823/71% 等）。运行 `pytest --collect-only` 实测 1907 collected；运行 `pytest --cov=promiselink` 实测 **1858 passed / 49 skipped / 0 failed / 88% coverage**。三语 README 与部署清单已统一为实测数字。
+- **P1-5 覆盖率 71% vs 实测 32.4%**：审核报告所称 32.4% 系 `pytest --collect-only`（只收集不执行）的错误数据；真实全量执行覆盖率 **88%**（9501 statements / 1125 missed）。README 三语覆盖率已由 71% 更新为 88%。注：1 个测试 `test_session_expiry` 因 `PyJWT` 未声明为开发依赖而失败，已在 requirements-dev.txt 补充 `PyJWT>=2.8.0`。
+- **P1-6 PG 密码硬编码**：`docker-compose.yml` 中 `POSTGRES_PASSWORD: promiselink_password` 与 `DATABASE_URL` 内嵌密码为硬编码。改为 `${POSTGRES_PASSWORD:?...}` 环境变量引用（未设置则拒绝启动），并在 `.env.example` / `.env.basic.example` / `.env.poc.example` 标注需用户设置。
+- **P1-7 PoC 登录无用户校验**：`/auth/login` 已有 `poc_secret` 常量时间比较（密码匹配）+ 生产环境禁用默认密钥；但 `user_id` 无任何输入校验。补充 `_validate_user_id()`（非空/无控制字符/长度 1-128）并在 docstring 诚实说明 PoC 阶段无 User 表、不校验用户存在性（Phase 1 `/auth/wechat/login` + User 模型实现）。
+
 ### Fixed — DevSquad 7角色评审修复 (BLOCKER + HIGH)
 
 - **`nginx/conf.d/default.conf` SSL 证书路径修复 [BLOCKER]**：nginx 引用 `live/promiselink.cn/`（无 www），但 init-ssl.sh 签发到 `live/www.promiselink.cn/`，导致 nginx 启动找不到证书。统一为 `live/www.promiselink.cn/`。

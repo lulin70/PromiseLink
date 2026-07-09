@@ -34,7 +34,7 @@
 - [x] .env.prod.example 配置模板
 - [x] scripts/ops/init-ssl.sh SSL 证书初始化脚本 (幂等, 含证书有效性检查)
 - [x] CI/CD build-and-push job (.github/workflows/ci.yml, push to main 自动触发)
-- [x] 后端测试零 skip: 1823 passed / 0 failed / 0 skipped
+- [x] 后端测试: 1858 passed / 49 skipped / 0 failed (2026-07-09 实测, 1907 collected, 88% coverage; skip 为可选依赖缺失/条件标记)
 
 ### 待执行 (Staging 后处理)
 - [ ] SSH 私钥轮换 (当前密钥曾暴露, staging 验证后立即轮换)

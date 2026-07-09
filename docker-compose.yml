@@ -15,7 +15,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://promiselink:promiselink_password@postgres:5432/promiselink
+      - DATABASE_URL=postgresql+asyncpg://promiselink:${POSTGRES_PASSWORD}@postgres:5432/promiselink
       - APP_ENV=staging
       - DEBUG=false
       - LOG_LEVEL=INFO
@@ -65,7 +65,8 @@ services:
     environment:
       POSTGRES_DB: promiselink
       POSTGRES_USER: promiselink
-      POSTGRES_PASSWORD: promiselink_password
+      # 密码必须通过 .env 注入，禁止硬编码（P1-6 修复）
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env (see .env.example)}
     ports:
       - "5432:5432"
     volumes:
