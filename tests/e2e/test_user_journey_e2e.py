@@ -1001,7 +1001,7 @@ class TestSessionExpiry:
         assert resp2.status_code == 401, "无效 token 应 401"
 
         # 篡改的 token（修改 iss/aud，校验失败）
-        import jwt as pyjwt
+        from jose import jwt as pyjwt
 
         from promiselink.config import get_settings
 
