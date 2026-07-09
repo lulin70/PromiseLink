@@ -50,7 +50,7 @@ jobs:
         run: python3 -m mypy src/promiselink --ignore-missing-imports
 
       - name: Run security audit
-        run: pip-audit --desc
+        run: pip-audit --desc --ignore-vuln PYSEC-2026-1325  # ecdsa Minerva timing attack, upstream won't fix (side-channel out of scope)
 
       - name: Run tests
         env:
@@ -345,7 +345,7 @@ jobs:
         run: bandit -r src/ -f json -o bandit-report.json -ll
 
       - name: Run pip-audit
-        run: pip-audit --desc
+        run: pip-audit --desc --ignore-vuln PYSEC-2026-1325  # ecdsa Minerva timing attack, upstream won't fix (side-channel out of scope)
 
       - name: Upload bandit report
         uses: actions/upload-artifact@v4

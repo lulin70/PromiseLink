@@ -217,7 +217,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.warning("relay_client_close_error", error=str(e))
 
     # Stop the WSS long-connection background task if it was started
-    relay_wss = getattr(app.state, "relay_wss_client", None)
+    relay_wss = getattr(app.state, "relay_wss_client", None)  # type: ignore[assignment]
     if relay_wss is not None:
         try:
             await relay_wss.stop()

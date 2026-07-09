@@ -239,7 +239,7 @@ class RelayWSSClient:
 
                 # 3. Wait for the "connected" ack from the gateway.
                 ack = await asyncio.wait_for(ws.recv(), timeout=10)
-                ack_msg = json.loads(ack) if isinstance(ack, str) else ack
+                ack_msg = json.loads(ack)
                 if ack_msg.get("type") != "connected":
                     raise RuntimeError(
                         f"Expected 'connected' ack, got: {ack_msg.get('type')}"
