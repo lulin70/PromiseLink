@@ -23,6 +23,7 @@ from promiselink.api.v1 import (
     export,
     health,
     metrics,
+    pair,
     privacy,
     promises,
     relationship_briefs,
@@ -35,6 +36,7 @@ from promiselink.core.exceptions import BusinessError, LLMError, PromiseLinkErro
 from promiselink.core.metrics import init_app_metrics
 from promiselink.core.metrics import metrics_middleware as _metrics_middleware
 from promiselink.database import close_db, init_db
+from promiselink.web.pair_page import get_pair_page
 
 settings = get_settings()
 
@@ -49,6 +51,7 @@ async def _scheduled_event_maintenance() -> None:
     Runs every 5 minutes. First run after 30 seconds delay.
     """
     import structlog
+
     logger = structlog.get_logger()
 
     # Initial delay to let app fully start
@@ -87,6 +90,7 @@ async def _scheduled_event_maintenance() -> None:
 def _signal_handler(signum: int, frame: Any) -> None:
     """Handle SIGTERM/SIGINT for graceful shutdown."""
     import structlog
+
     logger = structlog.get_logger()
     logger.info("shutdown_signal_received", signal=signum, pending_tasks=len(_pending_tasks))
     _shutdown_event.set()
@@ -102,11 +106,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan manager with graceful shutdown."""
     # Configure structured logging before any logger usage
     from promiselink.core.logging import configure_logging
+
     configure_logging(log_level=settings.log_level, json_output=settings.app_env != "development")
     import structlog
+
     logger = structlog.get_logger()
     logger.info("promiselink_starting")
-    logger.info(f"PromiseLink v{settings.app_version} — MPL 2.0. Commercial use requires compliance. https://promiselink.app")
+    logger.info(
+        f"PromiseLink v{settings.app_version} — MPL 2.0. Commercial use requires compliance. https://promiselink.app"
+    )
 
     # Check for default secret key
     if settings.secret_key == "change-me-in-production" and settings.app_env != "test":
@@ -114,13 +122,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             logger.warning(
                 "DEFAULT SECRET KEY DETECTED",
                 note="Secret key is still the default value 'change-me-in-production'. "
-                     "Set SECRET_KEY env var immediately. This is insecure for any deployment.",
+                "Set SECRET_KEY env var immediately. This is insecure for any deployment.",
             )
         else:
             logger.critical(
                 "INSECURE DEFAULT SECRET KEY - STARTUP BLOCKED",
                 note="Secret key is still the default value 'change-me-in-production'. "
-                     "Set SECRET_KEY env var or set ALLOW_INSECURE_KEY=true for development.",
+                "Set SECRET_KEY env var or set ALLOW_INSECURE_KEY=true for development.",
             )
             raise SystemExit(1)
 
@@ -141,11 +149,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # requests through the gateway to this local instance, so user data
     # stays on the user's computer while still being accessible from
     # the mini-app on the phone.
-    if (
-        settings.relay_gateway_url
-        and settings.pro_license_key
-        and settings.relay_wss_enabled
-    ):
+    if settings.relay_gateway_url and settings.pro_license_key and settings.relay_wss_enabled:
         try:
             from promiselink.services.relay_wss_client import RelayWSSClient
 
@@ -179,9 +183,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info("waiting_for_pending_tasks", count=len(_pending_tasks))
         # Wait up to 30 seconds for pending tasks to complete
         try:
-            done, pending = await asyncio.wait(
-                _pending_tasks, timeout=30.0
-            )
+            done, pending = await asyncio.wait(_pending_tasks, timeout=30.0)
             if pending:
                 logger.warning(
                     "cancelling_pending_tasks",
@@ -195,23 +197,28 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             logger.error("shutdown_task_error", error=str(e))
 
     from promiselink.core.redis import close_redis
+
     await close_redis()
 
     # Close shared LLM httpx client
     from promiselink.services.llm_client import close_shared_client
+
     await close_shared_client()
 
     # Close shared embedding provider (releases AsyncOpenAI client)
     from promiselink.services.embedding_provider import close_shared_provider
+
     await close_shared_provider()
 
     # Close shared semantic search engine (resets singleton)
     from promiselink.services.semantic_search import close_shared_engine
+
     await close_shared_engine()
 
     # Close shared relay client if it was created (Pro edition)
     try:
         from promiselink.services.relay_client import close_relay_client
+
         await close_relay_client()
     except Exception as e:  # Startup/shutdown — keep broad catch for resilience
         logger.warning("relay_client_close_error", error=str(e))
@@ -243,10 +250,11 @@ app = FastAPI(
 _cors_origins = settings.cors_origins
 if _cors_origins == ["*"]:
     import structlog as _structlog
+
     _structlog.get_logger().warning(
         "CORS_ALLOW_ORIGINS_WILDCARD",
         note="cors_origins is set to '*' which allows all origins. "
-             "This is insecure for production. Set CORS_ORIGINS to specific domains.",
+        "This is insecure for production. Set CORS_ORIGINS to specific domains.",
     )
 
 app.add_middleware(
@@ -260,6 +268,7 @@ app.add_middleware(
 
 # ── X-Powered-By Header Middleware ──
 
+
 @app.middleware("http")
 async def add_powered_by_header(request: Request, call_next: Any) -> Any:
     """Add X-Powered-By: PromiseLink to all HTTP responses."""
@@ -269,6 +278,7 @@ async def add_powered_by_header(request: Request, call_next: Any) -> Any:
 
 
 # ── Prometheus Metrics Middleware ──
+
 
 @app.middleware("http")
 async def prometheus_metrics_middleware(request: Request, call_next: Any) -> Any:
@@ -394,6 +404,7 @@ async def not_found_handler(request: Request, exc: Any) -> JSONResponse:
 async def internal_error_handler(request: Request, exc: Any) -> JSONResponse:
     """Handle 500 errors."""
     from promiselink.core.logging import get_logger
+
     get_logger("promiselink.errors").error(
         "internal_error",
         method=request.method,
@@ -411,6 +422,7 @@ async def internal_error_handler(request: Request, exc: Any) -> JSONResponse:
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Catch-all handler for all unhandled exceptions — logs full traceback."""
     from promiselink.core.logging import get_logger
+
     get_logger("promiselink.errors").exception(
         "unhandled_exception",
         method=request.method,
@@ -441,12 +453,17 @@ app.include_router(promises.router, prefix=settings.api_prefix, tags=["Promises"
 app.include_router(reminders.router, prefix=settings.api_prefix, tags=["Reminders"])
 app.include_router(scheduled_events.router, prefix=settings.api_prefix, tags=["ScheduledEvents"])
 app.include_router(privacy.router, prefix=settings.api_prefix, tags=["Privacy"])
+app.include_router(pair.router, prefix=settings.api_prefix, tags=["Pairing"])
 
 # Pro-only routes (voice/media/email_sync/wechat_forward/import_csv)
 # have been migrated to the PromiseLink-Pro repository.
 # Basic edition no longer registers them via APP_EDITION switch.
 # See docs/architecture/Repo_Split_Decision.md §5.2 for details.
 # Note: basic edition keeps a lightweight /privacy endpoint for PIPL/GDPR compliance.
+
+
+# ── Pairing Page (before StaticFiles so /pair isn't swallowed) ──
+app.get("/pair")(get_pair_page)
 
 
 # ── Static Files (H5 Frontend) ──
@@ -462,7 +479,10 @@ if STATIC_DIR:
     app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
 else:
     import sys
-    print("[PromiseLink] WARNING: Frontend static files not found. Run 'cd frontend && npm run build:h5'", file=sys.stderr)
+
+    print(
+        "[PromiseLink] WARNING: Frontend static files not found. Run 'cd frontend && npm run build:h5'", file=sys.stderr
+    )
 
 
 if __name__ == "__main__":
