@@ -1,5 +1,7 @@
 # PromiseLink 项目生命周期状态总览
 
+> ⚠️ **废弃内容说明（2026-07-12 更新）**：本文档中"托管 PoC 部署"相关内容（`docker-compose.hosted-poc.yml`、`deploy-staging.sh`、`init-ssl.sh` 等）已废弃并删除。基础版禁止云端部署（硬约束），必须在用户本地运行（localhost:8000）。详见：PromiseLink-Pro `docs/postmortem/2026-07-12_基础版违规部署根因分析.md`
+
 > **更新时间**: 2026-07-08 (三仓版本统一 0.8.0，发布前全面准备完成)
 > **当前阶段**: 三仓发布前准备就绪；版本统一 0.8.0；基础版 806 passed / 1 failed（性能 P95 边界）；专业版 293 passed / 1 failed（E2E 需真实网关）；小程序 114 passed / 2 failed（Pro UI 交互）
 > **产品定位**: AI驱动的个人商务关系经营助手

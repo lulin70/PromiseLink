@@ -1,5 +1,7 @@
 # PromiseLink 技术设计文档
 
+> ⚠️ **废弃内容说明（2026-07-12 更新）**：本文档 §8.6.3a "托管 PoC 部署"相关内容（`docker-compose.hosted-poc.yml`、云端部署命令等）已废弃并删除。基础版禁止云端部署（硬约束），必须在用户本地运行（localhost:8000）。云端服务器仅部署专业版网关 + 官网静态文件。详见：PromiseLink-Pro `docs/deployment/DEPLOYMENT_COMPLIANCE_CHECKLIST.md`
+
 > **版本**: v3.2
 > **日期**: 2026-06-17
 > **对应PRD**: v5.2

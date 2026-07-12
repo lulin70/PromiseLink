@@ -405,27 +405,7 @@ jobs:
           docker run --rm ghcr.io/${{ steps.version.outputs.repo_lower }}:${{ steps.version.outputs.version }} \
             python -c "import promiselink; print(f'PromiseLink v{promiselink.__version__} OK')"
 
-  deploy-staging:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    if: github.ref == 'refs/heads/main'
-    environment: staging
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.STAGING_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan ${{ secrets.STAGING_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Deploy to staging
-        env:
-          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
-        run: |
-          eval $(ssh-agent -a $SSH_AUTH_SOCK)
-          ssh-add ~/.ssh/deploy_key
-          chmod +x scripts/ops/deploy-staging.sh
-          ./scripts/ops/deploy-staging.sh ${{ secrets.STAGING_HOST }} ${{ secrets.STAGING_USER || 'ubuntu' }}
+# 注：deploy-staging job 已移除（2026-07-12）
+# 原因：基础版禁止云端部署（硬约束），staging 部署到云端服务器违反架构原则
+# 基础版在用户本地运行（localhost:8000），Docker 镜像通过 ghcr.io 分发
+# 详见 docs/postmortem/ 基础版违规部署根因分析

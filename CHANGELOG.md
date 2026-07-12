@@ -4,6 +4,24 @@ All notable changes to PromiseLink will be documented in this file.
 
 ## [Unreleased] - 2026-07-06
 
+### Removed — 违规部署配置清理 (2026-07-12)
+
+**背景**：基础版 Docker 容器违规部署在云服务器 47.116.219.15 上，违反硬约束"基础版必须在用户本地运行（localhost:8000），禁止云端部署基础版容器"。详见 PromiseLink-Pro `docs/postmortem/2026-07-12_基础版违规部署根因分析.md`。
+
+**删除文件**：
+- `docker-compose.hosted-poc.yml` — 托管 PoC 部署配置（违反硬约束）
+- `scripts/ops/deploy-prod.sh` — 基础版云端部署脚本
+- `scripts/ops/deploy-staging.sh` — staging 部署脚本
+- `scripts/ops/init-ssl.sh` — SSL 初始化脚本（为违规部署创建）
+- `docs/STAGING_DEPLOYMENT_CHECKLIST.md` — staging 部署清单
+- `.env.prod.example` — 生产环境配置模板
+- `.github/workflows/deploy-prod.yml` — 基础版生产部署 workflow
+
+**修改文件**：
+- `.github/workflows/ci.yml`：移除 `deploy-staging` job
+- `.gitignore`：移除 `.env.prod.example` 和 `.env.poc.hosted.example` 引用
+- `SECURITY.md`：部署建议从"使用 hosted-poc.yml"改为"基础版必须在用户本地运行"
+
 ### Changed — 许可证迁移 AGPL v3 → MPL 2.0 (2026-07-09)
 
 **背景**：基础版原采用 GNU AGPL v3，由于第 13 条"远程网络交互"条款的法律争议性和商业用户接受度低，迁移至 Mozilla Public License 2.0（MPL 2.0）。MPL 2.0 采用文件级 copyleft，无网络服务触发条款，允许与闭源代码组合成 Larger Work，更适合双版本商业模式。

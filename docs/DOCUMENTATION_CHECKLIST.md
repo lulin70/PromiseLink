@@ -1,5 +1,15 @@
 # PromiseLink 文档一致性检查清单
 
+> ⚠️ **废弃内容说明（2026-07-12 更新）**：本文档中引用的以下文件已删除（违反硬约束"基础版禁止云端部署"）：
+> - `docker-compose.hosted-poc.yml` — 托管 PoC 部署配置（已删除）
+> - `scripts/ops/deploy-staging.sh` — staging 部署脚本（已删除）
+> - `scripts/ops/deploy-prod.sh` — 生产部署脚本（已删除）
+> - `docs/STAGING_DEPLOYMENT_CHECKLIST.md` — staging 部署清单（已删除）
+> - `.env.prod.example` — 生产环境配置模板（已删除）
+>
+> 基础版部署方式：用户本地运行（localhost:8000），通过 Docker 镜像 `ghcr.io/lulin70/promiselink` 分发。
+> 详见：部署目标合规性检查制度（PromiseLink-Pro `docs/deployment/DEPLOYMENT_COMPLIANCE_CHECKLIST.md`）
+
 > **更新时间**: 2026-07-09
 > **阶段**: v0.8.0 基础版许可证迁移至 MPL 2.0 — 三仓库独立（PromiseLink + PromiseLink-Pro + PromiseLink-miniapp）
 > **目的**: 确认所有设计文档版本一致性，验证跨文档引用一致性
