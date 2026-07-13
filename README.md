@@ -349,7 +349,7 @@ curl "http://localhost:8000/api/v1/entities?search=技术合作" \
 | 版本 | 仓库 | 定位 | 价格 | 部署方式 |
 |------|------|------|------|----------|
 | **基础版** | [PromiseLink](https://github.com/lulin70/PromiseLink) (🌐 公开 MPL 2.0) | 本地免费，纯文本交互，电脑宽屏 | 免费 | 本地直接运行（无需 Docker） |
-| **专业版** | [PromiseLink-Pro](https://github.com/lulin70/PromiseLink-Pro) (🔒 私有 商业 License) | 云端 AI 网关 + 语音 / 邮件 / OCR / 隐私管理 | ¥29/月(早鸟) / ¥49/月(常规) | Docker + 云端网关 |
+| **专业版** | [PromiseLink-Pro](https://github.com/lulin70/PromiseLink-Pro) (🔒 私有 商业 License) | 云端 AI 网关 + 语音 / 邮件 / OCR / 隐私管理 | ¥39/月（年付 ¥365） | Docker + 云端网关 |
 | **小程序** | [PromiseLink-miniapp](https://github.com/lulin70/PromiseLink-miniapp) (🔒 私有 商业 License) | 微信小程序，手机竖屏，专业版移动端 | 随专业版 | 微信小程序平台 |
 | **定制版** | (未公开) | 销售团队协作，多租户 | 按需定制 | 云端 Docker Compose + K8s |
 

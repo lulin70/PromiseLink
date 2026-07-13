@@ -351,7 +351,7 @@ curl "http://localhost:8000/api/v1/entities?search=technical cooperation" \
 | エディション | リポジトリ | ポジショニング | 価格 | デプロイ方式 |
 |------|------|------|------|----------|
 | **基本版** | [PromiseLink](https://github.com/lulin70/PromiseLink) (🌐 公開 MPL 2.0) | ローカル無料、プレーンテキストインタラクション、デスクトップワイド画面 | 無料 | ローカル直接実行（Docker不要） |
-| **プロ版** | [PromiseLink-Pro](https://github.com/lulin70/PromiseLink-Pro) (🔒 プライベート 商用ライセンス) | クラウドAIゲートウェイ + 音声 / メール / OCR / プライバシー管理 | ¥29/月（アーリーバード） / ¥49/月（通常） | Docker + クラウドゲートウェイ |
+| **プロ版** | [PromiseLink-Pro](https://github.com/lulin70/PromiseLink-Pro) (🔒 プライベート 商用ライセンス) | クラウドAIゲートウェイ + 音声 / メール / OCR / プライバシー管理 | ¥39/月（年払い ¥365） | Docker + クラウドゲートウェイ |
 | **ミニプログラム** | [PromiseLink-miniapp](https://github.com/lulin70/PromiseLink-miniapp) (🔒 プライベート 商用ライセンス) | WeChatミニプログラム、モバイル縦画面、プロ版モバイルクライアント | プロ版に同梱 | WeChatミニプログラムプラットフォーム |
 | **カスタム版** | (非公開) | 営業チーム協業、マルチテナント | カスタム見積もり | クラウド Docker Compose + K8s |
 
