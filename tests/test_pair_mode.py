@@ -30,7 +30,7 @@ def _gateway_init_response() -> dict:
             "device_pair_code": "384721",
             "device_fingerprint": "sha256:test-fp",
             "expires_in": 300,
-            "qr_content": "promiselink://pair?code=384721",
+            "qr_content": "https://www.promiselink.cn/pair?code=384721",
         }
     }
 
@@ -97,7 +97,7 @@ def test_pair_init_success(monkeypatch):
     data = resp.json()
     assert data["success"] is True
     assert data["device_pair_code"] == "384721"
-    assert data["qr_content"] == "promiselink://pair?code=384721"
+    assert data["qr_content"] == "https://www.promiselink.cn/pair?code=384721"
     assert data["expires_in"] == 300
 
 

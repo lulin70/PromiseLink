@@ -85,7 +85,7 @@ _PAIR_PAGE_HTML = """<!DOCTYPE html>
           return;
         }
         pairCode = data.device_pair_code;
-        showQRCode(data.qr_content || ('promiselink://pair?code=' + pairCode), pairCode, data.expires_in);
+        showQRCode(data.qr_content || ('https://www.promiselink.cn/pair?code=' + pairCode), pairCode, data.expires_in);
         startPolling();
       } catch (err) {
         initRetries++;
@@ -100,18 +100,20 @@ _PAIR_PAGE_HTML = """<!DOCTYPE html>
     function showQRCode(qrContent, code, expiresIn) {
       const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(qrContent);
       document.getElementById('content').innerHTML = `
-        <div class="status-text">请用微信小程序扫描下方二维码</div>
+        <div class="status-text">请用微信「扫一扫」扫描下方二维码</div>
         <div class="qr-container">
           <div class="qr-code"><img src="${qrUrl}" alt="配对二维码" width="200" height="200" /></div>
           <div class="pair-code">${code}</div>
         </div>
         <div class="hint">
           <ol class="steps">
-            <li>打开微信「PromiseLink」小程序</li>
-            <li>进入「我的」→「专业版激活」</li>
-            <li>选择「配对码激活」，扫描上方二维码</li>
-            <li>配对成功后自动激活</li>
+            <li>打开微信，点击右上角「+」→「扫一扫」</li>
+            <li>扫描上方二维码，自动跳转 PromiseLink 小程序</li>
+            <li>在小程序中确认配对，电脑端自动激活专业版</li>
           </ol>
+        </div>
+        <div class="hint" style="margin-top:16px;padding:12px;background:#fff3cd;border-radius:8px;color:#856404;">
+          <strong>无法扫码？</strong>打开 PromiseLink 小程序 →「我的」→「专业版激活」→ 激活后点击「配对电脑」→ 输入配对码：<strong>${code}</strong>
         </div>
         <div class="hint">配对码有效期：${Math.floor(expiresIn / 60)} 分钟</div>
       `;
