@@ -305,7 +305,7 @@ docker compose -f docker-compose.poc.yml logs --tail=50
 
 ### 2.9 托管PoC部署模式 [0.4.8新增]
 
-[0.4.8新增] 本节面向**不具备服务器运维能力的非技术用户**，提供一种介于本地PoC和专业版之间的轻量云端部署方案。用户只需购买一台轻量云服务器，即可通过微信小程序访问PromiseLink，无需自行管理本地Docker环境。
+[0.4.8新增] 本节面向**不具备服务器运维能力的非技术用户**，提供一种介于本地PoC和专业版之间的轻量云端部署方案。用户只需准备一台轻量云服务器，即可通过微信小程序访问PromiseLink，无需自行管理本地Docker环境。
 
 #### 2.9.1 概述
 
@@ -323,7 +323,7 @@ docker compose -f docker-compose.poc.yml logs --tail=50
 | 数据库 | SQLite（本地文件） | SQLite（云端持久化卷） |
 | 访问方式 | localhost:8000 | HTTPS域名（公网可访问） |
 | 小程序接入 | ❌ 不支持 | ✅ 支持 |
-| 月成本 | 零云成本 | ~50元/月（服务器） |
+| 月度成本 | 零云成本 | 参考云厂商报价 |
 | 运维要求 | 需懂Docker基础 | 需懂SSH+基础Linux命令 |
 
 #### 2.9.2 架构图
@@ -375,13 +375,13 @@ docker compose -f docker-compose.poc.yml logs --tail=50
 
 #### 2.9.4 部署步骤
 
-**Step 1：购买轻量云服务器**
+**Step 1：准备轻量云服务器**
 
-| 云厂商 | 推荐配置 | 参考价格 | 说明 |
-|--------|---------|---------|------|
-| 阿里云轻量应用服务器 | 2C4G / 60GB SSD | ~50元/月 | 新用户首年优惠 |
-| 腾讯云轻量应用服务器 | 2C4G / 60GB SSD | ~50元/月 | 新用户首年优惠 |
-| 华为云HECS | 2C4G / 40GB SSD | ~60元/月 | 备选 |
+| 云厂商 | 推荐配置 | 说明 |
+|--------|---------|------|
+| 阿里云轻量应用服务器 | 2C4G / 60GB SSD | 新用户首年优惠 |
+| 腾讯云轻量应用服务器 | 2C4G / 60GB SSD | 新用户首年优惠 |
+| 华为云HECS | 2C4G / 40GB SSD | 备选 |
 
 > **选择建议**：优先选择阿里云或腾讯云（生态成熟、文档齐全），操作系统选Ubuntu 22.04 LTS。
 
@@ -596,17 +596,18 @@ psql promiselink < /tmp/promiselink_pg_data_only.sql
 python3 scripts/verify_migration.py --source sqlite --target postgresql
 ```
 
-#### 2.9.7 费用估算
+#### 2.9.7 成本估算
 
-| 费用项 | 月费用 | 说明 |
-|--------|--------|------|
-| 云服务器（2C4G） | ~50元 | 阿里云/腾讯云轻量应用服务器 |
-| 域名 | ~4元 | 年费50元摊销 |
-| SSL证书 | 0元 | Let's Encrypt免费 |
-| LLM API | 按用量 | 单用户日常使用约20~100元/月 |
-| **合计** | **~74~154元/月** | 不含LLM API约54元/月 |
+> **说明**：以下为用户自备云资源的成本估算参考，非 PromiseLink 收取费用。专业版授权费用请咨询销售团队。
 
-> **成本对比**：基础版（零云成本）vs 专业版（~50元/月网关费用），专业版以极低成本实现微信小程序随时访问。
+| 成本项 | 说明 |
+|--------|------|
+| 云服务器（2C4G） | 参考阿里云/腾讯云轻量应用服务器报价 |
+| 域名 | 参考域名注册商报价 |
+| SSL证书 | Let's Encrypt 免费 |
+| LLM API | 按用量，参考模型厂商报价 |
+
+> **成本对比**：基础版（零云成本）vs 托管 PoC（自备云资源成本），托管 PoC 以极低成本实现微信小程序随时访问。
 
 ### 2.10 基础版 vs 专业版 Docker配置
 
@@ -2372,7 +2373,7 @@ curl -s http://localhost:8000/api/v1/import/csv \
 | **0.3.1** | **2026-06-06** | **F-55/F-56 依赖性与场景匹配部署：①§12.5 DependencyAnalyzer部署[0.3.1新增](纯Python算法+SQL查询+无额外容器/无额外cron/无外部依赖+性能预估<500ms) ②§12.6 ContextMatcher部署[0.3.1新增](Event表索引优化CREATE INDEX idx_events_context ON events(user_id,event_type,created_at)+Alembic迁移脚本007+索引效果预估+纯Python算法无额外容器) ③§12.7 PriorityScorerV2定时评分任务[0.3.1新增](复用现有cron每小时整点+recalculate_scores脚本升级为V2四维评分+降级策略回退PoC公式)** | **DevSquad** |
 | **0.4.0** | **2026-06-06** | **F-57/F-58 语义搜索与关联发现增强部署：①§12.8 EmbeddingProvider部署[0.4.0新增] — 12.8.1 sqlite-vec安装(pip install sqlite-vec+安装验证清单+自动降级) 12.8.2 API Key配置(复用LLM_API_KEY+curl验证命令) 12.8.3 缓存策略(PoC内存dict重启清空/Phase1 Redis TTL=7天) ②§12.9 SemanticSearchEngine部署[0.4.0新增] — 12.9.1 索引构建(Pipeline自动触发+手动reindex API+性能预估100条~10s) 12.9.2 降级模式(sqlite-vec不可用时Python余弦相似度+性能对比5ms vs 50ms) 12.9.3 Phase2迁移(pgvector+IVFFlat索引+迁移检查清单)** | **DevSquad** |
 | **0.4.1** | **2026-06-07** | **F-08/F-36 EmailAdapter/CSV导入部署：①§12.10 EmailAdapter IMAP配置[0.4.1新增] — IMAP连接参数6项环境变量+常见邮箱配置表(Gmail/Outlook/QQ/163)+Docker Compose配置+SSL强制+Phase1应用密码/Phase2 OAuth2+同步频率15分钟+验证命令 ②§12.11 CSV导入文件大小限制配置[0.4.1新增] — 文件大小10MB/行数5000限制+CSV格式要求5项+Nginx上传限制对齐+导入性能预估4档+验证命令** |
-| **0.4.8** | **2026-06-08** | **托管PoC部署模式：①§1.1 三阶段部署策略表新增"托管PoC"行(云端轻量服务器+SQLite+~50元/月+小程序接入) ②§1.2 环境要求表新增"托管PoC"列 ③§2.9 托管PoC部署模式[0.4.8新增] — 2.9.1 概述(适用场景+与本地PoC对比表) 2.9.2 架构图(云端服务器+Docker Compose+promiselink-api+Nginx+SQLite+微信小程序+LLM API) 2.9.3 前置条件(云服务器2C4G/域名/SSL证书/LLM API Key/SSH+域名备案说明) 2.9.4 部署步骤7步(购买服务器→域名HTTPS→安装Docker→克隆配置→启动服务→健康检查→小程序白名单) 2.9.5 运维管理(备份策略+自动备份脚本+监控+更新升级) 2.9.6 迁移到Phase1(SQLite导出→PG导入→切换compose文件) 2.9.7 费用估算(~54元/月不含LLM，约为Phase1的1/4)** | **DevSquad** |
+| **0.4.8** | **2026-06-08** | **托管PoC部署模式：①§1.1 三阶段部署策略表新增"托管PoC"行(云端轻量服务器+SQLite+参考云厂商报价+小程序接入) ②§1.2 环境要求表新增"托管PoC"列 ③§2.9 托管PoC部署模式[0.4.8新增] — 2.9.1 概述(适用场景+与本地PoC对比表) 2.9.2 架构图(云端服务器+Docker Compose+promiselink-api+Nginx+SQLite+微信小程序+LLM API) 2.9.3 前置条件(云服务器2C4G/域名/SSL证书/LLM API Key/SSH+域名备案说明) 2.9.4 部署步骤7步(准备服务器→域名HTTPS→安装Docker→克隆配置→启动服务→健康检查→小程序白名单) 2.9.5 运维管理(备份策略+自动备份脚本+监控+更新升级) 2.9.6 迁移到Phase1(SQLite导出→PG导入→切换compose文件) 2.9.7 成本估算(参考云厂商报价，不含LLM，约为Phase1的1/4)** | **DevSquad** |
 | **0.5.0** | **2026-06-11** | **产品分级重构+网关中继架构：①§1.1 部署策略表重构(PoC→PoC概念验证/托管PoC→基础版本地免费/Phase1→专业版网关中继/移除Phase2/定制版保留) ②§1.2 环境要求表更新为4列(PoC/基础版/专业版/定制版) ③§2.10 基础版vs专业版Docker配置[0.5.0新增] — 2.10.1 架构差异(基础版:仅FastAPI+SQLite+本地Embedding/专业版:+relay_client+网关代理AI) 2.10.2 Docker Compose差异表 2.10.3 基础版安装命令(docker run+Taro H5编译) 2.10.4 专业版安装命令(docker run+RELAY_GATEWAY_URL+RELAY_TOKEN) 2.10.5 版本切换(同镜像+环境变量控制) ④§4 重构为专业版部署网关中继方案(4.1架构概述+4.2前置条件+4.3 Docker部署+4.4中继网关配置+4.7微信小程序域名白名单+4.8备份与恢复) ⑤移除§4 Nginx/SSL配置(网关已处理)** | **DevSquad** |
 
 ---

@@ -191,7 +191,7 @@ graph LR
 | Promise / Todo relationship tracking | ✅ 6-type Todo state machine | ❌ Tasks only | ⚠️ Simple |
 | Association discovery | ✅ 3 strategies | ❌ | ⚠️ LLM-generated |
 | Data ownership | ✅ 100% local SQLite | ⚠️ | ❌ Cloud |
-| Price | Free (MPL 2.0) | $$$$ | $$$/month |
+| Licensing | Open Source (MPL 2.0) | Commercial | Commercial |
 
 ---
 
@@ -348,12 +348,12 @@ curl "http://localhost:8000/api/v1/entities?search=technical cooperation" \
 
 ## Product Editions
 
-| Edition | Repository | Positioning | Price | Deployment |
+| Edition | Repository | Positioning | License | Deployment |
 |------|------|------|------|----------|
-| **Basic Edition** | [PromiseLink](https://github.com/lulin70/PromiseLink) (🌐 public MPL 2.0) | Local free, plain-text interaction, desktop widescreen | Free | Run locally directly (no Docker) |
-| **Pro Edition** | [PromiseLink-Pro](https://github.com/lulin70/PromiseLink-Pro) (🔒 private commercial License) | Cloud AI gateway + voice / email / OCR / privacy management | ¥29/month (early bird) / ¥49/month (regular) | Docker + cloud gateway |
+| **Basic Edition** | [PromiseLink](https://github.com/lulin70/PromiseLink) (🌐 public MPL 2.0) | Local, plain-text interaction, desktop widescreen | Open-source free | Run locally directly (no Docker) |
+| **Pro Edition** | [PromiseLink-Pro](https://github.com/lulin70/PromiseLink-Pro) (🔒 private commercial License) | Cloud AI gateway + voice / email / OCR / privacy management | Contact sales | Docker + cloud gateway |
 | **Mini-Program** | [PromiseLink-miniapp](https://github.com/lulin70/PromiseLink-miniapp) (🔒 private commercial License) | WeChat mini-program, mobile portrait, Pro edition mobile client | Bundled with Pro | WeChat mini-program platform |
-| **Custom Edition** | (not public) | Sales team collaboration, multi-tenant | Custom quote | Cloud Docker Compose + K8s |
+| **Custom Edition** | (not public) | Sales team collaboration, multi-tenant | Contact sales | Cloud Docker Compose + K8s |
 
 > The basic edition uses plain-text interaction and does not include voice or image scanning features. The Pro edition depends on cloud service credentials.
 > The basic edition can optionally connect to the Pro edition cloud gateway via `relay_client` to use cloud AI capabilities (requires Pro License).

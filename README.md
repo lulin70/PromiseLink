@@ -189,7 +189,7 @@ graph LR
 | 承诺 / Todo 关系追踪 | ✅ 6 类 Todo 状态机 | ❌ 仅任务 | ⚠️ 简单 |
 | 关联发现 | ✅ 3 策略 | ❌ | ⚠️ LLM 生成 |
 | 数据所有权 | ✅ 100% 本地 SQLite | ⚠️ | ❌ 云端 |
-| 价格 | 免费 (MPL 2.0) | $$$$ | $$$/月 |
+| 授权方式 | 开源免费 (MPL 2.0) | 商业授权 | 商业服务 |
 
 ---
 
@@ -346,12 +346,12 @@ curl "http://localhost:8000/api/v1/entities?search=技术合作" \
 
 ## 产品版本
 
-| 版本 | 仓库 | 定位 | 价格 | 部署方式 |
+| 版本 | 仓库 | 定位 | 授权 | 部署方式 |
 |------|------|------|------|----------|
-| **基础版** | [PromiseLink](https://github.com/lulin70/PromiseLink) (🌐 公开 MPL 2.0) | 本地免费，纯文本交互，电脑宽屏 | 免费 | 本地直接运行（无需 Docker） |
-| **专业版** | [PromiseLink-Pro](https://github.com/lulin70/PromiseLink-Pro) (🔒 私有 商业 License) | 云端 AI 网关 + 语音 / 邮件 / OCR / 隐私管理 | ¥39/月（年付 ¥365） | Docker + 云端网关 |
+| **基础版** | [PromiseLink](https://github.com/lulin70/PromiseLink) (🌐 公开 MPL 2.0) | 本地，纯文本交互，电脑宽屏 | 开源免费 | 本地直接运行（无需 Docker） |
+| **专业版** | [PromiseLink-Pro](https://github.com/lulin70/PromiseLink-Pro) (🔒 私有 商业 License) | 云端 AI 网关 + 语音 / 邮件 / OCR / 隐私管理 | 联系销售 | Docker + 云端网关 |
 | **小程序** | [PromiseLink-miniapp](https://github.com/lulin70/PromiseLink-miniapp) (🔒 私有 商业 License) | 微信小程序，手机竖屏，专业版移动端 | 随专业版 | 微信小程序平台 |
-| **定制版** | (未公开) | 销售团队协作，多租户 | 按需定制 | 云端 Docker Compose + K8s |
+| **定制版** | (未公开) | 销售团队协作，多租户 | 联系销售 | 云端 Docker Compose + K8s |
 
 > 基础版为纯文本交互，不包含语音功能和图片扫描功能。专业版依赖云端服务凭证。
 > 基础版通过 `relay_client` 可选连接专业版云端网关以使用云端 AI 能力（需专业版 License）。

@@ -39,46 +39,116 @@ info()  { echo -e "${GREEN}[INFO]${NC} $1"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
+# 检测操作系统（用于给出针对性提示与引导链接）
+detect_os() {
+    case "$(uname -s)" in
+        Darwin)               echo "macOS" ;;
+        MINGW*|MSYS*|CYGWIN*) echo "Windows" ;;
+        Linux)                echo "Linux" ;;
+        *)                    echo "未知系统" ;;
+    esac
+}
+CURRENT_OS="$(detect_os)"
+
 echo "============================================================"
 echo "  PromiseLink 基础版安装程序（种子客户专用）"
+echo "  检测到系统：$CURRENT_OS"
 echo "============================================================"
+echo ""
+echo "本脚本将为你完成以下操作："
+echo "  1. 检查 Docker 运行环境"
+echo "  2. 输入专业版许可证密钥"
+echo "  3. 配置云端网关连接"
+echo "  4. 生成配置文件并启动服务"
+echo "  5. 验证服务运行与健康状态"
+echo ""
+echo "如任何一步卡住，可随时联系 support@promiselink.cn 获取协助。"
 echo ""
 
 # 1. 检查 Docker
-info "检查 Docker 环境..."
+info "第 1 步：检查 Docker 运行环境..."
 if ! command -v docker &> /dev/null; then
-    error "未检测到 Docker。请先安装 Docker Desktop：
-  macOS:  https://www.docker.com/products/docker-desktop
-  Windows: https://www.docker.com/products/docker-desktop
-安装后启动 Docker Desktop，再重新运行本脚本。"
+    # 根据系统给出对应的 Docker 图文安装引导链接
+    DOCKER_GUIDE_URL="https://www.docker.com/products/docker-desktop"
+    if [ "$CURRENT_OS" = "Linux" ]; then
+        DOCKER_GUIDE_URL="https://docs.docker.com/engine/install/"
+    fi
+
+    cat << EOF
+
+${RED}[ERROR]${NC} 未检测到 Docker，安装暂时无法继续。
+
+PromiseLink 基础版需要 Docker 运行环境。别担心，只需按下面 4 步操作：
+
+  你的系统：${CURRENT_OS}
+
+  第 1 步｜打开 Docker 下载页面（含图文安装指引）：
+    ${DOCKER_GUIDE_URL}
+
+  第 2 步｜下载对应你系统的 Docker Desktop 安装包，双击安装
+           （macOS 拖到 Applications；Windows 按向导下一步即可）
+
+  第 3 步｜安装完成后，启动 Docker Desktop
+           （菜单栏 / 任务栏出现鲸鱼图标，且状态为「running」即代表已就绪）
+
+  第 4 步｜等待 Docker 完全启动后，重新运行本脚本：
+           bash install_basic.sh
+
+  仍遇到问题？把终端报错截图发到 support@promiselink.cn，我们会帮你排查。
+EOF
+    exit 1
 fi
 
 if ! docker info &> /dev/null; then
-    error "Docker 未运行。请启动 Docker Desktop 后再运行本脚本。"
+    cat << EOF
+
+${RED}[ERROR]${NC} Docker 已安装但尚未运行。
+
+请先启动 Docker Desktop：
+  ${CURRENT_OS} 系统：在「应用程序 / 开始菜单」中找到 Docker 并打开，
+  等待菜单栏 / 任务栏的鲸鱼图标变为稳定状态（约 10-30 秒），
+  然后重新运行本脚本：bash install_basic.sh
+
+  如启动失败，可参考：https://docs.docker.com/desktop/troubleshoot/overview/
+EOF
+    exit 1
 fi
 info "Docker 已就绪 ✓"
 
 # 2. 询问许可证密钥
 echo ""
-echo "请输入您的专业版许可证密钥（PL-PRO-xxxx-xxxx-xxxx 格式）："
+info "第 2 步：输入专业版许可证密钥"
+echo "请输入您收到的专业版许可证密钥（格式如 PL-PRO-xxxx-xxxx-xxxx）："
 read -r LICENSE_KEY
 
 if [[ ! "$LICENSE_KEY" =~ ^PL-PRO-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4,}$ ]]; then
-    error "许可证密钥格式不正确。应为 PL-PRO-xxxx-xxxx-xxxx 格式。
-请检查您收到的密钥，或联系 support@promiselink.cn 获取。"
+    cat << EOF
+
+${RED}[ERROR]${NC} 许可证密钥格式不正确。
+
+  正确格式应为：PL-PRO-xxxx-xxxx-xxxx（每组 x 为字母或数字）
+  你输入的是：$LICENSE_KEY
+
+  请检查邮件或卡片上收到的密钥后重新运行本脚本。
+  如未收到密钥或格式有疑问，请联系 support@promiselink.cn。
+EOF
+    exit 1
 fi
 info "许可证密钥已确认 ✓"
 
 # 3. 询问网关地址（通常用默认值）
 echo ""
-echo "云端网关地址（直接回车使用默认值 $DEFAULT_GATEWAY_URL）："
+info "第 3 步：配置云端网关地址"
+echo "云端网关地址（直接回车使用默认值即可，一般无需修改）："
+echo "  $DEFAULT_GATEWAY_URL"
 read -r GATEWAY_URL
 GATEWAY_URL="${GATEWAY_URL:-$DEFAULT_GATEWAY_URL}"
 info "网关地址: $GATEWAY_URL ✓"
 
-# 4. 创建安装目录
+# 4. 创建安装目录 + 生成配置
 echo ""
-info "创建安装目录: $INSTALL_DIR"
+info "第 4 步：准备安装目录与配置文件"
+info "安装目录: $INSTALL_DIR"
 mkdir -p "$INSTALL_DIR/data"
 cd "$INSTALL_DIR"
 
@@ -141,17 +211,18 @@ services:
         max-file: "3"
 EOF
 
-# 7. 拉取镜像并启动
+# 5. 拉取镜像并启动
 echo ""
-info "拉取 Docker 镜像（首次约 200MB，请耐心等待）..."
+info "第 5 步：拉取镜像并启动服务"
+info "正在下载 Docker 镜像（首次约 200MB，请耐心等待，期间请勿关闭终端）..."
 docker pull "$DEFAULT_IMAGE"
 
-info "启动 PromiseLink 基础版..."
+info "镜像下载完成，正在启动 PromiseLink 基础版..."
 docker compose up -d
 
-# 8. 等待健康检查
+# 等待健康检查
 echo ""
-info "等待服务启动（最多 60 秒）..."
+info "正在等待服务就绪（最多 60 秒，看到 ✓ 即代表启动成功）..."
 HEALTH_OK=false
 for i in $(seq 1 60); do
     if curl -sf http://localhost:8000/api/v1/health > /dev/null 2>&1; then

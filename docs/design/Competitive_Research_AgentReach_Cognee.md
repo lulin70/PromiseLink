@@ -111,7 +111,7 @@ channels/
 |------|---------|-----------|----------------|
 | 🌐 网页 | ✅ Jina Reader | — | 🟢 高（读任意文章/博客） |
 | 📺 YouTube | ✅ yt-dlp 字幕 | — | 🟡 中（技术内容） |
-| 📡 RSS | ✅ feedparser | — | 🟢 高（订阅联系人博客/公司动态） |
+| 📡 RSS | ✅ feedparser | — | 🟢 高（追踪联系人博客/公司动态） |
 | 🔍 全网搜索 | — | Exa 语义搜索 | 🟢 高（搜联系人名字） |
 | 📦 GitHub | ✅ 公开仓库 | 私有仓库 | 🟡 中（技术人脉） |
 | 🐦 Twitter/X | ✅ 读单条 | 搜索/时间线 | 🟢 高（联系人动态） |
@@ -132,7 +132,7 @@ channels/
 | **面向 Agent，非应用** | 设计为 Agent 通过 shell 调用，PromiseLink 是 FastAPI 应用，需适配 | 中（需包装为 Python API 或 subprocess） |
 | **依赖重** | Node.js + mcporter + 多个 CLI 工具 | 高（破坏基础版"无 Docker"约束） |
 | **Cookie 封号风险** | Twitter/小红书明确警告可能封号 | 高（商业产品不能让用户封号） |
-| **读为主，无定时订阅** | 无 cron/scheduler，不能定时拉取联系人动态 | 高（关系经营需要主动推送） |
+| **读为主，无定时追踪** | 无 cron/scheduler，不能定时拉取联系人动态 | 高（关系经营需要主动推送） |
 | **无数据结构化** | 返回文本，需 PromiseLink 自行提取实体 | 中（PromiseLink 已有 LLM 增强层） |
 | **中国大陆访问** | Reddit/Twitter 需代理 | 中（基础版用户多在大陆） |
 
@@ -219,10 +219,10 @@ cognee 通过 Claude Code 插件实现 session memory 自动捕获（PostToolUse
 
 #### 4.1.4 基础版 vs 专业版的功能划分
 
-| 功能 | 基础版（MPL、本地、免费） | 专业版（Docker、云端、付费） |
+| 功能 | 基础版（MPL、本地、免费） | 专业版（Docker、云端、商业） |
 |------|------------------------|--------------------------|
 | **手动 URL 粘贴** | ✅ 用户粘贴联系人文章链接，LLM 提取摘要+实体 | ✅ |
-| **RSS 订阅** | ✅ 订阅联系人博客/公司 RSS，定时拉取 | ✅ |
+| **RSS 追踪** | ✅ 追踪联系人博客/公司 RSS，定时拉取 | ✅ |
 | **网页阅读** | ✅ Jina Reader 读任意网页（零配置） | ✅ |
 | **LinkedIn 动态** | ❌（Cookie 风险+代理问题） | ✅（借鉴 Agent-Reach linkedin-mcp） |
 | **Twitter/X 动态** | ❌（Cookie 封号风险） | ✅（专业版用专用小号） |
@@ -250,7 +250,7 @@ cognee 通过 Claude Code 插件实现 session memory 自动捕获（PostToolUse
   5. 若关联度 > 0.7，生成 help todo (如"转发/评论/祝贺")
 ```
 
-**基础版 RSS 订阅（P1，1 周开发量）**:
+**基础版 RSS 追踪（P1，1 周开发量）**:
 - 用户为联系人添加 RSS feed URL
 - 应用启动时拉取最新文章（不做定时，避免本地 cron 依赖）
 - 新文章 → 生成 Event → 触发 LLM 摘要 → 可选 help todo
@@ -310,7 +310,7 @@ cognee 通过 Claude Code 插件实现 session memory 自动捕获（PostToolUse
 
 #### 4.2.3 数据模型扩展
 
-新增 `contact_dynamics_sources` 表（订阅源管理）:
+新增 `contact_dynamics_sources` 表（信息源管理）:
 
 ```sql
 CREATE TABLE contact_dynamics_sources (
@@ -401,9 +401,9 @@ Codebase-Memory 项目证明：SQLite 单文件可索引 Linux 内核（28M LOC,
 | **运维成本** | 高 | 低 | 中 |
 | **学习曲线** | Cypher 查询语言 | Cypher（OpenCypher） | Cypher |
 | **与现有代码兼容** | 需重写 AssociationEngine | 需适配 | 需适配 |
-| **MPL 兼容性** | 社区版 GPL，商业版付费 | MIT | SSPL（争议） |
+| **MPL 兼容性** | 社区版 GPL，商业版闭源 | MIT | SSPL（争议） |
 
-**关键约束冲突**: 基础版要求"本地运行、无 Docker、MPL 开源"。Neo4j 社区版是 GPL（与 MPL 兼容但需开源），商业版付费；FalkorDB 是 SSPL（MongoDB 协议，开源争议）。任何图数据库都会破坏基础版的轻量定位。
+**关键约束冲突**: 基础版要求"本地运行、无 Docker、MPL 开源"。Neo4j 社区版是 GPL（与 MPL 兼容但需开源），商业版闭源；FalkorDB 是 SSPL（MongoDB 协议，开源争议）。任何图数据库都会破坏基础版的轻量定位。
 
 #### 5.2.3 cognee 迁移引擎的警示
 
@@ -516,7 +516,7 @@ class RelationshipBriefRefiner:
 | 编号 | 建议 | 借鉴来源 | 优先级 | 开发量 | 风险 |
 |------|------|---------|--------|--------|------|
 | **B1** | 实现手动 URL 粘贴 → 动态提取 → Event 存储 | Agent-Reach web.py (Jina Reader) | 🟠 P1 | 2 周 | 低 |
-| **B2** | 实现 RSS 订阅渠道（feedparser） | Agent-Reach rss.py | 🟠 P1 | 1 周 | 低 |
+| **B2** | 实现 RSS 追踪渠道（feedparser） | Agent-Reach rss.py | 🟠 P1 | 1 周 | 低 |
 | **B3** | 创建 `channels/` 目录结构，统一渠道契约 | Agent-Reach 架构 | 🟡 P2 | 1 周 | 低 |
 | **B4** | 实现实体规范化层（字典 + difflib） | cognee Ontology | 🟡 P2 | 1 周 | 低 |
 | **B5** | 用 SQLite recursive CTE 实现多跳关联查询 | cognee 图遍历 | 🟡 P2 | 1 周 | 低 |
@@ -524,7 +524,7 @@ class RelationshipBriefRefiner:
 | **B7** | RelationshipBrief 动态强化（基于互动频率） | cognee memify | 🟢 P3 | 1 周 | 低 |
 | **❌** | 迁移到图数据库 | cognee 三存储 | — | — | 不建议 |
 
-### 6.2 专业版建议（Docker、云端、付费）
+### 6.2 专业版建议（Docker、云端、商业）
 
 | 编号 | 建议 | 借鉴来源 | 优先级 | 开发量 | 风险 |
 |------|------|---------|--------|--------|------|
@@ -574,12 +574,12 @@ class RelationshipBriefRefiner:
 **目标**: 验证"联系人动态"功能的产品价值，零 Cookie 风险。
 
 - [ ] B1: 手动 URL 粘贴 → Jina Reader 抓取 → LLM 提取 → Event 存储
-- [ ] B2: RSS 订阅渠道（feedparser，应用启动时拉取）
+- [ ] B2: RSS 追踪渠道（feedparser，应用启动时拉取）
 - [ ] B3: 创建 `channels/` 目录结构（rss.py / web.py / github.py）
 
 **验收标准**:
 - 用户可为联系人粘贴 URL，系统自动生成 Event + 可选 todo
-- 用户可订阅联系人 RSS，新文章自动生成 Event
+- 用户可追踪联系人 RSS，新文章自动生成 Event
 - E2E 测试：粘贴 URL → Event 生成 → AssociationEngine 触发 → RelationshipBrief 更新
 
 #### Phase 2: 图查询能力增强（v0.9.0，2 周）
@@ -598,7 +598,7 @@ class RelationshipBriefRefiner:
 
 #### Phase 3: 专业版深度感知（v1.0.0 Pro，4-5 周）
 
-**目标**: 专业版上线互联网感知完整能力，作为付费卖点。
+**目标**: 专业版上线互联网感知完整能力，作为核心卖点。
 
 - [ ] P1: LinkedIn + Twitter 渠道（借鉴 Agent-Reach 多后端路由）
 - [ ] P2: InternetSensingService + 云端 SensingScheduler
@@ -608,7 +608,7 @@ class RelationshipBriefRefiner:
 - [ ] P6: Cookie 安全管理 + 专用小号提示
 
 **验收标准**:
-- 专业版用户订阅 LinkedIn 动态，联系人换工作时自动推送 todo
+- 专业版用户追踪 LinkedIn 动态，联系人换工作时自动推送 todo
 - 动态仪表盘展示所有联系人的最新动态
 - Cookie 加密存储，明确提示封号风险
 
@@ -631,7 +631,7 @@ class RelationshipBriefRefiner:
 |------|------|---------|
 | **Cookie 封号** | 🔴 高（Twitter/小红书） | 基础版不支持；专业版强制专用小号 + 明确风险提示 |
 | **反爬封锁** | 🟡 中 | 借鉴 Agent-Reach 多后端路由，首选挂了切备选 |
-| **数据合规** | 🟡 中 | 只抓取公开数据；RSS 是用户主动订阅；LinkedIn/Twitter 遵守 ToS |
+| **数据合规** | 🟡 中 | 只抓取公开数据；RSS 是用户主动追踪；LinkedIn/Twitter 遵守 ToS |
 | **LLM 成本** | 🟡 中 | 动态摘要用 LLM，需控制调用频率；基础版只在用户主动粘贴时调用 |
 | **数据质量** | 🟡 中 | LLM 提取的实体可能错误；需用户确认机制 |
 | **中国大陆访问** | 🟡 中（Twitter/Reddit） | 基础版不涉及；专业版用户需自备代理或用云端网关 |

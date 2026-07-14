@@ -33,7 +33,7 @@
 | 1 | IAMHERE小程序集成 | P0 | ✅ 设计完成（[D7-4] 微信OAuth code2session流程不变） |
 | 2 | LLM集成设计 | P0 | ✅ 0.2.0更新（Moka AI + 模板0/3更新 + action_type） |
 | 3 | TTS/ASR集成设计 | P0 | ✅ 0.2.1详细化（ASR:微信同声传译+Whisper+Protocol抽象层 / TTS:Edge-TTS+缓存策略+Protocol抽象层+PII脱敏 / Voice Orchestrator+NLG） |
-| 4 | 微信服务号推送 | P1 | ✅ 设计完成（[D7-7] 模板消息/订阅消息框架不变） |
+| 4 | 微信服务号推送 | P1 | ✅ 设计完成（[D7-7] 模板消息/消息推送框架不变） |
 | 5 | CarryMem集成设计 | P1 | ✅ 0.2.0更新（三阶段路径：PoC→Phase1→Phase2） |
 | 6 | 数字名片API对接 | P1 | 🔶 PoC阶段暂停，Phase1再评估（[D7-6] PRD v4.9确认PoC不对接外部数字名片平台） |
 | 7 | 数据导出集成 | P1 | ✅ 0.2.0新增（[D7-9] GET /data/export + PII脱敏） |
@@ -2408,7 +2408,7 @@ class AliyunTTSClient(TTSClient):
 | SDK | `edge-tts` — Microsoft Edge Read Aloud API的异步Python封装 |
 | 费用 | **完全免费**，无API Key，无调用限额 |
 | 延迟 | ~200-800ms（取决于文本长度和网络） |
-| 音质 | Neural级别，接近Azure Cognitive Services付费版 |
+| 音质 | Neural级别，接近Azure Cognitive Services商业版 |
 | SSML支持 | ✅ 完整SSML标记（语速、音调、停顿、多角色） |
 | 离线使用 | ❌ 需要网络连接 |
 | 商用授权 | ⚠️ 个人学习用途OK，生产环境需确认Microsoft授权 |
@@ -3545,7 +3545,7 @@ class NLGGenerator:
 
 ---
 
-## 5. 微信服务号推送集成（[D7-7] 模板消息/订阅消息框架不变）
+## 5. 微信服务号推送集成（[D7-7] 模板消息/消息推送框架不变）
 
 ### 5.1 推送通道设计
 
@@ -3553,7 +3553,7 @@ PromiseLink支持3种推送通道，按优先级选择：
 
 | 通道 | 适用场景 | 到达率 | 实时性 | 限制 |
 |------|---------|--------|--------|------|
-| 模板消息 | Todo到期/商机提醒 | 高 | 高 | 需用户订阅，每月有限额 |
+| 模板消息 | Todo到期/商机提醒 | 高 | 高 | 需用户授权接收，每月有限额 |
 | 移动推送（H5 Push） | 实时通知 | 中 | 高 | 需浏览器授权 |
 | 小程序卡片 | 重要事项提醒 | 高 | 中 | 需用户打开小程序 |
 
@@ -3709,7 +3709,7 @@ class WeChatPushClient:
 ### 5.3 移动推送（H5 Push API）
 
 ```javascript
-// H5端推送订阅
+// H5端推送授权
 async function subscribePush() {
   const registration = await navigator.serviceWorker.ready
   const subscription = await registration.pushManager.subscribe({
@@ -3781,7 +3781,7 @@ class PushFrequencyController:
         if is_quiet_hours():
             return False
 
-        # 4. 检查用户订阅设置
+        # 4. 检查用户推送设置
         if not await is_subscribed(user_id, todo_type):
             return False
 

@@ -42,7 +42,7 @@ All notable changes to PromiseLink will be documented in this file.
 
 **新增法务文档**：
 - `docs/legal/MPL_BOUNDARY.md`：MPL 2.0 传染边界法律确认（替代原 `AGPL_BOUNDARY.md`），9 章节覆盖文件级 copyleft、无网络条款、Larger Work、pip import 隔离、AGPL→MPL 迁移说明
-- `docs/legal/TERMS_OF_SERVICE.md`：服务条款/用户协议（10 章节），覆盖用户行为准则、知识产权、订阅计费、数据隐私、免责声明
+- `docs/legal/TERMS_OF_SERVICE.md`：服务条款/用户协议（10 章节），覆盖用户行为准则、知识产权、专业版授权、数据隐私、免责声明
 - `docs/legal/PRO_LICENSE_AGREEMENT.md`：专业版商业许可协议（13 章节），覆盖单设备绑定、使用量限制、退款政策、责任上限
 - `docs/legal/PRIVACY_POLICY.md` v1.1：补充个人信息处理者主体信息（PIPL §17）和投诉渠道（12377/12315/12321）
 

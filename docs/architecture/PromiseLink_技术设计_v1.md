@@ -360,7 +360,7 @@ class TTSFallbackChain:
 触发条件（满足任一）：
   - 许总团队2周内无法启动前端开发
   - 数字名片API对接超3周无结论
-  - 需要独立种子用户测试环境
+  - 需要独立目标用户测试环境
 
 技术栈：
   - Taro 3.x + Vue3 + NutUI 4.x（微信小程序）
@@ -2687,7 +2687,7 @@ class TTSService:
 | 方案 | 优点 | 缺点 | 产品层级 |
 |------|------|------|---------|
 | 微信同声传译插件 | 小程序原生支持，免费 | 音质一般 | 专业版 |
-| 讯飞语音合成 | 音质好，中文优化 | 需付费 | 定制版 |
+| 讯飞语音合成 | 音质好，中文优化 | 商业授权 | 定制版 |
 | Azure TTS | 多语言，音质最佳 | 成本高 | 定制版 |
 
 #### 7.1c-plus 语音交互技术方案（v2.4新增）
@@ -3999,11 +3999,11 @@ curl -f https://promiselink.example.com/health || echo "HEALTH CHECK FAILED"
 
 | 场景 | 用户状态 | 入口 | AI后端 | Key来源 | 网络要求 |
 |------|----------|------|--------|---------|----------|
-| 场景1 | 纯基础版（未付费） | 浏览器局域网 | 本地模型/自带Key | 用户自备 | 完全离线可用 |
-| 场景2 | 已购专业版 + 在家用浏览器 | 浏览器局域网 | 云端AI（我方Key） | 网关代理 | 需联网验证身份 |
-| 场景3 | 已购专业版 + 出门用小程序 | 微信小程序 | 云端AI（我方Key） | 网关代理 | 正常路径 |
+| 场景1 | 纯基础版 | 浏览器局域网 | 本地模型/自带Key | 用户自备 | 完全离线可用 |
+| 场景2 | 已开通专业版 + 在家用浏览器 | 浏览器局域网 | 云端AI（我方Key） | 网关代理 | 需联网验证身份 |
+| 场景3 | 已开通专业版 + 出门用小程序 | 微信小程序 | 云端AI（我方Key） | 网关代理 | 正常路径 |
 
-**场景1：纯基础版（未付费）→ 完全离线**
+**场景1：纯基础版 → 完全离线**
 
 ```
 浏览器(H5) → 本地Docker(FastAPI) → 用户自带API Key / 本地模型 → 返回
@@ -4013,7 +4013,7 @@ curl -f https://promiselink.example.com/health || echo "HEALTH CHECK FAILED"
 - 不经过网关，不消耗我方AI额度
 - 隐私最大化：数据不离开用户局域网
 
-**场景2：已购专业版 + 在家用浏览器 → 网关代理AI**
+**场景2：已开通专业版 + 在家用浏览器 → 网关代理AI**
 
 ```
 浏览器(H5) → 本地Docker(FastAPI)
@@ -4031,7 +4031,7 @@ curl -f https://promiselink.example.com/health || echo "HEALTH CHECK FAILED"
 - 身份已激活，无需重复验证（JWT缓存有效期内）
 - 享受专业版AI额度，网关统一计数限流
 
-**场景3：已购专业版 + 出门用小程序 → 正常路径**
+**场景3：已开通专业版 + 出门用小程序 → 正常路径**
 
 ```
 微信小程序 → 中继网关 → 本地Docker(业务逻辑)
@@ -4059,7 +4059,7 @@ curl -f https://promiselink.example.com/health || echo "HEALTH CHECK FAILED"
 **JWT验证5步流程**：
 
 ```
-步骤1: 用户付费 → 支付平台确认 → 激活专业版身份
+步骤1: 用户开通 → 授权确认 → 激活专业版身份
 步骤2: 用户登录/同步 → 本地Docker获取JWT → 存储
 步骤3: 每次AI调用 → relay_client携带JWT → 网关 /auth/verify 验证
 步骤4: 网关验证通过 → 缓存JWT（有效期内存） → 放行AI请求
@@ -4079,9 +4079,9 @@ curl -f https://promiselink.example.com/health || echo "HEALTH CHECK FAILED"
 
 **隐私声明**：
 
-> ⚠️ **联网仅验证付费身份，不传关系数据**
+> ⚠️ **联网仅验证授权身份，不传关系数据**
 >
-> 专业版身份验证过程中，网络传输仅包含JWT令牌（用户ID+付费状态+有效期），**不传输任何关系数据、事件记录、实体信息或AI对话内容**。业务数据始终存储在用户本地Docker中，网关仅做加密转发，不解析、不存储业务payload。
+> 专业版身份验证过程中，网络传输仅包含JWT令牌（用户ID+授权状态+有效期），**不传输任何关系数据、事件记录、实体信息或AI对话内容**。业务数据始终存储在用户本地Docker中，网关仅做加密转发，不解析、不存储业务payload。
 
 **网关AI计数限流**：
 
@@ -4251,7 +4251,7 @@ JWT刷新失败:
 8. 完成后填写反馈比例≥50%
 9. 用户认为产品使自己更不易失约≥70%
 10. 4周持续使用率≥60%
-11. 愿意进入付费试用的用户≥3位
+11. 愿意进入体验的用户≥3位
 
 ### 9.1 专业版MVP核心（PoC后4周）
 
@@ -4284,7 +4284,7 @@ JWT刷新失败:
 24. 安全校验与敏感词过滤
 25. 数据导出
 26. 文本会议纪要录入支持
-27. 合作档案Excel导入（仅种子用户）
+27. 合作档案Excel导入（仅目标用户）
 
 ### 9.3 定制版（持续迭代——资源经营能力）
 
@@ -4595,7 +4595,7 @@ class SemanticSearchEngine:
 |------|------|----------|------|
 | v2.6 | 2026-06-06 | 新增洞察引擎层+数据接入层架构：①§2.1架构图新增Insight Engine服务②§2.2服务拆分表新增Insight Engine行③§3.1 todos表DDL新增completed_rank/dynamic_score/score_calculated_at字段+索引④§4.10新增洞察引擎设计（动态评分器PriorityScorer+隐式反馈收集器ImplicitFeedbackCollector+Todo模型扩展+API变更）⑤§4.11新增数据接入层设计（DataSourceAdapter接口+邮件场景数据流+微信生态约束） | CarryMem团队 |
 | v2.7 | 2026-06-06 | Phase 1动态优先级四维演进：①§4.10.1a新增Phase 1四维评分器详细设计（依赖性全图谱路径分析+场景匹配Event表驱动）②依赖性算法：有向依赖图+阻塞链检测+3跳间接依赖+dependency_score=Σ(1/depth)×blocked_weight③场景匹配算法：未来24h meeting/call扫描+Entity匹配+context_score=max(0,1-hours/24)④权重配置Phase1(0.3/0.35/0.2/0.15) | CarryMem团队 |
-| v3.2 | 2026-06-11 | §8.7.4 AI调用路径升级为三场景模型+专业版身份验证流程+§8.7.6 Open Core模型：①§8.7.4 AI调用路径从双路径升级为三场景模型（场景1:纯基础版未付费→浏览器局域网→本地模型/自带Key→完全离线；场景2:已购专业版+在家用浏览器→浏览器局域网→云端AI我方Key→身份已激活；场景3:已购专业版+出门用小程序→微信小程序→云端AI我方Key→正常路径）②§8.7.4新增专业版身份验证流程子节（JWT验证5步流程:付费→登录同步→/auth/verify→缓存JWT→自动刷新+JWT payload结构+隐私声明:联网仅验证付费身份不传关系数据）③§8.7.6安全约束新增Open Core模型与隐私保证（基础版开源MPL 2.0代码可审计+专业版闭源中继网关/小程序/云端AI+开源是隐私声明的技术保证） | CarryMem团队 |
+| v3.2 | 2026-06-11 | §8.7.4 AI调用路径升级为三场景模型+专业版身份验证流程+§8.7.6 Open Core模型：①§8.7.4 AI调用路径从双路径升级为三场景模型（场景1:纯基础版→浏览器局域网→本地模型/自带Key→完全离线；场景2:已开通专业版+在家用浏览器→浏览器局域网→云端AI我方Key→身份已激活；场景3:已开通专业版+出门用小程序→微信小程序→云端AI我方Key→正常路径）②§8.7.4新增专业版身份验证流程子节（JWT验证5步流程:开通→登录同步→/auth/verify→缓存JWT→自动刷新+JWT payload结构+隐私声明:联网仅验证授权身份不传关系数据）③§8.7.6安全约束新增Open Core模型与隐私保证（基础版开源MPL 2.0代码可审计+专业版闭源中继网关/小程序/云端AI+开源是隐私声明的技术保证） | CarryMem团队 |
 | v3.1 | 2026-06-11 | 网关中继架构（专业版）设计：①§8.7.1架构概览（三层产品模型L1基础版/L2专业版/L3定制版+用户PC←WSS→云VPS网关←HTTPS→微信小程序架构图+网关不存业务数据只做加密转发+AI代理+计数限流）②§8.7.2基础版vs专业版Docker区别（专业版新增relay_client+Docker Compose差异表）③§8.7.3网关中继协议（WebSocket长连接出站+request/response/ping消息格式+user_token路由映射+30s心跳+60s超时+指数退避重连）④§8.7.4 AI调用路径（基础版本地Key vs 专业版网关代理DeepSeek+X-AI-Call标记+绿灯/黄灯/红灯状态不暴露Token数）⑤§8.7.5网关高可用与降级（网关故障自动降级基础版H5+本地AI Key回退+网关恢复自动重连）⑥§8.7.6安全约束（数据不落地+WSS加密+JWT签名防伪造+API Key隔离） | CarryMem团队 |
 | v3.0 | 2026-06-11 | F-67/F-68/F-69三大功能设计：①§4.13新增F-67 RelationshipBrief关系推进卡前端对接（API路径修正/类型定义对齐/去除Mock回退/数据流说明）②§4.14新增F-68 Promise兑现状态追踪（Todo新增fulfillment_status/fulfilled_at/overdue_notified_at字段+fulfillment_status与status正交设计+step_05/step_08 Pipeline扩展+my_promise自动overdue/their_promise手动标记安全约束+PromiseBoardService+FulfillmentTracker模块+明确不实现关系信用分）③§4.15新增F-69智能跟进提醒（reminder_preferences表+reminder_logs表+提醒时机算法+疲劳度控制≤5条/日+静默时段22:00-08:00+APScheduler调度架构+4种提醒类型+ReminderEngine+FatigueController模块） | CarryMem团队 |
 | v2.9 | 2026-06-09 | 托管PoC部署模式设计：①§8.6.2部署架构图更新为双路径（自助PoC+托管PoC）②§8.6.3a新增托管PoC部署模式（云服务器2C4G+Docker Compose+Nginx反向代理+Let's Encrypt HTTPS+SQLite+微信小程序接入）③新增自助PoC vs 托管PoC对比表（部署位置/访问方式/运维责任/成本/数据存储/TLS/域名）④§8.6.6新增托管PoC→Phase1迁移路径（SQLite导出→SQL方言转换→PG导入→docker-compose切换→DNS切换+零停机+回滚方案） | CarryMem团队 |
