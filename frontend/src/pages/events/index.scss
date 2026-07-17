@@ -4,7 +4,7 @@
   padding-bottom: 120px;
 
   .header {
-    background: #7B9EA8;
+    background: #A0B0C4;
     padding: 40px 30px 30px;
     color: #fff;
     display: flex;
@@ -51,7 +51,7 @@
 
       &.active {
         background: #E8EEF0;
-        color: #7B9EA8;
+        color: #A0B0C4;
         font-weight: 500;
       }
     }
@@ -137,7 +137,7 @@
 
       .event-time {
         font-size: 24px;
-        color: #7B9EA8;
+        color: #A0B0C4;
         font-weight: 500;
       }
     }
@@ -178,7 +178,7 @@
 
         &.status-pending {
           background: #E8EEF0;
-          Text { color: #7B9EA8; }
+          Text { color: #A0B0C4; }
         }
 
         &.status-processing {
@@ -215,7 +215,7 @@
 
         .entity-link {
           font-size: 22px;
-          color: #7B9EA8;
+          color: #A0B0C4;
           text-decoration: underline;
           cursor: pointer;
           background: #E8EEF0;
@@ -307,9 +307,9 @@
       .view-detail-btn {
         display: inline-block;
         font-size: 26px;
-        color: #7B9EA8;
+        color: #A0B0C4;
         padding: 10px 24px;
-        border: 1px solid #7B9EA8;
+        border: 1px solid #A0B0C4;
         border-radius: 8px;
         cursor: pointer;
         margin-top: 12px;
@@ -391,7 +391,7 @@
         }
 
         .pending-confirm-status {
-          color: #7B9EA8;
+          color: #A0B0C4;
           font-weight: 500;
         }
 

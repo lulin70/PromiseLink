@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { View, Text, ScrollView, Button, Input } from '@tarojs/components'
+import { View, Text, ScrollView, Button } from '@tarojs/components'
 import Taro from '@tarojs/taro'
-import { getDashboard, DayViewResponse, login as apiLogin, SupplyDemandMatch, getSupplyDemand, RelationshipHealthResponse, getRelationshipHealth, CareRemindersResponse, getCareReminders, exportData, getDailyReminders, DailyReminderResponse } from '../../services/api'
-import { isLoggedIn, setToken, setUserId, saveLoginCredentials, getUserId } from '../../services/auth'
+import { getDashboard, DayViewResponse, SupplyDemandMatch, getSupplyDemand, RelationshipHealthResponse, getRelationshipHealth, CareRemindersResponse, getCareReminders, exportData, getDailyReminders, DailyReminderResponse } from '../../services/api'
+import { isLoggedIn, getUserId } from '../../services/auth'
 import { navigateToEvent } from '../../services/navigation'
+import LoginGate from '../../components/LoginGate'
 import './index.scss'
 
 export default function Index() {
@@ -12,10 +13,6 @@ export default function Index() {
   const [error, setError] = useState('')
   // Login inline state
   const [showLogin, setShowLogin] = useState(false)
-  const [loginSecret, setLoginSecret] = useState('')
-  const [loginUserId, setLoginUserId] = useState('poc-user')
-  const [loginLoading, setLoginLoading] = useState(false)
-  const [loginError, setLoginError] = useState('')
   // F-E4: Supply-demand matching
   const [sdMatches, setSdMatches] = useState<SupplyDemandMatch[]>([])
   // F-G1: Relationship Health Diagnostic
@@ -64,29 +61,6 @@ export default function Index() {
     }
   }
 
-  async function handleInlineLogin() {
-    if (!loginSecret.trim()) {
-      setLoginError('请输入 PoC 密钥')
-      return
-    }
-    try {
-      setLoginLoading(true)
-      setLoginError('')
-      const res = await apiLogin(loginSecret.trim(), loginUserId.trim())
-      setToken(res.access_token)
-      setUserId(res.user_id || loginUserId)
-      saveLoginCredentials(loginSecret.trim())
-      setShowLogin(false)
-      // Now load dashboard
-      loadDashboard()
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err)
-      setLoginError('登录失败: ' + msg)
-    } finally {
-      setLoginLoading(false)
-    }
-  }
-
   async function handleExportData() {
     try {
       const userId = getUserId()
@@ -115,42 +89,14 @@ export default function Index() {
   // ── Inline Login Form ──
   if (showLogin) {
     return (
-      <View className='page-login-inline'>
-        <View className='login-card'>
-          <Text className='login-title'>PromiseLink</Text>
-          <Text className='login-subtitle'>基础版 · 本地部署</Text>
-
-          <View className='form-group'>
-            <Text className='label'>用户 ID</Text>
-            <Input
-              className='input'
-              value={loginUserId}
-              onInput={e => setLoginUserId(e.detail.value)}
-              placeholder='poc-user'
-            />
-          </View>
-
-          <View className='form-group'>
-            <Text className='label'>PoC 密钥</Text>
-            <Input
-              className='input'
-              type='safe-password'
-              value={loginSecret}
-              onInput={e => setLoginSecret(e.detail.value)}
-              placeholder='请输入 PoC Secret'
-            />
-          </View>
-
-          {loginError ? <Text className='error-text'>{loginError}</Text> : null}
-
-          <View
-            className={`login-btn ${loginLoading ? 'loading' : ''}`}
-            onClick={loginLoading ? undefined : handleInlineLogin}
-          >
-            <Text className='login-btn-text'>{loginLoading ? '登录中...' : '登 录'}</Text>
-          </View>
-        </View>
-      </View>
+      <LoginGate
+        showUserIdField
+        subtitle='基础版 · 本地部署'
+        onLoginSuccess={() => {
+          setShowLogin(false)
+          loadDashboard()
+        }}
+      />
     )
   }
 

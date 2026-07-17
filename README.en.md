@@ -10,8 +10,8 @@
   <a href="https://promiselink.cn"><img src="https://img.shields.io/badge/🌐_官网-promiselink.cn-blue?style=for-the-badge" alt="Website"></a>
   <br/>
   <a href="https://github.com/lulin70/PromiseLink/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/lulin70/PromiseLink/ci.yml?branch=main&label=CI&logo=github" alt="CI"></a>
-  <img src="https://img.shields.io/badge/tests-1858%20passed-brightgreen" alt="Tests">
-  <img src="https://img.shields.io/badge/coverage-88%25-green" alt="Coverage">
+  <img src="https://img.shields.io/badge/tests-1904%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/coverage-89%25-green" alt="Coverage">
   <img src="https://img.shields.io/badge/mypy-0%20errors-brightgreen" alt="mypy">
   <img src="https://img.shields.io/badge/ruff-0%20errors-brightgreen" alt="ruff">
   <img src="https://img.shields.io/badge/security-50%20tests%20passed-blue" alt="Security">
@@ -25,7 +25,7 @@
 > It provides the core loop: event entry → entity extraction → Todo generation → promise tracking → association discovery → dashboard.
 >
 > **Architectural layering**:
-> - **Core algorithm layer** (entity resolution / Todo state machine / promise fulfillment / association discovery / dynamic scoring) — **pure algorithm implementation, no LLM dependency**, runs offline, auditable, reproducible
+> - **Core algorithm layer** (entity resolution / Todo state machine / promise fulfillment / association discovery / dynamic scoring) — **main logic is pure algorithm implementation** (NetworkX + RapidFuzz + numpy), with optional LLM enhancement dimensions (entity_resolution step 5 llm_reasoning / promise_fulfillment's llm_semantic dimension), all with complete degradation mechanisms (weight 0.0 in PoC), runs offline, auditable, reproducible
 > - **LLM enhancement layer** (entity extraction / NLG response generation) — optional LLM enhancement, requires `LLM_API_KEY` (Moka AI / OpenAI / Anthropic, any one)
 >
 > **Not included**: voice input, voice query, email sync, WeChat forwarding, OCR business card scanning, private data management — these are Pro edition features.
@@ -40,8 +40,8 @@
 
 | Advantage | Proof | vs. Traditional CRM |
 |------|---------|-------------|
-| 🏭 **Industrial-grade quality** | 1858 tests passed / 88% coverage / mypy 0 / ruff 0 / 50 security tests / 17 performance tests | Most open-source CRMs have < 30% coverage |
-| 🧠 **Core algorithm layer does not depend on LLM** | Entity resolution / Todo state machine / promise fulfillment / association discovery / dynamic scoring — pure algorithm implementation (NetworkX + RapidFuzz + numpy), runs offline, auditable | Mainstream AI-CRMs depend on GPT API across the full chain |
+| 🏭 **Industrial-grade quality** | 1904 tests passed / 89% coverage / mypy 0 / ruff 0 / 50 security tests / 17 performance tests | Most open-source CRMs have < 30% coverage |
+| 🧠 **Core algorithm layer: main logic is pure algorithm** | Entity resolution / Todo state machine / promise fulfillment / association discovery / dynamic scoring — main logic is pure algorithm implementation (NetworkX + RapidFuzz + numpy), with optional LLM enhancement dimensions (all with degradation mechanisms), runs offline, auditable | Mainstream AI-CRMs depend on GPT API across the full chain |
 | 🚀 **Portable, zero deployment** | `pip install -e .` + `bash scripts/start.sh` ready to use, no Docker / K8s required | Similar tools require docker-compose |
 
 > **Honest disclosure**: Entity extraction, NLG response generation, etc. require `LLM_API_KEY`; the core relationship management algorithms (5 modules) are pure algorithm implementations — when LLM is unavailable, the core loop still runs in degraded mode.
@@ -96,7 +96,7 @@ bash scripts/start.sh
 git clone https://github.com/lulin70/PromiseLink
 cd PromiseLink
 pip install -e '.[dev]'
-pytest --co -q | tail -1   # Should show 1907 tests collected
+pytest --co -q | tail -1   # Should show 1953 tests collected
 pytest tests/test_security_comprehensive.py -q --no-cov   # 50 security tests
 ```
 
@@ -106,8 +106,8 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50 security tests
 
 | Metric       | Value                                                               |
 | -------- | ---------------------------------------------------------------- |
-| Test cases     | **1858 passed**, 49 skipped, 0 failed (incl. 50 relay_client robustness + 12 v5.6 corrections + 50 security + 17 performance + 6 real LLM E2E) |
-| Code coverage    | **88%**                                                          |
+| Test cases     | **1904 passed**, 49 skipped, 0 failed (incl. 50 relay_client robustness + 12 v5.6 corrections + 50 security + 17 performance + 6 real LLM E2E) |
+| Code coverage    | **89%**                                                          |
 | mypy type check | **0 errors** (112 source files all passed)                                             |
 | ruff code check | **0 errors**                                                          |
 | Security tests     | **50 all passed** (SQL injection / XSS / path traversal / JWT / privilege escalation / input validation / rate limiting)         |
@@ -120,7 +120,7 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50 security tests
 | Product tier     | Basic (local free) / Pro (gateway relay) / Mini-program (mobile) / Custom (team)                      |
 | Overall progress     | **89%** (Basic E2E 81/0/0 zero skip achieved)                              |
 
-> **Layered coverage note**: The core algorithm layer (entity_resolution / todo_state_machine / promise_fulfillment / association_discovery / priority_scorer) has coverage higher than the project average of 88%, and does not depend on LLM — deterministic and reproducible.
+> **Layered coverage note**: The core algorithm layer (entity_resolution / todo_state_machine / promise_fulfillment / association_discovery / priority_scorer) has coverage higher than the project average of 89%, and does not depend on LLM — deterministic and reproducible.
 
 ---
 
@@ -187,7 +187,7 @@ graph LR
 | Capability | PromiseLink Basic Edition | Traditional CRM | SaaS AI-CRM |
 |------|-------------------|----------|-------------|
 | Local offline operation | ✅ No Docker | ⚠️ Some require Docker | ❌ Must be online |
-| Core algorithm does not depend on LLM | ✅ Pure algorithm | ✅ No LLM | ❌ Full-chain dependency |
+| Core algorithm main logic is pure algorithm (with optional LLM enhancement) | ✅ Main logic pure algorithm + optional LLM enhancement | ✅ No LLM | ❌ Full-chain dependency |
 | Promise / Todo relationship tracking | ✅ 6-type Todo state machine | ❌ Tasks only | ⚠️ Simple |
 | Association discovery | ✅ 3 strategies | ❌ | ⚠️ LLM-generated |
 | Data ownership | ✅ 100% local SQLite | ⚠️ | ❌ Cloud |
@@ -241,7 +241,7 @@ PromiseLink/
 │   ├── prompts/                # LLM Prompt templates
 │   └── main.py                 # FastAPI entry
 ├── docs/                       # Documentation
-├── tests/                      # Tests (67 files / 1907 cases)
+├── tests/                      # Tests (67 files / 1953 cases)
 ├── data/                       # SQLite data storage
 ├── scripts/                    # One-click install/start scripts + E2E tests
 └── frontend/                   # Taro H5 frontend
@@ -287,7 +287,7 @@ PromiseLink/
 - [x] DataSourceAdapter abstraction layer (manual / CSV; voice / WeChat / email are Pro edition features)
 - [x] CarryMem protocol decoupling (NullMemoryProvider graceful degradation)
 - [x] Encryption system (HMAC-SHA256 + field-level encryption + row-level security)
-- [x] 67 test files / **1907 test cases** (incl. 50 relay_client robustness + 12 v5.6 corrections + 6 real LLM E2E) / **88% coverage**
+- [x] 67 test files / **1953 test cases** (incl. 50 relay_client robustness + 12 v5.6 corrections + 6 real LLM E2E) / **89% coverage**
 - [x] CI/CD + Alembic ready
 - [x] PoC Demo 4/4 scenarios passed
 - [x] One-click install / start scripts (run locally directly, no Docker required)

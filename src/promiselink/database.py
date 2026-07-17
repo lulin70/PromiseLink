@@ -205,7 +205,10 @@ def get_pipeline_lock(user_id: str = "") -> asyncio.Lock:
     Pipeline entry points should acquire this lock before processing events
     to prevent concurrent SQLite write operations that cause data loss.
     Per-user locking allows different users to process events concurrently.
-    For PostgreSQL (Phase 1+), this lock can be removed.
+
+    Note: SQLite is the long-term storage for the local base edition
+    (see Database_Design_v1.md §30). This lock remains required to avoid
+    "database is locked" errors under concurrent pipeline writes.
     """
     if user_id not in _pipeline_locks:
         _pipeline_locks[user_id] = asyncio.Lock()

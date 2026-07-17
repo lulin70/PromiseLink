@@ -11,6 +11,7 @@ import {
   ReminderPreferenceResponse,
 } from '../../services/api'
 import { isLoggedIn } from '../../services/auth'
+import LoginGate from '../../components/LoginGate'
 import './index.scss'
 
 // 4 级优先级分组（1.3 提醒页核心信息架构）
@@ -205,18 +206,13 @@ export default function RemindersPage() {
     updatePrefDraft('preferred_times', times)
   }
 
-  // ── Login inline ──
+  // ── Login redirect ──
   if (showLogin) {
     return (
-      <View className='page-reminders login-inline'>
-        <View className='login-card'>
-          <Text className='login-title'>PromiseLink</Text>
-          <Text className='login-subtitle'>请先登录以查看今日提醒</Text>
-          <View className='login-btn' onClick={() => { setShowLogin(false); Taro.reLaunch({ url: '/pages/index/index' }) }}>
-            <Text className='login-btn-text'>返回首页登录</Text>
-          </View>
-        </View>
-      </View>
+      <LoginGate
+        showBackHomeButton
+        subtitle='请先登录以查看今日提醒'
+      />
     )
   }
 

@@ -3,18 +3,8 @@
   background-color: #f5f5f5;
   padding-bottom: 120px;
 
-  .page-login-inline {
-    min-height: 100vh; display: flex; align-items: center; justify-content: center;
-    background: linear-gradient(135deg, #7B9EA8 0%, #5B838F 100%); padding: 40px;
-    .login-card { width: 100%; background: #fff; border-radius: 24px; padding: 60px 40px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); }
-    .login-title { font-size: 40px; font-weight: bold; color: #7B9EA8; display: block; text-align: center; }
-    .form-group { margin-bottom: 28px; .label { font-size: 26px; color: #666; margin-bottom: 12px; display: block; } .input { width: 100%; height: 80px; border: 2px solid #d9d9d9; border-radius: 12px; padding: 0 20px; font-size: 28px; box-sizing: border-box; } }
-    .error-text { color: #C4A7A0; font-size: 24px; display: block; margin-bottom: 16px; text-align: center; }
-    .login-btn { width: 100%; height: 88px; background: #7B9EA8; border-radius: 12px; display: flex; align-items: center; justify-content: center; &.loading{opacity:0.6;} .login-btn-text{color:#fff;font-size:32px;} }
-  }
-
   .header {
-    background: #7B9EA8;
+    background: #A0B0C4;
     padding: 40px 30px 30px;
     color: #fff;
 
@@ -77,7 +67,7 @@
 
       .avatar-text {
         font-size: 32px;
-        color: #7B9EA8;
+        color: #A0B0C4;
         font-weight: bold;
       }
     }
@@ -207,9 +197,9 @@
         .view-detail-btn {
           display: inline-block;
           font-size: 26px;
-          color: #7B9EA8;
+          color: #A0B0C4;
           padding: 10px 24px;
-          border: 1px solid #7B9EA8;
+          border: 1px solid #A0B0C4;
           border-radius: 8px;
           cursor: pointer;
           margin-top: 12px;
@@ -228,7 +218,7 @@
           .detail-edit-input {
             flex: 1;
             height: 56px;
-            border: 1px solid #7B9EA8;
+            border: 1px solid #A0B0C4;
             border-radius: 8px;
             padding: 0 12px;
             font-size: 26px;
@@ -237,7 +227,7 @@
 
           .detail-edit-save {
             font-size: 24px;
-            color: #7B9EA8;
+            color: #A0B0C4;
             padding: 8px 16px;
             background: #E8EEF0;
             border-radius: 8px;
@@ -321,7 +311,7 @@
     .dormant-entry-text {
       font-size: 28px;
       font-weight: bold;
-      color: #7B9EA8;
+      color: #A0B0C4;
     }
     .dormant-entry-desc {
       font-size: 22px;
@@ -396,7 +386,7 @@
     border-radius: 12px;
     padding: 20px;
     margin-bottom: 12px;
-    border-left: 4px solid #7B9EA8;
+    border-left: 4px solid #A0B0C4;
 
     .dormant-card-top {
       display: flex;
@@ -407,7 +397,7 @@
 
     .dormant-avatar {
       width: 56px; height: 56px;
-      background: #7B9EA8;
+      background: #A0B0C4;
       border-radius: 28px;
       display: flex; align-items: center; justify-content: center;
 
@@ -485,7 +475,7 @@
 
         &.grade-Ap { background: linear-gradient(135deg, #C4A7A0, #A88A82); }
         &.grade-A { background: #A0C4A8; }
-        &.grade-B { background: #7B9EA8; }
+        &.grade-B { background: #A0B0C4; }
         &.grade-C { background: #C4C0A0; }
         &.grade-D { background: #C4A7A0; }
       }
@@ -501,7 +491,7 @@
       .credit-fill {
         height: 100%;
         border-radius: 6px;
-        background: linear-gradient(90deg, #A0C4A8, #73d13d);
+        background: linear-gradient(90deg, #A0C4A8, #8FB098);
         transition: width 0.3s ease;
       }
     }
@@ -595,16 +585,6 @@
 @media screen and (min-width: 1024PX) {
   .page-entities {
     padding-bottom: 24px;
-
-    // Inline login
-    .page-login-inline {
-      padding: 20px;
-      .login-card { padding: 32px 28px; border-radius: 12px; max-width: 420px; margin: 0 auto; }
-      .login-title { font-size: 20px; }
-      .form-group { margin-bottom: 16px; .label { font-size: 13px; margin-bottom: 6px; } .input { height: 40px; border-radius: 6px; padding: 0 12px; font-size: 14px; border-width: 1px; } }
-      .error-text { font-size: 12px; }
-      .login-btn { height: 44px; border-radius: 6px; .login-btn-text { font-size: 16px; } }
-    }
 
     .header { padding: 16px 24px; .header-title { font-size: 18px; } }
 

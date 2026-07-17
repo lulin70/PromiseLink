@@ -1,97 +1,10 @@
-// ── Inline Login (shown when not authenticated) ──
-.page-login-inline {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #7B9EA8 0%, #5B838F 100%);
-  padding: 40px;
-
-  .login-card {
-    width: 100%;
-    background: #fff;
-    border-radius: 24px;
-    padding: 60px 40px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
-  }
-
-  .login-title {
-    font-size: 48px;
-    font-weight: bold;
-    color: #7B9EA8;
-    display: block;
-    text-align: center;
-  }
-
-  .login-subtitle {
-    font-size: 24px;
-    color: #6B6B6B;
-    display: block;
-    text-align: center;
-    margin-top: 8px;
-    margin-bottom: 48px;
-  }
-
-  .form-group {
-    margin-bottom: 28px;
-
-    .label {
-      font-size: 26px;
-      color: #666;
-      margin-bottom: 12px;
-      display: block;
-    }
-
-    .input {
-      width: 100%;
-      height: 80px;
-      border: 2px solid #d9d9d9;
-      border-radius: 12px;
-      padding: 0 20px;
-      font-size: 28px;
-      box-sizing: border-box;
-    }
-  }
-
-  .error-text {
-    color: #C4A7A0;
-    font-size: 24px;
-    display: block;
-    margin-bottom: 16px;
-    text-align: center;
-  }
-
-  .login-btn {
-    width: 100%;
-    height: 88px;
-    background: #7B9EA8;
-    color: #fff;
-    font-size: 32px;
-    border-radius: 12px;
-    border: none;
-    margin-top: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    &.loading {
-      opacity: 0.6;
-    }
-
-    .login-btn-text {
-      color: #fff;
-      font-size: 32px;
-    }
-  }
-}
-
 .page-index {
   min-height: 100vh;
   background-color: #f5f5f5;
   padding-bottom: 120px;
 
   .header {
-    background: #7B9EA8;
+    background: #A0B0C4;
     padding: 40px 30px 30px;
     color: #fff;
 
@@ -259,7 +172,7 @@
 
       .event-time {
         font-size: 24px;
-        color: #7B9EA8;
+        color: #A0B0C4;
         font-weight: 500;
       }
     }
@@ -282,7 +195,7 @@
 
       .event-todo-count {
         font-size: 22px;
-        color: #7B9EA8;
+        color: #A0B0C4;
         margin-top: 4px;
         display: block;
       }
@@ -355,7 +268,7 @@
     width: 100px;
     height: 100px;
     border-radius: 50%;
-    background: #7B9EA8;
+    background: #A0B0C4;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -395,7 +308,7 @@
       .sd-demander {
         font-size: 28px;
         font-weight: bold;
-        color: #7B9EA8;
+        color: #A0B0C4;
       }
 
       .sd-arrow {
@@ -549,7 +462,7 @@
 
       .care-toggle {
         font-size: 22px;
-        color: #7B9EA8;
+        color: #A0B0C4;
       }
     }
 
@@ -635,21 +548,6 @@
 
 // ── Desktop overrides (≥1024px) ──
 @media screen and (min-width: 1024PX) {
-  // Inline login (not nested under .page-index in DOM)
-  .page-login-inline {
-    padding: 20px;
-    .login-card { padding: 32px 28px; border-radius: 12px; max-width: 420px; margin: 0 auto; }
-    .login-title { font-size: 24px; }
-    .login-subtitle { font-size: 13px; margin-bottom: 24px; }
-    .form-group {
-      margin-bottom: 16px;
-      .label { font-size: 13px; margin-bottom: 6px; }
-      .input { height: 40px; border-radius: 6px; padding: 0 12px; font-size: 14px; border-width: 1px; }
-    }
-    .error-text { font-size: 12px; margin-bottom: 8px; }
-    .login-btn { height: 44px; border-radius: 6px; .login-btn-text { font-size: 16px; } }
-  }
-
   .page-index {
     padding-bottom: 24px;
 

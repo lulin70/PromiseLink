@@ -16,7 +16,7 @@
 #   用户电脑（本脚本）         云端网关              手机微信小程序
 #   ┌─────────────────┐       ┌──────────┐         ┌──────────┐
 #   │ 基础版 Docker    │ ─WSS→ │ 网关     │ ←HTTP── │ 小程序   │
-#   │ localhost:8000  │       │ gateway. │         │ 扫码预览 │
+#   │ localhost:8000  │       │ www.     │         │ 扫码预览 │
 #   │ SQLite 数据     │       │ promisel │         └──────────┘
 #   └─────────────────┘       │ ink.cn   │
 #                             └──────────┘
@@ -24,8 +24,9 @@
 set -e
 
 # 默认配置：网关地址优先读环境变量，否则用正式域名
+# 注：SSL 证书当前仅覆盖 www.promiselink.cn，gateway.promiselink.cn 待申请独立证书
 # ICP 备案完成前，用户运行脚本时可手动输入临时地址
-DEFAULT_GATEWAY_URL="${GATEWAY_URL:-https://gateway.promiselink.cn}"
+DEFAULT_GATEWAY_URL="${GATEWAY_URL:-https://www.promiselink.cn}"
 DEFAULT_IMAGE="ghcr.io/lulin70/promiselink:0.8.0"
 INSTALL_DIR="${PROMISELINK_INSTALL_DIR:-$HOME/promiselink}"
 
@@ -266,11 +267,13 @@ echo "  浏览器打开: http://localhost:8000"
 echo "  PoC 登录密码: $(grep POC_SECRET .env.basic | cut -d= -f2)"
 echo ""
 echo "【手机小程序访问】"
-echo "  1. 在 PC 上安装微信开发者工具："
-echo "     https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html"
-echo "  2. 用 AppID wxa8704555bc066773 导入项目"
-echo "  3. 点击'预览'生成二维码"
-echo "  4. 手机微信扫码即可在小程序中访问本地数据"
+echo "  无需任何技术操作，只需："
+echo "  1. 用手机微信扫描我们发给你的'体验版二维码'"
+echo "     （我们会通过微信直接发给你）"
+echo "  2. 点击'前往体验版'即可打开 PromiseLink 小程序"
+echo "  3. 小程序会自动连接到你电脑上刚装好的基础版"
+echo ""
+echo "  注意：保持电脑开机且 Docker 运行，小程序才能访问本地数据。"
 echo ""
 echo "【常用命令】"
 echo "  查看日志:   docker compose logs -f"

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { View, Text, Input, ScrollView } from '@tarojs/components'
-import { getEntities, getEntityDetail, getEntityHistory, login as apiLogin, EntityResponse, EntityDetailResponse, EntityHistoryResponse, DormantContactItem, getDormantContacts, CreditScoreResponse, getCreditScore, StageInfoResponse, getStageInfo, dismissTodo, updateEntity, deleteEntity } from '../../services/api'
-import { isLoggedIn, setToken, setUserId, saveLoginCredentials } from '../../services/auth'
+import { getEntities, getEntityDetail, getEntityHistory, EntityResponse, EntityDetailResponse, EntityHistoryResponse, DormantContactItem, getDormantContacts, CreditScoreResponse, getCreditScore, StageInfoResponse, getStageInfo, dismissTodo, updateEntity, deleteEntity } from '../../services/api'
+import { isLoggedIn } from '../../services/auth'
 import { NAV_EVENTS, navigateToEvent, navigateToEntityDetail } from '../../services/navigation'
 import Taro from '@tarojs/taro'
+import LoginGate from '../../components/LoginGate'
 import './index.scss'
 
 export default function EntitiesPage() {
@@ -15,9 +16,6 @@ export default function EntitiesPage() {
   const [detail, setDetail] = useState<EntityDetailResponse | null>(null)
   // Inline login
   const [showLogin, setShowLogin] = useState(false)
-  const [loginSecret, setLoginSecret] = useState('')
-  const [loginLoading, setLoginLoading] = useState(false)
-  const [loginError, setLoginError] = useState('')
   // F-E3: Dormant contacts state
   const [showDormant, setShowDormant] = useState(false)
   const [dormantContacts, setDormantContacts] = useState<DormantContactItem[]>([])
@@ -46,32 +44,15 @@ export default function EntitiesPage() {
     }
   }, [])
 
-  async function handleInlineLogin() {
-    if (!loginSecret.trim()) { setLoginError('请输入PoC密钥'); return }
-    try {
-      setLoginLoading(true); setLoginError('')
-      const res = await apiLogin(loginSecret.trim())
-      setToken(res.access_token); setUserId(res.user_id || 'poc-user')
-      saveLoginCredentials(loginSecret.trim()); setShowLogin(false); loadEntities()
-    } catch (err: unknown) { setLoginError('登录失败: ' + (err instanceof Error ? err.message : String(err))) }
-    finally { setLoginLoading(false) }
-  }
-
   if (showLogin) {
     return (
-      <View className='page-login-inline'>
-        <View className='login-card'>
-          <Text className='login-title'>需要登录</Text>
-          <View className='form-group'>
-            <Text className='label'>PoC 密钥</Text>
-            <Input className='input' type='safe-password' value={loginSecret} onInput={e => setLoginSecret(e.detail.value)} placeholder='请输入 PoC Secret' />
-          </View>
-          {loginError ? <Text className='error-text'>{loginError}</Text> : null}
-          <View className={`login-btn ${loginLoading?'loading':''}`} onClick={loginLoading?undefined:handleInlineLogin}>
-            <Text className='login-btn-text'>{loginLoading?'登录中...':'登 录'}</Text>
-          </View>
-        </View>
-      </View>
+      <LoginGate
+        title='需要登录'
+        onLoginSuccess={() => {
+          setShowLogin(false)
+          loadEntities()
+        }}
+      />
     )
   }
 

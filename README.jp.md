@@ -10,8 +10,8 @@
   <a href="https://promiselink.cn"><img src="https://img.shields.io/badge/🌐_官网-promiselink.cn-blue?style=for-the-badge" alt="Website"></a>
   <br/>
   <a href="https://github.com/lulin70/PromiseLink/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/lulin70/PromiseLink/ci.yml?branch=main&label=CI&logo=github" alt="CI"></a>
-  <img src="https://img.shields.io/badge/tests-1858%20passed-brightgreen" alt="Tests">
-  <img src="https://img.shields.io/badge/coverage-88%25-green" alt="Coverage">
+  <img src="https://img.shields.io/badge/tests-1904%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/coverage-89%25-green" alt="Coverage">
   <img src="https://img.shields.io/badge/mypy-0%20errors-brightgreen" alt="mypy">
   <img src="https://img.shields.io/badge/ruff-0%20errors-brightgreen" alt="ruff">
   <img src="https://img.shields.io/badge/security-50%20tests%20passed-blue" alt="Security">
@@ -25,7 +25,7 @@
 > イベント入力 → エンティティ抽出 → Todo生成 → 約束追跡 → 関連発見 → ダッシュボード、というコアループを提供します。
 >
 > **アーキテクチャの階層化**:
-> - **コアアルゴリズム層**（エンティティ正規化 / Todo状態機械 / 約束履行 / 関連発見 / 動的スコアリング）— **純粋なアルゴリズム実装であり、LLMに依存しない**、オフラインで動作、監査可能、再現可能
+> - **コアアルゴリズム層**（エンティティ正規化 / Todo状態機械 / 約束履行 / 関連発見 / 動的スコアリング）— **メインロジックは純粋なアルゴリズム実装**（NetworkX + RapidFuzz + numpy）、オプションのLLM拡張次元あり（entity_resolution 第5歩 llm_reasoning / promise_fulfillment の llm_semantic 次元）、いずれも完全な縮退メカニズム付き（PoCでは重み0.0）、オフライン動作、監査可能、再現可能
 > - **LLM拡張層**（エンティティ抽出 / NLG応答生成）— 任意のLLM拡張、`LLM_API_KEY`の設定が必要（Moka AI / OpenAI / Anthropic からいずれか一つ）
 >
 > **含まれないもの**: 音声入力、音声クエリ、メール同期、WeChat転送、OCR名刺スキャン、プライベートデータ管理 — これらはプロ版の機能です。
@@ -40,8 +40,8 @@
 
 | 利点 | データによる証明 | 従来のCRMとの比較 |
 |------|---------|-------------|
-| 🏭 **産業グレードの品質** | 1858 テスト合格 / 88% カバレッジ / mypy 0 / ruff 0 / 50 セキュリティテスト / 17 パフォーマンステスト | 多くのオープンソースCRMはカバレッジ 30% 未満 |
-| 🧠 **コアアルゴリズム層はLLMに依存しない** | エンティティ正規化 / Todo状態機械 / 約束履行 / 関連発見 / 動的スコアリング — 純粋なアルゴリズム実装（NetworkX + RapidFuzz + numpy）、オフライン動作、監査可能 | 主要なAI-CRMは全工程でGPT APIに依存 |
+| 🏭 **産業グレードの品質** | 1904 テスト合格 / 89% カバレッジ / mypy 0 / ruff 0 / 50 セキュリティテスト / 17 パフォーマンステスト | 多くのオープンソースCRMはカバレッジ 30% 未満 |
+| 🧠 **コアアルゴリズム層のメインロジックは純粋アルゴリズム** | エンティティ正規化 / Todo状態機械 / 約束履行 / 関連発見 / 動的スコアリング — メインロジックは純粋なアルゴリズム実装（NetworkX + RapidFuzz + numpy）、オプションのLLM拡張次元あり（いずれも縮退メカニズム付き）、オフライン動作、監査可能 | 主要なAI-CRMは全工程でGPT APIに依存 |
 | 🚀 **ポータブル・ゼロデプロイ** | `pip install -e .` + `bash scripts/start.sh` ですぐ利用可能、Docker / K8s 不要 | 同種ツールは docker-compose が必要 |
 
 > **誠実な開示**: エンティティ抽出、NLG応答生成などは `LLM_API_KEY` の設定が必要です。コアの関係構築アルゴリズム（5モジュール）は純粋なアルゴリズム実装であり、LLMが利用できない場合でもコアループは縮退運転できます。
@@ -96,7 +96,7 @@ bash scripts/start.sh
 git clone https://github.com/lulin70/PromiseLink
 cd PromiseLink
 pip install -e '.[dev]'
-pytest --co -q | tail -1   # 1907 tests collected と表示されるはず
+pytest --co -q | tail -1   # 1953 tests collected と表示されるはず
 pytest tests/test_security_comprehensive.py -q --no-cov   # 50件のセキュリティテスト
 ```
 
@@ -106,8 +106,8 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50件のセキュリ
 
 | 指標       | 値                                                               |
 | -------- | ---------------------------------------------------------------- |
-| テストケース     | **1858 passed**, 49 skipped, 0 failed（50件の relay_client 堅牢性 + 12件の v5.6 修正 + 50セキュリティ + 17パフォーマンス + 6件のリアル LLM E2E を含む） |
-| コードカバレッジ    | **88%**                                                          |
+| テストケース     | **1904 passed**, 49 skipped, 0 failed（50件の relay_client 堅牢性 + 12件の v5.6 修正 + 50セキュリティ + 17パフォーマンス + 6件のリアル LLM E2E を含む） |
+| コードカバレッジ    | **89%**                                                          |
 | mypy 型チェック | **0 エラー**（112ソースファイルすべて合格）                                             |
 | ruff リント | **0 エラー**                                                          |
 | セキュリティテスト     | **50件すべて合格**（SQLインジェクション / XSS / パストラバーサル / JWT / 権限昇格 / 入力バリデーション / レートリミット）         |
@@ -120,7 +120,7 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50件のセキュリ
 | 製品階層     | 基本版（ローカル無料） / プロ版（ゲートウェイ中継） / ミニプログラム（モバイル縦画面） / カスタム版（チーム）                      |
 | 全体進捗     | **89%** (基本版 E2E 81/0/0 零 skip 達成)                              |
 
-> **階層別カバレッジに関する注記**: コアアルゴリズム層（entity_resolution / todo_state_machine / promise_fulfillment / association_discovery / priority_scorer）は、プロジェクト平均の88%より高いカバレッジを持ち、LLMに依存せず、決定論的で再現可能です。
+> **階層別カバレッジに関する注記**: コアアルゴリズム層（entity_resolution / todo_state_machine / promise_fulfillment / association_discovery / priority_scorer）は、プロジェクト平均の89%より高いカバレッジを持ち、LLMに依存せず、決定論的で再現可能です。
 
 ---
 
@@ -187,7 +187,7 @@ graph LR
 | 能力 | PromiseLink 基本版 | 従来のCRM | SaaS AI-CRM |
 |------|-------------------|----------|-------------|
 | ローカルオフライン動作 | ✅ Docker不要 | ⚠️ 一部はDocker必要 | ❌ オンライン必須 |
-| コアアルゴリズムがLLMに依存しない | ✅ 純粋アルゴリズム | ✅ LLMなし | ❌ 全工程依存 |
+| コアアルゴリズムのメインロジックは純粋アルゴリズム（オプションLLM拡張付き） | ✅ メインロジック純粋アルゴリズム + オプションLLM拡張 | ✅ LLMなし | ❌ 全工程依存 |
 | 約束 / Todo関係追跡 | ✅ 6種Todo状態機械 | ❌ タスクのみ | ⚠️ 単純 |
 | 関連発見 | ✅ 3戦略 | ❌ | ⚠️ LLM生成 |
 | データ所有権 | ✅ 100% ローカルSQLite | ⚠️ | ❌ クラウド |
@@ -241,7 +241,7 @@ PromiseLink/
 │   ├── prompts/                # LLM Promptテンプレート
 │   └── main.py                 # FastAPIエントリ
 ├── docs/                       # ドキュメント
-├── tests/                      # テスト（67ファイル / 1907ケース）
+├── tests/                      # テスト（67ファイル / 1953ケース）
 ├── data/                       # SQLiteデータストレージ
 ├── scripts/                    # ワンクリックインストール/起動スクリプト + E2Eテスト
 └── frontend/                   # Taro H5フロントエンド
@@ -287,7 +287,7 @@ PromiseLink/
 - [x] DataSourceAdapter 抽象層（手動 / CSV；音声 / WeChat / メールはプロ版の機能）
 - [x] CarryMem プロトコル分離（NullMemoryProvider グレースフルデグラデーション）
 - [x] 暗号化体系（HMAC-SHA256 + フィールドレベル暗号化 + 行レベルセキュリティ）
-- [x] 67 テストファイル / **1907 テストケース**（50件の relay_client 堅牢性 + 12件の v5.6 修正 + 6件のリアル LLM E2E を含む）/ **88% カバレッジ**
+- [x] 67 テストファイル / **1953 テストケース**（50件の relay_client 堅牢性 + 12件の v5.6 修正 + 6件のリアル LLM E2E を含む）/ **89% カバレッジ**
 - [x] CI/CD + Alembic 対応完了
 - [x] PoC Demo 4/4 シナリオ合格
 - [x] ワンクリックインストール / 起動スクリプト（ローカルで直接実行、Docker不要）

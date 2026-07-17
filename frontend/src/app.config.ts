@@ -15,7 +15,7 @@ export default defineAppConfig({
   ],
   tabBar: {
     color: '#8a8a8a',
-    selectedColor: '#7B9EA8',
+    selectedColor: '#A0B0C4',
     backgroundColor: '#ffffff',
     borderStyle: 'white',
     list: [
@@ -53,7 +53,7 @@ export default defineAppConfig({
   },
   window: {
     backgroundTextStyle: 'light',
-    navigationBarBackgroundColor: '#7B9EA8',
+    navigationBarBackgroundColor: '#A0B0C4',
     navigationBarTitleText: 'PromiseLink 基础版',
     navigationBarTextStyle: 'white',
   },

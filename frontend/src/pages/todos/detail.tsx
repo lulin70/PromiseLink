@@ -26,8 +26,8 @@ const TYPE_LABELS: Record<string, string> = {
 
 const PRIORITY_MAP: Record<number, { label: string; color: string }> = {
   1: { label: '紧急', color: '#C4A7A0' },
-  2: { label: '高', color: '#fa8c16' },
-  3: { label: '中', color: '#7B9EA8' },
+  2: { label: '高', color: '#C4B0A0' },
+  3: { label: '中', color: '#A0B0C4' },
   4: { label: '低', color: '#999' },
   5: { label: '低', color: '#d9d9d9' },
 }

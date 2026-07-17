@@ -8,8 +8,8 @@
   <a href="https://promiselink.cn"><img src="https://img.shields.io/badge/🌐_官网-promiselink.cn-blue?style=for-the-badge" alt="Website"></a>
   <br/>
   <a href="https://github.com/lulin70/PromiseLink/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/lulin70/PromiseLink/ci.yml?branch=main&label=CI&logo=github" alt="CI"></a>
-  <img src="https://img.shields.io/badge/tests-1858%20passed-brightgreen" alt="Tests">
-  <img src="https://img.shields.io/badge/coverage-88%25-green" alt="Coverage">
+  <img src="https://img.shields.io/badge/tests-1904%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/coverage-89%25-green" alt="Coverage">
   <img src="https://img.shields.io/badge/mypy-0%20errors-brightgreen" alt="mypy">
   <img src="https://img.shields.io/badge/ruff-0%20errors-brightgreen" alt="ruff">
   <img src="https://img.shields.io/badge/security-50%20tests%20passed-blue" alt="Security">
@@ -23,7 +23,7 @@
 > 提供事件录入 → 实体提取 → Todo 生成 → 承诺追踪 → 关联发现 → 仪表盘的核心闭环。
 >
 > **架构分层**：
-> - **核心算法层**（实体归一 / Todo 状态机 / 承诺履行 / 关联发现 / 动态评分）— **纯算法实现，不依赖 LLM**，可离线运行、可审计、可复现
+> - **核心算法层**（实体归一 / Todo 状态机 / 承诺履行 / 关联发现 / 动态评分）— **主逻辑纯算法实现**（NetworkX + RapidFuzz + numpy），含可选 LLM 增强维度（entity_resolution 第5步 llm_reasoning / promise_fulfillment 的 llm_semantic 维度），均具备完整降级机制（PoC 中权重为 0.0），可离线运行、可审计、可复现
 > - **LLM 增强层**（实体提取 / NLG 响应生成）— 可选 LLM 增强，需配置 `LLM_API_KEY`（Moka AI / OpenAI / Anthropic 任选）
 >
 > **不含**语音输入、语音查询、邮件同步、微信转发、OCR 名片扫描、隐私数据管理等专业版功能。
@@ -38,8 +38,8 @@
 
 | 优势 | 数据证明 | 对比传统 CRM |
 |------|---------|-------------|
-| 🏭 **工业级质量** | 1858 测试通过 / 88% 覆盖率 / mypy 0 / ruff 0 / 50 安全测试 / 17 性能测试 | 多数开源 CRM < 30% 覆盖率 |
-| 🧠 **核心算法层不依赖 LLM** | 实体归一 / Todo 状态机 / 承诺履行 / 关联发现 / 动态评分 — 纯算法实现（NetworkX + RapidFuzz + numpy），可离线运行、可审计 | 主流 AI-CRM 全链路依赖 GPT API |
+| 🏭 **工业级质量** | 1904 测试通过 / 89% 覆盖率 / mypy 0 / ruff 0 / 50 安全测试 / 17 性能测试 | 多数开源 CRM < 30% 覆盖率 |
+| 🧠 **核心算法层主逻辑纯算法** | 实体归一 / Todo 状态机 / 承诺履行 / 关联发现 / 动态评分 — 主逻辑纯算法实现（NetworkX + RapidFuzz + numpy），含可选 LLM 增强维度（均具备降级机制），可离线运行、可审计 | 主流 AI-CRM 全链路依赖 GPT API |
 | 🚀 **便携零部署** | `pip install -e .` + `bash scripts/start.sh` 即用，无需 Docker / K8s | 同类工具需 docker-compose |
 
 > **诚实声明**：实体提取、NLG 响应生成等环节需配置 `LLM_API_KEY`；核心关系经营算法（5 大模块）为纯算法实现，LLM 不可用时核心闭环仍可降级运行。
@@ -94,7 +94,7 @@ bash scripts/start.sh
 git clone https://github.com/lulin70/PromiseLink
 cd PromiseLink
 pip install -e '.[dev]'
-pytest --co -q | tail -1   # 应显示 1907 tests collected
+pytest --co -q | tail -1   # 应显示 1953 tests collected
 pytest tests/test_security_comprehensive.py -q --no-cov   # 50 项安全测试
 ```
 
@@ -104,8 +104,8 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50 项安全测试
 
 | 指标       | 数值                                                               |
 | -------- | ---------------------------------------------------------------- |
-| 测试用例     | **1858 passed**, 49 skipped, 0 failed (含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏 + 50 安全 + 17 性能 + 6 真实 LLM E2E) |
-| 代码覆盖率    | **88%**                                                          |
+| 测试用例     | **1904 passed**, 49 skipped, 0 failed (含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏 + 50 安全 + 17 性能 + 6 真实 LLM E2E) |
+| 代码覆盖率    | **89%**                                                          |
 | mypy 类型检查 | **0 错误** (112 源文件全部通过)                                             |
 | ruff 代码检查 | **0 错误**                                                          |
 | 安全测试     | **50 项全通过** (SQL 注入 / XSS / 路径遍历 / JWT / 越权 / 输入验证 / 速率限制)         |
@@ -118,7 +118,7 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50 项安全测试
 | 产品层级     | 基础版(本地免费) / 专业版(网关中继) / 小程序(手机竖屏) / 定制版(团队)                      |
 | 总体进度     | **89%** (基础版 E2E 81/0/0 零 skip 达成)                              |
 
-> **分层覆盖率提示**：核心算法层（entity_resolution / todo_state_machine / promise_fulfillment / association_discovery / priority_scorer）覆盖率高于项目平均 88%，且不依赖 LLM，确定性可复现。
+> **分层覆盖率提示**：核心算法层（entity_resolution / todo_state_machine / promise_fulfillment / association_discovery / priority_scorer）覆盖率高于项目平均 89%，主逻辑纯算法实现（含可选 LLM 增强维度），确定性可复现。
 
 ---
 
@@ -185,7 +185,7 @@ graph LR
 | 能力 | PromiseLink 基础版 | 传统 CRM | SaaS AI-CRM |
 |------|-------------------|----------|-------------|
 | 本地离线运行 | ✅ 无需 Docker | ⚠️ 部分需 Docker | ❌ 必须联网 |
-| 核心算法不依赖 LLM | ✅ 纯算法实现 | ✅ 无 LLM | ❌ 全链路依赖 |
+| 核心算法主逻辑纯算法（含可选 LLM 增强维度） | ✅ 主逻辑纯算法 + 可选 LLM 增强 | ✅ 无 LLM | ❌ 全链路依赖 |
 | 承诺 / Todo 关系追踪 | ✅ 6 类 Todo 状态机 | ❌ 仅任务 | ⚠️ 简单 |
 | 关联发现 | ✅ 3 策略 | ❌ | ⚠️ LLM 生成 |
 | 数据所有权 | ✅ 100% 本地 SQLite | ⚠️ | ❌ 云端 |
@@ -239,7 +239,7 @@ PromiseLink/
 │   ├── prompts/                # LLM Prompt 模板
 │   └── main.py                 # FastAPI 入口
 ├── docs/                       # 文档体系
-├── tests/                      # 测试（67 个文件 / 1907 用例）
+├── tests/                      # 测试（67 个文件 / 1953 用例）
 ├── data/                       # SQLite 数据存储
 ├── scripts/                    # 一键安装/启动脚本 + E2E 测试
 └── frontend/                   # Taro H5 前端
@@ -285,7 +285,7 @@ PromiseLink/
 - [x] DataSourceAdapter 抽象层（手动 / CSV；语音 / 微信 / 邮件为专业版功能）
 - [x] CarryMem 协议解耦（NullMemoryProvider 优雅降级）
 - [x] 加密体系（HMAC-SHA256 + 字段级加密 + 行级安全）
-- [x] 67 个测试文件 / **1907 测试用例**（含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏 + 6 真实 LLM E2E）/ **88% 覆盖率**
+- [x] 67 个测试文件 / **1953 测试用例**（含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏 + 6 真实 LLM E2E）/ **89% 覆盖率**
 - [x] CI/CD + Alembic 就绪
 - [x] PoC Demo 4/4 场景通过
 - [x] 一键安装 / 启动脚本（本地直接运行，无需 Docker）

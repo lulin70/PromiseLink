@@ -130,7 +130,9 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
     # Serialize pipeline executions to prevent SQLite "database is locked" errors.
     # Per-user locking allows different users to process events concurrently.
     # Real-world usage is sequential (events happen at different times), so this
-    # does not impact user experience. For PostgreSQL (Phase 1+), remove this lock.
+    # does not impact user experience. SQLite is the long-term storage for the
+    # local base edition (see Database_Design_v1.md §30); this lock remains
+    # required.
 
     # Resolve user_id for per-user locking
     _resolved_user_id = ""

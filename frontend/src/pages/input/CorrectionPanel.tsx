@@ -774,8 +774,8 @@ export default function CorrectionPanel({
                 <View className='todo-field'>
                   <Text className='field-label'>方向</Text>
                   <RadioGroup onChange={e => setNewPromiseType(e.detail.value as 'my_promise' | 'their_promise')}>
-                    <Radio value='my_promise' checked={newPromiseType === 'my_promise'} color='#7B9EA8'>我答应</Radio>
-                    <Radio value='their_promise' checked={newPromiseType === 'their_promise'} color='#7B9EA8'>对方答应</Radio>
+                    <Radio value='my_promise' checked={newPromiseType === 'my_promise'} color='#A0B0C4'>我答应</Radio>
+                    <Radio value='their_promise' checked={newPromiseType === 'their_promise'} color='#A0B0C4'>对方答应</Radio>
                   </RadioGroup>
                 </View>
                 <View className='todo-field'>

@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from 'react'
-import { View, Text, ScrollView, Input } from '@tarojs/components'
-import { getPromises, getPromiseStats, login as apiLogin, PromiseItem, PromiseStatsResponse, getPendingConfirmations, getNudgeDraft, updatePromiseStatus, confirmTodo } from '../../services/api'
-import { isLoggedIn, setToken, setUserId, saveLoginCredentials } from '../../services/auth'
+import { View, Text, ScrollView } from '@tarojs/components'
+import { getPromises, getPromiseStats, PromiseItem, PromiseStatsResponse, getPendingConfirmations, getNudgeDraft, updatePromiseStatus, confirmTodo } from '../../services/api'
+import { isLoggedIn } from '../../services/auth'
 import { navigateToEntity, navigateToEvent, navigateToPromiseDetail } from '../../services/navigation'
 import Taro from '@tarojs/taro'
+import LoginGate from '../../components/LoginGate'
 import './index.scss'
 
 const VIEW_TABS = [
@@ -42,9 +43,6 @@ export default function PromisesPage() {
   const [error, setError] = useState('')
   // Inline login
   const [showLogin, setShowLogin] = useState(false)
-  const [loginSecret, setLoginSecret] = useState('')
-  const [loginLoading, setLoginLoading] = useState(false)
-  const [loginError, setLoginError] = useState('')
   // F-E2: Nudge draft popup state
   const [nudgeTodoId, setNudgeTodoId] = useState<string | null>(null)
   const [nudgeText, setNudgeText] = useState('')
@@ -62,17 +60,6 @@ export default function PromisesPage() {
     }, 300)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [activeView, activeStatus, searchQuery])
-
-  async function handleInlineLogin() {
-    if (!loginSecret.trim()) { setLoginError('请输入PoC密钥'); return }
-    try {
-      setLoginLoading(true); setLoginError('')
-      const res = await apiLogin(loginSecret.trim())
-      setToken(res.access_token); setUserId(res.user_id || 'poc-user')
-      saveLoginCredentials(loginSecret.trim()); setShowLogin(false); loadData()
-    } catch (err: unknown) { setLoginError('登录失败: ' + (err instanceof Error ? err.message : String(err))) }
-    finally { setLoginLoading(false) }
-  }
 
   // F-E2: Generate nudge draft
   async function handleNudge(todoId: string) {
@@ -107,19 +94,13 @@ export default function PromisesPage() {
 
   if (showLogin) {
     return (
-      <View className='page-login-inline'>
-        <View className='login-card'>
-          <Text className='login-title'>需要登录</Text>
-          <View className='form-group'>
-            <Text className='label'>PoC 密钥</Text>
-            <Input className='input' type='safe-password' value={loginSecret} onInput={e => setLoginSecret(e.detail.value)} placeholder='请输入 PoC Secret' />
-          </View>
-          {loginError ? <Text className='error-text'>{loginError}</Text> : null}
-          <View className={`login-btn ${loginLoading?'loading':''}`} onClick={loginLoading?undefined:handleInlineLogin}>
-            <Text className='login-btn-text'>{loginLoading?'登录中...':'登 录'}</Text>
-          </View>
-        </View>
-      </View>
+      <LoginGate
+        title='需要登录'
+        onLoginSuccess={() => {
+          setShowLogin(false)
+          loadData()
+        }}
+      />
     )
   }
 

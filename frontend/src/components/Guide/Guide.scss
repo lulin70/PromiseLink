@@ -1,5 +1,5 @@
 // First-time user guide overlay — Morandi color palette
-// 雾蓝灰主色 #7B9EA8 / 米白背景 #F5F0EB / 深灰标题 #3D4E56 / 中灰正文 #6B7C85
+// 雾蓝灰主色 #A0B0C4 / 米白背景 #F5F0EB / 深灰标题 #3D4E56 / 中灰正文 #6B7C85
 
 .pl-guide-overlay {
   position: fixed;
@@ -96,7 +96,7 @@
     transition: all 0.2s;
 
     &.active {
-      background: #7B9EA8;
+      background: #A0B0C4;
       width: 20px;
       border-radius: 4px;
     }
@@ -126,7 +126,7 @@
 }
 
 .pl-guide-btn-primary {
-  background: #7B9EA8;
+  background: #A0B0C4;
 
   .pl-guide-btn-text {
     color: #ffffff;

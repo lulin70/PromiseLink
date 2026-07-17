@@ -561,7 +561,7 @@ export async function setupMockApi(page: Page): Promise<void> {
           name: entity.name,
           current_stage: 'active',
           current_stage_label: '活跃',
-          current_stage_color: '#7B9EA8',
+          current_stage_color: '#A0B0C4',
           current_stage_desc: '近期保持稳定联系',
           stage_order: 2,
           suggestion: {
