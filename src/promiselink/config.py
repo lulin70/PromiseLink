@@ -223,6 +223,18 @@ class Settings(BaseSettings):
         if self.app_env != "development":
             if not self.llm_api_key:
                 raise ValueError("llm_api_key must be set in non-development environments")
+            # P1-4: POC backdoor must be disabled in production
+            if self.poc_anonymous_access:
+                raise ValueError(
+                    "poc_anonymous_access must be False in non-development environments "
+                    "(security: POC anonymous access backdoor)"
+                )
+            # P1-4: allow_insecure_key must be disabled in production
+            if self.allow_insecure_key:
+                raise ValueError(
+                    "allow_insecure_key must be False in non-development environments "
+                    "(security: default secret key backdoor)"
+                )
         return self
 
 

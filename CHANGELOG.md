@@ -2,6 +2,39 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [0.8.1] - 2026-07-18
+
+### Fixed — P0-P2 系统优化 (2026-07-18)
+
+本次发版为 **PATCH 递增**（无新功能，仅 bug 修复 + 工程化改进 + 重构），由 DevSquad 7 角色达成共识后按项目生命周期推进。详见 `PromiseLink-Pro/docs/planning/P0_P2_OPTIMIZATION_PLAN_2026-07-17.md`。
+
+- **P1-3 association_discovery 进程内 LRU+TTL 缓存**：docstring 声明 "Redis cache for 1 hour" 但代码未实现，Cold 类型每次读时重算。用 `OrderedDict + time.monotonic()` 实现进程内 LRU+TTL 缓存（5min TTL，maxsize=128），符合基础版 local-first 架构。新增 `TestColdCache` 6 个测试（22 passed）。
+- **P1-4 POC 后门生产强制关闭**：`config.py` 的 `validate_production_settings` 新增 2 个 raise 检查 — 非 dev 环境启用 `poc_anonymous_access` 或 `allow_insecure_key` 时启动失败。新增 `tests/test_config.py` 9 个测试（59 passed 含 test_security_comprehensive）。
+
+### Docs — P2 文档同步 (2026-07-18)
+
+- **P2-7 docstring 漂移修复**：
+  - `association_discovery.py:3` "11 association types" → "12 association types"
+  - `association_discovery.py:15,375` Redis cache 声明 → 进程内 LRU
+  - `Entity` 模型 status 字段注释补充 4 态说明（provisional / confirmed / merged / deleted）
+- **P2-8 合规留存宣传**：README 新增"合规与数据留存"章节，引用《生成式人工智能服务管理暂行办法》第十七条，声明国内大模型对话日志 6 个月以上留存机制 + 数据主权承诺（基础版数据 100% 本地存储、不部署云端基础版）。
+
+### 版本号一致性
+
+更新所有版本号位置 0.8.0 → 0.8.1：
+- `VERSION` 文件
+- `frontend/package.json`
+- `docker-compose.prod.yml` 注释
+- `scripts/install_basic.sh` `DEFAULT_IMAGE`
+- `README.md` / `README.en.md` / `README.jp.md`
+
+### 生命周期
+
+- 7 角色（architect/security/tester/coder/devops/pm/ui）达成共识
+- 测试校验：22 passed（association_discovery）+ 59 passed（config + security）+ 1904 passed 全量无回归
+- 版本策略：PATCH 递增（无新功能，仅 bug 修复 + 工程化改进 + 重构）
+- 文档先行：活文档 `PromiseLink-Pro/docs/planning/P0_P2_OPTIMIZATION_PLAN_2026-07-17.md` 实时更新
+
 ## [Unreleased] - 2026-07-06
 
 ### Removed — 违规部署配置清理 (2026-07-12)

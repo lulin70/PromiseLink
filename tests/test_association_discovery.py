@@ -15,6 +15,22 @@ from promiselink.services.association_discovery import (
 from tests.conftest import create_test_event, make_user_id
 
 
+def _wrap_discoverers_with_counter(engine: AssociationDiscoveryEngine) -> dict[str, int]:
+    """Wrap every cold discoverer with a call counter.
+
+    Returns a dict mapping discoverer name to call count. The dict is shared
+    by all wrappers, so reading it after a call reflects the total invocations.
+    """
+    counts = {name: 0 for name in engine.cold_discoverers}
+    original = dict(engine.cold_discoverers)
+    for name, fn in original.items():
+        async def _counting(ea, eb, _fn=fn, _name=name):
+            counts[_name] += 1
+            return await _fn(ea, eb)
+        engine.cold_discoverers[name] = _counting
+    return counts
+
+
 async def _make_entity(
     session: AsyncSession,
     user_id: str,
@@ -421,3 +437,182 @@ class TestConstants:
             "topic_overlap", "supply_demand", "industry_chain",
         }
         assert VALID_ASSOCIATION_TYPES == expected
+
+
+# ── P1-3: In-process LRU+TTL cache ──
+
+
+class TestColdCache:
+    """Test in-process LRU+TTL cache for discover_cold_types (P1-3)."""
+
+    @pytest.mark.asyncio
+    async def test_cold_cache_miss_on_first_call(self, db_session):
+        """First call should miss cache and populate it."""
+        engine = AssociationDiscoveryEngine(db_session)
+        user_id = make_user_id()
+        a = await _make_entity(
+            db_session, user_id, "Alice",
+            properties={"basic": {"schools": ["清华大学"]}},
+        )
+        b = await _make_entity(
+            db_session, user_id, "Bob",
+            properties={"basic": {"schools": ["清华大学"]}},
+        )
+        await db_session.flush()
+
+        assert len(engine._cold_cache) == 0
+        results = await engine.discover_cold_types(a, b)
+        assert len(results) > 0  # alumni match
+        assert len(engine._cold_cache) == 1
+
+    @pytest.mark.asyncio
+    async def test_cold_cache_hit_on_second_call(self, db_session):
+        """Second call with same entities should hit cache (no recompute)."""
+        engine = AssociationDiscoveryEngine(db_session)
+        user_id = make_user_id()
+        a = await _make_entity(
+            db_session, user_id, "Alice",
+            properties={"basic": {"schools": ["清华大学"]}},
+        )
+        b = await _make_entity(
+            db_session, user_id, "Bob",
+            properties={"basic": {"schools": ["清华大学"]}},
+        )
+        await db_session.flush()
+
+        counts = _wrap_discoverers_with_counter(engine)
+
+        # First call — miss, should invoke discoverers
+        r1 = await engine.discover_cold_types(a, b)
+        first_total = sum(counts.values())
+        assert first_total > 0
+
+        # Second call — hit, should NOT invoke any discoverer
+        r2 = await engine.discover_cold_types(a, b)
+        assert sum(counts.values()) == first_total  # no new calls
+        assert r1 == r2
+
+    @pytest.mark.asyncio
+    async def test_cold_cache_key_order_independent(self, db_session):
+        """Cache key should be order-independent: (a,b) == (b,a)."""
+        engine = AssociationDiscoveryEngine(db_session)
+        user_id = make_user_id()
+        a = await _make_entity(
+            db_session, user_id, "Alice",
+            properties={"basic": {"schools": ["清华大学"]}},
+        )
+        b = await _make_entity(
+            db_session, user_id, "Bob",
+            properties={"basic": {"schools": ["清华大学"]}},
+        )
+        await db_session.flush()
+
+        counts = _wrap_discoverers_with_counter(engine)
+
+        await engine.discover_cold_types(a, b)
+        assert len(engine._cold_cache) == 1
+        first_total = sum(counts.values())
+
+        # Reversed order should hit the same cache entry
+        await engine.discover_cold_types(b, a)
+        assert len(engine._cold_cache) == 1
+        assert sum(counts.values()) == first_total  # no new calls
+
+    @pytest.mark.asyncio
+    async def test_cold_cache_ttl_expiry(self, db_session):
+        """Expired cache entry should be recomputed."""
+        from promiselink.services.association_discovery import _COLD_CACHE_TTL_SECONDS
+
+        engine = AssociationDiscoveryEngine(db_session)
+        user_id = make_user_id()
+        a = await _make_entity(
+            db_session, user_id, "Alice",
+            properties={"basic": {"schools": ["清华大学"]}},
+        )
+        b = await _make_entity(
+            db_session, user_id, "Bob",
+            properties={"basic": {"schools": ["清华大学"]}},
+        )
+        await db_session.flush()
+
+        # First call populates cache
+        r1 = await engine.discover_cold_types(a, b)
+        assert len(engine._cold_cache) == 1
+
+        # Backdate the cache entry to simulate TTL expiry
+        cache_key = tuple(sorted([str(a.id), str(b.id)]))
+        old_ts, cached_results = engine._cold_cache[cache_key]
+        engine._cold_cache[cache_key] = (old_ts - _COLD_CACHE_TTL_SECONDS - 1, cached_results)
+
+        counts = _wrap_discoverers_with_counter(engine)
+
+        # Second call should recompute (expired)
+        r2 = await engine.discover_cold_types(a, b)
+        assert sum(counts.values()) > 0  # discoverers were invoked
+        # Cache entry should be refreshed with a fresh timestamp
+        new_ts, _ = engine._cold_cache[cache_key]
+        assert new_ts > old_ts - _COLD_CACHE_TTL_SECONDS - 1
+        assert r1 == r2  # content equivalent
+
+    @pytest.mark.asyncio
+    async def test_clear_cache_empties_cache(self, db_session):
+        """clear_cache() should empty the cache; next call recomputes."""
+        engine = AssociationDiscoveryEngine(db_session)
+        user_id = make_user_id()
+        a = await _make_entity(
+            db_session, user_id, "Alice",
+            properties={"basic": {"schools": ["清华大学"]}},
+        )
+        b = await _make_entity(
+            db_session, user_id, "Bob",
+            properties={"basic": {"schools": ["清华大学"]}},
+        )
+        await db_session.flush()
+
+        await engine.discover_cold_types(a, b)
+        assert len(engine._cold_cache) == 1
+
+        engine.clear_cache()
+        assert len(engine._cold_cache) == 0
+
+        # Next call should recompute and repopulate
+        results = await engine.discover_cold_types(a, b)
+        assert len(results) > 0
+        assert len(engine._cold_cache) == 1
+
+    @pytest.mark.asyncio
+    async def test_cold_cache_lru_eviction(self, db_session):
+        """Cache should evict LRU entry when maxsize exceeded."""
+        from promiselink.services.association_discovery import _COLD_CACHE_MAXSIZE
+
+        engine = AssociationDiscoveryEngine(db_session)
+
+        # Stub all discoverers to avoid DB dependency for this logic test
+        async def _stub(ea, eb):
+            return 0.0, {}
+        for t in list(engine.cold_discoverers.keys()):
+            engine.cold_discoverers[t] = _stub
+
+        # Pre-fill cache to maxsize with dummy entries
+        for i in range(_COLD_CACHE_MAXSIZE):
+            engine._cold_cache[(f"old-{i:03d}", f"old-{i:03d}-b")] = (0.0, [])
+        assert len(engine._cold_cache) == _COLD_CACHE_MAXSIZE
+
+        # New call should evict the oldest (first inserted) entry
+        a = Entity(
+            id="new-a", user_id="u1", entity_type="person",
+            name="A", canonical_name="A", source_event_id="evt", status="confirmed",
+        )
+        b = Entity(
+            id="new-b", user_id="u1", entity_type="person",
+            name="B", canonical_name="B", source_event_id="evt", status="confirmed",
+        )
+        await engine.discover_cold_types(a, b)
+
+        # Size stays at maxsize (one evicted, one added)
+        assert len(engine._cold_cache) == _COLD_CACHE_MAXSIZE
+        # Oldest entry evicted
+        assert ("old-000", "old-000-b") not in engine._cold_cache
+        # New entry present
+        new_key = tuple(sorted(["new-a", "new-b"]))
+        assert new_key in engine._cold_cache

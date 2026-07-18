@@ -27,7 +27,7 @@ set -e
 # 注：SSL 证书当前仅覆盖 www.promiselink.cn，gateway.promiselink.cn 待申请独立证书
 # ICP 备案完成前，用户运行脚本时可手动输入临时地址
 DEFAULT_GATEWAY_URL="${GATEWAY_URL:-https://www.promiselink.cn}"
-DEFAULT_IMAGE="ghcr.io/lulin70/promiselink:0.8.0"
+DEFAULT_IMAGE="ghcr.io/lulin70/promiselink:0.8.1"
 INSTALL_DIR="${PROMISELINK_INSTALL_DIR:-$HOME/promiselink}"
 
 # 颜色输出

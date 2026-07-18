@@ -1,6 +1,6 @@
 """Association Discovery Engine — discovers relationships between entities.
 
-Implements 11 association types:
+Implements 12 association types:
 
 Structural types (exact field match):
   co_occurrence, same_city, ex_colleague, competitor,
@@ -12,7 +12,7 @@ Semantic types (LLM-assisted inference):
 Architecture (Phase 1):
   - **Incremental discovery**: Only process new/merged entities, not full rescan
   - **SQL pushdown**: same_city/same_company via SQL JOIN, not Python memory
-  - **Lazy discovery**: Low-frequency types computed on-demand with Redis cache
+  - **Lazy discovery**: Low-frequency types computed on-demand with in-process TTL cache
   - **Conflict resolution**: existing_pairs dedup + merge-triggered partial rescan
 
 Hot types (computed on write):
@@ -30,6 +30,8 @@ The implementation is split across companion modules:
 
 from __future__ import annotations
 
+import time
+from collections import OrderedDict
 from datetime import UTC, datetime
 from typing import Any, cast
 
@@ -54,6 +56,10 @@ CONFIRM_THRESHOLD = 0.70
 
 # Time decay: half-life of 180 days (6 months)
 DECAY_HALF_LIFE_DAYS = 180
+
+# P1-3: In-process LRU+TTL cache for cold types (local-first, no Redis dependency).
+_COLD_CACHE_TTL_SECONDS = 300  # 5 minutes
+_COLD_CACHE_MAXSIZE = 128
 
 # Hot types: computed on every write (incremental)
 HOT_ASSOCIATION_TYPES = {"co_occurrence", "same_city", "ex_colleague", "competitor", "topic_overlap"}
@@ -97,6 +103,13 @@ class AssociationDiscoveryEngine(
             "supply_demand": self._discover_supply_demand,
             "industry_chain": self._discover_industry_chain,
         }
+
+        # P1-3: In-process LRU+TTL cache for cold types.
+        # Local-first architecture — no Redis dependency for base edition.
+        # Key: sorted tuple of entity IDs. Value: (inserted_monotonic, results).
+        self._cold_cache: OrderedDict[tuple[str, str], tuple[float, list[dict[str, Any]]]] = (
+            OrderedDict()
+        )
 
     # ── Public API ──
 
@@ -359,7 +372,8 @@ class AssociationDiscoveryEngine(
         Used when the user queries associations — computes alumni, tech_overlap,
         deal_link, risk_link, supply_chain lazily.
 
-        Results are cached in Redis for 1 hour.
+        Results are cached in-process (OrderedDict with 5min TTL, LRU eviction)
+        for cold types. Local-first architecture — no Redis dependency.
 
         Args:
             entity_a: First entity.
@@ -368,6 +382,21 @@ class AssociationDiscoveryEngine(
         Returns:
             List of association data dicts.
         """
+        # Order-independent cache key: sorted pair of entity IDs.
+        a_id, b_id = str(entity_a.id), str(entity_b.id)
+        cache_key: tuple[str, str] = (a_id, b_id) if a_id <= b_id else (b_id, a_id)
+        now = time.monotonic()
+
+        cached = self._cold_cache.get(cache_key)
+        if cached is not None:
+            inserted_at, cached_results = cached
+            if now - inserted_at < _COLD_CACHE_TTL_SECONDS:
+                # LRU: mark as recently used.
+                self._cold_cache.move_to_end(cache_key)
+                return cached_results
+            # TTL expired — evict stale entry.
+            self._cold_cache.pop(cache_key, None)
+
         results = []
         for assoc_type, discoverer in self.cold_discoverers.items():
             confidence, evidence = await discoverer(entity_a, entity_b)
@@ -379,6 +408,13 @@ class AssociationDiscoveryEngine(
                     "evidence": evidence,
                     "status": status,
                 })
+
+        # Store in cache with LRU eviction.
+        self._cold_cache[cache_key] = (now, results)
+        if len(self._cold_cache) > _COLD_CACHE_MAXSIZE:
+            # Evict least-recently-used entry (first item in OrderedDict).
+            self._cold_cache.popitem(last=False)
+
         return results
 
     def discover_pair(
@@ -392,6 +428,14 @@ class AssociationDiscoveryEngine(
         Cold types are computed on-demand via discover_cold_types().
         """
         return self._discover_hot_types(entity_a, entity_b)
+
+    def clear_cache(self) -> None:
+        """Clear the in-process cold-type cache.
+
+        Call this when underlying entity data may have changed (e.g., after a
+        merge or explicit refresh) to force recomputation on next read.
+        """
+        self._cold_cache.clear()
 
     async def apply_time_decay(self, user_id: str) -> int:
         """Apply time decay to all associations of a user."""

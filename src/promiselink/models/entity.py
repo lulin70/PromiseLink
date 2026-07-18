@@ -63,6 +63,7 @@ class Entity(Base):
         nullable=False,
     )
     confidence: Mapped[float] = mapped_column(nullable=False, default=1.0)
+    # Entity status lifecycle: 4 states — provisional / confirmed / merged / deleted
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="confirmed")
 
     # Timestamps
