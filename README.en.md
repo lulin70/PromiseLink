@@ -18,11 +18,14 @@
   <img src="https://img.shields.io/badge/perf-17%20tests%20passed-blue" alt="Performance">
   <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python">
   <img src="https://img.shields.io/badge/deploy-Local%20No%20Docker-success" alt="Deploy">
+  <img src="https://img.shields.io/badge/data-100%25%20Local%20%C2%B7%20No%20SaaS-success" alt="Data Sovereignty">
   <img src="https://img.shields.io/badge/license-MPL%202.0-blue" alt="License">
 </p>
 
 > **PromiseLink** is the **open-source basic edition** (MPL 2.0) of the AI-driven personal business relationship management assistant.
 > It provides the core loop: event entry → entity extraction → Todo generation → promise tracking → association discovery → dashboard.
+>
+> **🔐 Data Sovereignty Promise**: **No SaaS offering** — 100% of business data is stored on the user's local device (SQLite), data never leaves your home. This is the fundamental difference between PromiseLink and all SaaS AI-CRMs: your relationship network is your most valuable asset and should not be handed over to a third party.
 >
 > **Architectural layering**:
 > - **Core algorithm layer** (entity resolution / Todo state machine / promise fulfillment / association discovery / dynamic scoring) — **main logic is pure algorithm implementation** (NetworkX + RapidFuzz + numpy), with optional LLM enhancement dimensions (entity_resolution step 5 llm_reasoning / promise_fulfillment's llm_semantic dimension), all with complete degradation mechanisms (weight 0.0 in PoC), runs offline, auditable, reproducible
@@ -40,11 +43,12 @@
 
 | Advantage | Proof | vs. Traditional CRM |
 |------|---------|-------------|
+| 🔐 **Data Sovereignty · No SaaS** | 100% local SQLite storage / data never leaves your home / offline-capable / PIPL & GDPR compliant | SaaS AI-CRMs upload data to the cloud, entrusting relationship assets to a third party |
 | 🏭 **Industrial-grade quality** | 1904 tests passed / 89% coverage / mypy 0 / ruff 0 / 50 security tests / 17 performance tests | Most open-source CRMs have < 30% coverage |
 | 🧠 **Core algorithm layer: main logic is pure algorithm** | Entity resolution / Todo state machine / promise fulfillment / association discovery / dynamic scoring — main logic is pure algorithm implementation (NetworkX + RapidFuzz + numpy), with optional LLM enhancement dimensions (all with degradation mechanisms), runs offline, auditable | Mainstream AI-CRMs depend on GPT API across the full chain |
 | 🚀 **Portable, zero deployment** | `pip install -e .` + `bash scripts/start.sh` ready to use, no Docker / K8s required | Similar tools require docker-compose |
 
-> **Honest disclosure**: Entity extraction, NLG response generation, etc. require `LLM_API_KEY`; the core relationship management algorithms (5 modules) are pure algorithm implementations — when LLM is unavailable, the core loop still runs in degraded mode.
+> **Honest disclosure**: Entity extraction, NLG response generation, etc. require `LLM_API_KEY`; the core relationship management algorithms (5 modules) are pure algorithm implementations — when LLM is unavailable, the core loop still runs in degraded mode. **Business data always stays on the user's local device** — even when LLM is configured, only the text to be parsed is transmitted to the AI service, and the analysis result is not retained in the cloud after return.
 
 ---
 

@@ -18,11 +18,14 @@
   <img src="https://img.shields.io/badge/perf-17%20tests%20passed-blue" alt="Performance">
   <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python">
   <img src="https://img.shields.io/badge/deploy-Local%20No%20Docker-success" alt="Deploy">
+  <img src="https://img.shields.io/badge/data-100%25%20Local%20%C2%B7%20No%20SaaS-success" alt="Data Sovereignty">
   <img src="https://img.shields.io/badge/license-MPL%202.0-blue" alt="License">
 </p>
 
 > **PromiseLink** は、AI駆動の個人ビジネス関係構築アシスタントの**オープンソース基本版**（MPL 2.0）です。
 > イベント入力 → エンティティ抽出 → Todo生成 → 約束追跡 → 関連発見 → ダッシュボード、というコアループを提供します。
+>
+> **🔐 データ主権の約束**：**SaaSサービスは提供しない**——すべての業務データは100%ユーザーのローカルデバイス（SQLite）に保存され、データが家の外に出ることはありません。これがPromiseLinkとすべてのSaaS AI-CRMの根本的な違いです：あなたの関係ネットワークは最も価値ある資産であり、第三者に委託すべきではありません。
 >
 > **アーキテクチャの階層化**:
 > - **コアアルゴリズム層**（エンティティ正規化 / Todo状態機械 / 約束履行 / 関連発見 / 動的スコアリング）— **メインロジックは純粋なアルゴリズム実装**（NetworkX + RapidFuzz + numpy）、オプションのLLM拡張次元あり（entity_resolution 第5歩 llm_reasoning / promise_fulfillment の llm_semantic 次元）、いずれも完全な縮退メカニズム付き（PoCでは重み0.0）、オフライン動作、監査可能、再現可能
@@ -40,11 +43,12 @@
 
 | 利点 | データによる証明 | 従来のCRMとの比較 |
 |------|---------|-------------|
+| 🔐 **データ主権 · SaaS非提供** | 100% ローカル SQLite ストレージ / データは家の外に出ない / オフライン利用可能 / PIPL & GDPR 準拠 | SaaS AI-CRM はデータをクラウドにアップロードし、関係資産を第三者に委託 |
 | 🏭 **産業グレードの品質** | 1904 テスト合格 / 89% カバレッジ / mypy 0 / ruff 0 / 50 セキュリティテスト / 17 パフォーマンステスト | 多くのオープンソースCRMはカバレッジ 30% 未満 |
 | 🧠 **コアアルゴリズム層のメインロジックは純粋アルゴリズム** | エンティティ正規化 / Todo状態機械 / 約束履行 / 関連発見 / 動的スコアリング — メインロジックは純粋なアルゴリズム実装（NetworkX + RapidFuzz + numpy）、オプションのLLM拡張次元あり（いずれも縮退メカニズム付き）、オフライン動作、監査可能 | 主要なAI-CRMは全工程でGPT APIに依存 |
 | 🚀 **ポータブル・ゼロデプロイ** | `pip install -e .` + `bash scripts/start.sh` ですぐ利用可能、Docker / K8s 不要 | 同種ツールは docker-compose が必要 |
 
-> **誠実な開示**: エンティティ抽出、NLG応答生成などは `LLM_API_KEY` の設定が必要です。コアの関係構築アルゴリズム（5モジュール）は純粋なアルゴリズム実装であり、LLMが利用できない場合でもコアループは縮退運転できます。
+> **誠実な開示**: エンティティ抽出、NLG応答生成などは `LLM_API_KEY` の設定が必要です。コアの関係構築アルゴリズム（5モジュール）は純粋なアルゴリズム実装であり、LLMが利用できない場合でもコアループは縮退運転できます。**業務データは常にユーザーのローカルデバイスに留まります**——LLMを設定した場合でも、AIサービスに送信されるのは解析対象のテキストのみで、解析結果はクラウドに残りません。
 
 ---
 

@@ -16,11 +16,14 @@
   <img src="https://img.shields.io/badge/perf-17%20tests%20passed-blue" alt="Performance">
   <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python">
   <img src="https://img.shields.io/badge/deploy-Local%20No%20Docker-success" alt="Deploy">
+  <img src="https://img.shields.io/badge/data-100%25%20Local%20%C2%B7%20No%20SaaS-success" alt="Data Sovereignty">
   <img src="https://img.shields.io/badge/license-MPL%202.0-blue" alt="License">
 </p>
 
 > **PromiseLink** 是 AI 驱动的个人商务关系经营助手的**开源基础版**（MPL 2.0）。
 > 提供事件录入 → 实体提取 → Todo 生成 → 承诺追踪 → 关联发现 → 仪表盘的核心闭环。
+>
+> **🔐 数据主权承诺**：**不提供 SaaS 服务**——所有业务数据 100% 存储在用户本地设备（SQLite），数据从不出家门。这是 PromiseLink 与所有 SaaS AI-CRM 的根本区别：你的关系网络是你最宝贵的资产，不该交给第三方托管。
 >
 > **架构分层**：
 > - **核心算法层**（实体归一 / Todo 状态机 / 承诺履行 / 关联发现 / 动态评分）— **主逻辑纯算法实现**（NetworkX + RapidFuzz + numpy），含可选 LLM 增强维度（entity_resolution 第5步 llm_reasoning / promise_fulfillment 的 llm_semantic 维度），均具备完整降级机制（PoC 中权重为 0.0），可离线运行、可审计、可复现
@@ -38,11 +41,12 @@
 
 | 优势 | 数据证明 | 对比传统 CRM |
 |------|---------|-------------|
+| 🔐 **数据主权 · 不提供 SaaS** | 100% 本地 SQLite 存储 / 数据从不出家门 / 离线可用 / 符合 PIPL & GDPR | SaaS AI-CRM 数据上云，关系资产交给第三方托管 |
 | 🏭 **工业级质量** | 1904 测试通过 / 89% 覆盖率 / mypy 0 / ruff 0 / 50 安全测试 / 17 性能测试 | 多数开源 CRM < 30% 覆盖率 |
 | 🧠 **核心算法层主逻辑纯算法** | 实体归一 / Todo 状态机 / 承诺履行 / 关联发现 / 动态评分 — 主逻辑纯算法实现（NetworkX + RapidFuzz + numpy），含可选 LLM 增强维度（均具备降级机制），可离线运行、可审计 | 主流 AI-CRM 全链路依赖 GPT API |
 | 🚀 **便携零部署** | `pip install -e .` + `bash scripts/start.sh` 即用，无需 Docker / K8s | 同类工具需 docker-compose |
 
-> **诚实声明**：实体提取、NLG 响应生成等环节需配置 `LLM_API_KEY`；核心关系经营算法（5 大模块）为纯算法实现，LLM 不可用时核心闭环仍可降级运行。
+> **诚实声明**：实体提取、NLG 响应生成等环节需配置 `LLM_API_KEY`；核心关系经营算法（5 大模块）为纯算法实现，LLM 不可用时核心闭环仍可降级运行。**业务数据始终留在用户本地**——即使配置 LLM，也仅传输待解析文本到 AI 服务，分析结果返回后不在云端留存。
 
 ---
 
