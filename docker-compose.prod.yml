@@ -1,6 +1,6 @@
 # PromiseLink 生产环境部署配置
 # 使用预构建镜像（由 CI build-and-push job 推送到 ghcr.io）
-# 部署方式: VERSION=0.8.1 docker compose -f docker-compose.prod.yml up -d
+# 部署方式: VERSION=0.8.3 docker compose -f docker-compose.prod.yml up -d
 
 version: "3.8"
 
