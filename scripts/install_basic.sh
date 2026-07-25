@@ -24,8 +24,11 @@
 set -e
 
 # 默认配置：网关地址优先读环境变量，否则用正式域名
-# 注：SSL 证书当前仅覆盖 www.promiselink.cn，gateway.promiselink.cn 待申请独立证书
-# ICP 备案完成前，用户运行脚本时可手动输入临时地址
+# 2026-07-25 状态：ICP 备案已通过（沪ICP备2026035207号，2026-07-24）
+#   - gateway.promiselink.cn 的 nginx 配置已部署到服务器（HTTP-only ACME 临时版本）
+#   - SSL 证书申请失败：阿里云 ICP 路径同步延迟（根路径已放行，ACME challenge 路径仍 403）
+#   - 临时仍使用 www.promiselink.cn（SSL 已覆盖），待 gateway.promiselink.cn 证书申请成功后切换
+#   - 重试证书申请：bash scripts/retry_gateway_cert.sh
 DEFAULT_GATEWAY_URL="${GATEWAY_URL:-https://www.promiselink.cn}"
 DEFAULT_IMAGE="ghcr.io/lulin70/promiselink:0.8.3"
 INSTALL_DIR="${PROMISELINK_INSTALL_DIR:-$HOME/promiselink}"
