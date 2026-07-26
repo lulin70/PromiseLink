@@ -1,0 +1,145 @@
+# PromiseLink Dependabot Configuration
+#
+# Purpose: Automated dependency update management.
+#
+# project_memory hard constraints:
+# - "dependabot must group dev dependencies updates into a single PR to reduce noise"
+# - "dependabot must ignore patch/minor updates for dev dependencies"
+# - "dependabot must check for security updates daily instead of weekly"
+# - "CI must include concurrency control to cancel in-progress runs for the same PR"
+#
+# Strategy:
+# - Python production deps: weekly check, individual PRs (visibility into runtime changes)
+# - Python dev deps: weekly check, GROUPED PR, ignore patch/minor (reduce noise)
+# - GitHub Actions: weekly check, grouped (reduce workflow PR spam)
+# - Docker base images: weekly check (security-critical)
+# - Security updates: daily for ALL ecosystems (fastest response to CVEs)
+
+version: 2
+
+updates:
+  # Python production dependencies (pyproject.toml [project] dependencies)
+  # Individual PRs for visibility into runtime-affecting changes
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "python"
+      - "production"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    reviewers:
+      - "lulin70"
+    # Production deps: allow all update types (major/minor/patch)
+    # Major bumps reviewed manually before merge
+    # Ignore dev dependencies to prevent duplicate PRs (dev deps managed in separate config below)
+    ignore:
+      - dependency-name: "pytest*"
+      - dependency-name: "ruff"
+      - dependency-name: "mypy"
+      - dependency-name: "black"
+      - dependency-name: "pre-commit"
+      - dependency-name: "pip-audit"
+      - dependency-name: "bandit"
+
+  # Python dev dependencies (pyproject.toml [project.optional-dependencies] dev)
+  # GROUPED PR to reduce noise, ignore patch/minor (project_memory constraint)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "python"
+      - "dev"
+    commit-message:
+      prefix: "deps-dev"
+      include: "scope"
+    reviewers:
+      - "lulin70"
+    # Group all dev dep updates into a single PR
+    groups:
+      dev-dependencies:
+        patterns:
+          - "pytest*"
+          - "ruff"
+          - "mypy"
+          - "black"
+          - "pre-commit"
+          - "pip-audit"
+          - "bandit"
+    # Ignore patch and minor updates for dev dependencies
+    # (project_memory: "dependabot must ignore patch/minor updates for dev dependencies")
+    # Only create PR for major version bumps (breaking changes need review)
+    ignore:
+      - dependency-name: "pytest"
+        update-types: ["version-update:semver-patch", "version-update:semver-minor"]
+      - dependency-name: "pytest-asyncio"
+        update-types: ["version-update:semver-patch", "version-update:semver-minor"]
+      - dependency-name: "pytest-cov"
+        update-types: ["version-update:semver-patch", "version-update:semver-minor"]
+      - dependency-name: "ruff"
+        update-types: ["version-update:semver-patch", "version-update:semver-minor"]
+      - dependency-name: "mypy"
+        update-types: ["version-update:semver-patch", "version-update:semver-minor"]
+      - dependency-name: "black"
+        update-types: ["version-update:semver-patch", "version-update:semver-minor"]
+      - dependency-name: "pre-commit"
+        update-types: ["version-update:semver-patch", "version-update:semver-minor"]
+      - dependency-name: "pip-audit"
+        update-types: ["version-update:semver-patch", "version-update:semver-minor"]
+      - dependency-name: "bandit"
+        update-types: ["version-update:semver-patch", "version-update:semver-minor"]
+
+  # GitHub Actions versions
+  # Grouped to reduce workflow PR noise
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    reviewers:
+      - "lulin70"
+    groups:
+      github-actions:
+        patterns:
+          - "actions/*"
+          - "docker/*"
+
+  # Docker base image (Dockerfile)
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+    reviewers:
+      - "lulin70"

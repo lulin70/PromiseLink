@@ -1,0 +1,89 @@
+# PromiseLink Gitleaks Configuration
+#
+# Purpose: Secret scanning configuration that allows test fixtures
+# while catching real secret leaks.
+#
+# project_memory lesson: "gitleaks全量扫描(nightly)会误报测试文件中的假API密钥，
+# 需创建.gitleaks.toml allowlist忽略tests/目录"
+#
+# Usage:
+#   gitleaks detect --config .gitleaks.toml --source .
+#   gitleaks detect --config .gitleaks.toml --source . --report-path leaks.json
+
+title = "PromiseLink Gitleaks Config"
+
+[extend]
+# Extend the default ruleset
+useDefault = true
+
+[allowlist]
+# Allowlist paths that contain test fixtures with fake/mock secrets.
+# These are NOT real secrets — they are test data with known-fake values.
+description = "Allow test fixtures, mock data, and documentation with placeholder secrets"
+
+paths = [
+    # Test directories — contain mock API keys, test JWTs, fake credentials
+    '''tests/.*''',
+    '''scripts/e2e/.*''',
+    '''frontend/tests/.*''',
+
+    # Documentation — may contain example/placeholder secrets for illustration
+    '''docs/.*\.md''',
+    '''docs/spec/.*''',
+    '''docs/design/.*''',
+    '''docs/architecture/.*''',
+    '''docs/evaluation/.*''',
+    '''docs/legal/.*''',
+    '''docs/user_guide/.*''',
+
+    # Lock files — may contain hashes that look like secrets
+    '''requirements.*\.txt''',
+    '''requirements\.lock''',
+    '''frontend/package-lock\.json''',
+]
+
+# Specific allowed patterns (false-positive reduction)
+regexes = [
+    # JWT test tokens (header.payload.signature with test payload)
+    '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJ0ZXN0''',
+
+    # Placeholder values commonly used in config templates
+    '''\{\{.*API_KEY.*\}\}''',
+    '''\{\{.*SECRET.*\}\}''',
+    '''<.*API_KEY.*>''',
+    '''<.*SECRET.*>''',
+    '''your.*api.*key.*here''',
+    '''your.*secret.*here''',
+    '''replace.*me''',
+    '''CHANGEME''',
+    '''REPLACE_WITH_.*''',
+    '''INSERT_.*_HERE''',
+
+    # Environment variable references (not actual values)
+    '''\$\{.*API_KEY.*\}''',
+    '''\$\{.*SECRET.*\}''',
+    '''os\.environ\[.API_KEY.\]''',
+    '''os\.environ\[.SECRET.\]''',
+    '''os\.getenv\(.''',
+
+    # CI test secrets (clearly marked as test-only)
+    '''test-key-for-ci''',
+    '''ci-test-secret-key.*''',
+]
+
+# Stopwords: values that should never be flagged as secrets
+stopwords = [
+    "promiselink",
+    "carrymem",
+    "localhost",
+    "127.0.0.1",
+    "0.0.0.0",
+    "example.com",
+    "example.org",
+    "test.com",
+    "dummy",
+    "placeholder",
+    "mock",
+    "fake",
+    "sample",
+]

@@ -9,6 +9,12 @@ on:
     # Nightly at 2 AM UTC
     - cron: "0 2 * * *"
 
+# project_memory hard constraint:
+# "CI must include concurrency control to cancel in-progress runs for the same PR"
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
