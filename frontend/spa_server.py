@@ -4,6 +4,7 @@ import os
 import sys
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 
+
 class SPAHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, directory=None, **kwargs):
         self.directory = directory or os.getcwd()

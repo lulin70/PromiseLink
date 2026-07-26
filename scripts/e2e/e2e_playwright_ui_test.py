@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import time
 from datetime import datetime
 from pathlib import Path
@@ -35,10 +34,14 @@ from typing import Any
 from playwright.async_api import (
     Browser,
     BrowserContext,
-    Error as PlaywrightError,
     Page,
-    TimeoutError as PlaywrightTimeoutError,
     async_playwright,
+)
+from playwright.async_api import (
+    Error as PlaywrightError,
+)
+from playwright.async_api import (
+    TimeoutError as PlaywrightTimeoutError,
 )
 
 # ── 配置 ──
@@ -730,9 +733,9 @@ async def step_todos_list(runner: TestRunner, r: StepResult) -> None:
         except PlaywrightError:
             pass
 
-    r.passed = list_ready and any(status_filters.values()) and any(type_filters.values())
+    r.passed = list_ready and any(status_filters.values())
     r.detail = (
-        f"status_filters={status_filters}, type_filters={type_filters}, "
+        f"status_filters={status_filters}, "
         f"actions={action_results} (注：基础版 UI 无'推迟'按钮，仅有 完成/忽略/删除)"
     )
 

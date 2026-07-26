@@ -228,6 +228,7 @@ else:
 
 # 创建预定日程 (模拟用户点击"+ 新建预定日程")
 from datetime import datetime, timedelta
+
 tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
 schedule_payload = {
     "scheduled_at": f"{tomorrow}T14:00:00+08:00",
@@ -373,7 +374,7 @@ if len(pending_todos) >= 1:
     # 验证终态保护 (done → pending 应该失败)
     status, data = api_call("PATCH", f"/todos/{todo_id}", body={"status": "pending"})
     if status in (400, 422):
-        log_ok(f"终态保护验证: done→pending 被正确拒绝 (终态不可恢复)")
+        log_ok("终态保护验证: done→pending 被正确拒绝 (终态不可恢复)")
     else:
         log_fail(f"终态保护失败: done→pending 应该被拒绝，实际status={status}")
 

@@ -452,7 +452,7 @@ class TestExceptionHandling:
         @asynccontextmanager
         async def _failing_session():
             raise RuntimeError("DB connection failed")
-            yield  # noqa: unreachable — makes this an async gen
+            yield  # makes this an async gen (unreachable but required for async generator syntax)
 
         with patch(
             "promiselink.database.AsyncSessionLocal",

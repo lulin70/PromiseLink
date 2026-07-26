@@ -439,7 +439,6 @@ class TestCrossPageNavigation:
         # 步骤1: 查看事件详情，找到关联人脉 ID
         resp = await client.get(f"{API_PREFIX}/events/{event.id}")
         assert resp.status_code == 200
-        event_detail = resp.json()
         # 事件详情可能通过 related_entities 或直接查询关联
         # 模拟 UI 跳转：用人脉 ID 查询人脉详情
         resp = await client.get(f"{API_PREFIX}/entities/{entity.id}")
