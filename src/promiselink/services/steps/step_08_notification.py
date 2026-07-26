@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import cast
 
-from sqlalchemy import and_, update
+from sqlalchemy import CursorResult, and_, update
 from sqlalchemy.exc import SQLAlchemyError
 
 from promiselink.core.logging import get_logger
@@ -26,6 +27,7 @@ class Step08_Notification(PipelineStep):
 
         try:
             from promiselink.services.notification_service import notification_service
+
             for todo in context.result.todos:
                 await notification_service.notify_todo_created(
                     user_id=user_id,
@@ -59,7 +61,7 @@ class Step08_Notification(PipelineStep):
                     .values(fulfillment_status="overdue")
                 )
                 result = await session.execute(overdue_q)
-                overdue_count = result.rowcount  # type: ignore[attr-defined]
+                overdue_count = cast(CursorResult, result).rowcount
 
                 if overdue_count > 0:
                     logger.info(

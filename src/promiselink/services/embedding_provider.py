@@ -9,7 +9,7 @@ Design reference: PromiseLink_技术设计_v1.md v2.8 §4.12.1
 import asyncio
 import hashlib
 from collections import OrderedDict
-from typing import Optional
+from typing import Optional, cast
 
 from openai import AsyncOpenAI
 
@@ -203,7 +203,7 @@ class EmbeddingProvider:
                     key = self._cache_key(text)
                     emb = await self._embed_local(text, key)
                     results[idx] = emb
-                return results  # type: ignore
+                return cast(list[list[float]], results)
 
             # API provider: try batch API, fall back to local
             try:
@@ -235,13 +235,13 @@ class EmbeddingProvider:
                 for i, text in enumerate(texts):
                     key = self._cache_key(text)
                     if results[i] is not None:
-                        results_list.append(results[i])  # type: ignore
+                        results_list.append(cast(list[float], results[i]))
                     else:
                         emb = await self._embed_local(text, key)
                         results_list.append(emb)
                 return results_list
 
-        return results  # type: ignore
+        return cast(list[list[float]], results)
 
     def get_cache_stats(self) -> dict:
         """Get cache statistics."""

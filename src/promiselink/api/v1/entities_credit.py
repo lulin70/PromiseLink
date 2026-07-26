@@ -73,8 +73,7 @@ async def get_entity_credit_score(
         score=round(score_data["score"], 1),
         grade=score_data["grade"],
         breakdown=CreditScoreBreakdown(
-            **{k: v for k, v in score_data.items()
-               if k != "score" and k != "grade"}
+            **{k: v for k, v in score_data.items() if k != "score" and k != "grade"}
         ),
     )
 
@@ -98,7 +97,9 @@ async def list_credit_scores(
         .group_by(Todo.related_entity_id)
         .having(func.count() >= min_interactions)
     )
-    entity_counts: dict[str, int] = dict((await session.execute(todo_count_q)).all())  # type: ignore[arg-type]
+    entity_counts: dict[str, int] = {
+        str(row[0]): int(row[1]) for row in (await session.execute(todo_count_q)).all()
+    }
 
     if not entity_counts:
         return CreditScoreListResponse(items=[], total=0)
@@ -120,6 +121,7 @@ async def list_credit_scores(
 
     # Batch calculate all credit scores in 3 queries instead of N*4
     from promiselink.services.credit_score import CreditScoreService
+
     scores = await CreditScoreService.batch_calculate(session, qualified_ids, user_id)
 
     results = []
@@ -127,19 +129,20 @@ async def list_credit_scores(
         score_data = scores.get(eid_str)
         if not score_data:
             continue
-        results.append(CreditScoreResponse(
-            entity_id=eid_str,
-            name=entity_name_map[eid_str],
-            score=round(score_data["score"], 1),
-            grade=score_data["grade"],
-            breakdown=CreditScoreBreakdown(
-                **{k: v for k, v in score_data.items()
-                   if k not in ("score", "grade")}
-            ),
-        ))
+        results.append(
+            CreditScoreResponse(
+                entity_id=eid_str,
+                name=entity_name_map[eid_str],
+                score=round(score_data["score"], 1),
+                grade=score_data["grade"],
+                breakdown=CreditScoreBreakdown(
+                    **{k: v for k, v in score_data.items() if k not in ("score", "grade")}
+                ),
+            )
+        )
 
     results.sort(key=lambda r: r.score, reverse=True)
-    return CreditScoreListResponse(items=results[offset:offset + limit], total=len(results))
+    return CreditScoreListResponse(items=results[offset : offset + limit], total=len(results))
 
 
 async def _calculate_credit_score(
@@ -149,4 +152,5 @@ async def _calculate_credit_score(
 ) -> dict:
     """Core credit score calculation logic — delegates to CreditScoreService."""
     from promiselink.services.credit_score import CreditScoreService
+
     return await CreditScoreService.calculate(session, entity_id, user_id)

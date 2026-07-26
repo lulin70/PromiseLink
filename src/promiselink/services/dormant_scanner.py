@@ -150,7 +150,9 @@ async def scan_dormant_contacts(
         .where(Todo.user_id == user_id, Todo.related_entity_id.in_(entity_ids))
         .group_by(Todo.related_entity_id)
     )
-    todo_counts: dict[str, int] = dict((await session.execute(todo_count_q)).all())  # type: ignore[arg-type]
+    todo_counts: dict[str, int] = {
+        str(row[0]): int(row[1]) for row in (await session.execute(todo_count_q)).all()
+    }
 
     # Count pending their_promises per entity
     promise_q = (
@@ -163,7 +165,9 @@ async def scan_dormant_contacts(
         )
         .group_by(Todo.related_entity_id)
     )
-    promise_counts: dict[str, int] = dict((await session.execute(promise_q)).all())  # type: ignore[arg-type]
+    promise_counts: dict[str, int] = {
+        str(row[0]): int(row[1]) for row in (await session.execute(promise_q)).all()
+    }
 
     # Step 4: Score each entity
     for entity in entities:
@@ -183,10 +187,7 @@ async def scan_dormant_contacts(
         # If no event found via entity_events, check entity's own created_at as fallback
         if not last_time:
             # Try to find any event mentioning this entity's name
-            name_matches = [
-                e for e in all_events
-                if e.raw_text and entity.name in e.raw_text
-            ]
+            name_matches = [e for e in all_events if e.raw_text and entity.name in e.raw_text]
             if name_matches:
                 last_time = name_matches[0].timestamp
                 last_title = name_matches[0].title
@@ -196,7 +197,7 @@ async def scan_dormant_contacts(
 
         # Calculate dormant days
         try:
-            last_date = last_time.date() if hasattr(last_time, 'date') else last_time
+            last_date = last_time.date() if hasattr(last_time, "date") else last_time
         except (ValueError, AttributeError):
             last_date = today
 
@@ -226,11 +227,7 @@ async def scan_dormant_contacts(
         signal_score = min(100, pending_promises * 33 + (1 if total_todos > 3 else 0) * 20)
 
         # Weighted total
-        reactivation_score = (
-            depth_score * 0.40 +
-            decay_score * 0.35 +
-            signal_score * 0.25
-        )
+        reactivation_score = depth_score * 0.40 + decay_score * 0.35 + signal_score * 0.25
 
         # Generate reason text
         company = _extract_company(entity.properties)
@@ -263,24 +260,26 @@ async def scan_dormant_contacts(
             if isinstance(rel, dict):
                 rel_stage = rel.get("stage", "unknown")
 
-        results.append(DormantContactResult(
-            entity_id=eid_str,
-            name=entity.name,
-            company=company,
-            dormant_days=dormant_days,
-            reactivation_score=reactivation_score,
-            last_interaction=last_time.isoformat() if last_time else None,
-            last_event_summary=last_title or None,
-            reason=reason,
-            icebreaker_topic=icebreaker,
-            pending_their_promises=pending_promises,
-            relationship_stage=rel_stage,
-        ))
+        results.append(
+            DormantContactResult(
+                entity_id=eid_str,
+                name=entity.name,
+                company=company,
+                dormant_days=dormant_days,
+                reactivation_score=reactivation_score,
+                last_interaction=last_time.isoformat() if last_time else None,
+                last_event_summary=last_title or None,
+                reason=reason,
+                icebreaker_topic=icebreaker,
+                pending_their_promises=pending_promises,
+                relationship_stage=rel_stage,
+            )
+        )
 
     # Sort by score descending
     results.sort(key=lambda r: r.reactivation_score, reverse=True)
     total_count = len(results)
-    return results[offset:offset + limit], total_count
+    return results[offset : offset + limit], total_count
 
 
 def _generate_icebreaker(

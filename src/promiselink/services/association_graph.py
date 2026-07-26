@@ -50,10 +50,14 @@ class AssociationGraphMixin:
         results: list[Association] = []
 
         # Fetch all entities for this user
-        stmt = select(Entity).where(
-            Entity.user_id == user_id,
-            Entity.entity_type == "person",
-        ).order_by(Entity.id)
+        stmt = (
+            select(Entity)
+            .where(
+                Entity.user_id == user_id,
+                Entity.entity_type == "person",
+            )
+            .order_by(Entity.id)
+        )
         all_result = await self.session.execute(stmt)
         all_entities = list(all_result.scalars().all())
 
@@ -114,7 +118,11 @@ class AssociationGraphMixin:
                     history_i = (group[i].properties or {}).get("work_history", [])
                     for ha in history_i:
                         ha_company = ha.get("company") or ""
-                        if ha_company and ha_company in work_company_index and j in work_company_index[ha_company]:
+                        if (
+                            ha_company
+                            and ha_company in work_company_index
+                            and j in work_company_index[ha_company]
+                        ):
                             is_ex_colleague = True
                             break
 
@@ -142,7 +150,7 @@ class AssociationGraphMixin:
                             },
                         )
                     results.append(assoc)
-                    existing_pair_keys.add(pair_key)  # type: ignore[arg-type]
+                    existing_pair_keys.add(cast(tuple[str, str], pair_key))
 
         return results
 
@@ -233,6 +241,7 @@ class AssociationGraphMixin:
 
         if len(all_entities) >= MAX_ENTITY_LIMIT:
             import structlog
+
             logger = structlog.get_logger()
             logger.warning(
                 "entity_limit_reached",
@@ -265,9 +274,7 @@ class AssociationGraphMixin:
             normalized.add((src, tgt, assoc_type))
         return normalized
 
-    async def _fetch_existing_associations(
-        self, user_id: str
-    ) -> list[Association]:
+    async def _fetch_existing_associations(self, user_id: str) -> list[Association]:
         """Fetch all existing associations for a user."""
         stmt = select(Association).where(Association.user_id == user_id)
         result = await self.session.execute(stmt)

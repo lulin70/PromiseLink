@@ -7,7 +7,7 @@ Supports retry with exponential backoff, timeout, and graceful degradation.
 import asyncio
 import json
 import time
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -213,7 +213,7 @@ class LLMClient:
         cached = await cache_service.get(cache_key)
         if cached:
             logger.debug("llm_cache_hit", key=cache_key)
-            return cached["content"]  # type: ignore[no-any-return]
+            return cast(str, cached["content"])
 
         start_time = time.monotonic()
         last_error: Exception | None = None

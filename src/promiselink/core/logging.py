@@ -6,7 +6,7 @@ Uses structlog for JSON structured output with request_id propagation.
 
 import uuid
 from contextvars import ContextVar
-from typing import Any
+from typing import Any, cast
 
 import structlog
 
@@ -61,7 +61,7 @@ def get_logger(name: str = "promiselink") -> structlog.stdlib.BoundLogger:
     Returns:
         A bound structlog logger instance.
     """
-    return structlog.get_logger(name)  # type: ignore[no-any-return]
+    return cast(structlog.stdlib.BoundLogger, structlog.get_logger(name))
 
 
 def new_request_id() -> str:

@@ -4,7 +4,9 @@ Moves batch delete operations out of the API layer into a proper service.
 Uses ORM delete queries instead of raw ``__table__.delete()`` calls.
 """
 
-from sqlalchemy import delete, select
+from typing import cast
+
+from sqlalchemy import CursorResult, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.core.logging import get_logger
@@ -98,7 +100,7 @@ async def delete_event_cascade(
                 ),
             )
         )
-        deleted["associations"] = assoc_result.rowcount  # type: ignore[attr-defined]
+        deleted["associations"] = cast(CursorResult, assoc_result).rowcount
 
         # Delete todos referencing these entities
         todo_entity_result = await session.execute(
@@ -107,7 +109,7 @@ async def delete_event_cascade(
                 Todo.related_entity_id.in_(entity_ids),
             )
         )
-        deleted["todos"] += todo_entity_result.rowcount  # type: ignore[attr-defined]
+        deleted["todos"] += cast(CursorResult, todo_entity_result).rowcount
 
         # Delete entities
         entity_del_result = await session.execute(
@@ -116,7 +118,7 @@ async def delete_event_cascade(
                 Entity.id.in_(entity_ids),
             )
         )
-        deleted["entities"] = entity_del_result.rowcount  # type: ignore[attr-defined]
+        deleted["entities"] = cast(CursorResult, entity_del_result).rowcount
 
     # Always delete todos from this event (even if no entities)
     todo_event_result = await session.execute(
@@ -125,7 +127,7 @@ async def delete_event_cascade(
             Todo.source_event_id == event_id,
         )
     )
-    deleted["todos"] += todo_event_result.rowcount  # type: ignore[attr-defined]
+    deleted["todos"] += cast(CursorResult, todo_event_result).rowcount
 
     logger.info(
         "event_cascade_deleted",

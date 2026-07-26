@@ -119,7 +119,9 @@ async def get_day_view(
     # ── Fetch events for target date ──
     # Use UTC+8 offset so "local date 00:00" maps to correct UTC range
     _CST = timezone(timedelta(hours=8))
-    day_start_local = datetime(target_date.year, target_date.month, target_date.day, 0, 0, 0, tzinfo=_CST)
+    day_start_local = datetime(
+        target_date.year, target_date.month, target_date.day, 0, 0, 0, tzinfo=_CST
+    )
     day_end_local = day_start_local + timedelta(days=1)
     # Convert to UTC for database comparison (timestamps stored as naive UTC in SQLite)
     day_start = day_start_local.astimezone(UTC).replace(tzinfo=None)
@@ -142,8 +144,9 @@ async def get_day_view(
     if event_ids:
         # Batch: entity names per event
         entity_result = await session.execute(
-            select(Entity.source_event_id, Entity.name)
-            .where(Entity.source_event_id.in_(event_ids), Entity.entity_type == "person")
+            select(Entity.source_event_id, Entity.name).where(
+                Entity.source_event_id.in_(event_ids), Entity.entity_type == "person"
+            )
         )
         for source_event_id, name in entity_result.fetchall():
             entity_map.setdefault(source_event_id, []).append(name)
@@ -154,7 +157,7 @@ async def get_day_view(
             .where(Todo.source_event_id.in_(event_ids))
             .group_by(Todo.source_event_id)
         )
-        todo_count_map = dict(todo_count_result.fetchall())  # type: ignore[arg-type]
+        todo_count_map = {str(row[0]): int(row[1]) for row in todo_count_result.fetchall()}
 
     # Build event items with entity names and todo counts
     event_items = []
@@ -243,7 +246,9 @@ async def get_day_view(
     todo_items = []
     for td in all_todos:
         # Resolve related person name from entity
-        related_person_name = entity_name_map.get(str(td.related_entity_id)) if td.related_entity_id else None
+        related_person_name = (
+            entity_name_map.get(str(td.related_entity_id)) if td.related_entity_id else None
+        )
 
         # Determine if overdue
         is_overdue = False
@@ -315,9 +320,7 @@ async def get_day_view(
     total_todos = len(todo_items)
     overdue_todos = sum(1 for t in todo_items if t.is_overdue)
     pending_promises = sum(
-        1
-        for t in todo_items
-        if t.todo_type == "promise" and t.status == "pending"
+        1 for t in todo_items if t.todo_type == "promise" and t.status == "pending"
     )
     upcoming_meetings = sum(1 for e in event_items if e.event_type == "meeting")
     pending_schedules = sum(1 for se in all_scheduled if se.status == "pending")
@@ -344,5 +347,7 @@ async def get_day_view(
         todos=todo_items,
         scheduled_events=scheduled_items,
         summary=summary,
-        adjacent_dates=AdjacentDates(previous_day=prev_day.isoformat(), next_day=next_day.isoformat()),
+        adjacent_dates=AdjacentDates(
+            previous_day=prev_day.isoformat(), next_day=next_day.isoformat()
+        ),
     )

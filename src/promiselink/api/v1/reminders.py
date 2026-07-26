@@ -1,7 +1,7 @@
 """Smart Follow-up Reminder API endpoints (F-69)."""
 
 from datetime import UTC, datetime, time, timedelta
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -159,12 +159,14 @@ async def get_daily_reminders(
     quiet_start = pref.quiet_hours_start if pref else time(22, 0)
     quiet_end = pref.quiet_hours_end if pref else time(8, 0)
 
-    quiet = _is_quiet_hours(quiet_start, quiet_end)  # type: ignore[arg-type]
+    quiet = _is_quiet_hours(cast(time, quiet_start), cast(time, quiet_end))
 
     # Count reminders already sent today
     today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     sent_count_result = await session.execute(
-        select(func.count()).select_from(ReminderLog).where(
+        select(func.count())
+        .select_from(ReminderLog)
+        .where(
             and_(
                 ReminderLog.user_id == user_id,
                 ReminderLog.sent_at >= today_start,
@@ -282,7 +284,11 @@ async def take_reminder_action(
         log_entry.action_taken = req.action
         # sent_at 可能是 naive datetime（PostgreSQL timestamp without tz），
         # 需补 tzinfo=UTC 才能与 datetime.now(UTC) 相减
-        sent_at = log_entry.sent_at.replace(tzinfo=UTC) if log_entry.sent_at.tzinfo is None else log_entry.sent_at
+        sent_at = (
+            log_entry.sent_at.replace(tzinfo=UTC)
+            if log_entry.sent_at.tzinfo is None
+            else log_entry.sent_at
+        )
         latency = (datetime.now(UTC) - sent_at).total_seconds()
         log_entry.response_latency_seconds = int(latency)
 
@@ -397,7 +403,9 @@ async def get_preferences(
         user_id=pref.user_id,
         preferred_times=pref.preferred_times or ["09:00", "20:00"],
         fatigue_threshold=pref.fatigue_threshold,
-        quiet_hours_start=pref.quiet_hours_start.strftime("%H:%M") if pref.quiet_hours_start else "22:00",
+        quiet_hours_start=(
+            pref.quiet_hours_start.strftime("%H:%M") if pref.quiet_hours_start else "22:00"
+        ),
         quiet_hours_end=pref.quiet_hours_end.strftime("%H:%M") if pref.quiet_hours_end else "08:00",
     )
 
@@ -452,6 +460,8 @@ async def update_preferences(
         user_id=pref.user_id,
         preferred_times=pref.preferred_times or ["09:00", "20:00"],
         fatigue_threshold=pref.fatigue_threshold,
-        quiet_hours_start=pref.quiet_hours_start.strftime("%H:%M") if pref.quiet_hours_start else "22:00",
+        quiet_hours_start=(
+            pref.quiet_hours_start.strftime("%H:%M") if pref.quiet_hours_start else "22:00"
+        ),
         quiet_hours_end=pref.quiet_hours_end.strftime("%H:%M") if pref.quiet_hours_end else "08:00",
     )

@@ -20,7 +20,7 @@ from __future__ import annotations
 import copy
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from promiselink.services.llm_client import LLMClient
@@ -603,7 +603,7 @@ class RelationshipBriefService:
             except (ValueError, TypeError):
                 pass
 
-        return min(score, 100)  # type: ignore[no-any-return]
+        return cast(int, min(score, 100))
 
     async def _get_associations_for_entity(self, entity_id: str) -> list[dict]:
         """Fetch associations involving this entity for action generation.

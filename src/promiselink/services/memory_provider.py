@@ -608,7 +608,7 @@ class CarryMemProvider:
 
         try:
             response = await client.get("/health")
-            return response.status_code == 200  # type: ignore[no-any-return]
+            return cast(bool, response.status_code == 200)
         except Exception as exc:  # External API — keep broad catch for resilience
             logger.warning("carrymem_health_check_failed", error=str(exc))
             return False

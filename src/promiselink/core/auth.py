@@ -125,7 +125,7 @@ def create_access_token(user_id: str) -> str:
         "aud": "promiselink-api",
     }
     encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
-    return encoded_jwt  # type: ignore[no-any-return]
+    return cast(str, encoded_jwt)
 
 
 def verify_token(token: str) -> dict[Any, Any]:

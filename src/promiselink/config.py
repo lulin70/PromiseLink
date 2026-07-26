@@ -1,7 +1,7 @@
 """Application configuration management."""
 
 from functools import lru_cache
-from typing import Any
+from typing import Any, cast
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -62,8 +62,8 @@ class Settings(BaseSettings):
         """Parse CORS origins from string or list."""
         if isinstance(v, str):
             import json
-            return json.loads(v)  # type: ignore[no-any-return]
-        return v  # type: ignore[no-any-return]
+            return cast(list[str], json.loads(v))
+        return cast(list[str], v)
 
     # Database
     database_url: str = "sqlite:///./data/promiselink.db"

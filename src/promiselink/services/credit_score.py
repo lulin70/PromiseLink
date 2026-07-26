@@ -1,6 +1,5 @@
 """Credit score calculation service with batch query support."""
 
-
 from sqlalchemy import Integer, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,9 +37,9 @@ class CreditScoreService:
             select(
                 Todo.related_entity_id,
                 func.count().label("total"),
-                func.sum(
-                    func.cast(Todo.fulfillment_status == "fulfilled", type_=Integer)
-                ).label("fulfilled"),
+                func.sum(func.cast(Todo.fulfillment_status == "fulfilled", type_=Integer)).label(
+                    "fulfilled"
+                ),
             )
             .where(
                 Todo.user_id == user_id,
@@ -57,9 +56,9 @@ class CreditScoreService:
             select(
                 Todo.related_entity_id,
                 func.count().label("total"),
-                func.sum(
-                    func.cast(Todo.fulfillment_status == "fulfilled", type_=Integer)
-                ).label("fulfilled"),
+                func.sum(func.cast(Todo.fulfillment_status == "fulfilled", type_=Integer)).label(
+                    "fulfilled"
+                ),
             )
             .where(
                 Todo.user_id == user_id,
@@ -68,7 +67,9 @@ class CreditScoreService:
             )
             .group_by(Todo.related_entity_id)
         )
-        their_rows = {row[0]: (row[1], row[2]) for row in (await session.execute(their_promises_q)).all()}
+        their_rows = {
+            row[0]: (row[1], row[2]) for row in (await session.execute(their_promises_q)).all()
+        }
         # their_rows: entity_id -> (total, fulfilled)
 
         # ── Batch query 3: Total interactions (all todos per entity) ──
@@ -83,7 +84,9 @@ class CreditScoreService:
             )
             .group_by(Todo.related_entity_id)
         )
-        total_rows: dict[str, int] = dict((await session.execute(total_q)).all())  # type: ignore[arg-type]
+        total_rows: dict[str, int] = {
+            str(row[0]): int(row[1]) for row in (await session.execute(total_q)).all()
+        }
         # total_rows: entity_id -> total_count
 
         # ── Build results ──
@@ -154,9 +157,9 @@ class CreditScoreService:
         """
         # Verify entity exists; otherwise return default (avoids treating
         # non-existent entities as "no todos" which would yield score=50)
-        exists = (await session.execute(
-            select(Entity.id).where(Entity.id == entity_id)
-        )).scalar_one_or_none()
+        exists = (
+            await session.execute(select(Entity.id).where(Entity.id == entity_id))
+        ).scalar_one_or_none()
         if not exists:
             return {
                 "score": 0,
@@ -166,14 +169,15 @@ class CreditScoreService:
                 "interaction_consistency": 50,
                 "total_interactions": 0,
             }
-        results = await CreditScoreService.batch_calculate(
-            session, [entity_id], user_id
+        results = await CreditScoreService.batch_calculate(session, [entity_id], user_id)
+        return results.get(
+            entity_id,
+            {
+                "score": 0,
+                "grade": "D",
+                "my_fulfillment_rate": 0.5,
+                "their_fulfillment_rate": 0.5,
+                "interaction_consistency": 50,
+                "total_interactions": 0,
+            },
         )
-        return results.get(entity_id, {
-            "score": 0,
-            "grade": "D",
-            "my_fulfillment_rate": 0.5,
-            "their_fulfillment_rate": 0.5,
-            "interaction_consistency": 50,
-            "total_interactions": 0,
-        })

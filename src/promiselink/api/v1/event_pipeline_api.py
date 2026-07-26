@@ -34,8 +34,7 @@ class BatchEventCreateRequest(BaseModel):
     """Request schema for batch creating events."""
 
     events: list[EventCreateRequest] = Field(
-        ..., min_length=1, max_length=20,
-        description="List of events to create (max 20 per batch)"
+        ..., min_length=1, max_length=20, description="List of events to create (max 20 per batch)"
     )
 
     model_config = {
@@ -46,14 +45,14 @@ class BatchEventCreateRequest(BaseModel):
                         "event_type": "meeting",
                         "source": "manual",
                         "title": "上午与李总讨论合作",
-                        "raw_text": "今天上午和李总讨论了新项目的合作方案..."
+                        "raw_text": "今天上午和李总讨论了新项目的合作方案...",
                     },
                     {
                         "event_type": "call",
                         "source": "manual",
                         "title": "下午与陈宇鑫电话沟通",
-                        "raw_text": "和陈宇鑫通了电话，确认了技术对接的时间..."
-                    }
+                        "raw_text": "和陈宇鑫通了电话，确认了技术对接的时间...",
+                    },
                 ]
             }
         }
@@ -93,18 +92,22 @@ async def batch_create_events(
         try:
             # Validate event type
             if event_req.event_type not in valid_types:
-                failed.append({
-                    "index": idx,
-                    "error": f"Invalid event_type: {event_req.event_type}",
-                })
+                failed.append(
+                    {
+                        "index": idx,
+                        "error": f"Invalid event_type: {event_req.event_type}",
+                    }
+                )
                 continue
 
             # Validate raw_text size
             if event_req.raw_text and len(event_req.raw_text.encode("utf-8")) > 512000:
-                failed.append({
-                    "index": idx,
-                    "error": "raw_text exceeds 500KB limit",
-                })
+                failed.append(
+                    {
+                        "index": idx,
+                        "error": "raw_text exceeds 500KB limit",
+                    }
+                )
                 continue
 
             event = Event(
@@ -125,20 +128,22 @@ async def batch_create_events(
             # Queue pipeline processing (runs serially via Pipeline lock)
             background_tasks.add_task(process_event_background, event_id=event.id)
 
-            created.append(EventCreateResponse(
-                id=str(event.id),
-                user_id=str(event.user_id),
-                event_type=event.event_type,
-                source=event.source,
-                title=event.title,
-                timestamp=event.timestamp,
-                status=event.status,
-                created_at=event.created_at,
-                pipeline_status="pending",
-                entity_count=0,
-                todo_count=0,
-                entities=[],
-            ))
+            created.append(
+                EventCreateResponse(
+                    id=str(event.id),
+                    user_id=str(event.user_id),
+                    event_type=event.event_type,
+                    source=event.source,
+                    title=event.title,
+                    timestamp=event.timestamp,
+                    status=event.status,
+                    created_at=event.created_at,
+                    pipeline_status="pending",
+                    entity_count=0,
+                    todo_count=0,
+                    entities=[],
+                )
+            )
 
             logger.info(
                 "batch_event_created",
@@ -149,10 +154,12 @@ async def batch_create_events(
 
         except SQLAlchemyError as e:
             logger.warning("batch_event_create_failed", index=idx, error=str(e))
-            failed.append({
-                "index": idx,
-                "error": str(e),
-            })
+            failed.append(
+                {
+                    "index": idx,
+                    "error": str(e),
+                }
+            )
             # Rollback this event but continue with others
             await session.rollback()
 
@@ -253,7 +260,9 @@ class CorrectedEntityItem(BaseModel):
 
     extracted_entity_id: str = Field(..., description="AI 提取的实体 ID")
     action: str = Field(..., description="select_existing | create_new | ignore")
-    selected_entity_id: str | None = Field(default=None, description="选择已有实体 ID (select_existing)")
+    selected_entity_id: str | None = Field(
+        default=None, description="选择已有实体 ID (select_existing)"
+    )
     new_name: str | None = Field(default=None, description="新名称 (create_new)")
     new_company: str | None = Field(default=None, description="新公司 (create_new)")
     new_title: str | None = Field(default=None, description="新职位 (create_new)")
@@ -380,7 +389,8 @@ async def correct_event(
                 extracted.canonical_name = ent_item.new_name
             if ent_item.new_company or ent_item.new_title:
                 props = dict(extracted.properties or {})
-                basic = dict(props.get("basic") if isinstance(props.get("basic"), dict) else {})  # type: ignore[arg-type]
+                basic_val = props.get("basic")
+                basic = dict(basic_val) if isinstance(basic_val, dict) else {}
                 if ent_item.new_company:
                     basic["company"] = ent_item.new_company
                 if ent_item.new_title:
@@ -388,6 +398,7 @@ async def correct_event(
                 props["basic"] = basic
                 extracted.properties = props
                 from sqlalchemy.orm.attributes import flag_modified
+
                 flag_modified(extracted, "properties")
             extracted.status = "confirmed"
             resp.entities_created += 1

@@ -11,7 +11,7 @@ import sqlite3
 import struct
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from promiselink.core.logging import get_logger
 from promiselink.services.embedding_provider import (
@@ -399,7 +399,7 @@ class SemanticSearchEngine:
         norm_b = sum(x * x for x in b) ** 0.5
         if norm_a == 0 or norm_b == 0:
             return 0.0
-        return dot / (norm_a * norm_b)  # type: ignore[no-any-return]
+        return cast(float, dot / (norm_a * norm_b))
 
     async def get_stats(self, user_id: str | None = None) -> dict:
         """Get indexing statistics."""
