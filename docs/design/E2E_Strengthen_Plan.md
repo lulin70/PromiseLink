@@ -26,7 +26,7 @@
 | `e2e_user_journey_extended.py` | 62KB | 8 大场景 42 个测试函数 | pytest + httpx + in-memory SQLite + LLM mock | 否 |
 | `e2e_smoke_test.py` | 5.2KB | 烟雾测试 | 启动服务后调用 | 否 |
 | `e2e_user_journey.py` / `e2e_full_user_journey.py` | 17KB/27KB | 用户旅程 | httpx | 否 |
-| `user_journey_test.py` | - | 用户旅程（含 upload/associations） | httpx | 否 |
+| `e2e_user_journey_basic.py` | - | 用户旅程（含 upload/associations） | httpx | 否 |
 | `e2e_miniprogram.py` | 6KB | 小程序模拟 | 启动服务后调用 | 否 |
 
 ### 1.2 基础版用户操作覆盖矩阵
@@ -35,7 +35,7 @@
 |----------|----------|----------------|-------------------|---------------------------|------|
 | 手动文本输入 | `POST /events` | ✅ | ✅ | ✅ | — |
 | 事件录入（需求） | `POST /demands` | ❌ | ✅ | ❌ | basic_test 缺 |
-| **文件上传 .txt/.md** | `POST /events/upload` | ❌ | ❌ | ❌ | **P0 缺口**（仅 user_journey_test/smoke 覆盖） |
+| **文件上传 .txt/.md** | `POST /events/upload` | ❌ | ❌ | ❌ | **P0 缺口**（仅 e2e_user_journey_basic/smoke 覆盖） |
 | Todo 完成 | `PATCH /todos/{id}` status=done | ❌（仅 in_progress） | ✅ | ✅ | — |
 | Todo 推迟（snoozed） | `PATCH /todos/{id}` status=snoozed | ❌ | ❌（仅 dismissed） | ❌ | **P1 缺口** |
 | Todo 忽略（dismissed） | `PATCH /todos/{id}` status=dismissed | ❌ | ✅ | ✅（via confirm rejected） | — |

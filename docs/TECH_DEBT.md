@@ -1,6 +1,6 @@
 # PromiseLink 基础版技术债跟踪文档
 
-> **文档版本** v1.5 / 2026-07-26 / TD-B04 标记 RESOLVED（合理保留）
+> **文档版本** v1.6 / 2026-07-26 / TD-B08/B09 标记 RESOLVED（全部技术债清理完成）
 > **关联文档** [PROJECT_STATUS.md](PROJECT_STATUS.md) · [ROADMAP.md](ROADMAP.md) · [PromiseLink-Pro TECH_DEBT.md](../PromiseLink-Pro/docs/TECH_DEBT.md)
 > **用途**：量化跟踪基础版技术债，按优先级清理，防止技术债积累导致项目可维护性下降
 > **更新原则**：每次清理后更新状态（OPEN→RESOLVED），新增技术债及时登记
@@ -12,12 +12,12 @@
 | 优先级 | 数量 | 已解决 | 进行中 | 待处理 |
 |--------|------|--------|--------|--------|
 | P0 关键 | 0 项 | 0 项 | 0 项 | 0 项 |
-| P1 重要 | 3 项 | 1 项 | 0 项 | 2 项 |
-| P2 一般 | 2 项 | 0 项 | 0 项 | 2 项 |
-| P3 低优先 | 2 项 | 0 项 | 0 项 | 2 项 |
-| **合计** | **7 项** | **1 项** | **0 项** | **6 项** |
+| P1 重要 | 3 项 | 3 项 | 0 项 | 0 项 |
+| P2 一般 | 2 项 | 2 项 | 0 项 | 0 项 |
+| P3 低优先 | 2 项 | 2 项 | 0 项 | 0 项 |
+| **合计** | **7 项** | **7 项** | **0 项** | **0 项** |
 
-> **变更说明**：v1.4（2026-07-26）TD-B04 第四批修复 embedding_provider.py 3 处无 error code 的 `# type: ignore`（line 206/244 `return results` → `cast(list[list[float]], results)`；line 238 `results_list.append(results[i])` → `cast(list[float], results[i])`），新增 cast import。src/ type:ignore 14→11。同步完成 TD-B05 审查（30 处 noqa 全部合理保留，无 F821，无无效 noqa，状态 RESOLVED）+ TD-B06 审查（src/ 仅 1 处 TODO 注释 P3 优化建议合理保留，tests/ 0 处，之前估计"16 个文件"为变量名误判）。v1.3（2026-07-26）TD-B04 第三批修复 8 处 no-any-return（36→28，no-any-return 9→0）。v1.2（2026-07-26）TD-B04 第二批修复 8 处 arg-type（44→36）。v1.1（2026-07-25 晚）TD-B04 第一批修复 5 处 attr-defined（49→44）。v1.0（2026-07-25）初始版本。同步完成 TD-B01/B02/B03（.gitleaks.toml + .github/dependabot.yml + ci.yml concurrency control）。
+> **变更说明**：v1.6（2026-07-26）TD-B08 清理 41 个 __pycache__ 目录（基础版 17 + 专业版 24）+ TD-B09 重命名 user_journey_test.py → e2e_user_journey_basic.py，同步更新 E2E_Strengthen_Plan.md 2 处引用。基础版技术债全部清理完成（7/7 RESOLVED）。v1.5（2026-07-26）TD-B04 第四批修复 + TD-B05/B06 审查完成。v1.4（2026-07-26）TD-B04 第四批修复 embedding_provider.py。v1.3（2026-07-26）TD-B04 第三批修复 no-any-return。v1.2（2026-07-26）TD-B04 第二批修复 arg-type。v1.1（2026-07-25 晚）TD-B04 第一批修复 attr-defined。v1.0（2026-07-25）初始版本 + TD-B01/B02/B03。
 
 ---
 
@@ -163,24 +163,26 @@
 
 ## 3. P3 低优先技术债
 
-### TD-B08: __pycache__ 本地缓存
+### TD-B08: __pycache__ 本地缓存 ✅ RESOLVED
 
-- **状态**：OPEN（不影响 git，仅本地磁盘）
+- **状态**：RESOLVED (2026-07-26)
 - **优先级**：P3
 - **描述**：scripts/__pycache__ 和 src/__pycache__ 本地存在
 - **影响**：不影响 git（.gitignore 正确保护），仅占用本地磁盘
-- **计划**：定期 `find . -name __pycache__ -exec rm -rf {} +` 清理
-- **验收**：本地无 __pycache__ 目录
+- **解决**：执行 `find . -type d -name __pycache__ -not -path "*/.venv/*" -exec rm -rf {} +` 清理基础版 17 个 + 专业版 24 个 = 41 个 __pycache__ 目录
+- **验收**：✅ 本地无 __pycache__ 目录（基础版 0 + 专业版 0）；.gitignore line 2 `__pycache__/` 正确保护，git status 确认无影响
 - **关联**：专业版 TD-014
 
-### TD-B09: 测试目录命名一致性
+### TD-B09: 测试目录命名一致性 ✅ RESOLVED
 
-- **状态**：OPEN
+- **状态**：RESOLVED (2026-07-26)
 - **优先级**：P3
 - **描述**：基础版测试目录结构良好（tests/ 统一），但 scripts/e2e/ 下的测试文件命名风格不一致
 - **影响**：命名风格不统一
-- **计划**：审查 scripts/e2e/ 下的文件命名，统一为 e2e_*.py 风格
-- **验收**：scripts/e2e/ 下所有测试文件使用 e2e_ 前缀
+- **解决**：使用 `git mv` 将 `user_journey_test.py` → `e2e_user_journey_basic.py`（保留作为快速冒烟测试，与增强版 `e2e_user_journey.py` 区分）
+- **同步更新**：`docs/design/E2E_Strengthen_Plan.md` 2 处引用（文件清单 + 覆盖矩阵）
+- **保留**：`check_pipeline.py`（运维诊断工具）和 `seed_demo_data.py`（种子数据生成）不是测试文件，不在验收范围内
+- **验收**：✅ scripts/e2e/ 下所有测试文件使用 e2e_ 前缀（15 个 e2e_*.py + 2 个工具脚本 + 1 个 .sh）
 - **关联**：专业版 TD-015
 
 ---
@@ -193,3 +195,4 @@
 | 2026-07-25 | v1.1 | DevSquad V4.1.7 | TD-B04 第一批修复 5 处 attr-defined（49→44）。验证：mypy 0 / ruff 0 / black 0 / 11 tests passed 无回归 |
 | 2026-07-26 | v1.2 | DevSquad V4.1.7 | TD-B04 第二批修复 8 处 arg-type（44→36），采用字典推导式替代 dict(cast(...))。验证：mypy 0 / ruff 0 / black 7 files reformatted / 186 tests passed 无回归。TD-B05 发现 1 处无效 noqa 指令（test_step11_assoc_todos.py:455） |
 | 2026-07-26 | v1.3 | DevSquad V4.1.7 | TD-B04 第三批修复 8 处 no-any-return（36→28），采用 cast(目标类型, expr) 包裹 return。5 个文件新增 cast import。验证：mypy 0 / ruff 0 / 130 tests passed 无回归。TD-B05 修复 1 处无效 noqa（51→50），test_step11_assoc_todos.py:455 改为普通注释。 |
+| 2026-07-26 | v1.6 | DevSquad V4.1.7 | TD-B08 清理 41 个 __pycache__ 目录（基础版 17 + 专业版 24）+ TD-B09 重命名 user_journey_test.py → e2e_user_journey_basic.py，同步更新 E2E_Strengthen_Plan.md 2 处引用。基础版技术债全部清理完成（7/7 RESOLVED）|
