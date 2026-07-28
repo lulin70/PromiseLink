@@ -24,13 +24,12 @@
 set -e
 
 # 默认配置：网关地址优先读环境变量，否则用正式域名
-# 2026-07-28 状态：ICP 备案已通过（网站备案号：沪ICP备2026035458号-1，2026-07-27）
+# 2026-07-28 状态：ICP 备案已通过 + gateway.promiselink.cn SSL 证书已签发
+#   - 网站备案号：沪ICP备2026035458号-1（2026-07-27）
 #   - 主办单位：麟研(上海)文化艺术传播有限公司
-#   - gateway.promiselink.cn 的 nginx 配置已部署到服务器（HTTP-only ACME 临时版本）
-#   - SSL 证书申请失败：阿里云 ICP 路径同步延迟（根路径已放行，ACME challenge 路径仍 403）
-#   - 临时仍使用 www.promiselink.cn（SSL 已覆盖），待 gateway.promiselink.cn 证书申请成功后切换
-#   - 重试证书申请：bash scripts/retry_gateway_cert.sh
-DEFAULT_GATEWAY_URL="${GATEWAY_URL:-https://www.promiselink.cn}"
+#   - gateway.promiselink.cn SSL 证书已签发（有效期至 2026-10-26，Certbot 自动续期）
+#   - 网关地址从 www.promiselink.cn 切换到 gateway.promiselink.cn
+DEFAULT_GATEWAY_URL="${GATEWAY_URL:-https://gateway.promiselink.cn}"
 DEFAULT_IMAGE="ghcr.io/lulin70/promiselink:0.8.3"
 INSTALL_DIR="${PROMISELINK_INSTALL_DIR:-$HOME/promiselink}"
 
