@@ -1,7 +1,7 @@
 # PromiseLink 基础版技术债跟踪文档
 
-> **文档版本** v1.6 / 2026-07-26 / TD-B08/B09 标记 RESOLVED（全部技术债清理完成）
-> **关联文档** [PROJECT_STATUS.md](PROJECT_STATUS.md) · [ROADMAP.md](ROADMAP.md) · [PromiseLink-Pro TECH_DEBT.md](../PromiseLink-Pro/docs/TECH_DEBT.md)
+> **文档版本** v1.7 / 2026-07-27 / TD-B10/B11 文档滞后修复（全部技术债清理完成）
+> **关联文档** [PROJECT_STATUS.md](PROJECT_STATUS.md) · [CHANGELOG.md](../CHANGELOG.md) · [ROADMAP.md](ROADMAP.md) · [PromiseLink-Pro TECH_DEBT.md](../PromiseLink-Pro/docs/TECH_DEBT.md)
 > **用途**：量化跟踪基础版技术债，按优先级清理，防止技术债积累导致项目可维护性下降
 > **更新原则**：每次清理后更新状态（OPEN→RESOLVED），新增技术债及时登记
 
@@ -14,10 +14,10 @@
 | P0 关键 | 0 项 | 0 项 | 0 项 | 0 项 |
 | P1 重要 | 3 项 | 3 项 | 0 项 | 0 项 |
 | P2 一般 | 2 项 | 2 项 | 0 项 | 0 项 |
-| P3 低优先 | 2 项 | 2 项 | 0 项 | 0 项 |
-| **合计** | **7 项** | **7 项** | **0 项** | **0 项** |
+| P3 低优先 | 4 项 | 4 项 | 0 项 | 0 项 |
+| **合计** | **9 项** | **9 项** | **0 项** | **0 项** |
 
-> **变更说明**：v1.6（2026-07-26）TD-B08 清理 41 个 __pycache__ 目录（基础版 17 + 专业版 24）+ TD-B09 重命名 user_journey_test.py → e2e_user_journey_basic.py，同步更新 E2E_Strengthen_Plan.md 2 处引用。基础版技术债全部清理完成（7/7 RESOLVED）。v1.5（2026-07-26）TD-B04 第四批修复 + TD-B05/B06 审查完成。v1.4（2026-07-26）TD-B04 第四批修复 embedding_provider.py。v1.3（2026-07-26）TD-B04 第三批修复 no-any-return。v1.2（2026-07-26）TD-B04 第二批修复 arg-type。v1.1（2026-07-25 晚）TD-B04 第一批修复 attr-defined。v1.0（2026-07-25）初始版本 + TD-B01/B02/B03。
+> **变更说明**：v1.7（2026-07-27）新增 2 项文档滞后技术债并立即修复：① TD-B10 PROJECT_STATUS.md 严重滞后（停留在 v0.8.0/806 passed，实际 v0.8.3/1968 tests collected），更新顶部元信息/总览仪表板/版本信息表/末尾更新时间；② TD-B11 CHANGELOG.md 缺 [0.8.2] 和 [0.8.3] 章节（v0.8.1→v0.8.3 跨越 2 个版本未记录），补全 0.8.2 打包子包缺失修复 + 0.8.3 版本号同步章节。基础版技术债全部清理完成（9/9 RESOLVED）。v1.6（2026-07-26）TD-B08 清理 41 个 __pycache__ 目录 + TD-B09 重命名 user_journey_test.py → e2e_user_journey_basic.py。v1.5（2026-07-26）TD-B04 第四批修复 + TD-B05/B06 审查完成。v1.4（2026-07-26）TD-B04 第四批修复 embedding_provider.py。v1.3（2026-07-26）TD-B04 第三批修复 no-any-return。v1.2（2026-07-26）TD-B04 第二批修复 arg-type。v1.1（2026-07-25 晚）TD-B04 第一批修复 attr-defined。v1.0（2026-07-25）初始版本 + TD-B01/B02/B03。
 
 ---
 
@@ -185,6 +185,37 @@
 - **验收**：✅ scripts/e2e/ 下所有测试文件使用 e2e_ 前缀（15 个 e2e_*.py + 2 个工具脚本 + 1 个 .sh）
 - **关联**：专业版 TD-015
 
+### TD-B10: PROJECT_STATUS.md 文档滞后 ✅ RESOLVED
+
+- **状态**：RESOLVED (2026-07-27)
+- **优先级**：P3
+- **描述**：`docs/PROJECT_STATUS.md` 严重滞后，停留在 v0.8.0/2026-07-08，实际已是 v0.8.3/2026-07-27
+- **影响**：版本号、测试数量、阶段进度均与实际不符，违反"文档是活文档"原则
+- **根因**：v0.8.1→v0.8.3 版本同步时未同步更新 PROJECT_STATUS.md（与 project_memory 教训"v0.4.16 诚实修正从未传播到 PRD"同类）
+- **修复**：
+  - 顶部元信息：`2026-07-08 (三仓版本统一 0.8.0)` → `2026-07-27 (基础版 v0.8.3，技术债 9/9 RESOLVED，等待 ICP 备案)`
+  - 当前阶段：`806 passed / 1 failed` → `1968 tests collected / 3 skipif (依赖运行中的服务器，合理保留) / ruff 0 / mypy 0`
+  - 总览仪表板：P8/P9/P10 进度百分比更新，总体进度 89% → 92%
+  - 三级产品模型：基础版/专业版测试数和状态更新
+  - 软件版本行：`0.8.0` → `0.8.3`
+  - 最新Commit：`97e9d00 (AGPL→MPL)` → `26137ac (技术债清理完成)`
+  - 末尾更新时间：`2026-07-08` → `2026-07-27`
+- **验收**：✅ grep "0.8.0" docs/PROJECT_STATUS.md 仅剩历史记录（"v0.8.0-rc1/rc2" 等 UI 整改记录保留）；grep "806 passed" 无匹配
+- **关联**：project_memory 教训"文档滞后根因 — 将文档视为一次性交付物而非活文档"
+
+### TD-B11: CHANGELOG.md 缺 [0.8.2] 和 [0.8.3] 章节 ✅ RESOLVED
+
+- **状态**：RESOLVED (2026-07-27)
+- **优先级**：P3
+- **描述**：`CHANGELOG.md` 最新章节为 [0.8.1] - 2026-07-18，但 VERSION 文件已是 0.8.3，跨越 2 个版本未记录
+- **影响**：版本变更历史不完整，违反"文档先行 + 文档同步"原则
+- **根因**：v0.8.2（commit c8305da）和 v0.8.3（commit d192308）均为 PATCH 版本，仅做打包修复和版本号同步，未补全 CHANGELOG
+- **修复**：
+  - 新增 `## [0.8.2] - 2026-07-18` 章节：记录 pyproject.toml packages.find 修复（基础版子包缺失导致 promiselink.api 不可导入）
+  - 新增 `## [0.8.3] - 2026-07-21` 章节：记录版本号同步 8 处（VERSION/pyproject.toml/3 语 README/frontend/package.json/scripts/docker-compose），关联专业版 v0.8.3 部署执行资源
+- **验收**：✅ grep "^## \[0.8" CHANGELOG.md 显示 [0.8.3] / [0.8.2] / [0.8.1] / [0.8.0-rc2] / [0.8.0-rc1] 完整序列；版本号与 VERSION 文件一致
+- **关联**：project_memory 教训"版本一致性检查不能遗漏"
+
 ---
 
 ## 4. 变更历史
@@ -196,3 +227,4 @@
 | 2026-07-26 | v1.2 | DevSquad V4.1.7 | TD-B04 第二批修复 8 处 arg-type（44→36），采用字典推导式替代 dict(cast(...))。验证：mypy 0 / ruff 0 / black 7 files reformatted / 186 tests passed 无回归。TD-B05 发现 1 处无效 noqa 指令（test_step11_assoc_todos.py:455） |
 | 2026-07-26 | v1.3 | DevSquad V4.1.7 | TD-B04 第三批修复 8 处 no-any-return（36→28），采用 cast(目标类型, expr) 包裹 return。5 个文件新增 cast import。验证：mypy 0 / ruff 0 / 130 tests passed 无回归。TD-B05 修复 1 处无效 noqa（51→50），test_step11_assoc_todos.py:455 改为普通注释。 |
 | 2026-07-26 | v1.6 | DevSquad V4.1.7 | TD-B08 清理 41 个 __pycache__ 目录（基础版 17 + 专业版 24）+ TD-B09 重命名 user_journey_test.py → e2e_user_journey_basic.py，同步更新 E2E_Strengthen_Plan.md 2 处引用。基础版技术债全部清理完成（7/7 RESOLVED）|
+| 2026-07-27 | v1.7 | DevSquad V4.3.1 | 新增 2 项文档滞后技术债并立即修复：TD-B10 PROJECT_STATUS.md 滞后（v0.8.0→v0.8.3 + 806→1968 tests collected）+ TD-B11 CHANGELOG.md 缺 [0.8.2]/[0.8.3] 章节。基础版技术债全部清理完成（9/9 RESOLVED）。验证：grep "0.8.0" 仅历史记录 / grep "806 passed" 无匹配 / CHANGELOG 版本序列完整 |

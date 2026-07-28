@@ -2,6 +2,36 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [0.8.3] - 2026-07-21
+
+### Changed — 版本号同步 (2026-07-21)
+
+DevSquad 7-Role 评估发现基础版版本号落后专业版 2 个版本（v0.8.1 vs v0.8.3），违反"项目版本号必须在所有位置保持一致"硬约束。本次同步所有版本号到 v0.8.3，与专业版/小程序对齐。
+
+- **版本号同步 8 处**：VERSION / pyproject.toml / README.md / README.en.md / README.jp.md / frontend/package.json / scripts/install_basic.sh / docker-compose.prod.yml
+- **验证**：全量 grep "0.8.1" 确认无遗漏（CHANGELOG.md 中的历史记录保留），三语 README 版本号一致性已确认
+
+### 版本策略
+
+- PATCH 递增 v0.8.2 → v0.8.3（无新业务功能，仅版本号同步）
+- 关联专业版 v0.8.3 部署执行资源（算法备案材料 + LLM 对话日志 6 个月留存 + 官网清理 + 种子用户 onboarding 物料），详见 PromiseLink-Pro CHANGELOG.md [0.8.3]
+
+## [0.8.2] - 2026-07-18
+
+### Fixed — 打包子包缺失修复 (2026-07-18)
+
+- **pyproject.toml packages.find 修复**：原 `packages = ["promiselink"]` 仅声明顶层包，未含 `api/core/models/services` 等子包。导致 PyPI/git 安装包缺少子包目录，PromiseLink-Pro pro-tests `import promiselink.api` 失败（ModuleNotFoundError）。改为 `[tool.setuptools.packages.find] where = ["src"]`，自动发现所有子包。
+- **验证**：PromiseLink-Pro pro-tests 272 passed（editable install 后），0 失败。
+
+### 关联
+
+- 对应专业版 v0.8.2 P1-3 pro-tests voice 18 failed 根因修复
+- 仅 1 个文件变更（pyproject.toml），无业务功能改动
+
+### 版本策略
+
+- PATCH 递增 v0.8.1 → v0.8.2（无新功能，仅打包 bug 修复）
+
 ## [0.8.1] - 2026-07-18
 
 ### Fixed — P0-P2 系统优化 (2026-07-18)
