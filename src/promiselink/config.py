@@ -7,6 +7,7 @@ from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LLM_PRESETS: dict[str, dict[str, str]] = {
+    "rsxermu666": {"base_url": "https://rsxermu666.cn/v1", "model": "claude-opus-5"},
     "moka_ai": {"base_url": "https://api.moka-ai.com/v1", "model": "moka/claude-sonnet-4-6"},
     "openai": {"base_url": "https://api.openai.com/v1", "model": "gpt-5.5"},
     "anthropic": {"base_url": "https://api.anthropic.com/v1", "model": "claude-sonnet-4-6-20250514"},
@@ -95,7 +96,7 @@ class Settings(BaseSettings):
     trusted_proxies: list[str] = Field(default_factory=list, description="Trusted reverse proxy IPs for X-Forwarded-For")
 
     # LLM Provider
-    llm_provider: str = "moka_ai"  # moka_ai, openai, anthropic — see LLM_PRESETS
+    llm_provider: str = "rsxermu666"  # rsxermu666, moka_ai, openai, anthropic — see LLM_PRESETS
     llm_api_key: str = Field(default="")
     llm_base_url: str = Field(default="")
     llm_model: str = Field(default="")

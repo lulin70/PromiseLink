@@ -26,7 +26,8 @@ _LICENSE_PREFIX = "/api/v1/pro/license"
 _HEALTH_PATH = "/api/v1/pro/health"
 
 # Default relay model (gateway selects the actual backend model)
-_DEFAULT_LLM_MODEL = "moka/claude-sonnet-4-6"
+# Updated 2026-07-28: align with rsxermu666.cn backend (was moka/claude-sonnet-4-6)
+_DEFAULT_LLM_MODEL = "claude-opus-5"
 _DEFAULT_ASR_MODEL = "whisper-1"
 _DEFAULT_TTS_MODEL = "moka-tts"
 _DEFAULT_OCR_MODEL = "moka-vision"

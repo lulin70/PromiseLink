@@ -323,6 +323,12 @@ class RelayWSSClient:
         headers = msg_data.get("headers", {}) or {}
         body = msg_data.get("body")
 
+        # 2026-07-29 fix: Mini-app sends relative paths like "/entities",
+        # but local FastAPI endpoints are mounted under "/api/v1/".
+        # Without this prefix, forwarding returns 404.
+        if path and not path.startswith("/api/v1"):
+            path = f"/api/v1{path}"
+
         # Strip hop-by-hop headers that should not be forwarded.
         # Also drop Content-Length — httpx will recompute it.
         # Drop Authorization and X-API-Key — these are gateway creds
@@ -342,7 +348,14 @@ class RelayWSSClient:
         # carry the user JWT via X-User-Token from the mini-app.
         user_token = headers.get("X-User-Token") or headers.get("x-user-token")
         if user_token:
-            forwarded_headers["Authorization"] = user_token
+            # 2026-07-29 fix: HTTPBearer expects "Bearer <jwt>" scheme prefix.
+            # Without it, the local auth middleware returns 401, causing
+            # "undefined is not iterable" in the mini-app (r.items is undefined
+            # because the body is {"detail":"Not authenticated"} not PaginatedResponse).
+            if user_token.startswith("Bearer "):
+                forwarded_headers["Authorization"] = user_token
+            else:
+                forwarded_headers["Authorization"] = f"Bearer {user_token}"
 
         url = f"{self.local_api_url}{path}"
         if query:

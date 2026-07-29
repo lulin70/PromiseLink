@@ -22,7 +22,7 @@ import os
 import pathlib
 
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from promiselink.config import get_settings
@@ -152,11 +152,17 @@ async def get_pair_status(code: str) -> PairStatusResponse:
 
 
 @router.post("/activate", response_model=PairActivateResponse)
-async def activate_pair(body: PairActivateRequest) -> PairActivateResponse:
+async def activate_pair(body: PairActivateRequest, request: Request) -> PairActivateResponse:
     """Activate Pro edition with the obtained license key.
 
-    Writes PRO_LICENSE_KEY to the .env file so it persists across restarts.
-    The WSS relay will start on next restart (or can be triggered dynamically).
+    Writes PRO_LICENSE_KEY to the .env file so it persists across restarts,
+    then dynamically starts the WSS relay connection — no restart required.
+
+    2026-07-29 fix: Previously this endpoint only wrote .env and returned
+    "即将启动中继服务", but the WSS client was only started in the lifespan
+    startup event, so users had to manually restart the basic edition.
+    Now we clear the settings cache, reload settings with the new license
+    key, and start the WSS client immediately.
     """
     license_key = body.license_key.strip()
     if not license_key:
@@ -193,9 +199,54 @@ async def activate_pair(body: PairActivateRequest) -> PairActivateResponse:
 
     os.environ["PRO_LICENSE_KEY"] = license_key
 
-    logger.info("pair_activate_success", license_key=license_key[:10] + "****")
+    # Clear the lru_cache on get_settings so the new PRO_LICENSE_KEY is picked up.
+    get_settings.cache_clear()
+    fresh_settings = get_settings()
 
+    wss_started = False
+    wss_error = ""
+
+    # Start WSS relay dynamically if not already running.
+    existing_wss = getattr(request.app.state, "relay_wss_client", None)
+    if existing_wss is not None:
+        # Already running — nothing to do.
+        wss_started = True
+    elif fresh_settings.relay_gateway_url and fresh_settings.pro_license_key and fresh_settings.relay_wss_enabled:
+        try:
+            from promiselink.services.relay_wss_client import RelayWSSClient
+
+            relay_wss = RelayWSSClient(
+                gateway_url=fresh_settings.relay_gateway_url,
+                license_key=fresh_settings.pro_license_key,
+                local_api_url=fresh_settings.relay_local_api_url,
+                heartbeat_interval=fresh_settings.relay_heartbeat_interval,
+                reconnect_interval=fresh_settings.relay_reconnect_interval,
+                reconnect_max=fresh_settings.relay_reconnect_max,
+                http_request_timeout=fresh_settings.relay_http_request_timeout,
+            )
+            await relay_wss.start()
+            request.app.state.relay_wss_client = relay_wss
+            wss_started = True
+            logger.info(
+                "pair_activate_wss_started",
+                gateway=fresh_settings.relay_gateway_url,
+                local_api_url=fresh_settings.relay_local_api_url,
+            )
+        except Exception as exc:
+            wss_error = str(exc)[:200]
+            logger.error("pair_activate_wss_start_failed", error=wss_error)
+    else:
+        wss_error = " relay_gateway_url 或 relay_wss_enabled 未配置，无法启动 WSS 中继"
+
+    logger.info("pair_activate_success", license_key=license_key[:10] + "****", wss_started=wss_started)
+
+    if wss_started:
+        return PairActivateResponse(
+            success=True,
+            message="专业版激活成功！中继服务已启动，小程序可连接。",
+        )
     return PairActivateResponse(
         success=True,
-        message="专业版激活成功！即将启动中继服务，请稍候...",
+        message=f"专业版激活成功，但 WSS 中继启动失败（{wss_error}）。请重启基础版后重试。",
+        error=wss_error,
     )
