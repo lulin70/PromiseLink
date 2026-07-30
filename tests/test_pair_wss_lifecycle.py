@@ -28,21 +28,77 @@ from fastapi.testclient import TestClient
 from promiselink.api.v1 import pair as pair_module
 from promiselink.services.relay_client import RelayClient
 
-
 # ── Helpers ──
 
 
 @pytest.fixture(autouse=True)
-def _clean_app_state():
-    """Clear app.state.relay_wss_client between tests to prevent leakage."""
-    yield
-    # Cleanup after each test
+def _clean_app_state(monkeypatch):
+    """Isolate tests from real .env and prevent lifespan WSS startup.
+
+    Root cause of pre-existing failures (2026-07-30 P0-02e root cause):
+    The module-level ``settings`` in main.py is loaded from the real .env
+    at import time. If the developer's .env has PRO_LICENSE_KEY set,
+    lifespan startup creates a (mocked) RelayWSSClient and sets
+    ``app.state.relay_wss_client`` BEFORE the test's assertion runs.
+
+    Fix: (1) Clear app.state.relay_wss_client BEFORE and AFTER each test.
+         (2) Mock main.settings.pro_license_key="" so lifespan skips WSS.
+    """
+    # BEFORE: clean any leftover state from a previous test or import-time load
     try:
         from promiselink.main import app
         if hasattr(app.state, "relay_wss_client"):
             del app.state.relay_wss_client
     except Exception:
         pass
+
+    # Prevent lifespan startup from starting WSS during tests.
+    # Tests that verify activate-starts-WSS will mock pair_module.get_settings
+    # separately to return controlled settings with the test license_key.
+    monkeypatch.setattr("promiselink.main.settings.pro_license_key", "")
+    monkeypatch.setattr("promiselink.main.settings.relay_wss_enabled", False)
+
+    yield
+
+    # AFTER: clean state again in case the test set it
+    try:
+        from promiselink.main import app
+        if hasattr(app.state, "relay_wss_client"):
+            del app.state.relay_wss_client
+    except Exception:
+        pass
+
+
+def _make_test_get_settings(
+    *,
+    gateway_url: str = "https://gateway.promiselink.cn",
+    license_key: str = "PL-PRO-LIFECYCLE-001",
+    wss_enabled: bool = True,
+):
+    """Build a mock get_settings callable with controlled relay fields.
+
+    Returns a MagicMock that:
+    - Supports ``cache_clear()`` (no-op, since we bypass lru_cache)
+    - Returns a SimpleNamespace with the test relay settings
+
+    This isolates pair/activate from the real .env file, so the test's
+    license_key (not the developer's .env value) is passed to RelayWSSClient.
+    """
+    from types import SimpleNamespace
+
+    test_settings = SimpleNamespace(
+        relay_gateway_url=gateway_url,
+        pro_license_key=license_key,
+        relay_wss_enabled=wss_enabled,
+        relay_local_api_url="http://localhost:8000",
+        relay_heartbeat_interval=30,
+        relay_reconnect_interval=5,
+        relay_reconnect_max=10,
+        relay_http_request_timeout=10.0,
+    )
+    mock = MagicMock(return_value=test_settings)
+    mock.cache_clear = MagicMock()
+    return mock
 
 
 def _mock_httpx_module(handler) -> types.ModuleType:
@@ -105,9 +161,13 @@ class TestPairActivateWssStartup:
 
         monkeypatch.setattr(pair_module, "_get_env_path", lambda: fake_env)
         monkeypatch.delenv("PRO_LICENSE_KEY", raising=False)
-        # Settings reads from env vars (not from fake_env path), so set them directly
-        monkeypatch.setenv("RELAY_GATEWAY_URL", "https://gateway.promiselink.cn")
-        monkeypatch.setenv("RELAY_WSS_ENABLED", "true")
+        # Mock get_settings so activate uses the test's license_key, not the
+        # real .env value (root cause of pre-existing isolation failure).
+        monkeypatch.setattr(
+            pair_module,
+            "get_settings",
+            _make_test_get_settings(license_key="PL-PRO-LIFECYCLE-001"),
+        )
 
         # Mock RelayWSSClient to avoid real network connections
         mock_wss_instances = []
@@ -232,6 +292,14 @@ class TestPairActivateWssStartup:
         monkeypatch.setattr(pair_module, "_get_env_path", lambda: fake_env)
         monkeypatch.delenv("RELAY_GATEWAY_URL", raising=False)
         monkeypatch.delenv("RELAY_WSS_ENABLED", raising=False)
+        # Mock get_settings to return empty gateway_url, isolating from real .env
+        # (root cause of pre-existing isolation failure: real .env has
+        # RELAY_GATEWAY_URL set, so get_settings() returned a non-empty URL).
+        monkeypatch.setattr(
+            pair_module,
+            "get_settings",
+            _make_test_get_settings(gateway_url="", wss_enabled=False),
+        )
 
         mock_wss_instances = []
 
@@ -293,8 +361,15 @@ class TestFullPairFlowToWssStartup:
 
         monkeypatch.setattr(pair_module, "httpx", _mock_httpx_module(handler))
         monkeypatch.setattr(pair_module, "_get_env_path", lambda: fake_env)
-        monkeypatch.setenv("RELAY_GATEWAY_URL", "https://gateway.promiselink.cn")
-        monkeypatch.setenv("RELAY_WSS_ENABLED", "true")
+        # Mock get_settings so activate uses the mocked gateway's license_key,
+        # not the real .env value (root cause of pre-existing isolation failure:
+        # real .env has PRO_LICENSE_KEY=PL-PRO-EE3B-8344-5372 which leaked into
+        # RelayWSSClient kwargs, causing assert 'PL-PRO-EE3B-8344-5372' == 'PL-PRO-TEST-ABCD-EFGH').
+        monkeypatch.setattr(
+            pair_module,
+            "get_settings",
+            _make_test_get_settings(license_key="PL-PRO-TEST-ABCD-EFGH"),
+        )
 
         mock_wss_instances = []
 

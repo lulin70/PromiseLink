@@ -2,6 +2,27 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [Unreleased]
+
+### Fixed — P0-02a relayToken 自动刷新 + 测试隔离修复 (2026-07-30)
+
+P0-02 任务按项目生命周期推进（P1 规格→P2 设计→P7 测试计划→P8 实现→P9 验证）。修复 relayToken 刷新调用 /activate 导致 license 重激活的根因问题。
+
+#### P0-02a: relayToken 两级刷新策略
+
+- **根因**: `relay_client.py` 的 `refresh_token()` 始终调用 `/api/v1/pro/license/activate`，未使用已存储的 `refresh_token`。每次 token 过期（15 分钟）都走完整激活流程，产生 audit log 噪音，且 WeChat openid 变化时触发 `LicenseAlreadyActivated` 错误。
+- **修复**: `refresh_token()` 改为两级策略 — 策略1 调用 `/api/v1/pro/license/refresh`（轻量，不产生 audit log）；策略2 仅在 refresh_token 失效时降级到 `/activate`。
+- **新增方法**: `_refresh_via_refresh_token()` 封装 `/refresh` 端点调用，处理 401/403（降级）和网络错误（直接抛出 RelayUnavailableError）。
+- **副作用验证**: 单元测试断言 token 轮换（new_refresh != old_refresh）+ expires_in 正确设置。
+
+#### 测试隔离 BUG 修复 (test_pair_wss_lifecycle.py)
+
+- **根因**: 4 个测试因未隔离 `get_settings()` 和模块级 `settings`，导致真实 `.env` 的 `PRO_LICENSE_KEY=PL-PRO-EE3B-8344-5372` 泄露进测试。lifespan 启动时读取模块级 `settings`（从真实 `.env` 加载），创建 mock WSS 客户端并设置 `app.state.relay_wss_client`，干扰测试断言。
+- **修复**: autouse fixture 增加 BEFORE 清理 + mock `main.settings.pro_license_key=""` 防止 lifespan 启动 WSS；新增 `_make_test_get_settings()` helper；3 个测试注入 `pair_module.get_settings` mock 隔离真实 `.env`。
+- **结果**: 16/16 passed（修复前 4 failed），226 relay 相关测试全绿。
+
+详见 [PromiseLink-Pro/docs/spec/P0-02_License_Reactivation_Token_Refresh_WSS_SelfCheck.md](../PromiseLink-Pro/docs/spec/P0-02_License_Reactivation_Token_Refresh_WSS_SelfCheck.md)
+
 ## [0.8.3] - 2026-07-21
 
 ### Changed — 版本号同步 (2026-07-21)

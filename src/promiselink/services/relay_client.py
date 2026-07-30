@@ -171,17 +171,22 @@ class RelayClient(RelayEndpointsMixin):
         return {"Authorization": f"Bearer {self._token.access_token}"}
 
     async def refresh_token(self) -> str:
-        """Refresh the relay JWT using the license key.
+        """Refresh the relay JWT using a two-level strategy.
 
-        Calls the gateway license activation endpoint with the license
-        key and device fingerprint. The returned access token is cached
-        and used for subsequent relay requests.
+        Level 1: If a ``refresh_token`` is cached, call the gateway
+        ``/api/v1/pro/license/refresh`` endpoint (lightweight, no
+        audit log, no device fingerprint check).
+
+        Level 2: If Level 1 fails (401/403 — refresh token expired or
+        revoked) or no refresh_token is cached, fall back to the full
+        ``/api/v1/pro/license/activate`` flow (re-activates the license
+        with device fingerprint, produces an audit log entry).
 
         Returns:
             The new access token (JWT string).
 
         Raises:
-            RelayAuthError: If the license key is invalid or expired.
+            RelayAuthError: If both refresh and activation fail.
             RelayUnavailableError: If the gateway is unreachable.
         """
         async with self._token.refresh_lock:
@@ -190,63 +195,162 @@ class RelayClient(RelayEndpointsMixin):
             if not self._token.needs_refresh:
                 return self._token.access_token
 
-            url = f"{self.gateway_url}{_LICENSE_PREFIX}/activate"
-            payload = {
-                "license_key": self.license_key,
-                "device_fingerprint": self.device_fingerprint,
-            }
+            # Level 1: try /refresh with the cached refresh_token.
+            if self._token.refresh_token:
+                try:
+                    new_access, new_refresh, expires_in = await self._refresh_via_refresh_token()
+                    self._token.access_token = new_access
+                    self._token.refresh_token = new_refresh
+                    self._token.expires_at = time.time() + expires_in
+                    logger.info(
+                        "relay_token_refreshed_via_refresh_token",
+                        expires_in=expires_in,
+                    )
+                    return self._token.access_token
+                except RelayAuthError:
+                    # Refresh token expired/revoked — clear it and fall
+                    # back to full activation.
+                    logger.warning("relay_refresh_token_expired_fallback_to_activate")
+                    self._token.refresh_token = ""
+                except RelayUnavailableError:
+                    # Gateway unreachable — propagate immediately; no
+                    # point trying /activate against the same dead gateway.
+                    raise
 
-            try:
-                client = await self._get_client()
-                response = await client.post(
-                    url,
-                    json=payload,
-                    headers={"Content-Type": "application/json"},
-                    timeout=httpx.Timeout(15.0, connect=5.0),
-                )
-            except httpx.HTTPError as exc:
-                logger.error("relay_token_refresh_network_error", error=str(exc)[:200])
-                raise RelayUnavailableError(
-                    message=f"Cannot reach gateway to refresh token: {exc}",
-                    details={"gateway_url": self.gateway_url, "error": str(exc)[:200]},
-                ) from exc
+            # Level 2: fall back to /activate (full license activation).
+            return await self._activate_license()
 
-            if response.status_code in (401, 403):
-                detail = safe_error_detail(response)
-                logger.error("relay_token_refresh_auth_failed", status=response.status_code, detail=detail)
-                raise RelayAuthError(
-                    message=f"License activation rejected (HTTP {response.status_code}): {detail}",
-                    details={"status_code": response.status_code, "detail": detail},
-                )
-            if response.status_code >= 400:
-                detail = safe_error_detail(response)
-                logger.error("relay_token_refresh_failed", status=response.status_code, detail=detail)
-                raise RelayError(
-                    message=f"License activation failed (HTTP {response.status_code}): {detail}",
-                    code="RELAY_LICENSE_ERROR",
-                    details={"status_code": response.status_code, "detail": detail},
-                )
+    async def _refresh_via_refresh_token(self) -> tuple[str, str, int]:
+        """Call ``/api/v1/pro/license/refresh`` with the cached refresh_token.
 
-            try:
-                data = response.json()
-            except json.JSONDecodeError as exc:
-                raise RelayError(
-                    message=f"Invalid JSON in activation response: {exc}",
-                    code="RELAY_PARSE_ERROR",
-                ) from exc
+        Returns:
+            A tuple of ``(access_token, refresh_token, expires_in)``.
 
-            # The gateway returns a UnifiedResponse with data.tokens
-            token_data = self._extract_token_data(data)
-            self._token.access_token = token_data["access_token"]
-            self._token.refresh_token = token_data.get("refresh_token", "")
-            self._token.expires_at = time.time() + token_data.get("expires_in", 900)
+        Raises:
+            RelayAuthError: If the refresh token is invalid/expired (401/403).
+            RelayUnavailableError: If the gateway is unreachable.
+            RelayError: On other HTTP errors or malformed response.
+        """
+        url = f"{self.gateway_url}{_LICENSE_PREFIX}/refresh"
+        payload = {"refresh_token": self._token.refresh_token}
 
-            logger.info(
-                "relay_token_refreshed",
-                expires_in=token_data.get("expires_in", 900),
-                has_refresh=bool(self._token.refresh_token),
+        try:
+            client = await self._get_client()
+            response = await client.post(
+                url,
+                json=payload,
+                headers={"Content-Type": "application/json"},
+                timeout=httpx.Timeout(15.0, connect=5.0),
             )
-            return self._token.access_token
+        except httpx.HTTPError as exc:
+            logger.error("relay_refresh_network_error", error=str(exc)[:200])
+            raise RelayUnavailableError(
+                message=f"Cannot reach gateway to refresh token: {exc}",
+                details={"gateway_url": self.gateway_url, "error": str(exc)[:200]},
+            ) from exc
+
+        if response.status_code in (401, 403):
+            detail = safe_error_detail(response)
+            logger.warning("relay_refresh_auth_failed", status=response.status_code, detail=detail)
+            raise RelayAuthError(
+                message=f"Token refresh rejected (HTTP {response.status_code}): {detail}",
+                details={"status_code": response.status_code, "detail": detail},
+            )
+        if response.status_code >= 400:
+            detail = safe_error_detail(response)
+            logger.error("relay_refresh_failed", status=response.status_code, detail=detail)
+            raise RelayError(
+                message=f"Token refresh failed (HTTP {response.status_code}): {detail}",
+                code="RELAY_REFRESH_ERROR",
+                details={"status_code": response.status_code, "detail": detail},
+            )
+
+        try:
+            data = response.json()
+        except json.JSONDecodeError as exc:
+            raise RelayError(
+                message=f"Invalid JSON in refresh response: {exc}",
+                code="RELAY_PARSE_ERROR",
+            ) from exc
+
+        token_data = self._extract_token_data(data)
+        return (
+            token_data["access_token"],
+            token_data.get("refresh_token", ""),
+            token_data.get("expires_in", 900),
+        )
+
+    async def _activate_license(self) -> str:
+        """Call ``/api/v1/pro/license/activate`` to re-activate the license.
+
+        This is the fallback path when no refresh_token is available or
+        the refresh_token has expired. It performs the full activation
+        flow (device fingerprint binding, audit log).
+
+        Returns:
+            The new access token (JWT string).
+
+        Raises:
+            RelayAuthError: If the license key is invalid or expired.
+            RelayUnavailableError: If the gateway is unreachable.
+        """
+        url = f"{self.gateway_url}{_LICENSE_PREFIX}/activate"
+        payload = {
+            "license_key": self.license_key,
+            "device_fingerprint": self.device_fingerprint,
+        }
+
+        try:
+            client = await self._get_client()
+            response = await client.post(
+                url,
+                json=payload,
+                headers={"Content-Type": "application/json"},
+                timeout=httpx.Timeout(15.0, connect=5.0),
+            )
+        except httpx.HTTPError as exc:
+            logger.error("relay_token_refresh_network_error", error=str(exc)[:200])
+            raise RelayUnavailableError(
+                message=f"Cannot reach gateway to refresh token: {exc}",
+                details={"gateway_url": self.gateway_url, "error": str(exc)[:200]},
+            ) from exc
+
+        if response.status_code in (401, 403):
+            detail = safe_error_detail(response)
+            logger.error("relay_token_refresh_auth_failed", status=response.status_code, detail=detail)
+            raise RelayAuthError(
+                message=f"License activation rejected (HTTP {response.status_code}): {detail}",
+                details={"status_code": response.status_code, "detail": detail},
+            )
+        if response.status_code >= 400:
+            detail = safe_error_detail(response)
+            logger.error("relay_token_refresh_failed", status=response.status_code, detail=detail)
+            raise RelayError(
+                message=f"License activation failed (HTTP {response.status_code}): {detail}",
+                code="RELAY_LICENSE_ERROR",
+                details={"status_code": response.status_code, "detail": detail},
+            )
+
+        try:
+            data = response.json()
+        except json.JSONDecodeError as exc:
+            raise RelayError(
+                message=f"Invalid JSON in activation response: {exc}",
+                code="RELAY_PARSE_ERROR",
+            ) from exc
+
+        # The gateway returns a UnifiedResponse with data.tokens
+        token_data = self._extract_token_data(data)
+        self._token.access_token = token_data["access_token"]
+        self._token.refresh_token = token_data.get("refresh_token", "")
+        self._token.expires_at = time.time() + token_data.get("expires_in", 900)
+
+        logger.info(
+            "relay_token_refreshed_via_activate",
+            expires_in=token_data.get("expires_in", 900),
+            has_refresh=bool(self._token.refresh_token),
+        )
+        return self._token.access_token
 
     @staticmethod
     def _extract_token_data(data: dict[str, Any]) -> dict[str, Any]:
