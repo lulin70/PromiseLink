@@ -4,10 +4,39 @@ Extracted from event_pipeline.py to break the circular dependency:
 event_pipeline → steps → event_pipeline.
 """
 
+import re
+
 from promiselink.core.logging import get_logger
 from promiselink.services.llm_client import LLMClient
 
 logger = get_logger("promiselink.title_generator")
+
+# LLM 思考过程泄露标签（Claude/OpenAI o-series 等推理模型可能返回）
+# <think>...</think> — DeepSeek-R1/通义千问等推理模型思考过程
+# <RichMediaReference>...</RichMediaReference> — 微信小程序转发消息中的媒体引用标签
+# 必须先剥离标签再截断，否则截断后标签未闭合会污染 title
+_LLM_TAG_PATTERNS = [
+    re.compile(r"<think>.*?</think>", re.DOTALL),
+    re.compile(r"<think>.*", re.DOTALL),  # 未闭合的 <think>（被截断）
+    re.compile(r"</think>", re.DOTALL),  # 残留的闭合标签
+    re.compile(r"<RichMediaReference>.*?</RichMediaReference>", re.DOTALL),
+    re.compile(r"<RichMediaReference>.*", re.DOTALL),
+    re.compile(r"</RichMediaReference>", re.DOTALL),
+]
+
+
+def _strip_llm_tags(text: str) -> str:
+    """Remove LLM thinking-process tags and media reference tags from text.
+
+    Some LLM models (e.g. Claude via rsxermu666, DeepSeek-R1) return
+    ``<think>...</think>`` reasoning blocks before the actual answer.
+    WeChat mini-app forwarded messages may contain ``<RichMediaReference>``
+    tags. These must be stripped before storing as event title.
+    """
+    cleaned = text
+    for pattern in _LLM_TAG_PATTERNS:
+        cleaned = pattern.sub("", cleaned)
+    return cleaned.strip()
 
 
 async def generate_event_title(llm_client: LLMClient, raw_text: str) -> str | None:
@@ -30,7 +59,11 @@ async def generate_event_title(llm_client: LLMClient, raw_text: str) -> str | No
             prompt=prompt,
             max_tokens=60,
         )
-        title = response.strip().strip('"').strip("'")
+        # Strip LLM thinking-process tags (<think>...</think>) and media
+        # reference tags before any other processing. Some reasoning models
+        # (Claude/DeepSeek-R1) leak thinking blocks into the response.
+        title = _strip_llm_tags(response)
+        title = title.strip().strip('"').strip("'").strip()
         # Truncate to 50 chars for safety
         if len(title) > 50:
             title = title[:47] + "..."

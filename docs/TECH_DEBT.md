@@ -1,6 +1,6 @@
 # PromiseLink 基础版技术债跟踪文档
 
-> **文档版本** v1.7 / 2026-07-27 / TD-B10/B11 文档滞后修复（全部技术债清理完成）
+> **文档版本** v1.8 / 2026-07-31 / TD-B12 新增（LLM 503 阻塞真实 LLM e2e）
 > **关联文档** [PROJECT_STATUS.md](PROJECT_STATUS.md) · [CHANGELOG.md](../CHANGELOG.md) · [ROADMAP.md](ROADMAP.md) · [PromiseLink-Pro TECH_DEBT.md](../PromiseLink-Pro/docs/TECH_DEBT.md)
 > **用途**：量化跟踪基础版技术债，按优先级清理，防止技术债积累导致项目可维护性下降
 > **更新原则**：每次清理后更新状态（OPEN→RESOLVED），新增技术债及时登记
@@ -14,10 +14,10 @@
 | P0 关键 | 0 项 | 0 项 | 0 项 | 0 项 |
 | P1 重要 | 3 项 | 3 项 | 0 项 | 0 项 |
 | P2 一般 | 2 项 | 2 项 | 0 项 | 0 项 |
-| P3 低优先 | 4 项 | 4 项 | 0 项 | 0 项 |
-| **合计** | **9 项** | **9 项** | **0 项** | **0 项** |
+| P3 低优先 | 5 项 | 4 项 | 0 项 | 1 项 |
+| **合计** | **10 项** | **9 项** | **0 项** | **1 项** |
 
-> **变更说明**：v1.7（2026-07-27）新增 2 项文档滞后技术债并立即修复：① TD-B10 PROJECT_STATUS.md 严重滞后（停留在 v0.8.0/806 passed，实际 v0.8.3/1968 tests collected），更新顶部元信息/总览仪表板/版本信息表/末尾更新时间；② TD-B11 CHANGELOG.md 缺 [0.8.2] 和 [0.8.3] 章节（v0.8.1→v0.8.3 跨越 2 个版本未记录），补全 0.8.2 打包子包缺失修复 + 0.8.3 版本号同步章节。基础版技术债全部清理完成（9/9 RESOLVED）。v1.6（2026-07-26）TD-B08 清理 41 个 __pycache__ 目录 + TD-B09 重命名 user_journey_test.py → e2e_user_journey_basic.py。v1.5（2026-07-26）TD-B04 第四批修复 + TD-B05/B06 审查完成。v1.4（2026-07-26）TD-B04 第四批修复 embedding_provider.py。v1.3（2026-07-26）TD-B04 第三批修复 no-any-return。v1.2（2026-07-26）TD-B04 第二批修复 arg-type。v1.1（2026-07-25 晚）TD-B04 第一批修复 attr-defined。v1.0（2026-07-25）初始版本 + TD-B01/B02/B03。
+> **变更说明**：v1.8（2026-07-31）新增 TD-B12（rsxermu666.cn LLM 服务 HTTP 503 阻塞真实 LLM e2e 测试，非产品代码问题，待 LLM 恢复后重跑验证）。v1.7（2026-07-27）新增 2 项文档滞后技术债并立即修复：① TD-B10 PROJECT_STATUS.md 严重滞后（停留在 v0.8.0/806 passed，实际 v0.8.3/1968 tests collected），更新顶部元信息/总览仪表板/版本号一致性表/末尾更新时间；② TD-B11 CHANGELOG.md 缺 [0.8.2] 和 [0.8.3] 章节（v0.8.1→v0.8.3 跨越 2 个版本未记录），补全 0.8.2 打包子包缺失修复 + 0.8.3 版本号同步章节。基础版技术债全部清理完成（9/9 RESOLVED）。v1.6（2026-07-26）TD-B08 清理 41 个 __pycache__ 目录 + TD-B09 重命名 user_journey_test.py → e2e_user_journey_basic.py。v1.5（2026-07-26）TD-B04 第四批修复 + TD-B05/B06 审查完成。v1.4（2026-07-26）TD-B04 第四批修复 embedding_provider.py。v1.3（2026-07-26）TD-B04 第三批修复 no-any-return。v1.2（2026-07-26）TD-B04 第二批修复 arg-type。v1.1（2026-07-25 晚）TD-B04 第一批修复 attr-defined。v1.0（2026-07-25）初始版本 + TD-B01/B02/B03。
 
 ---
 
@@ -216,12 +216,26 @@
 - **验收**：✅ grep "^## \[0.8" CHANGELOG.md 显示 [0.8.3] / [0.8.2] / [0.8.1] / [0.8.0-rc2] / [0.8.0-rc1] 完整序列；版本号与 VERSION 文件一致
 - **关联**：project_memory 教训"版本一致性检查不能遗漏"
 
+### TD-B12: rsxermu666.cn LLM 服务 HTTP 503 阻塞真实 LLM e2e ⏳ OPEN
+
+- **状态**：OPEN (2026-07-31)
+- **描述**：rsxermu666.cn LLM 服务返回 HTTP 503 "Service temporarily unavailable"，导致真实 LLM e2e 测试中 3 个 pipeline 测试失败（step02_extract_entities 无法执行，实体抽取 0 个）。直接 curl 验证 `https://rsxermu666.cn/v1/chat/completions` 3 次均返回 503。
+- **根因**：外部 LLM 服务不可用（rsxermu666.cn），非产品代码问题。备用 LLM MokaAI 已暂停（余额不足，2026-07-28）。
+- **影响**：真实 LLM e2e 测试 2/5 PASS（test_login + test_title_clean PASS，3 个 pipeline 测试 FAIL）；发布门禁第 5 项"真实 LLM e2e 全部 PASS"未通过，阻塞 v0.9.0 发布。
+- **已验证不受影响**：
+  - 承诺提取逻辑正常（rule_analyze "他承诺" 模式匹配 confidence=0.90，不依赖 LLM）
+  - title 标签过滤正常（test_title_clean_no_llm_tags PASS）
+  - title_generator.py 单元测试 18/18 PASS（覆盖率 100%）
+- **修复计划**：待 rsxermu666.cn LLM 服务恢复后，重跑 `scripts/real_llm_e2e_test.py` 验证 3 个 pipeline 测试。或考虑配置第三个 LLM provider 作为备用。
+- **关联**：[CHANGELOG.md](../CHANGELOG.md) v0.9.0 "e2e 测试补齐 + title 标签过滤 + 测试脚本 BUG 修复"
+
 ---
 
 ## 4. 变更历史
 
 | 日期 | 版本 | 作者 | 变更 |
 |------|------|------|------|
+| 2026-07-31 | v1.8 | DevSquad | 新增 TD-B12（rsxermu666.cn LLM 服务 HTTP 503 阻塞真实 LLM e2e，非产品代码问题，待 LLM 恢复后重跑验证）。基础版技术债 9/10 RESOLVED，1 项 OPEN。 |
 | 2026-07-25 | v1.0 | DevSquad 7-Role | 初始版本，7 项技术债。同步完成 TD-B01/B02/B03（.gitleaks.toml + .github/dependabot.yml + ci.yml concurrency control），这三项在专业版对应 TD-002/TD-003/TD-005 已于 2026-07-24 解决。基础版 .pre-commit-config.yaml 已存在（版本一致）。剩余 4 项待处理（TD-B04 type:ignore + TD-B05 noqa + TD-B06 TODO/FIXME + TD-B08/B09 P3 清理） |
 | 2026-07-25 | v1.1 | DevSquad V4.1.7 | TD-B04 第一批修复 5 处 attr-defined（49→44）。验证：mypy 0 / ruff 0 / black 0 / 11 tests passed 无回归 |
 | 2026-07-26 | v1.2 | DevSquad V4.1.7 | TD-B04 第二批修复 8 处 arg-type（44→36），采用字典推导式替代 dict(cast(...))。验证：mypy 0 / ruff 0 / black 7 files reformatted / 186 tests passed 无回归。TD-B05 发现 1 处无效 noqa 指令（test_step11_assoc_todos.py:455） |

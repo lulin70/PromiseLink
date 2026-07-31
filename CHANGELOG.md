@@ -33,6 +33,40 @@ P0-02 任务按项目生命周期推进（P1 规格→P2 设计→P7 测试计�
 
 详见 [PromiseLink-Pro/docs/spec/P0-02_License_Reactivation_Token_Refresh_WSS_SelfCheck.md](../PromiseLink-Pro/docs/spec/P0-02_License_Reactivation_Token_Refresh_WSS_SelfCheck.md)
 
+### Fixed — e2e 测试补齐 + title 标签过滤 + 测试脚本 BUG 修复 (2026-07-31)
+
+用户质疑"P2-P3就不用管，e2e测试没完成，产品BUG不排查，就可以发布？"后，按 8 阶段计划完成 e2e 测试补齐和产品 BUG 排查。
+
+#### title_generator.py LLM 标签过滤
+
+- **根因**: rsxermu666 Claude 模型返回 `<think>...</think>` 推理块和 `<RichMediaReference>...</RichMediaReference>` 微信媒体引用标签，未被过滤直接存入 events.title，截断后产生未闭合标签污染 title。
+- **修复**: 新增 `_strip_llm_tags()` 函数，6 个正则模式过滤未闭合/已闭合的 `<think>` 和 `<RichMediaReference>` 标签，在 `generate_event_title()` 中应用。
+- **单元测试**: 新增 [tests/test_title_generator.py](tests/test_title_generator.py) 18 个用例（10 个 `_strip_llm_tags` + 8 个 `generate_event_title`），覆盖率 100%。
+
+#### 测试脚本 BUG 修复
+
+- **real_llm_e2e_test.py view 参数 BUG**: `get_promises()` 调用 `GET /api/v1/promises`（默认 `view=my-promises`）只查 `my_promise`，遗漏 `their_promise`。修复为 `view=all`。
+- **three_tier_e2e_test.py 种子用户 license 断言**: 测试 SQL 断言 `plan_type='pro'`，而种子用户 license 为 `plan_type='trial'`（init_seed_users.py 设计）。修复为 `plan_type IN ('pro', 'trial') AND status='active'`。
+
+#### 承诺未提取 BUG 排查结论
+
+- **结论**: **无产品 BUG**。their_promise 通过 `promise_bidirectional.py` 的 rule_analyze "他承诺" 模式匹配识别（confidence=0.90，不依赖 LLM）。
+- **验证**: SSH 查询 PostgreSQL + curl `/api/v1/promises?view=their-promises` 确认 1 个 their_promise todo（action_type=their_promise, fulfillment_status=pending, confirmation_status=auto_set）。
+- **根因**: 之前测试报告 `promises_count=0` 是测试脚本 view 参数 BUG 导致的误报，已修复。
+
+#### e2e 测试结果
+
+| 测试套件 | 结果 |
+|---------|------|
+| 三层架构 e2e | 8/8 PASS |
+| 基础版 e2e（含 WSS lifecycle） | 94 PASS |
+| Pro 网关 e2e | 111 PASS |
+| 小程序 e2e | 150/150 PASS（2026-07-31 10:00 已验证） |
+| title_generator 单元测试 | 18/18 PASS（覆盖率 100%） |
+| 真实 LLM e2e | 2/5 PASS（test_login + test_title_clean PASS；3 个 pipeline 测试因 rsxermu666.cn HTTP 503 阻塞，非产品代码问题） |
+
+> **发布门禁状态**: 真实 LLM e2e 受外部 LLM 服务 503 阻塞，需 LLM 恢复后重跑验证。详见 [TECH_DEBT.md](docs/TECH_DEBT.md) TD-B12。
+
 ## [0.8.3] - 2026-07-21
 
 ### Changed — 版本号同步 (2026-07-21)
