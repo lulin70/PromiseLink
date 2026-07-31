@@ -30,7 +30,7 @@ set -e
 #   - gateway.promiselink.cn SSL 证书已签发（有效期至 2026-10-26，Certbot 自动续期）
 #   - 网关地址从 www.promiselink.cn 切换到 gateway.promiselink.cn
 DEFAULT_GATEWAY_URL="${GATEWAY_URL:-https://gateway.promiselink.cn}"
-DEFAULT_IMAGE="ghcr.io/lulin70/promiselink:0.8.3"
+DEFAULT_IMAGE="ghcr.io/lulin70/promiselink:0.9.0"
 INSTALL_DIR="${PROMISELINK_INSTALL_DIR:-$HOME/promiselink}"
 
 # 颜色输出

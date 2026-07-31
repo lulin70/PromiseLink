@@ -2,7 +2,17 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
-## [Unreleased]
+## [0.9.0] - 2026-07-31
+
+### Added — MINOR 升级: 版本号同步 + relayToken 两级刷新 + 测试隔离修复 (2026-07-31)
+
+MINOR 版本升级（0.8.3 → 0.9.0），升级原因：(1) 含 P0-02a relayToken 两级刷新新功能；(2) 小程序已升至 0.9.0，基础版需对齐。本次发布同步所有版本号到 v0.9.0，与小程序/专业版对齐。
+
+- **版本号同步 10 处**：VERSION / pyproject.toml / src/promiselink/__init__.py / frontend/package.json / README.md / README.en.md / README.jp.md / scripts/install_basic.sh / docker-compose.prod.yml / .github/workflows/build.yml
+- **同步小程序 v0.9.0 版本号**：基础版与小程序版本号对齐，保持"项目版本号必须在所有位置保持一致"硬约束
+- **P0-02a relayToken 两级刷新策略**：详见下方 Fixed 章节
+- **测试隔离修复**：详见下方 Fixed 章节
+- **验证**：VERSION / src/promiselink/__init__.py / pyproject.toml 三处核心版本号均为 0.9.0；10 处版本号同步完成（CHANGELOG.md 历史 [0.8.3] 章节及 docs/postmortem/、docs/TECH_DEBT.md 历史记录按惯例保留）
 
 ### Fixed — P0-02a relayToken 自动刷新 + 测试隔离修复 (2026-07-30)
 

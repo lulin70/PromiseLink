@@ -52,6 +52,7 @@
 
 ## 📑 目录
 
+- [安装](#安装)
 - [快速启动](#快速启动)
 - [30 秒验证](#30-秒验证无需-llm-配置)
 - [质量指标](#质量指标)
@@ -65,6 +66,29 @@
 - [验证安装](#验证安装)
 - [团队](#团队)
 - [License](#license)
+
+---
+
+## 安装
+
+### 方式一：一键安装（推荐非技术用户）
+
+从 [Releases](https://github.com/lulin70/PromiseLink/releases) 下载对应操作系统的安装包：
+
+- **macOS**: 下载 `PromiseLink-<version>-mac.dmg`
+- **Windows**: 下载 `PromiseLink-<version>-windows.exe`
+
+**安装步骤（3 步）**:
+
+1. 下载对应操作系统的安装包
+2. 双击安装（macOS: 拖拽到 Applications；Windows: 运行安装程序）
+3. 双击 PromiseLink 图标启动 — 浏览器将自动打开 http://localhost:8000
+
+无需安装 Python 环境。安装包内已包含 Python 运行时和全部依赖。
+
+### 方式二：源码安装（开发者）
+
+请参考下方 [快速启动](#快速启动) 章节。
 
 ---
 
@@ -118,7 +142,7 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50 项安全测试
 | 服务模块     | **38 个**                                                          |
 | 数据模型     | **8 个文件，10 个模型类**                                                  |
 | 文档版本     | PRD v5.8 / Tech v3.2                                             |
-| 软件版本     | v0.8.3                                                           |
+| 软件版本     | v0.9.0                                                           |
 | 产品层级     | 基础版(本地免费) / 专业版(网关中继) / 小程序(手机竖屏) / 定制版(团队)                      |
 | 总体进度     | **89%** (基础版 E2E 81/0/0 零 skip 达成)                              |
 

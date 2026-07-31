@@ -468,18 +468,41 @@ app.get("/pair")(get_pair_page)
 
 # ── Static Files (H5 Frontend) ──
 # Mount AFTER API routes so /api/v1/* takes priority.
-# Docker: /app/static | Local: ./frontend/dist
+# Docker: /app/static | PyInstaller: sys._MEIPASS/frontend/dist | Local: ./frontend/dist
+import sys
+
 STATIC_DIR = None
-for candidate in [Path("/app/static"), Path(__file__).parent.parent.parent / "frontend" / "dist"]:
+_static_candidates = [Path("/app/static")]
+# PyInstaller frozen executable: bundled resources extracted to sys._MEIPASS
+if hasattr(sys, "_MEIPASS"):
+    _static_candidates.append(Path(sys._MEIPASS) / "frontend" / "dist")
+# Local development: repo root / frontend / dist
+_static_candidates.append(Path(__file__).resolve().parent.parent.parent / "frontend" / "dist")
+for candidate in _static_candidates:
     if candidate.is_dir() and (candidate / "index.html").exists():
         STATIC_DIR = candidate
         break
 
+# Catch-all for non-GET/HEAD requests to non-existent paths.
+# Without this, StaticFiles mount at "/" returns 405 (Method Not Allowed)
+# for POST/PUT/DELETE requests to paths that don't match any API route
+# (e.g., POST /auth/poc-login returns 405 instead of 404).
+# This confuses clients and debuggers — 404 is the correct response for
+# "endpoint does not exist". GET/HEAD requests still fall through to
+# StaticFiles for frontend SPA routing.
+from fastapi import HTTPException
+
+@app.api_route(
+    "/{path:path}",
+    methods=["POST", "PUT", "DELETE", "PATCH"],
+    include_in_schema=False,
+)
+async def _catch_all_non_get(path: str):
+    raise HTTPException(status_code=404, detail=f"Not Found: /{path}")
+
 if STATIC_DIR:
     app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
 else:
-    import sys
-
     print(
         "[PromiseLink] WARNING: Frontend static files not found. Run 'cd frontend && npm run build:h5'", file=sys.stderr
     )
