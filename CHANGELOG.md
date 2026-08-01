@@ -4,6 +4,22 @@ All notable changes to PromiseLink will be documented in this file.
 
 ## [0.9.0] - 2026-07-31
 
+### Fixed — v0.9.0 上线部署 + 找问题阶段 BUG 修复 (2026-08-01)
+
+DevSquad 推进 P0-P3 修复后部署 v0.9.0 到生产服务器（47.116.219.15），真实用户旅程 e2e 测试发现并修复 2 个 BUG。
+
+**P0-P3 修复总结**：
+- **P0-3 SSL 证书修复**：www.promiselink.cn 证书不匹配（website.conf 误用 promiselink.cn 证书），改用 www.promiselink.cn 独立证书 + nginx reload。验证：HTTP/2 200 + CN=www.promiselink.cn + SAN=www.promiselink.cn。
+- **P1 服务器版本升级**：0.8.3 → 0.9.0（rsync 同步代码 + docker compose build + up + 健康验证 version=0.9.0 + 直接 IP HTTP/2 200 + /docs 404 + 安全头完整）。
+- **P2 .env 验证**：ADMIN_API_KEY 非默认值（30 字符通过 production 校验）+ 4 条 license 已初始化 + admin 路由完整 10 个端点。（注：summary 中"缺失 ADMIN_API_KEY"描述不准确，实际已配置）
+- **P3 小程序 mock**：已在 TD-B13 跟踪，P3 v0.10.0 处理，不阻塞上线。
+
+**找问题阶段发现并修复的 BUG**（专业版 PromiseLink-Pro 仓库，但影响基础版测试覆盖）：
+- **BUG-A**: `gateway/services/billing_service.py` `get_all_licenses()` 只返回内存 dict，未从 DB 加载，导致 admin/users 返回空列表（实际 DB 有 4 条 license）。修复：改为 async + 添加 DB fallback（session_factory 存在时从 DB 查询）。同步更新 6 处调用方（admin.py ×4 + website_auth_service.py ×2）。
+- **BUG-B**: gateway 启动时未调用 `init_db()`，导致 `llm_chat_logs` 和 `website_users` 表不存在，chat_log_cleanup_failed 启动错误。修复：main.py lifespan startup 添加 `await init_db()` 调用（checkfirst=True 不重复创建已存在表，try/except 避免阻塞启动）。
+
+**关联**：专业版 TECH_DEBT.md TD-P014 (BUG-A) + TD-P015 (BUG-B)；基础版 TD-B13 e2e mock 审计。
+
 ### Fixed — test_real_llm_e2e.py 诚实命名重命名 (2026-08-01)
 
 DevSquad 上线前 review 发现 `test_real_llm_e2e.py` 文件名误导（"real_llm" 但实际全用 `FakeLLMClient` mock，64 处 mock 关键字），违反"Tests should use real components"诚实命名原则。按 TD-B13 修复建议执行重命名。
