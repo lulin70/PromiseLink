@@ -4,6 +4,15 @@ All notable changes to PromiseLink will be documented in this file.
 
 ## [0.9.0] - 2026-07-31
 
+### Fixed — test_real_llm_e2e.py 诚实命名重命名 (2026-08-01)
+
+DevSquad 上线前 review 发现 `test_real_llm_e2e.py` 文件名误导（"real_llm" 但实际全用 `FakeLLMClient` mock，64 处 mock 关键字），违反"Tests should use real components"诚实命名原则。按 TD-B13 修复建议执行重命名。
+
+- **重命名**: `tests/e2e/test_real_llm_e2e.py` → `tests/e2e/test_pipeline_mock_e2e.py`（git mv 保留历史）
+- **引用更新**: `tests/e2e/test_user_journey_e2e.py` L66 注释从"复用 test_real_llm_e2e 的设计"改为"复用 test_pipeline_mock_e2e 的设计"
+- **验证**: 文件内无自引用（grep `real_llm` 0 匹配）；git mv 保留 41735 字节内容不变
+- **关联**: TD-B13 部分修复（剩余小程序全 mock + 缺失 e2e 路径仍 OPEN，P3 v0.10.0 处理）
+
 ### Added — MINOR 升级: 版本号同步 + relayToken 两级刷新 + 测试隔离修复 (2026-07-31)
 
 MINOR 版本升级（0.8.3 → 0.9.0），升级原因：(1) 含 P0-02a relayToken 两级刷新新功能；(2) 小程序已升至 0.9.0，基础版需对齐。本次发布同步所有版本号到 v0.9.0，与小程序/专业版对齐。
@@ -63,9 +72,9 @@ P0-02 任务按项目生命周期推进（P1 规格→P2 设计→P7 测试计�
 | Pro 网关 e2e | 111 PASS |
 | 小程序 e2e | 150/150 PASS（2026-07-31 10:00 已验证） |
 | title_generator 单元测试 | 18/18 PASS（覆盖率 100%） |
-| 真实 LLM e2e | 2/5 PASS（test_login + test_title_clean PASS；3 个 pipeline 测试因 rsxermu666.cn HTTP 503 阻塞，非产品代码问题） |
+| 真实 LLM e2e | 4/5 PASS（2026-07-31 重跑：LLM 间歇性恢复，承诺提取+人脉抽取+title 干净 PASS；待办生成因 LLM 间歇性 503 FAIL，非产品 BUG） |
 
-> **发布门禁状态**: 真实 LLM e2e 受外部 LLM 服务 503 阻塞，需 LLM 恢复后重跑验证。详见 [TECH_DEBT.md](docs/TECH_DEBT.md) TD-B12。
+> **发布门禁状态**: 真实 LLM e2e 4/5 PASS。1 FAIL 因 LLM 间歇性 503（非产品代码 BUG），待 LLM 完全稳定后重跑关闭 TD-B12。详见 [TECH_DEBT.md](docs/TECH_DEBT.md) TD-B12。
 
 ## [0.8.3] - 2026-07-21
 
