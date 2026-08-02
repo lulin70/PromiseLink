@@ -2,17 +2,23 @@
 
 确保小程序所有 API 调用都有基础版后端对应端点，且前后链路打通。
 
-覆盖度审计发现：
+覆盖度审计与修复记录（2026-07-29）：
 - 小程序 api.ts 共 49 个 API 调用
 - 其中 38 个有基础版后端对应端点（直连模式可通）
-- 6 个路径/字段不匹配（前后链路断裂）
+- 原 6 处路径/字段不匹配已全部修复：
+  1. pocLogin: /auth/poc-login → /auth/login ✅
+  2. wechatLogin: /auth/wechat → /auth/wechat/login ✅
+  3. searchEntities: /entities/search → /entities?search= ✅
+  4. reminderAction: snooze_days → snooze_hours（含天数→小时转换）✅
+  5. exportUserData: POST /privacy/export → GET /export/{user_id} ✅
+  6. deleteUserData: 补充 confirm:'DELETE' body ✅
 - 5 个为 Pro-only 端点（基础版不注册，设计如此）
 
 本测试文件验证：
 1. 每个有对应端点的小程序调用都有 e2e 测试
 2. 验证副作用（DB 写入/状态变更），不只验证 status_code
 3. 从用户旅程设计——模拟小程序真实调用顺序
-4. 显式验证路径不匹配的端点返回 404（前后链路断裂诊断）
+4. 安全验证：不带 confirm body 的删除请求被 422 拒绝
 5. Pro-only 端点在基础版返回 404（设计验证）
 """
 
@@ -1115,9 +1121,9 @@ class TestMiniappRemindersLink:
 class TestMiniappPrivacyLink:
     """验证小程序 Privacy 调用链路.
 
-    发现：
-    - 小程序 exportUserData 调用 POST /privacy/export，后端无此端点 → 404
-    - 小程序 deleteUserData 调用 DELETE /privacy/user-data 不带 body，后端要求 {confirm:"DELETE"} → 422
+    修复记录（2026-07-29）：
+    - exportUserData: 从 POST /privacy/export 改为 GET /export/{user_id}，与后端端点对齐
+    - deleteUserData: 已包含 confirm:'DELETE' body，与后端二次确认要求对齐
     """
 
     @pytest.mark.asyncio
@@ -1134,36 +1140,42 @@ class TestMiniappPrivacyLink:
         assert body["counts"]["events"] >= 1
 
     @pytest.mark.asyncio
-    async def test_miniapp_privacy_export_path_returns_404(self, client, file_engine):
-        """Verify: 小程序路径 POST /privacy/export 在后端不存在 → 404.
+    async def test_export_user_data_via_correct_path(self, client, file_engine):
+        """Verify: exportUserData 使用正确路径 GET /export/{user_id} 导出数据.
 
-        前后链路断裂诊断：小程序 exportUserData 调用 POST /privacy/export，
-        但后端没有此端点。后端的数据导出是 GET /export/{user_id}。
+        修复后：小程序 exportUserData 从 POST /privacy/export 改为 GET /export/{user_id}。
+        验证该路径能成功导出当前用户的所有数据。
         """
-        resp = await client.post(
-            f"{API_PREFIX}/privacy/export", headers=auth_headers()
+        await insert_event(file_engine, title="导出验证事件")
+        await insert_entity(file_engine, name="导出验证人脉")
+        await insert_todo(file_engine, title="导出验证待办")
+
+        resp = await client.get(
+            f"{API_PREFIX}/export/{TEST_USER_ID}", headers=auth_headers()
         )
-        assert resp.status_code == 404, (
-            f"小程序路径 /privacy/export 应返回 404（后端导出端点是 GET /export/{{user_id}}）: "
-            f"got {resp.status_code}"
-        )
+        assert resp.status_code == 200, f"数据导出失败: {resp.status_code} {resp.text}"
+        data = resp.json()
+        assert data["export_version"] == "1.0"
+        assert data["user_id"] == TEST_USER_ID
+        assert len(data["events"]) >= 1
+        assert len(data["entities"]) >= 1
+        assert len(data["todos"]) >= 1
 
     @pytest.mark.asyncio
     async def test_miniapp_delete_without_confirm_fails(self, client, file_engine):
-        """Verify: 小程序 DELETE /privacy/user-data 不带 confirm body → 422.
+        """Verify: DELETE /privacy/user-data 不带 confirm body → 422.
 
-        前后链路断裂诊断：小程序 deleteUserData 调用 DELETE /privacy/user-data 不带 body，
-        但后端要求 body {confirm: "DELETE"} 做二次确认。
-        不带 body 会返回 422 校验错误。
+        安全验证：后端要求二次确认（confirm: 'DELETE'），
+        不带 body 会返回 422 校验错误，防止误删。
         """
         await insert_event(file_engine, title="不应被删")
 
-        # 不带 body（模拟小程序行为）
+        # 不带 body（模拟错误调用）
         resp = await client.delete(
             f"{API_PREFIX}/privacy/user-data", headers=auth_headers()
         )
         assert resp.status_code == 422, (
-            f"小程序不带 confirm body 删除应返回 422（后端要求二次确认）: "
+            f"不带 confirm body 删除应返回 422（后端安全二次确认）: "
             f"got {resp.status_code}"
         )
 
