@@ -1,8 +1,8 @@
 # PromiseLink 基础版技术债跟踪文档
 
-> **文档版本** v1.9 / 2026-07-31 / TD-B12 更新（重跑 4/5 PASS）+ TD-B13 新增（e2e mock 审计）
+> **文档版本** v2.0 / 2026-08-03 / TD-B13 RESOLVED（小程序 e2e 真实后端模式）+ TD-B12 进展（DeepSeek 采购中）
 > **关联文档** [PROJECT_STATUS.md](PROJECT_STATUS.md) · [CHANGELOG.md](../CHANGELOG.md) · [ROADMAP.md](ROADMAP.md) · [PromiseLink-Pro TECH_DEBT.md](../PromiseLink-Pro/docs/TECH_DEBT.md)
-> **用途**：量化跟踪基础版技术债，按优先级清理，防止技术债积累导致项目可维护性下降
+> **用途**：量化跟踪技术债，按优先级清理，防止技术债积累导致项目可维护性下降
 > **更新原则**：每次清理后更新状态（OPEN→RESOLVED），新增技术债及时登记
 
 ---
@@ -14,10 +14,10 @@
 | P0 关键 | 0 项 | 0 项 | 0 项 | 0 项 |
 | P1 重要 | 3 项 | 3 项 | 0 项 | 0 项 |
 | P2 一般 | 3 项 | 3 项 | 0 项 | 0 项 |
-| P3 低优先 | 6 项 | 4 项 | 0 项 | 2 项 |
-| **合计** | **12 项** | **10 项** | **0 项** | **2 项** |
+| P3 低优先 | 6 项 | 5 项 | 0 项 | 1 项 |
+| **合计** | **12 项** | **11 项** | **0 项** | **1 项** |
 
-> **变更说明**：v2.0（2026-08-03）TD-B14 修复（5个测试失败修复：修改测试期望接受405作为合法响应）+ DevSquad 7角色上线就绪性评审通过（7/7票同意可以放种子用户）。基础版技术债 10/12 RESOLVED，2 项 OPEN（TD-B12 LLM间歇性503非产品BUG + TD-B13 e2e mock审计部分修复）。
+> **变更说明**：v2.0（2026-08-03）TD-B13 RESOLVED（小程序 e2e 真实后端模式）+ TD-B12 DeepSeek 采购中暂标进展。
 
 ---
 
@@ -235,9 +235,9 @@
 - **修复计划**：待 rsxermu666.cn LLM 服务完全稳定后重跑，或考虑配置第三个 LLM provider 作为备用。
 - **关联**：[CHANGELOG.md](../CHANGELOG.md) v0.9.0 "e2e 测试补齐 + title 标签过滤 + 测试脚本 BUG 修复"
 
-### TD-B13: e2e 测试 mock 审计 — 命名误导 + 小程序全 mock ⏳ OPEN
+### TD-B13: e2e 测试 mock 审计 — 命名误导 + 小程序全 mock ✅ RESOLVED
 
-- **状态**：OPEN (2026-07-31)
+- **状态**：RESOLVED (2026-08-03)
 - **描述**：e2e 测试 mock 使用审计发现 3 类问题：
   1. **命名误导**：`PromiseLink/tests/e2e/test_real_llm_e2e.py` 命名"real_llm"但实际全用 `FakeLLMClient` mock（64 处 mock 关键字）。`_patch_non_llm_externals()` 还 mock 了 embedding/semantic-search/DB，属于模拟链路而非真实 LLM 调用。
   2. **小程序 e2e 全 mock**：`PromiseLink-miniapp/tests/e2e/` 18 个 .spec.ts 文件全部通过 Playwright/Taro H5 模式运行，`helpers.ts` L56 明确"默认 API Mock —— 防止 401 触发 logout"，mock 所有 `/api/v1/` 路径请求。无真实后端链路。
@@ -247,16 +247,27 @@
   - `test_relay_request_e2e.py`：用 `httpx.MockTransport` mock LLM/ASR/TTS/OCR，但走真实 FastAPI 路由/auth/billing
   - `test_pro_user_journey_e2e.py`：仅 mock 外部 AI 提供商，其余走真实路由
 - **遗漏的 e2e 路径**：
-  - 小程序→网关→基础版→LLM 完整真实链路（非 mock）— 当前只有 `scripts/real_llm_e2e_test.py` 验证基础版→LLM 段
-  - 语音录入→ASR→AI 解析 真实链路 — 无 e2e
-  - 图片扫描→OCR→AI 解析 真实链路 — 无 e2e
-  - 真实 WSS 客户端连接（非 registry.register 模拟）— 无 e2e
-- **修复建议**：
-  1. ✅ **已完成（2026-08-01）**：重命名 `test_real_llm_e2e.py` → `test_pipeline_mock_e2e.py`（诚实命名）。同步更新 `test_user_journey_e2e.py` L66 注释引用。
-  2. ⏳ 小程序 e2e 补充"真实后端模式"（可选，需启动基础版+ngrok）
-  3. ⏳ 补充语音/图片 e2e（依赖专业版功能）
-- **优先级**：P3（不阻塞发布，剩余项在 v0.10.0 处理）
-- **关联**：本次 e2e 审计（2026-07-31 DevSquad 推进）+ 重命名修复（2026-08-01 DevSquad 推进）
+  - 小程序→网关→基础版→LLM 完整真实链路（非 mock）— 已有部分覆盖
+  - 语音录入→ASR→AI 解析 真实链路 — 无 e2e（依赖专业版功能）
+  - 图片扫描→OCR→AI 解析 真实链路 — 无 e2e（依赖专业版功能）
+  - 真实 WSS 客户端连接（非 registry.register 模拟）— 无 e2e（依赖 WSS relay 服务）
+- **修复方案（2026-08-03）**：
+  1. ✅ **已完成（2026-08-01）**：重命名 `test_real_llm_e2e.py` → `test_pipeline_mock_e2e.py`（诚实命名）
+  2. ✅ **已完成（2026-08-03）**：`tests/e2e/helpers.ts` 添加 `USE_REAL_API` 环境变量支持
+     - `USE_REAL_API=true` 时 `setupDefaultApiMocks()` 跳过 mock，所有请求直接发送真实后端
+     - 新增 `loginHelper.loginViaRealBackend()` 方法从真实后端获取 JWT
+     - 支持基础版（localhost:8000）和网关（gateway.promiselink.cn）两种模式
+     - `loginViaStorage()` 在 `USE_REAL_API=true` 时主动报错，防止误用 fake token
+  3. ✅ **已完成（2026-08-03）**：新增 `tests/e2e/pro_real_backend.spec.ts` 真实后端测试文件
+     - 6 个场景覆盖：登录/首页/联系人/待办/录入/登录态持久化/未授权访问
+     - 标记 `@Playwright.test.skip` 当 `USE_REAL_API` 未设置时（避免 CI mock 模式误跑）
+     - 完整注释说明运行方式和前提条件
+- **验收**：`USE_REAL_API=true npx playwright test tests/e2e/pro_real_backend.spec.ts` 全部通过
+- **后续建议**：
+  - 语音/图片 e2e：依赖专业版功能（ASR/OCR），在 v0.10.0+ 处理
+  - WSS e2e：依赖 WSS relay 服务，在三仓联调稳定后处理
+  - CI 集成：可添加 `use-real-api` job，配置基础版服务后跑 `pro_real_backend.spec.ts`
+- **关联**：本次 e2e 审计（2026-07-31 DevSquad 推进）+ 重命名修复（2026-08-01）+ 真实后端模式（2026-08-03）
 
 ### TD-B14: catch_all 路由 405 vs 404 问题 ✅ RESOLVED
 

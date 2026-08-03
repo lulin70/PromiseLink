@@ -11,8 +11,15 @@ on:
 
 permissions:
   contents: write
+  id-token: write  # needed for OIDC-based server deployment
+  contents: read
+
+env:
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
 
 jobs:
+  # ── Job 1: macOS DMG ────────────────────────────────────────────────────────
   build-macos:
     runs-on: macos-latest
     steps:
@@ -21,7 +28,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
         run: |
@@ -32,7 +39,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Build frontend
         working-directory: frontend
@@ -45,6 +52,7 @@ jobs:
         run: |
           VERSION=$(cat VERSION)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "short_version=${VERSION#v}" >> $GITHUB_OUTPUT
 
       - name: Build with PyInstaller
         run: |
@@ -52,22 +60,25 @@ jobs:
 
       - name: Create DMG (macOS)
         run: |
-          # Create a DMG installer
-          hdiutil create -volname "PromiseLink" -srcfolder dist/PromiseLink.app -ov -format UDZO "dist/PromiseLink-${{ steps.version.outputs.version }}-mac.dmg"
+          hdiutil create -volname "PromiseLink" \
+            -srcfolder dist/PromiseLink.app \
+            -ov -format UDZO \
+            "dist/PromiseLink-${{ steps.version.outputs.short_version }}-mac.dmg"
 
       - name: Upload release asset
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/PromiseLink-${{ steps.version.outputs.version }}-mac.dmg
+            dist/PromiseLink-${{ steps.version.outputs.short_version }}-mac.dmg
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PromiseLink-macos-${{ steps.version.outputs.version }}
-          path: dist/PromiseLink-${{ steps.version.outputs.version }}-mac.dmg
+          name: PromiseLink-macos-${{ steps.version.outputs.short_version }}
+          path: dist/PromiseLink-${{ steps.version.outputs.short_version }}-mac.dmg
 
+  # ── Job 2: Windows EXE ───────────────────────────────────────────────────────
   build-windows:
     runs-on: windows-latest
     steps:
@@ -76,7 +87,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
         run: |
@@ -87,10 +98,11 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Build frontend
         working-directory: frontend
+        shell: bash
         run: |
           npm ci
           npm run build:h5
@@ -101,25 +113,106 @@ jobs:
         run: |
           VERSION=$(cat VERSION)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "short_version=${VERSION#v}" >> $GITHUB_OUTPUT
 
-      - name: Build with PyInstaller
+      - name: Build with PyInstaller (onedir mode)
         run: |
+          # Build onedir bundle (creates dist/PromiseLink.exe/ directory on Windows)
           pyinstaller promiselink.spec --clean --noconfirm
 
-      - name: Rename executable
+      - name: Package EXE as zip
         shell: bash
         run: |
-          mv dist/PromiseLink.exe "dist/PromiseLink-${{ steps.version.outputs.version }}-windows.exe"
+          # PyInstaller onedir mode creates a directory, not a file.
+          # Zip it so it can be uploaded as a single artifact.
+          VERSION=${{ steps.version.outputs.short_version }}
+          cd dist
+          powershell -Command "Compress-Archive -Path PromiseLink.exe -DestinationPath PromiseLink-${VERSION}-windows.zip -Force"
+          ls -lh PromiseLink-${VERSION}-windows.zip
 
       - name: Upload release asset
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/PromiseLink-${{ steps.version.outputs.version }}-windows.exe
+            dist/PromiseLink-${{ steps.version.outputs.short_version }}-windows.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PromiseLink-windows-${{ steps.version.outputs.version }}
-          path: dist/PromiseLink-${{ steps.version.outputs.version }}-windows.exe
+          name: PromiseLink-windows-${{ steps.version.outputs.short_version }}
+          path: dist/PromiseLink-${{ steps.version.outputs.short_version }}-windows.zip
+
+  # ── Job 3: Deploy to server (after all builds succeed) ─────────────────────
+  deploy-to-server:
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    steps:
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: PromiseLink-macos-${{ github.event.release.tag_name # remove 'v' prefix }}
+          path: artifacts/
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: PromiseLink-windows-${{ github.event.release.tag_name # remove 'v' prefix }}
+          path: artifacts/
+
+      - name: Verify artifacts
+        run: |
+          echo "=== Artifacts ===" && ls -lh artifacts/
+
+      - name: Deploy to server via SSH
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: root
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: 22
+          source: artifacts/*
+          target: /opt/promiselink-pro/website/downloads/
+          strip_components: 0
+          overwrite: true
+          command: |
+            # Unzip Windows EXE
+            cd /opt/promiselink-pro/website/downloads/
+            for f in *.zip; do
+              unzip -o "$f" -d . && rm -f "$f"
+            done
+            # Rename .zip-extracted folder to .exe if needed
+            ls -lh
+          timeout: 300
+
+      - name: Update download page on server
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: root
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: 22
+          command: |
+            # Update download.html to point to local files (not GitHub CDN)
+            WEBSITE=/opt/promiselink-pro/website
+            VERSION=${{ github.event.release.tag_name # remove 'v' prefix }}
+
+            # Update macOS DMG link to local file
+            if [ -f $WEBSITE/downloads/PromiseLink-${VERSION}-mac.dmg ]; then
+              sed -i "s|https://github.com/lulin70/PromiseLink/releases/download/v${VERSION}/PromiseLink-${VERSION}-mac.dmg|downloads/PromiseLink-${VERSION}-mac.dmg|g" \
+                $WEBSITE/download.html 2>/dev/null || true
+              echo "macOS DMG link updated to local"
+            fi
+
+            # Update Windows EXE link to local file (if .exe exists after unzip)
+            if [ -f $WEBSITE/downloads/PromiseLink-${VERSION}-windows.exe ]; then
+              sed -i "s|https://github.com/lulin70/PromiseLink/releases/download/v${VERSION}/PromiseLink-${VERSION}-windows.exe|downloads/PromiseLink-${VERSION}-windows.exe|g" \
+                $WEBSITE/download.html 2>/dev/null || true
+              echo "Windows EXE link updated to local"
+            fi
+
+            # Reload nginx to serve new static files
+            nginx -t && nginx -s reload || echo "nginx reload skipped"
+            echo "=== Server downloads ===" && ls -lh $WEBSITE/downloads/
+          timeout: 60
