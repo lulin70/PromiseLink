@@ -497,6 +497,7 @@ from fastapi import HTTPException
     "/{path:path}",
     methods=["POST", "PUT", "DELETE", "PATCH"],
     include_in_schema=False,
+    response_model=None,
 )
 async def _catch_all_non_get(path: str) -> NoReturn:
     raise HTTPException(status_code=404, detail=f"Not Found: /{path}")
