@@ -1509,8 +1509,13 @@ class TestMainAppExceptionHandlers:
             "Note: 405 is acceptable per TD-B14."
         )
         data = response.json()
-        assert "error" in data
-        assert data["error"]["code"] == "NOT_FOUND"
+        if response.status_code == 404:
+            # Custom 404 error format: {'error': {'code': 'NOT_FOUND', ...}}
+            assert "error" in data
+            assert data["error"]["code"] == "NOT_FOUND"
+        else:
+            # 405 uses FastAPI default format: {'detail': 'Method Not Allowed'}
+            assert "detail" in data
 
 
 # ══════════════════════════════════════════════════════════════════
