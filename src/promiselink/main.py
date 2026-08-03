@@ -5,7 +5,7 @@ import signal
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -498,7 +498,7 @@ from fastapi import HTTPException
     methods=["POST", "PUT", "DELETE", "PATCH"],
     include_in_schema=False,
 )
-async def _catch_all_non_get(path: str):
+async def _catch_all_non_get(path: str) -> NoReturn:
     raise HTTPException(status_code=404, detail=f"Not Found: /{path}")
 
 if STATIC_DIR:
