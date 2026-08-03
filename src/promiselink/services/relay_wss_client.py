@@ -33,7 +33,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
 import time
 from typing import Any
 
@@ -41,10 +40,11 @@ import httpx
 import websockets
 from websockets.exceptions import ConnectionClosed
 
+from promiselink.core.logging import get_logger
 from promiselink.services.relay_client import RelayClient
 from promiselink.services.relay_models import _RELAY_PREFIX
 
-logger = logging.getLogger("promiselink.relay_wss")
+logger = get_logger("promiselink.relay_wss")
 
 __all__ = [
     "RelayWSSClient",
@@ -142,9 +142,9 @@ class RelayWSSClient:
         self._stop_event.clear()
         self._task = asyncio.create_task(self._run_forever(), name="relay_wss")
         logger.info(
-            "relay_wss_start_scheduled: gateway=%s local=%s",
-            self.gateway_url,
-            self.local_api_url,
+            "relay_wss_start_scheduled",
+            gateway=self.gateway_url,
+            local_api_url=self.local_api_url,
         )
 
     async def stop(self) -> None:
@@ -190,9 +190,9 @@ class RelayWSSClient:
             except Exception as exc:
                 self.state.last_error = f"{type(exc).__name__}: {exc}"[:200]
                 logger.warning(
-                    "relay_wss_session_ended: error=%s backoff=%ss",
-                    self.state.last_error,
-                    backoff,
+                    "relay_wss_session_ended",
+                    error=self.state.last_error,
+                    backoff_seconds=backoff,
                 )
 
             self.state.connected = False
@@ -218,7 +218,7 @@ class RelayWSSClient:
 
         # 2. Open WSS connection.
         url = self.ws_url
-        logger.info("relay_wss_connecting: url=%s", self._safe_url(url))
+        logger.info("relay_wss_connecting", url=self._safe_url(url))
         try:
             async with websockets.connect(
                 url,
@@ -233,8 +233,8 @@ class RelayWSSClient:
                 self.state.last_connected_at = time.time()
                 self.state.last_error = ""
                 logger.info(
-                    "relay_wss_connected: license_key=%s",
-                    self.license_key[:8] + "...",
+                    "relay_wss_connected",
+                    license_key=self.license_key[:8] + "...",
                 )
 
                 # 3. Wait for the "connected" ack from the gateway.
@@ -270,7 +270,7 @@ class RelayWSSClient:
             except asyncio.CancelledError:
                 raise
             except (ConnectionClosed, Exception) as exc:
-                logger.warning("relay_wss_heartbeat_failed: %s", exc)
+                logger.warning("relay_wss_heartbeat_failed", error=str(exc))
                 # Trigger reconnect by closing the socket from this side.
                 try:
                     await ws.close()
@@ -286,7 +286,7 @@ class RelayWSSClient:
             try:
                 msg = json.loads(raw) if isinstance(raw, str) else raw
             except json.JSONDecodeError:
-                logger.warning("relay_wss_invalid_json: %s", str(raw)[:200])
+                logger.warning("relay_wss_invalid_json", raw=str(raw)[:200])
                 continue
 
             msg_type = msg.get("type", "")
@@ -304,13 +304,13 @@ class RelayWSSClient:
                 continue
             if msg_type == "error":
                 logger.warning(
-                    "relay_wss_gateway_error: code=%s message=%s",
-                    msg_data.get("code"),
-                    msg_data.get("message"),
+                    "relay_wss_gateway_error",
+                    code=msg_data.get("code"),
+                    message=msg_data.get("message"),
                 )
                 continue
 
-            logger.debug("relay_wss_unhandled_message: type=%s", msg_type)
+            logger.debug("relay_wss_unhandled_message", msg_type=msg_type)
 
     # ── HTTP request forwarding ────────────────────────────────────
 
@@ -378,10 +378,10 @@ class RelayWSSClient:
             response_envelope["body"] = response.text
             self.state.requests_handled += 1
             logger.debug(
-                "relay_wss_http_forwarded: method=%s path=%s status=%s",
-                method,
-                path,
-                response.status_code,
+                "relay_wss_http_forwarded",
+                method=method,
+                path=path,
+                status=response.status_code,
             )
         except httpx.TimeoutException:
             response_envelope["status"] = 504
@@ -389,7 +389,7 @@ class RelayWSSClient:
             response_envelope["body"] = json.dumps(
                 {"error": "local_api_timeout", "message": "Local FastAPI did not respond in time"}
             )
-            logger.warning("relay_wss_http_timeout: method=%s path=%s", method, path)
+            logger.warning("relay_wss_http_timeout", method=method, path=path)
         except Exception as exc:
             response_envelope["status"] = 502
             response_envelope["headers"] = {"Content-Type": "application/json"}
@@ -397,17 +397,21 @@ class RelayWSSClient:
                 {"error": "local_api_unreachable", "message": str(exc)[:200]}
             )
             logger.warning(
-                "relay_wss_http_error: method=%s path=%s error=%s",
-                method,
-                path,
-                str(exc)[:200],
+                "relay_wss_http_error",
+                method=method,
+                path=path,
+                error=str(exc)[:200],
             )
 
         # Send the response back to the gateway.
         try:
             await ws.send(json.dumps({"type": "http_response", "data": response_envelope}))
         except (ConnectionClosed, Exception) as exc:
-            logger.warning("relay_wss_response_send_failed: request_id=%s err=%s", request_id, exc)
+            logger.warning(
+                "relay_wss_response_send_failed",
+                request_id=request_id,
+                error=str(exc),
+            )
 
     async def _get_http_client(self) -> httpx.AsyncClient:
         """Lazily create the shared httpx client for local forwarding."""

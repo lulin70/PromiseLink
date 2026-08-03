@@ -88,18 +88,22 @@ class AssociationMatcherMixin:
         new_event_ids = set()
         if new_entity.source_event_id:
             new_event_ids.add(str(new_entity.source_event_id))
-        for ev_id in props.get("event_ids", []):
+        # BUG-7 fix (2026-08-03): props.get(key, []) returns None when the key
+        # exists but its value is None (JSON null). Use `or []` to handle both
+        # missing keys and explicit None values, preventing
+        # "'NoneType' object is not iterable" in the set() comprehensions below.
+        for ev_id in props.get("event_ids") or []:
             new_event_ids.add(str(ev_id))
 
         # Build keyword sets for topic-overlap candidate matching
         new_keywords = set(
-            k.lower() for k in props.get("event_keywords", [])
-        ) | set(t.lower() for t in props.get("tech_stack", []))
-        new_topics = set(props.get("event_topics", []))
+            k.lower() for k in (props.get("event_keywords") or [])
+        ) | set(t.lower() for t in (props.get("tech_stack") or []))
+        new_topics = set(props.get("event_topics") or [])
 
         for e in all_entities:
             e_props = e.properties or {}
-            e_basic = e_props.get("basic", {})
+            e_basic = e_props.get("basic", {}) or {}
 
             # Share city?
             if city and e_basic.get("city") == city:
@@ -115,7 +119,7 @@ class AssociationMatcherMixin:
             e_event_ids = set()
             if e.source_event_id:
                 e_event_ids.add(str(e.source_event_id))
-            for ev_id in e_props.get("event_ids", []):
+            for ev_id in e_props.get("event_ids") or []:
                 e_event_ids.add(str(ev_id))
             if new_event_ids & e_event_ids:
                 candidates.append(e)
@@ -124,14 +128,14 @@ class AssociationMatcherMixin:
             # Overlapping keywords or topics? (for topic_overlap/supply_demand)
             if new_keywords:
                 e_keywords = set(
-                    k.lower() for k in e_props.get("event_keywords", [])
-                ) | set(t.lower() for t in e_props.get("tech_stack", []))
+                    k.lower() for k in (e_props.get("event_keywords") or [])
+                ) | set(t.lower() for t in (e_props.get("tech_stack") or []))
                 if new_keywords & e_keywords:
                     candidates.append(e)
                     continue
 
             if new_topics:
-                e_topics = set(e_props.get("event_topics", []))
+                e_topics = set(e_props.get("event_topics") or [])
                 if new_topics & e_topics:
                     candidates.append(e)
                     continue

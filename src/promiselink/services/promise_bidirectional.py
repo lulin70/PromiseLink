@@ -73,9 +73,9 @@ class PromiseAnalysis:
 RULE_PATTERNS: list[tuple[re.Pattern, ActionType, float]] = [
     # System reminders (highest confidence)
     (re.compile(r"系统(?:提醒|通知|推送)"), ActionType.SYSTEM_REMINDER, 0.95),
-    # My promises - first person commitments
+    # My promises - first person commitments (explicit)
     (
-        re.compile(r"我(?:答应|承诺|说好|会|负责)"),
+        re.compile(r"我(?:答应|承诺|说好|会|负责|一定)"),
         ActionType.MY_PROMISE,
         0.92,
     ),
@@ -85,7 +85,46 @@ RULE_PATTERNS: list[tuple[re.Pattern, ActionType, float]] = [
         ActionType.MUTUAL_ACTION,
         0.85,
     ),
+    # Implicit my promises - "we must/need/should" patterns
+    # "我们下周见面" / "我们要在..." / "我们需要..."
+    (
+        re.compile(r"我们(?:\s*)个?(?:要|需要|必须|应该|得)"),
+        ActionType.MY_PROMISE,
+        0.88,
+    ),
+    # Indirect my promises - third party requires us to do something
+    # "他/她/对方 要求我们+做..." → THEY require us, so it's OUR promise
+    # "他要求我们在下周五之前提交"
+    (
+        re.compile(r"(?:他|她|对方)(?:\s*)要求我们"),
+        ActionType.MY_PROMISE,
+        0.90,
+    ),
+    # Conditional my promises - "if we can X, that would be great"
+    # "如果能先出...就更好了" / "如果这周能先出...就更好了"
+    # Allow 0-8 chars between "如果" and "能" (e.g. "这周", "我们这周")
+    (
+        re.compile(r"如果.{0,8}能(?:够)?(?:先|提前)?"),
+        ActionType.MY_PROMISE,
+        0.86,
+    ),
+    # Planning my promises - "I plan/expect/intend to"
+    # "我预计本周五可以给他一个初步结论" / "我计划明天给出评估"
+    (
+        re.compile(r"我(?:预计|计划|打算|准备)"),
+        ActionType.MY_PROMISE,
+        0.87,
+    ),
+    # Implicit planning promises - "expect/plan to + time + action"
+    # "预计本周五可以给他一个初步结论" / "计划明天给出评估结果"
+    # Subject "I" is implied when no other subject precedes "预计/计划"
+    (
+        re.compile(r"(?:预计|计划|打算|准备).{0,12}(?:可以|给|回复|提交|发|出)"),
+        ActionType.MY_PROMISE,
+        0.84,
+    ),
     # Their promises - other party commitments
+    # [\u4e00-\u9fa5]{1,4} matches Chinese names (e.g. "李总", "王芳", "张伟总")
     (
         re.compile(
             r"(?:他|她|它|对方|[\u4e00-\u9fa5]{1,4})(?:说|答应|承诺|会|提到)(?:\s*要)?"

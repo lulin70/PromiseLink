@@ -104,8 +104,11 @@ class AssociationScoringMixin:
 
     def _discover_ex_colleague(self, a: Entity, b: Entity) -> tuple[float, dict]:
         """Ex-colleague: same company with overlapping time periods."""
-        history_a = (a.properties or {}).get("work_history", [])
-        history_b = (b.properties or {}).get("work_history", [])
+        # BUG-7b fix (2026-08-03): same NoneType pattern as BUG-7.
+        # `.get("work_history", [])` returns None when the key exists with
+        # JSON null value; use `or []` for both missing and explicit None.
+        history_a = (a.properties or {}).get("work_history") or []
+        history_b = (b.properties or {}).get("work_history") or []
 
         def _normalize_entry(entry: Any) -> dict:
             """Normalize work_history entry to dict.
@@ -150,8 +153,8 @@ class AssociationScoringMixin:
         if source_a and source_b and source_a == source_b:
             return 0.6, {"shared_event_id": source_a}
 
-        events_a = set(str(e) for e in (a.properties or {}).get("event_ids", []))
-        events_b = set(str(e) for e in (b.properties or {}).get("event_ids", []))
+        events_a = set(str(e) for e in (a.properties or {}).get("event_ids") or [])
+        events_b = set(str(e) for e in (b.properties or {}).get("event_ids") or [])
         if source_a:
             events_a.add(source_a)
         if source_b:
@@ -172,20 +175,20 @@ class AssociationScoringMixin:
 
     async def _discover_alumni(self, a: Entity, b: Entity) -> tuple[float, dict]:
         """Alumni: same school."""
-        schools_a = set((a.properties or {}).get("basic", {}).get("schools", []))
-        schools_b = set((b.properties or {}).get("basic", {}).get("schools", []))
+        schools_a = set((a.properties or {}).get("basic", {}).get("schools") or [])
+        schools_b = set((b.properties or {}).get("basic", {}).get("schools") or [])
         common = schools_a & schools_b
         if not common:
             return 0.0, {}
-        majors_a = set((a.properties or {}).get("basic", {}).get("majors", []))
-        majors_b = set((b.properties or {}).get("basic", {}).get("majors", []))
+        majors_a = set((a.properties or {}).get("basic", {}).get("majors") or [])
+        majors_b = set((b.properties or {}).get("basic", {}).get("majors") or [])
         confidence = 0.95 if (majors_a & majors_b) else 0.75
         return confidence, {"common_schools": list(common)}
 
     async def _discover_tech_overlap(self, a: Entity, b: Entity) -> tuple[float, dict]:
         """Tech overlap: shared technology stack."""
-        techs_a = set((a.properties or {}).get("tech_stack", []))
-        techs_b = set((b.properties or {}).get("tech_stack", []))
+        techs_a = set((a.properties or {}).get("tech_stack") or [])
+        techs_b = set((b.properties or {}).get("tech_stack") or [])
         if not techs_a or not techs_b:
             return 0.0, {}
         overlap = techs_a & techs_b
@@ -197,8 +200,8 @@ class AssociationScoringMixin:
 
     async def _discover_deal_link(self, a: Entity, b: Entity) -> tuple[float, dict]:
         """Deal link: shared projects/deals."""
-        deals_a = set((a.properties or {}).get("deals", []))
-        deals_b = set((b.properties or {}).get("deals", []))
+        deals_a = set((a.properties or {}).get("deals") or [])
+        deals_b = set((b.properties or {}).get("deals") or [])
         common = deals_a & deals_b
         if common:
             return 1.0, {"common_deals": list(common)}
@@ -206,8 +209,8 @@ class AssociationScoringMixin:
 
     async def _discover_risk_link(self, a: Entity, b: Entity) -> tuple[float, dict]:
         """Risk link: co-occurrence in negative events."""
-        risk_events_a = (a.properties or {}).get("risk_events", [])
-        risk_events_b = (b.properties or {}).get("risk_events", [])
+        risk_events_a = (a.properties or {}).get("risk_events") or []
+        risk_events_b = (b.properties or {}).get("risk_events") or []
         common = set(str(e) for e in risk_events_a) & set(str(e) for e in risk_events_b)
         if common:
             return 0.8, {"common_risk_events": len(common)}
@@ -244,14 +247,14 @@ class AssociationScoringMixin:
         props_a = a.properties or {}
         props_b = b.properties or {}
 
-        topics_a = set(props_a.get("event_topics", []))
-        topics_b = set(props_b.get("event_topics", []))
-        keywords_a_raw = props_a.get("event_keywords", [])
-        keywords_b_raw = props_b.get("event_keywords", [])
+        topics_a = set(props_a.get("event_topics") or [])
+        topics_b = set(props_b.get("event_topics") or [])
+        keywords_a_raw = props_a.get("event_keywords") or []
+        keywords_b_raw = props_b.get("event_keywords") or []
 
         # Also consider entity-level tech_stack as topic signal
-        tech_a = set(t.lower() for t in props_a.get("tech_stack", []))
-        tech_b = set(t.lower() for t in props_b.get("tech_stack", []))
+        tech_a = set(t.lower() for t in props_a.get("tech_stack") or [])
+        tech_b = set(t.lower() for t in props_b.get("tech_stack") or [])
 
         # Build keyword sets with Chinese-aware normalization
         # For Chinese: use individual chars as tokens for fuzzy matching
