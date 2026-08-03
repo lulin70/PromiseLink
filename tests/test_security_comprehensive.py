@@ -473,11 +473,12 @@ class TestPathTraversal:
         """Path traversal in export user_id should not access system files."""
         for payload in self.TRAVERSAL_PAYLOADS:
             resp = await client.get(f"{API_PREFIX}/export/{payload}")
-            # Should be 403 (user_id mismatch) or 404 (route not matched)
+            # Should be 403 (user_id mismatch) or 404 (route not matched) or 405 (method not allowed)
+            # TD-B14: 405 is acceptable when path matches catch_all but method not allowed
             # Never 200 with system file contents
-            assert resp.status_code in (403, 404, 422), (
+            assert resp.status_code in (403, 404, 422, 405), (
                 f"Export with traversal payload {payload!r} returned {resp.status_code}. "
-                "Possible path traversal vulnerability."
+                "Possible path traversal vulnerability. Note: 405 acceptable per TD-B14."
             )
             if resp.status_code == 200:
                 # If somehow 200, verify no system file content leaked
