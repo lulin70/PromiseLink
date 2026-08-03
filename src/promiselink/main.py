@@ -492,6 +492,7 @@ for candidate in _static_candidates:
 # StaticFiles for frontend SPA routing.
 from fastapi import HTTPException
 
+
 @app.api_route(
     "/{path:path}",
     methods=["POST", "PUT", "DELETE", "PATCH"],

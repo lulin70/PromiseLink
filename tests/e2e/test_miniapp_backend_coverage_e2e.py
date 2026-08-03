@@ -1001,8 +1001,9 @@ class TestMiniappRemindersLink:
     @pytest.mark.asyncio
     async def test_get_daily_reminders(self, client, file_engine):
         """Verify: GET /reminders/daily 返回每日提醒."""
-        from promiselink.models.reminder import ReminderPreference
         from datetime import time
+
+        from promiselink.models.reminder import ReminderPreference
 
         await insert_todo(file_engine, title="提醒项", priority=1)
         async with db_session_ctx(file_engine) as session:

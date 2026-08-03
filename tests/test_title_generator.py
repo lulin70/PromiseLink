@@ -25,7 +25,6 @@ import pytest
 
 from promiselink.services.title_generator import _strip_llm_tags, generate_event_title
 
-
 # ═══════════════════════════════════════════════════════════════════
 # _strip_llm_tags — pure function tests
 # ═══════════════════════════════════════════════════════════════════

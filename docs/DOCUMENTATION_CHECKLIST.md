@@ -251,4 +251,4 @@ ACTION_TYPES = ["follow_up", "introduce", "collaborate", "provide_help",
 
 > **维护说明**: 本文档是PromiseLink进入Sprint 0编码前的最终文档质量门禁。每次文档更新后应重新运行此检查清单。
 >
-> **最后审核**: 2026-07-05 (文档版本同步至 PRD v5.8 / 技术设计 v3.2 / API设计 v3.1 / 软件 v0.8.0-rc2)
+> **最后审核**: 2026-08-03 (文档版本同步至 PRD v5.8 / 技术设计 v3.2 / API设计 v3.1 / 软件 v0.9.0)

@@ -141,4 +141,4 @@ pending ⇄ in_progress ⇄ done
 
 ---
 
-*最后更新: 2026-07-05 (v0.8.0-rc2 同步: 技术设计 v3.2 + JWT HS256 + SQLite 长期方案)*
+*最后更新: 2026-08-03 (v0.9.0 同步: 技术设计 v3.2 + JWT HS256 + SQLite 长期方案)*

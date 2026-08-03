@@ -6,7 +6,7 @@ from typing import Any, cast
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from promiselink import __version__ as _PACKAGE_VERSION
+from promiselink import __version__
 
 LLM_PRESETS: dict[str, dict[str, str]] = {
     "rsxermu666": {"base_url": "https://rsxermu666.cn/v1", "model": "claude-opus-5"},
@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # Application
     app_name: str = "PromiseLink"
-    app_version: str = _PACKAGE_VERSION
+    app_version: str = __version__
     app_env: str = "development"
     debug: bool = False
     log_level: str = "INFO"

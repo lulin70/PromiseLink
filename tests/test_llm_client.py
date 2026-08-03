@@ -32,6 +32,7 @@ from promiselink.services.llm_client import LLMClient
 def settings():
     return Settings(
         llm_api_key="test-key",
+        llm_provider="moka_ai",
         llm_base_url="https://api.moka-ai.com/v1",
         llm_model="moka/claude-sonnet-4-6",
         llm_max_tokens=2000,
