@@ -76,8 +76,8 @@
 
 **v0.9.0 直接下载**（双击安装，无需 Python 环境）：
 
-- **macOS**: [PromiseLink-0.9.0-mac.dmg](https://github.com/lulin70/PromiseLink/releases/download/v0.9.0/PromiseLink-0.9.0-mac.dmg)（Apple Silicon / Intel，~176 MB）
-- **Windows**: [PromiseLink-0.9.0-windows.exe](https://github.com/lulin70/PromiseLink/releases/download/v0.9.0/PromiseLink-0.9.0-windows.exe)（Windows 10/11 64-bit，~42 MB）
+- **macOS**: [PromiseLink-0.9.0-mac.dmg](https://github.com/lulin70/PromiseLink/releases/download/v0.9.0/PromiseLink-0.9.0-mac.dmg)（Apple Silicon / Intel，~192 MB）
+- **Windows**: [PromiseLink-0.9.0-windows.exe](https://github.com/lulin70/PromiseLink/releases/download/v0.9.0/PromiseLink-0.9.0-windows.exe)（Windows 10/11 64-bit，~26 MB）
 
 或从 [Releases 页面](https://github.com/lulin70/PromiseLink/releases) 下载所有版本。
 
