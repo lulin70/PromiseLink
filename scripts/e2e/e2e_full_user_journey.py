@@ -19,10 +19,11 @@ from datetime import datetime
 import httpx
 
 # ── 配置 ───────────────────────────────────────────────
-BASE = "http://localhost:8002/api/v1"
+# 支持环境变量覆盖 BASE URL（默认基础版运行在 localhost:8000）
+BASE = os.getenv("E2E_BASE_URL", "http://localhost:8000/api/v1")
 TIMEOUT = 60.0
 POC_SECRET = os.getenv("POC_SECRET", "promiselink2026")
-USER_ID = "00000000-0000-4000-8000-000000000004"
+USER_ID = os.getenv("E2E_USER_ID", "00000000-0000-4000-8000-000000000004")
 
 # ── 6份用户场景录入内容 ─────────────────────────────────
 # 基于真实业务场景，覆盖核心功能点
