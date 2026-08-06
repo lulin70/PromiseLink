@@ -87,6 +87,67 @@ async def _scheduled_event_maintenance() -> None:
             pass  # Normal: continue loop
 
 
+async def _pair_auto_poll() -> None:
+    """Background task: automatically poll gateway pair status and activate when matched.
+
+    Runs only when PRO_LICENSE_KEY is not set (pairing mode).
+    Periodically polls GET /pair/device/{code} until status is 'matched',
+    then calls POST /pair/activate to write license_key to .env.
+    """
+    import structlog
+
+    logger = structlog.get_logger()
+    import httpx
+
+    await asyncio.sleep(5)  # Wait for app to fully start
+
+    gateway_url = os.environ.get("RELAY_GATEWAY_URL", "https://gateway.promiselink.cn").rstrip("/")
+    pair_code_file = pathlib.Path(__file__).resolve().parents[2] / ".pair_code"
+    env_file = pathlib.Path(__file__).resolve().parents[2] / ".env"
+
+    while not _shutdown_event.is_set():
+        # Load pair code from file (written by POST /pair/init endpoint)
+        if not pair_code_file.exists():
+            await asyncio.sleep(5)
+            continue
+
+        code = pair_code_file.read_text().strip()
+        if not code:
+            await asyncio.sleep(5)
+            continue
+
+        # Check if already activated (another instance or previous run)
+        settings = get_settings()
+        if settings.pro_license_key:
+            logger.info("pair_auto_poll_exiting", reason="license_already_set")
+            return
+
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
+                resp = await client.get(f"{gateway_url}/api/v1/pair/device/{code}")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    status = data.get("data", {}).get("status", "pending")
+                    if status == "matched":
+                        license_key = data.get("data", {}).get("license_key")
+                        if license_key:
+                            logger.info("pair_auto_poll_matched", code=code, license_key=license_key)
+                            # Activate
+                            act_resp = await client.post(
+                                f"http://127.0.0.1:8000/api/v1/pair/activate",
+                                json={"license_key": license_key},
+                            )
+                            if act_resp.status_code == 200:
+                                logger.info("pair_auto_activate_success", license_key=license_key)
+                                # Clean up pair code file
+                                pair_code_file.unlink(missing_ok=True)
+                                return
+        except Exception as e:
+            logger.warning("pair_auto_poll_error", error=str(e)[:100])
+
+        await asyncio.sleep(3)
+
+
 def _signal_handler(signum: int, frame: Any) -> None:
     """Handle SIGTERM/SIGINT for graceful shutdown."""
     import structlog
@@ -143,6 +204,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _se_task = asyncio.create_task(_scheduled_event_maintenance())
     _pending_tasks.add(_se_task)
     _se_task.add_done_callback(_pending_tasks.discard)
+
+    # Start auto-pair polling task if in pairing mode (no PRO_LICENSE_KEY).
+    # This background task polls the gateway's pair status and auto-activates
+    # when the miniapp completes the pairing scan.
+    if not settings.pro_license_key:
+        _pair_task = asyncio.create_task(_pair_auto_poll())
+        _pending_tasks.add(_pair_task)
+        _pair_task.add_done_callback(_pending_tasks.discard)
 
     # Start Pro edition WSS long-connection to cloud gateway (if configured).
     # The WSS connection allows the mini-app to relay HTTP business

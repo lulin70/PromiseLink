@@ -108,9 +108,16 @@ async def init_pair() -> PairInitResponse:
         )
 
     data = response.json().get("data", response.json())
+    code = data.get("device_pair_code", "")
+    
+    # Write pair code to file for background auto-poll task
+    if code:
+        pair_code_file = pathlib.Path(__file__).resolve().parents[4] / ".pair_code"
+        pair_code_file.write_text(code)
+    
     return PairInitResponse(
         success=True,
-        device_pair_code=data.get("device_pair_code", ""),
+        device_pair_code=code,
         qr_content=data.get("qr_content", ""),
         expires_in=data.get("expires_in", 300),
         gateway_url=gateway_url,
