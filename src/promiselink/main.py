@@ -94,26 +94,33 @@ async def _pair_auto_poll() -> None:
     Periodically polls GET /pair/device/{code} until status is 'matched',
     then calls POST /pair/activate to write license_key to .env.
     """
+    import os
     import structlog
 
     logger = structlog.get_logger()
     import httpx
 
-    await asyncio.sleep(5)  # Wait for app to fully start
+    await asyncio.sleep(2)  # Wait for app to fully start
 
     gateway_url = os.environ.get("RELAY_GATEWAY_URL", "https://gateway.promiselink.cn").rstrip("/")
     pair_code_file = pathlib.Path(__file__).resolve().parents[2] / ".pair_code"
     env_file = pathlib.Path(__file__).resolve().parents[2] / ".env"
 
-    while not _shutdown_event.is_set():
+    poll_interval = 3  # seconds between polls
+    max_runtime = 600  # stop after 10 minutes (5-min pair code expiry + buffer)
+    elapsed = 0
+
+    while not _shutdown_event.is_set() and elapsed < max_runtime:
         # Load pair code from file (written by POST /pair/init endpoint)
         if not pair_code_file.exists():
-            await asyncio.sleep(5)
+            await asyncio.sleep(poll_interval)
+            elapsed += poll_interval
             continue
 
         code = pair_code_file.read_text().strip()
         if not code:
-            await asyncio.sleep(5)
+            await asyncio.sleep(poll_interval)
+            elapsed += poll_interval
             continue
 
         # Check if already activated (another instance or previous run)
@@ -145,7 +152,10 @@ async def _pair_auto_poll() -> None:
         except Exception as e:
             logger.warning("pair_auto_poll_error", error=str(e)[:100])
 
-        await asyncio.sleep(3)
+        await asyncio.sleep(poll_interval)
+        elapsed += poll_interval
+
+    logger.info("pair_auto_poll_exiting", reason="timeout")
 
 
 def _signal_handler(signum: int, frame: Any) -> None:
