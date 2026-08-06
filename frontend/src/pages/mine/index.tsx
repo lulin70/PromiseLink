@@ -62,7 +62,12 @@ export default function MinePage() {
     }
   }
 
-  // 1.3 提醒偏好快捷入口
+  // 配对小程序
+  function handlePairMiniapp() {
+    Taro.navigateTo({ url: '/pages/pair/index' })
+  }
+
+  // 1.1 提醒偏好快捷入口
   function handleReminderPref() {
     Taro.navigateTo({ url: '/pages/reminders/index' })
   }
@@ -163,6 +168,10 @@ export default function MinePage() {
         </View>
         <View className='mine-menu-item' onClick={handleReminderPref}>
           <Text className='mine-menu-label'>提醒偏好</Text>
+          <Text className='mine-menu-arrow'>&gt;</Text>
+        </View>
+        <View className='mine-menu-item' onClick={handlePairMiniapp}>
+          <Text className='mine-menu-label'>配对小程序</Text>
           <Text className='mine-menu-arrow'>&gt;</Text>
         </View>
         <View className='mine-menu-item' onClick={handleExportData}>

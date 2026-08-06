@@ -12,6 +12,7 @@ export default defineAppConfig({
     'pages/promises/detail',
     'pages/reminders/index',
     'pages/mine/index',
+    'pages/pair/index',
   ],
   tabBar: {
     color: '#8a8a8a',
