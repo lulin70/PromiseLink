@@ -6,20 +6,38 @@
 
 ## 前置条件
 
-- Python 3.11+
-- Node.js 18+（用于构建 H5 前端）
+- Python 3.11+（如从源码运行）
+- Node.js 18+（如从源码运行 H5 前端）
 - LLM API Key（推荐 Moka AI / OpenAI / Anthropic）
 
-## 快速启动
+## 快速启动（两种方式）
 
-### 1. 安装依赖
+### 方式 A：下载安装包（推荐新手，3 分钟完成）
+
+前往 [promiselink.cn](https://promiselink.cn) 下载页面，根据你的操作系统下载：
+
+- **macOS**：下载 `PromiseLink-Setup-x.x.x.dmg`，双击打开并拖入 Applications 文件夹即可
+- **Windows**：下载 `PromiseLink-Setup-x.x.x.exe`，双击运行安装向导
+
+安装完成后，首次启动会自动打开配置向导，引导你：
+
+1. **设置 PoC 密码**（本地管理员密码，请妥善保管）
+2. **配置 LLM API Key**（AI 功能必需）
+3. **获取配对码**（用于手机小程序配对）
+4. **打开小程序**（手机微信搜索"PromiseLink"或扫码）
+
+> **提示**：安装包方式已包含所有依赖，无需手动安装 Python/Node.js。
+
+### 方式 B：从源码运行（适合开发者/深度定制）
+
+#### 1. 安装依赖
 
 ```bash
 cd PromiseLink
 pip install -e ".[dev]"
 ```
 
-### 2. 配置环境变量
+#### 2. 配置环境变量
 
 ```bash
 cp .env.basic.example .env
@@ -57,7 +75,7 @@ LLM_API_KEY=sk-ant-your-anthropic-key
 
 > 开发环境下 `SECRET_KEY` 会自动生成随机密钥，无需手动配置。
 
-### 3. 启动服务
+#### 3. 启动服务
 
 ```bash
 python -m uvicorn promiselink.main:app --host 0.0.0.0 --port 8000
@@ -69,7 +87,7 @@ python -m uvicorn promiselink.main:app --host 0.0.0.0 --port 8000
 bash scripts/start.sh
 ```
 
-### 4. 访问
+#### 4. 访问
 
 - API 文档：http://localhost:8000/docs
 - 健康检查：http://localhost:8000/api/v1/health
@@ -121,11 +139,28 @@ curl http://localhost:8000/api/v1/promises?view=my-promises \
 
 ## FAQ
 
+**Q: 下载页面在哪？**
+A: 访问 [promiselink.cn](https://promiselink.cn) → 下载页面，可下载 macOS (DMG) 或 Windows (EXE) 安装包。
+
+**Q: 安装包和源码版本有什么区别？**
+A: 安装包版本开箱即用，无需安装 Python/Node.js，适合非技术用户。从源码运行适合开发者深度定制。
+
+**Q: 如何只运行基础版不跑小程序？**
+A: 基础版无需配对小程序即可独立使用。LLM 功能由 `LLM_API_KEY` 配置，支持 Moka AI / OpenAI / Anthropic。
+
+**Q: 如何自己配置 LLM API Key？**
+A: 在安装向导中配置，或编辑 `.env` 文件：
+```env
+LLM_PROVIDER=openai  # 或 moka_ai / anthropic
+LLM_API_KEY=sk-your-key
+```
+推荐使用 Moka AI（境内访问速度快，兼容 Claude 接口）。
+
 **Q: 启动报错 "secret_key must be changed"？**
 A: 非 development 环境必须设置 `SECRET_KEY`。生成方法：`python -c "import secrets; print(secrets.token_urlsafe(32))"`
 
 **Q: 如何使用专业版功能（语音/邮件同步/OCR等）？**
-A: 基础版（本仓库）不包含语音、邮件同步、OCR名片扫描等专业版功能，设置 `APP_EDITION=pro` 不会启用这些功能（相关模块已迁移至 PromiseLink-Pro 私有仓库）。如需使用专业版功能，请访问 [PromiseLink-Pro](https://github.com/lulin70/PromiseLink-Pro)（需授权）获取许可证密钥，并按专业版安装流程部署。
+A: 基础版（本仓库）不包含语音、邮件同步、OCR名片扫描等专业版功能。如需使用专业版功能，请访问 [promiselink.cn](https://promiselink.cn) 获取许可证密钥，并按专业版安装流程部署。专业版可独立运行（无需基础版），也可与本仓库基础版配对使用。
 
 **Q: 忘记 PoC 密码怎么办？**
-A: 在 `.env` 中修改 `POC_SECRET` 的值，重启服务生效。
+A: 在 `.env` 中修改 `POC_SECRET` 的值，重启服务生效。安装包版本可在配置界面重置。
