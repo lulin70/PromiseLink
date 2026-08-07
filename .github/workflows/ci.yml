@@ -238,7 +238,11 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    # 仅夜间定时运行：e2e-nightly 需要真实 LLM API key，CI 环境无法通过，
+    # 且不阻塞镜像构建（build-and-push 不依赖本 job）。
+    # 每次 push 都跑会浪费 30 分钟 CI 时间并可能导致 concurrency 取消。
+    # 基本 E2E 由 e2e job 覆盖（push 时运行）。
+    if: github.event_name == 'schedule'
 
     services:
       postgres:
