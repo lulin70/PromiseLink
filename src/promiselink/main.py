@@ -95,6 +95,7 @@ async def _pair_auto_poll() -> None:
     then calls POST /pair/activate to write license_key to .env.
     """
     import os
+
     import structlog
 
     logger = structlog.get_logger()
@@ -103,8 +104,7 @@ async def _pair_auto_poll() -> None:
     await asyncio.sleep(2)  # Wait for app to fully start
 
     gateway_url = os.environ.get("RELAY_GATEWAY_URL", "https://gateway.promiselink.cn").rstrip("/")
-    pair_code_file = pathlib.Path(__file__).resolve().parents[2] / ".pair_code"
-    env_file = pathlib.Path(__file__).resolve().parents[2] / ".env"
+    pair_code_file = Path(__file__).resolve().parents[2] / ".pair_code"
 
     poll_interval = 3  # seconds between polls
     max_runtime = 600  # stop after 10 minutes (5-min pair code expiry + buffer)
@@ -141,7 +141,7 @@ async def _pair_auto_poll() -> None:
                             logger.info("pair_auto_poll_matched", code=code, license_key=license_key)
                             # Activate
                             act_resp = await client.post(
-                                f"http://127.0.0.1:8000/api/v1/pair/activate",
+                                "http://127.0.0.1:8000/api/v1/pair/activate",
                                 json={"license_key": license_key},
                             )
                             if act_resp.status_code == 200:

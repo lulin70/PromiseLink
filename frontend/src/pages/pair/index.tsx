@@ -1,6 +1,6 @@
 import { View, Text, Image, Button } from '@tarojs/components'
-import Taro, { useEffect, useState } from '@tarojs/taro'
-import { useRouter } from '@tarojs/router'
+import Taro from '@tarojs/taro'
+import { useEffect, useState } from 'react'
 import './index.scss'
 
 interface PairStatus {
@@ -10,13 +10,11 @@ interface PairStatus {
 }
 
 export default function PairPage() {
-  const router = useRouter()
   const [code, setCode] = useState<string>('')
   const [qrUrl, setQrUrl] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [pairStatus, setPairStatus] = useState<PairStatus | null>(null)
-  const [gatewayUrl, setGatewayUrl] = useState('')
 
   const BASIC_API = 'http://127.0.0.1:8000'
 
@@ -32,7 +30,6 @@ export default function PairPage() {
       if (data.success) {
         setCode(data.device_pair_code)
         setQrUrl(data.qr_content)
-        setGatewayUrl(data.gateway_url)
         startPolling(data.device_pair_code)
       } else {
         setError(data.error || '生成配对码失败')
