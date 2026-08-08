@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from promiselink.config import get_settings
 
-PII_FIELDS = {"phone", "email"}
+PII_FIELDS = {"phone", "email", "wechat"}
 PII_PREFIX = "ENC:"  # Prefix to identify encrypted values
 _PII_SALT = b"promiselink-pii-encryption-salt-v1"
 

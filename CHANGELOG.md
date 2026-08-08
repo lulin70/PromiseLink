@@ -2,6 +2,39 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [0.9.1] - 2026-08-08
+
+### Fixed — DevSquad 批判性审核 P0/P1/P2 问题修复 (2026-08-08)
+
+DevSquad 第二轮全面批判性审核，发现 19 个问题（按 P0/P1/P2 优先级），全部修复。
+
+**P0 修复**：
+- **P0-1 contact-confirm onUnmount 清理 PII**：`useEffect` return 清理 `card_confirm_data` storage，防止退出后残留姓名/电话/微信。
+- **P0-2 input/index.tsx OCR 失败引导**：两处 `chooseImage` 增加 fail 回调处理权限拒绝 + success 回调失败时 Modal 引导（重新拍摄/手动录入）。
+- **P0-3 api.ts relayRequest 错误码解析**：新增 `backendStatus` 解包 + 解析 body.detail/message/error；新增 403/404/500 分类错误码。
+- **P0-4 entity_extractor PII 加密**：`encrypt_pii_in_properties` 已在 `_create_entity` 调用（properties 构建完成后），`merge_entity` 末尾也调用（所有属性修改完成后）。
+- **P0-5 crypto.py PII_FIELDS 添加 wechat：PII_FIELDS = {"phone", "email", "wechat"}`。
+- **P0-6 miniapp.yml CI continue-on-error 移除**：替换为 secrets 前置检查 + exit 0（skip 而非掩盖失败）；新增并发控制 `cancel-in-progress: true`。
+
+**P1 修复**：
+- **P1-7 保存重试机制**：`formSnapshot` 实时保存表单快照；`handleSave` 失败自动重试 1 次；重试仍失败 Modal 引导。
+- **P1-8 重新拍照按钮**：confirm 页 header 加"重新拍照"按钮，返回 input 页重新扫描。
+- **P1-9 chooseImage 完整错误处理**：fail 回调 + success OCR 失败 Modal（对应 P0-2）。
+- **P1-11 contact-confirm 单元测试**：新建 `tests/pages/contact-confirm.test.tsx`，覆盖辅助函数/加载/清理/校验/保存/重试/重拍。
+- **P1-12 名片扫描 E2E**：新建 `tests/e2e/business-card.spec.ts`，覆盖 Pro 激活/OCR 无姓名/confirm 预填/重拍/检测重名/保存跳转/Storage 清理。
+- **P1-13 检测重名 loading 文案**：`checking` 状态控制按钮文案"检测中..."。
+
+**P2 修复**：
+- **P2-14 小程序 city/industry 字段**：`CardData` 接口 + 表单输入 + `api.createCardEvent` 类型签名 + `handleSave` payload 均加 city/industry；后端 `_extract_card_direct` 和 `_build_entity` 已支持。
+- **P2-15 card_save 端到端测试**：新建 `tests/test_card_save_pipeline.py`，覆盖全字段/最小字段/PII加密/重复合并/空姓名跳过/wechat加密/city-industry持久化 7 个用例。
+- **P2-17 CI 并发控制**：对应 P0-6，已在 miniapp.yml 修复。
+- **P2-18 rollback.sh 回滚脚本**：新建 `deploy/rollback.sh`，支持指定镜像 tag 回滚（SSH + docker pull + health check）。
+- **P2-19 auth.ts 退出清理**：logout 加 `Taro.removeStorageSync('card_confirm_data')`。
+
+**文档与基础设施**：
+- Pro 官网下载页重新设计：新增功能特点 section（4 卡片）+ Hero 双 CTA + 锚点导航。
+- Pro CI 新增 rollback job：`workflow_dispatch` 触发，指定镜像 tag 回滚到上一稳定版本。
+
 ## [0.9.0] - 2026-07-31
 
 ### Fixed — v0.9.0 上线部署 + 找问题阶段 BUG 修复 (2026-08-01)

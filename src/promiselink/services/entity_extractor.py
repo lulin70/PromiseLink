@@ -15,6 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.core.logging import get_logger
+from promiselink.core.crypto import encrypt_pii_in_properties
 from promiselink.core.text_utils import sanitize_llm_input
 from promiselink.models.entity import Entity
 from promiselink.models.event import Event
@@ -527,6 +528,9 @@ class EntityExtractor:
                 "event_topics": event_topics or [],
                 "event_keywords": event_keywords or [],
             }
+
+        # 加密 PII 字段（phone/email/wechat）
+        properties = encrypt_pii_in_properties(properties)
 
         # Validate properties against EntityProperties schema (graceful degradation)
         try:

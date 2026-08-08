@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from promiselink.core.crypto import encrypt_pii_in_properties
 from promiselink.core.logging import get_logger
 from promiselink.models.entity import Entity
 
@@ -306,7 +307,9 @@ class EntityResolutionEngine:
             event_ids.insert(0, str(target.source_event_id))
         existing_props["event_ids"] = event_ids
 
-        target.properties = existing_props
+        # 加密 PII 字段（phone/email/wechat），在所有属性修改完成后调用
+        # encrypt_pii_in_properties 内部检测已加密值（ENC: 前缀）不会重复加密
+        target.properties = encrypt_pii_in_properties(existing_props)
 
         # Update confidence (take max)
         new_confidence = new_entity_data.get("confidence", 1.0)
