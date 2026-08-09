@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sprint 0 E2E Validation — Full 11-step Pipeline with Real Moka AI.
+"""Sprint 0 E2E Validation — Full 11-step Pipeline with Real DeepSeek.
 
 Validates F-44~F-50 integration by running one realistic event through
 the complete pipeline and printing results for each step.
@@ -8,7 +8,7 @@ Usage:
     cd . && python scripts/e2e_sprint0_pipeline.py
 
 Prerequisites:
-    - .env with MOKA_AI key configured
+    - .env with DeepSeek key configured
     - SQLite DB initialized (alembic upgrade head)
 """
 
@@ -45,7 +45,7 @@ async def run_e2e_validation():
 
     print("=" * 70)
     print("  Sprint 0 E2E Validation — Full 11-Step Pipeline")
-    print("  Using REAL Moka AI (moka/claude-sonnet-4-6)")
+    print("  Using REAL DeepSeek (deepseek-v4-flash)")
     print("=" * 70)
 
     # 1. Initialize DB

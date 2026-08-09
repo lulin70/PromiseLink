@@ -281,7 +281,7 @@ MPL 2.0 相比 AGPL v3 的**唯一实质代价**是失去基础版的 SaaS 保�
 
 **基础版（PromiseLink）可以完全独立运行**，不依赖 Pro 的任何代码：
 
-- 用户配置 `LLM_API_KEY`（支持 `moka_ai` / `openai` / `anthropic` 三种 Provider）即可启动
+- 用户配置 `LLM_API_KEY`（支持 `deepseek` / `openai` / `anthropic` 三种 Provider）即可启动
 - 提供完整的 13 步 AI 管线：事件录入 → 实体提取 → 人脉/关系/待办/承诺分析
 - 包含 Docker 一键安装、H5 宽屏前端、SQLite 存储、PIPL/GDPR 隐私合规
 - 基础版 `src/` 中无任何对 Pro 代码的依赖（仅 2 处注释说明哪些功能已迁移到 Pro）

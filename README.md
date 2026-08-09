@@ -28,7 +28,7 @@
 >
 > **架构分层**：
 > - **核心算法层**（实体归一 / Todo 状态机 / 承诺履行 / 关联发现 / 动态评分）— **主逻辑纯算法实现**（NetworkX + RapidFuzz + numpy），含可选 LLM 增强维度（entity_resolution 第5步 llm_reasoning / promise_fulfillment 的 llm_semantic 维度），均具备完整降级机制（PoC 中权重为 0.0），可离线运行、可审计、可复现
-> - **LLM 增强层**（实体提取 / NLG 响应生成）— 可选 LLM 增强，需配置 `LLM_API_KEY`（Moka AI / OpenAI / Anthropic 任选）
+> - **LLM 增强层**（实体提取 / NLG 响应生成）— 可选 LLM 增强，需配置 `LLM_API_KEY`（DeepSeek / OpenAI / Anthropic 任选）
 >
 > **不含**语音输入、语音查询、邮件同步、微信转发、OCR 名片扫描、隐私数据管理等专业版功能。
 > 基础版可通过 `relay_client` 可选连接专业版云端网关以使用云端 AI 能力（需专业版 License）。
@@ -105,7 +105,7 @@ pip install -e '.[dev]'
 
 # 2. 配置环境变量
 cp .env.basic.example .env
-# 编辑 .env 填入 LLM_API_KEY（Moka AI / OpenAI / Anthropic 任选其一）
+# 编辑 .env 填入 LLM_API_KEY（DeepSeek / OpenAI / Anthropic 任选其一）
 
 # 3. 启动应用（本地直接运行，无需 Docker）
 python -m uvicorn promiselink.main:app --host 0.0.0.0 --port 8000
@@ -258,7 +258,7 @@ PromiseLink/
 │   │   ├── promise_fulfillment.py  # 承诺履行追踪（不依赖 LLM）
 │   │   ├── association_discovery.py # 关联发现（3 策略，不依赖 LLM）
 │   │   ├── priority_scorer.py      # 动态优先级评分（不依赖 LLM）
-│   │   ├── llm_client.py           # LLM 客户端（Moka AI）
+│   │   ├── llm_client.py           # LLM 客户端（DeepSeek）
 │   │   ├── semantic_search.py      # 向量语义搜索
 │   │   ├── memory_provider.py      # CarryMem 集成
 │   │   └── ...                     # （20+ 其他服务模块）
@@ -336,7 +336,7 @@ PromiseLink/
 | **框架**  | FastAPI 0.109+ (Python 3.11+)                                          |
 | **数据库** | SQLite (基础版 + 专业版长期方案) / PostgreSQL 15 (定制版)                         |
 | **ORM** | SQLAlchemy 2.0+ (async)                                                |
-| **LLM** | Moka AI (Claude Sonnet 4.6) / OpenAI (GPT-5.5) / Anthropic             |
+| **LLM** | DeepSeek (deepseek-v4-flash) / OpenAI (GPT-5.5) / Anthropic             |
 | **向量**  | sqlite-vec (基础版 + 专业版) / pgvector (定制版)                                  |
 | **缓存**  | Redis (定制版)                                                            |
 | **算法**  | NetworkX + RapidFuzz + numpy（核心算法层，不依赖 LLM）                            |

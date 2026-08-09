@@ -10,7 +10,7 @@
 - 真实基础版 (localhost:8000)
 - 真实 Pro 网关 (https://gateway.promiselink.cn)
 - 真实 WSS 中继链路
-- 真实 LLM 调用 (Moka AI)
+- 真实 LLM 调用 (DeepSeek)
 
 前置条件:
 - 基础版运行在 localhost:8000, .env 配置 PRO_LICENSE_KEY + RELAY_WSS_ENABLED=true

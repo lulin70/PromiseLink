@@ -82,13 +82,13 @@ class TestChatCompletionNonStreaming:
         def handler(req: httpx.Request) -> httpx.Response:
             assert req.url.path == f"{_RELAY_PREFIX}/llm"
             body = json.loads(req.content)
-            assert body["provider"] == "moka_ai"
+            assert body["provider"] == "deepseek"
             assert body["messages"] == [{"role": "user", "content": "hi"}]
             assert body["stream"] is False
             return httpx.Response(200, json={
                 "data": {
                     "content": "hello back",
-                    "model": "moka-1",
+                    "model": "deepseek-v4-flash",
                     "usage": {"tokens": 5},
                     "billing": {"cost": 0.01},
                 }
@@ -99,7 +99,7 @@ class TestChatCompletionNonStreaming:
             messages=[{"role": "user", "content": "hi"}],
         )
         assert result["content"] == "hello back"
-        assert result["model"] == "moka-1"
+        assert result["model"] == "deepseek-v4-flash"
         assert result["usage"] == {"tokens": 5}
         assert result["billing"] == {"cost": 0.01}
         await client.close()
@@ -513,7 +513,7 @@ class TestTTSRelay:
             assert req.url.path == f"{_RELAY_PREFIX}/tts"
             body = json.loads(req.content)
             assert body["text"] == "你好"
-            assert body["voice"] == "zh-female-1"
+            assert body["voice"] == "zhixiaochun"
             assert body["response_format"] == "mp3"
             return httpx.Response(200, content=audio)
 

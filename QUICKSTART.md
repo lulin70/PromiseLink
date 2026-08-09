@@ -8,7 +8,7 @@
 
 - Python 3.11+（如从源码运行）
 - Node.js 18+（如从源码运行 H5 前端）
-- LLM API Key（推荐 Moka AI / OpenAI / Anthropic）
+- LLM API Key（推荐 DeepSeek / OpenAI / Anthropic）
 
 ## 快速启动（两种方式）
 
@@ -53,7 +53,7 @@ LLM_API_KEY=sk-your-key-here
 
 | LLM_PROVIDER | LLM_BASE_URL | LLM_MODEL |
 |---|---|---|
-| `moka_ai`（默认） | `https://api.moka-ai.com/v1` | `moka/claude-sonnet-4-6` |
+| `deepseek`（默认） | `https://api.deepseek.com/v1` | `deepseek-v4-flash` |
 | `openai` | `https://api.openai.com/v1` | `gpt-5.5` |
 | `anthropic` | `https://api.anthropic.com/v1` | `claude-sonnet-4-6-20250514` |
 
@@ -130,7 +130,7 @@ curl http://localhost:8000/api/v1/promises?view=my-promises \
 | `APP_EDITION` | `basic` | 版本：仅 `basic`（基础版）。专业版为独立仓库 [PromiseLink-Pro](https://github.com/lulin70/PromiseLink-Pro)，需单独安装 |
 | `SECRET_KEY` | 自动生成 | JWT 签名密钥，⚠️ 生产环境必须配置强随机密钥 |
 | `POC_SECRET` | 必须配置 | PoC 登录密码，⚠️ 默认弱密码已禁用，必须设置自定义密码 |
-| `LLM_PROVIDER` | `moka_ai` | LLM 提供商：moka_ai / openai / anthropic |
+| `LLM_PROVIDER` | `deepseek` | LLM 提供商：deepseek / openai / anthropic |
 | `LLM_API_KEY` | 空 | LLM API 密钥 |
 | `LLM_BASE_URL` | 自动填充 | LLM API 地址（根据 LLM_PROVIDER 自动设置） |
 | `LLM_MODEL` | 自动填充 | LLM 模型名称（根据 LLM_PROVIDER 自动设置） |
@@ -146,15 +146,15 @@ A: 访问 [promiselink.cn](https://promiselink.cn) → 下载页面，可下载 
 A: 安装包版本开箱即用，无需安装 Python/Node.js，适合非技术用户。从源码运行适合开发者深度定制。
 
 **Q: 如何只运行基础版不跑小程序？**
-A: 基础版无需配对小程序即可独立使用。LLM 功能由 `LLM_API_KEY` 配置，支持 Moka AI / OpenAI / Anthropic。
+A: 基础版无需配对小程序即可独立使用。LLM 功能由 `LLM_API_KEY` 配置，支持 DeepSeek / OpenAI / Anthropic。
 
 **Q: 如何自己配置 LLM API Key？**
 A: 在安装向导中配置，或编辑 `.env` 文件：
 ```env
-LLM_PROVIDER=openai  # 或 moka_ai / anthropic
+LLM_PROVIDER=openai  # 或 deepseek / anthropic
 LLM_API_KEY=sk-your-key
 ```
-推荐使用 Moka AI（境内访问速度快，兼容 Claude 接口）。
+推荐使用 DeepSeek（境内访问速度快，性价比高，默认 provider）。
 
 **Q: 启动报错 "secret_key must be changed"？**
 A: 非 development 环境必须设置 `SECRET_KEY`。生成方法：`python -c "import secrets; print(secrets.token_urlsafe(32))"`

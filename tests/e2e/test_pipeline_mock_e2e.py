@@ -98,7 +98,7 @@ class FakeLLMClient:
         if self.fail_mode == "timeout":
             from promiselink.core.exceptions import LLMTimeoutError
 
-            raise LLMTimeoutError(provider="moka_ai", timeout=1)
+            raise LLMTimeoutError(provider="deepseek", timeout=1)
         return self._respond_text(prompt)
 
     async def call_json(
@@ -123,7 +123,7 @@ class FakeLLMClient:
         if self.fail_mode == "timeout":
             from promiselink.core.exceptions import LLMTimeoutError
 
-            raise LLMTimeoutError(provider="moka_ai", timeout=1)
+            raise LLMTimeoutError(provider="deepseek", timeout=1)
         if "事件标题" in prompt or "简洁的事件标题" in prompt:
             return MEETING_TITLE
         return "ok"

@@ -25,7 +25,7 @@ PromiseLink是个人产品，SQLite完全够用。采用功能递进式部署，
 
 **关键约束**：
 - 不做原生APP，微信小程序是主入口
-- LLM推理走云端API（OpenAI/Anthropic/Moka AI），不部署本地模型
+- LLM推理走云端API（DeepSeek/OpenAI/Anthropic），不部署本地模型
 - PoC阶段零云成本，所有服务运行在本地Docker内
 - **数据主权**：数据属于用户，PromiseLink是processor不是owner（详见 §8.6.5）
 
@@ -53,7 +53,7 @@ PromiseLink是个人产品，SQLite完全够用。采用功能递进式部署，
 |------|----------|----------|------|
 | Docker Desktop | 24+ | `docker --version` | 包含Docker Compose |
 | Python | 3.11+ | `python3 --version` | 仅宿主机调试时需要 |
-| LLM API Key | - | - | OpenAI / Anthropic / Moka AI 任选其一 |
+| LLM API Key | - | - | DeepSeek / OpenAI / Anthropic 任选其一 |
 
 **[F-50新增] 语音助手额外依赖**：
 
@@ -350,8 +350,8 @@ docker compose -f docker-compose.poc.yml logs --tail=50
           │
 ┌─────────┴──────────┐    ┌─────────────────────┐
 │  微信小程序         │    │  LLM API（云端）     │
-│  （用户主入口）      │    │  OpenAI/Anthropic/   │
-│                     │    │  Moka AI             │
+│  （用户主入口）      │    │  DeepSeek/OpenAI/    │
+│                     │    │  Anthropic           │
 └─────────────────────┘    └─────────────────────┘
 ```
 
@@ -368,7 +368,7 @@ docker compose -f docker-compose.poc.yml logs --tail=50
 | 云服务器 | 2C4G最低配置，推荐阿里云/腾讯云轻量应用服务器 | ~50元/月 |
 | 域名 | 已备案域名（微信小程序要求HTTPS+备案域名） | ~50元/年 |
 | SSL证书 | Let's Encrypt免费证书（Certbot自动管理） | 免费 |
-| LLM API Key | OpenAI / Anthropic / Moka AI 任选其一 | 按用量计费 |
+| LLM API Key | DeepSeek / OpenAI / Anthropic 任选其一 | 按用量计费 |
 | SSH访问 | 服务器需开放22端口用于远程管理 | 免费 |
 
 > **域名备案说明**：微信小程序要求后端域名必须已完成ICP备案，备案流程通常需要7~20个工作日，建议提前准备。
@@ -1620,8 +1620,8 @@ docker compose exec promiselink-api env | grep -E "^TTS_|^VOICE_"
 | **LLM** | | | | |
 | `LLM_API_KEY` | - | **是** | 全部 | LLM API密钥 |
 | `LLM_BASE_URL` | - | **是** | 全部 | LLM API地址 |
-| `LLM_MODEL` | `claude-sonnet-4-20250514` | 否 | 全部 | 模型名称 |
-| `LLM_PROVIDER` | `anthropic` | 否 | 全部 | 提供商：anthropic/openai/moka_ai |
+| `LLM_MODEL` | `deepseek-v4-flash` | 否 | 全部 | 模型名称 |
+| `LLM_PROVIDER` | `deepseek` | 否 | 全部 | 提供商：deepseek/openai/anthropic |
 | `LLM_MAX_TOKENS` | `2000` | 否 | 全部 | 单次最大Token数 |
 | `LLM_TEMPERATURE` | `0.3` | 否 | 全部 | 生成温度 |
 | `LLM_TIMEOUT` | `30` | 否 | 全部 | 请求超时（秒） |
@@ -2156,17 +2156,17 @@ python -c "import sqlite_vec; print('sqlite-vec available')"
 
 ```bash
 # .env 文件追加（复用LLM_API_KEY，无需新增独立密钥）
-LLM_API_KEY=sk-your-moka-ai-key-here
+LLM_API_KEY=sk-your-deepseek-key-here
 
 # EmbeddingProvider自动复用LLM_API_KEY
-# 调用 https://api.moka-ai.com/v1/embeddings
+# 调用 https://api.deepseek.com/v1/embeddings
 ```
 
 **配置验证**:
 
 ```bash
 # 验证API Key可用
-curl -X POST https://api.moka-ai.com/v1/embeddings \
+curl -X POST https://api.deepseek.com/v1/embeddings \
   -H "Authorization: Bearer $LLM_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"model": "text-embedding-3-small", "input": ["测试"]}'

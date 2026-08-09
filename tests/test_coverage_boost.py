@@ -2490,8 +2490,8 @@ class TestHealthAPIErrorPaths:
         with patch("promiselink.config.get_settings") as mock_settings:
             settings = MagicMock()
             settings.llm_api_key = "sk-test-key"
-            settings.llm_base_url = "https://api.moka-ai.com/v1"
-            settings.llm_model = "moka/claude-sonnet-4-6"
+            settings.llm_base_url = "https://api.deepseek.com/v1"
+            settings.llm_model = "deepseek-v4-flash"
             settings.app_version = "test"
             mock_settings.return_value = settings
             response = await client.get(f"{API_PREFIX}/health/full")

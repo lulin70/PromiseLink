@@ -46,7 +46,7 @@
 | **数据库** | SQLite (基础版长期方案，per-user asyncio.Lock 序列化写) |
 | **缓存** | Redis 7 |
 | **图计算** | NetworkX + igraph |
-| **LLM** | Moka AI (Claude Sonnet) + spaCy |
+| **LLM** | DeepSeek + spaCy |
 | **容器化** | Docker + docker-compose |
 
 ---

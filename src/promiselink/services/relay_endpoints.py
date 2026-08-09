@@ -83,7 +83,7 @@ class RelayEndpointsMixin:
         """
         url = f"{self.gateway_url}{_RELAY_PREFIX}/llm"
         payload: dict[str, Any] = {
-            "provider": "moka_ai",
+            "provider": "deepseek",
             "model": model,
             "messages": messages,
             "max_tokens": max_tokens,
@@ -217,7 +217,7 @@ class RelayEndpointsMixin:
         text: str,
         *,
         model: str = _DEFAULT_TTS_MODEL,
-        voice: str = "zh-female-1",
+        voice: str = "zhixiaochun",
         speed: float = 1.0,
         response_format: str = "mp3",
     ) -> bytes:

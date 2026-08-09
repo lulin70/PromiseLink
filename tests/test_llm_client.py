@@ -32,9 +32,9 @@ from promiselink.services.llm_client import LLMClient
 def settings():
     return Settings(
         llm_api_key="test-key",
-        llm_provider="moka_ai",
-        llm_base_url="https://api.moka-ai.com/v1",
-        llm_model="moka/claude-sonnet-4-6",
+        llm_provider="deepseek",
+        llm_base_url="https://api.deepseek.com/v1",
+        llm_model="deepseek-v4-flash",
         llm_max_tokens=2000,
         llm_temperature=0.3,
         llm_timeout=30,
@@ -202,7 +202,7 @@ class TestHttpExceptionMapping:
                 max_tokens=100,
                 temperature=0.3,
             )
-        assert exc_info.value.details["provider"] == "moka_ai"
+        assert exc_info.value.details["provider"] == "deepseek"
         assert exc_info.value.details["timeout"] == 30
 
     async def test_rate_limit_raises_llm_rate_limit_error(self, llm_client):
@@ -469,8 +469,8 @@ class TestClientLifecycle:
 
     def test_init_stores_config(self, settings, llm_client):
         assert llm_client.api_key == "test-key"
-        assert llm_client.base_url == "https://api.moka-ai.com/v1"
-        assert llm_client.model == "moka/claude-sonnet-4-6"
+        assert llm_client.base_url == "https://api.deepseek.com/v1"
+        assert llm_client.model == "deepseek-v4-flash"
         assert llm_client.default_max_tokens == 2000
         assert llm_client.default_temperature == 0.3
         assert llm_client.timeout == 30

@@ -4,7 +4,7 @@
 前置条件:
   1. 后端运行在 http://localhost:8001
   2. POC_SECRET=promiselink2026 (或环境变量覆盖)
-  3. LLM_API_KEY 已配置 (Moka AI / OpenAI / Anthropic)
+  3. LLM_API_KEY 已配置 (DeepSeek / OpenAI / Anthropic)
 
 测试维度:
   - Happy: 真实 LLM 提取实体 / Todo / Promise

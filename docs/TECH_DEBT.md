@@ -1,6 +1,6 @@
 # PromiseLink 基础版技术债跟踪文档
 
-> **文档版本** v2.0 / 2026-08-03 / TD-B13 RESOLVED（小程序 e2e 真实后端模式）+ TD-B12 进展（DeepSeek 采购中）
+> **文档版本** v2.2 / 2026-08-09 / LLM Provider 迁移至 DeepSeek，TD-B12 RESOLVED（rsxermu666.cn 间歇性 503 已随迁移消除）+ TD-B13 RESOLVED（小程序 e2e 真实后端模式）
 > **关联文档** [PROJECT_STATUS.md](PROJECT_STATUS.md) · [CHANGELOG.md](../CHANGELOG.md) · [ROADMAP.md](ROADMAP.md) · [PromiseLink-Pro TECH_DEBT.md](../PromiseLink-Pro/docs/TECH_DEBT.md)
 > **用途**：量化跟踪技术债，按优先级清理，防止技术债积累导致项目可维护性下降
 > **更新原则**：每次清理后更新状态（OPEN→RESOLVED），新增技术债及时登记
@@ -14,10 +14,10 @@
 | P0 关键 | 0 项 | 0 项 | 0 项 | 0 项 |
 | P1 重要 | 3 项 | 3 项 | 0 项 | 0 项 |
 | P2 一般 | 3 项 | 3 项 | 0 项 | 0 项 |
-| P3 低优先 | 6 项 | 5 项 | 0 项 | 1 项 |
-| **合计** | **12 项** | **11 项** | **0 项** | **1 项** |
+| P3 低优先 | 6 项 | 6 项 | 0 项 | 0 项 |
+| **合计** | **12 项** | **12 项** | **0 项** | **0 项** |
 
-> **变更说明**：v2.0（2026-08-03）TD-B13 RESOLVED（小程序 e2e 真实后端模式）+ TD-B12 DeepSeek 采购中暂标进展。
+> **变更说明**：v2.2（2026-08-09）LLM Provider 从 Moka AI/rsxermu666.cn 迁移至 DeepSeek，TD-B12 RESOLVED。
 
 ---
 
@@ -216,9 +216,9 @@
 - **验收**：✅ grep "^## \[0.8" CHANGELOG.md 显示 [0.8.3] / [0.8.2] / [0.8.1] / [0.8.0-rc2] / [0.8.0-rc1] 完整序列；版本号与 VERSION 文件一致
 - **关联**：project_memory 教训"版本一致性检查不能遗漏"
 
-### TD-B12: rsxermu666.cn LLM 服务间歇性 503 阻塞真实 LLM e2e ⏳ OPEN
+### TD-B12: rsxermu666.cn LLM 服务间歇性 503 阻塞真实 LLM e2e ✅ RESOLVED
 
-- **状态**：OPEN (2026-07-31，部分验证)
+- **状态**：RESOLVED (2026-08-09，LLM Provider 迁移至 DeepSeek，rsxermu666.cn 已停用)
 - **描述**：rsxermu666.cn LLM 服务**间歇性**返回 HTTP 503。根路径 200 但 chat completion 端点间歇性 503。
 - **2026-07-31 重跑结果**：4/5 PASS, 1/5 FAIL（耗时 212s）
   - ✅ test_login (10ms)
@@ -232,7 +232,7 @@
   - title 标签过滤正常（test_title_clean_no_llm_tags PASS，`_strip_llm_tags` 6 种标签模式过滤有效）
   - title_generator.py 单元测试 18/18 PASS（覆盖率 100%）
   - 规则匹配步骤正常（classify_rule_hit confidence=0.9）
-- **修复计划**：待 rsxermu666.cn LLM 服务完全稳定后重跑，或考虑配置第三个 LLM provider 作为备用。
+- **修复计划**：已通过迁移至 DeepSeek 解决（基础版默认 provider=deepseek，模型 deepseek-v4-flash，base_url https://api.deepseek.com/v1；网关 primary_provider=deepseek / fallback_provider=openai），不再依赖 rsxermu666.cn。
 - **关联**：[CHANGELOG.md](../CHANGELOG.md) v0.9.0 "e2e 测试补齐 + title 标签过滤 + 测试脚本 BUG 修复"
 
 ### TD-B13: e2e 测试 mock 审计 — 命名误导 + 小程序全 mock ✅ RESOLVED

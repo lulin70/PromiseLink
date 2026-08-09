@@ -2953,7 +2953,7 @@ class ReindexResponse(BaseModel):
 
 **Response 200**:
 ```json
-{ "text": "我今天有几个待办", "confidence": 0.95, "provider": "moka_ai" }
+{ "text": "我今天有几个待办", "confidence": 0.95, "provider": "deepseek" }
 ```
 
 **限流**: LLM端点限流(20次/分钟)
@@ -2991,7 +2991,7 @@ class ReindexResponse(BaseModel):
     "email": ["zhangsan@abc.com"],
     "notes": []
   },
-  "provider": "moka_ai"
+  "provider": "deepseek"
 }
 ```
 
@@ -3314,11 +3314,11 @@ GDPR合规端点，支持数据查看、导出、删除。
 > **实现状态**: ✅已实现 6 个端点 | 实现文件: `PromiseLink-Pro/gateway/api/v1/relay.py`
 > **认证**: 所有端点需 `verify_relay_token`（Relay JWT，由许可证激活后签发，非普通用户 JWT）
 
-**说明**: 专业版网关提供 6 个中继端点，覆盖 LLM/ASR/TTS/OCR 四类 AI 能力中继、WebSocket 实时通道、以及 HTTP→WSS 业务请求转发。基础版用户无需持有 LLM API Key，所有 AI 调用通过网关代理到 Moka AI。
+**说明**: 专业版网关提供 6 个中继端点，覆盖 LLM/ASR/TTS/OCR 四类 AI 能力中继、WebSocket 实时通道、以及 HTTP→WSS 业务请求转发。基础版用户无需持有 LLM API Key，所有 AI 调用通过网关代理到 DeepSeek/阿里云。
 
 #### 3.27.1 POST /api/v1/pro/relay/llm ✅ **已实现**
 
-LLM 中继：基础版/小程序将 LLM 调用请求发送到网关，网关代理调用 Moka AI 后返回结果。支持流式（SSE）和非流式两种模式。
+LLM 中继：基础版/小程序将 LLM 调用请求发送到网关，网关代理调用 DeepSeek 后返回结果。支持流式（SSE）和非流式两种模式。
 
 **认证**: `verify_relay_token`（Relay JWT）
 
@@ -3345,7 +3345,7 @@ data: {"usage": {...}, "billing": {...}}
 
 #### 3.27.2 POST /api/v1/pro/relay/asr ✅ **已实现**
 
-ASR 中继：语音转文字，通过 Moka AI Whisper 实现。
+ASR 中继：语音转文字，通过阿里云 NLS 一句话识别实现。
 
 **认证**: `verify_relay_token`
 
@@ -3363,7 +3363,7 @@ ASR 中继：语音转文字，通过 Moka AI Whisper 实现。
   "data": {
     "text": "我今天有几个待办",
     "confidence": 0.95,
-    "provider": "moka_ai"
+    "provider": "deepseek"
   }
 }
 ```
@@ -3389,7 +3389,7 @@ TTS 中继：文字转语音，返回音频流。
 
 #### 3.27.4 POST /api/v1/pro/relay/ocr ✅ **已实现**
 
-OCR 中继：图片文字识别，通过 Moka AI Vision 实现。
+OCR 中继：图片文字识别，通过阿里云 OCR 全文高精版实现。
 
 **认证**: `verify_relay_token`
 
@@ -3398,7 +3398,7 @@ OCR 中继：图片文字识别，通过 Moka AI Vision 实现。
 |------|------|------|------|
 | image | file | ✅ | 图片文件 (jpg/png)，最大 10MB |
 | task | string | ❌ | 识别任务类型，默认 `general` |
-| model | string | ❌ | 模型名，默认 `moka-vision` |
+| model | string | ❌ | 模型名，默认 `recognize-advanced` |
 
 **响应 200** (`UnifiedResponse[OCRRelayResponse]`):
 ```json
@@ -3413,7 +3413,7 @@ OCR 中继：图片文字识别，通过 Moka AI Vision 实现。
       "phone": ["13800138000"],
       "email": ["zhangsan@abc.com"]
     },
-    "provider": "moka_ai"
+    "provider": "deepseek"
   }
 }
 ```

@@ -1,7 +1,7 @@
-"""EmbeddingProvider — Text embedding via Moka AI API (OpenAI-compatible).
+"""EmbeddingProvider — Text embedding via LLM API (OpenAI-compatible).
 
 Implements F-57: Text embedding for semantic search and association enhancement.
-Uses text-embedding-3-small model (768 dimensions) via Moka AI.
+Uses text-embedding-3-small model (768 dimensions) via the configured LLM provider.
 
 Design reference: PromiseLink_技术设计_v1.md v2.8 §4.12.1
 """
@@ -71,8 +71,8 @@ class EmbeddingProvider:
     """Provide text embeddings via API or local model.
 
     Strategy:
-    1. Try Moka AI API (text-embedding-3-small) first
-    2. If API fails, fall back to local sentence-transformers (moka-ai/m3e-base)
+    1. Try LLM API (text-embedding-3-small) first
+    2. If API fails, fall back to local sentence-transformers (all-MiniLM-L6-v2)
     3. If neither available, raise error
 
     Features:
@@ -276,7 +276,7 @@ class EmbeddingProvider:
     async def _embed_local(self, text: str, cache_key: str) -> list[float]:
         """Embed text using local sentence-transformers model.
 
-        Lazy-loads moka-ai/m3e-base on first call.
+        Lazy-loads all-MiniLM-L6-v2 on first call.
         Falls back to simple hash-based pseudo-embedding if
         sentence-transformers is not installed.
         """

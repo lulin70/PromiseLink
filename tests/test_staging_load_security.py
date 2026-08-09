@@ -114,7 +114,7 @@ class TestConcurrentUsers:
     async def test_100_concurrent_event_creations(self):
         """100 个不同用户并发创建事件。
 
-        注意：100 并发事件会触发 100+ LLM 调用，可能触发 Moka AI 速率限制。
+        注意：100 并发事件会触发 100+ LLM 调用，可能触发 DeepSeek 速率限制。
         验证点：
           1. API 层应接受大部分请求 (>= 50%)
           2. 不应有 5xx 服务器错误 (系统不应崩溃)

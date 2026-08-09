@@ -20,7 +20,7 @@
 | 6 | 部署 | PoC本地Docker+SQLite → Phase1云端Docker Compose+PG+Redis |
 | 7 | 明确排除 | RBAC/多租户/团队协作/他人资源匹配/原生APP |
 | 8 | 字段名 | todo_type（非todo_nature）、callability（非availability） |
-| 9 | LLM Provider | Moka AI（https://api.moka-ai.com/v1），model: moka/claude-sonnet-4-6 [0.2.0新增] |
+| 9 | LLM Provider | DeepSeek（https://api.deepseek.com/v1），model: deepseek-v4-flash |
 
 ---
 
@@ -31,7 +31,7 @@
 | # | 集成模块 | 优先级 | 状态 |
 |---|---------|--------|------|
 | 1 | IAMHERE小程序集成 | P0 | ✅ 设计完成（[D7-4] 微信OAuth code2session流程不变） |
-| 2 | LLM集成设计 | P0 | ✅ 0.2.0更新（Moka AI + 模板0/3更新 + action_type） |
+| 2 | LLM集成设计 | P0 | ✅ 0.2.0更新（DeepSeek + 模板0/3更新 + action_type） |
 | 3 | TTS/ASR集成设计 | P0 | ✅ 0.2.1详细化（ASR:微信同声传译+Whisper+Protocol抽象层 / TTS:Edge-TTS+缓存策略+Protocol抽象层+PII脱敏 / Voice Orchestrator+NLG） |
 | 4 | 微信服务号推送 | P1 | ✅ 设计完成（[D7-7] 模板消息/消息推送框架不变） |
 | 5 | CarryMem集成设计 | P1 | ✅ 0.2.0更新（三阶段路径：PoC→Phase1→Phase2） |
@@ -64,7 +64,7 @@ graph TB
         CACHE[CacheService<br/>Redis优先+内存fallback]
     end
     subgraph 外部服务
-        MOKA[Moka AI<br/>moka/claude-sonnet-4-6]
+        DEEPSEEK[DeepSeek<br/>deepseek-v4-flash]
         ASR_P[ASR: 微信同声传译/Whisper]
         TTS_P[TTS: Azure Edge-TTS / 预合成MP3]
         WECHAT[微信服务号]
@@ -82,7 +82,7 @@ graph TB
     API --> DC
     API --> EXPORT
     API --> CACHE
-    LLM --> MOKA
+    LLM --> DEEPSEEK
     TTS --> ASR_P
     TTS --> TTS_P
     WX --> WECHAT
@@ -449,19 +449,19 @@ export const authManager = new AuthManager()
 
 ### 3.1 接口封装
 
-统一LLMClient类封装LLM调用，[0.2.0更新] 使用 **Moka AI** 作为唯一Provider。
+统一LLMClient类封装LLM调用，[0.2.0更新] 使用 **DeepSeek** 作为唯一Provider。
 
 ```python
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Optional
 
-# [0.2.0更新] 统一使用Moka AI
-MOKA_API_BASE = "https://api.moka-ai.com/v1"
-MOKA_MODEL = "moka/claude-sonnet-4-6"
+# [0.2.0更新] 统一使用DeepSeek
+MOKA_API_BASE = "https://api.deepseek.com/v1"
+MOKA_MODEL = "deepseek-v4-flash"  # [0.2.0更新] 模型已迁移至DeepSeek
 
 class LLMClient:
-    """统一LLM客户端 — [0.2.0] Moka AI单Provider"""
+    """统一LLM客户端 — [0.2.0] DeepSeek单Provider"""
 
     def __init__(self, config: dict):
         self.api_key = config.get("api_key")
@@ -490,7 +490,7 @@ class LLMClient:
         max_tokens: Optional[int] = None,
         temperature: float = 0.3,
     ) -> str:
-        """调用Moka AI LLM，失败时规则降级"""
+        """调用DeepSeek LLM，失败时规则降级"""
         client = await self._get_client()
         try:
             resp = await client.post(
@@ -506,7 +506,7 @@ class LLMClient:
             data = resp.json()
             return data["choices"][0]["message"]["content"]
         except Exception as e:
-            logger.warning(f"Moka AI调用失败: {e}，使用规则降级")
+            logger.warning(f"DeepSeek调用失败: {e}，使用规则降级")
             return self._rule_based_fallback(prompt)
 
     def _rule_based_fallback(self, prompt: str) -> str:
@@ -514,12 +514,12 @@ class LLMClient:
         return '{"error": "llm_unavailable", "fallback": true}'
 ```
 
-> [deprecated] v1.2的多Provider降级策略（OpenAI→Claude→通义千问）已替换为Moka AI单Provider + 规则降级。如需多Provider回退，可在Phase 2引入。
+> [deprecated] v1.2的多Provider降级策略（OpenAI→Claude→通义千问）已替换为DeepSeek单Provider + 规则降级。如需多Provider回退，可在Phase 2引入。
 
 ### 3.2 Prompt模板库（14个模板）
 
 > 每个模板包含：完整prompt文本、输入变量、输出格式、示例
-> [0.2.0更新] 新增模板0（Input Scope分类）+ 模板13/14（RelationshipBrief/RelationshipStage），统一使用Moka AI moka/claude-sonnet-4-6模型
+> [0.2.0更新] 新增模板0（Input Scope分类）+ 模板13/14（RelationshipBrief/RelationshipStage），统一使用DeepSeek deepseek-v4-flash模型
 
 ---
 
@@ -1561,7 +1561,7 @@ Promise双向识别规则（[0.2.0新增]）：
 | 最大重试次数 | 3 | 超过3次返回错误 |
 | 退避策略 | 指数退避 | 1s → 2s → 4s |
 | 超时时间 | 30s | 单次请求超时 |
-| 降级策略 | Moka AI → 规则降级 | [0.2.0] 单Provider + fallback |
+| 降级策略 | DeepSeek → 规则降级 | [0.2.0] 单Provider + fallback |
 
 ```python
 import asyncio
@@ -1572,8 +1572,8 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
     wait=wait_exponential(multiplier=1, min=1, max=4),
     retry=retry_if_exception_type((LLMTimeoutError, LLMRateLimitError)),
 )
-async def call_with_retry(prompt: str, model: str = "moka/claude-sonnet-4-6") -> str:
-    """[0.2.0] Moka AI重试调用"""
+async def call_with_retry(prompt: str, model: str = "deepseek-v4-flash") -> str:
+    """[0.2.0] DeepSeek重试调用"""
     return await llm_client.call(prompt, model=model)
 ```
 
@@ -1583,28 +1583,28 @@ async def call_with_retry(prompt: str, model: str = "moka/claude-sonnet-4-6") ->
 |------|---|------|
 | 单次请求Token上限 | 4000 | 防止过长prompt（[0.2.0]提升以支持12模块填充） |
 | 每日Token配额 | 10万 | 控制日成本 |
-| 模型选择策略 | 统一使用Moka AI | moka/claude-sonnet-4-6 |
+| 模型选择策略 | 统一使用DeepSeek | deepseek-v4-flash |
 | 缓存策略 | 相同prompt缓存24h | 避免重复调用 |
 
-**模型选择策略（[0.2.0更新] 统一Moka AI）**:
+**模型选择策略（[0.2.0更新] 统一DeepSeek）**:
 
 | 模板 | 推荐模型 | 原因 |
 |------|---------|------|
-| 模板0 Input Scope分类 | moka/claude-sonnet-4-6 | 分类任务，需要理解scope语义 |
-| 模板1 名片提取 | moka/claude-sonnet-4-6 | 结构化提取，简单任务 |
-| 模板2 语音实体抽取 | moka/claude-sonnet-4-6 | 需要理解上下文 |
-| 模板3 Todo生成 | moka/claude-sonnet-4-6 | 需要理解6种action_type策略+降噪规则 |
-| 模板4 商机优化 | moka/claude-sonnet-4-6 | 文本优化，中等任务 |
-| 模板5 实体归一 | moka/claude-sonnet-4-6 | 需要推理判断 |
-| 模板6 关系发现 | moka/claude-sonnet-4-6 | 需要综合分析 |
-| 模板7 资源识别 | moka/claude-sonnet-4-6 | 需要深度理解 |
-| 模板8 需求提取 | moka/claude-sonnet-4-6 | 需要深度理解 |
-| 模板9 敏感度判断 | moka/claude-sonnet-4-6 | 需要安全判断 |
-| 模板10 关系维护 | moka/claude-sonnet-4-6 | 基于规则+模板生成 |
-| 模板11 承诺提取 | moka/claude-sonnet-4-6 | 需要理解承诺语义 |
-| 模板12 关注点提取 | moka/claude-sonnet-4-6 | 需要理解关注意图 |
+| 模板0 Input Scope分类 | deepseek-v4-flash | 分类任务，需要理解scope语义 |
+| 模板1 名片提取 | deepseek-v4-flash | 结构化提取，简单任务 |
+| 模板2 语音实体抽取 | deepseek-v4-flash | 需要理解上下文 |
+| 模板3 Todo生成 | deepseek-v4-flash | 需要理解6种action_type策略+降噪规则 |
+| 模板4 商机优化 | deepseek-v4-flash | 文本优化，中等任务 |
+| 模板5 实体归一 | deepseek-v4-flash | 需要推理判断 |
+| 模板6 关系发现 | deepseek-v4-flash | 需要综合分析 |
+| 模板7 资源识别 | deepseek-v4-flash | 需要深度理解 |
+| 模板8 需求提取 | deepseek-v4-flash | 需要深度理解 |
+| 模板9 敏感度判断 | deepseek-v4-flash | 需要安全判断 |
+| 模板10 关系维护 | deepseek-v4-flash | 基于规则+模板生成 |
+| 模板11 承诺提取 | deepseek-v4-flash | 需要理解承诺语义 |
+| 模板12 关注点提取 | deepseek-v4-flash | 需要理解关注意图 |
 
-> [deprecated] v1.2的按模板选不同模型（gpt-3.5/gpt-4）策略已替换为统一moka/claude-sonnet-4-6。
+> [deprecated] v1.2的按模板选不同模型（gpt-3.5/gpt-4）策略已替换为统一deepseek-v4-flash。
 
 ### 3.5 错误处理
 
@@ -2904,7 +2904,7 @@ def detect_language(text: str) -> str:
 ## 4.6 Voice Orchestrator — 语音问答流程编排器 [0.2.1新增]
 
 > **定位**: 将 ASR → NLU → API调用 → NLG → TTS 串联为完整语音问答 Pipeline。
-> 复用现有 LLM 基础设施（Moka AI）和 Query Orchestrator。
+> 复用现有 LLM 基础设施（DeepSeek）和 Query Orchestrator。
 
 ### 4.6.1 架构总览
 
@@ -2936,7 +2936,7 @@ graph TB
 | Step 1 | NLU 意图识别 | 用户查询文本 | IntentResult（意图+置信度） | InputClassifier 扩展 |
 | Step 2 | 槽位填充 | IntentResult + 原文 | Slots（参数映射） | SlotFiller（LLM模板） |
 | Step 3 | API 调用 | Intent + Slots + UserID | 结构化数据 | QueryOrchestrator（现有） |
-| Step 4 | NLG 回答生成 | Intent + Data + Slots | 自然语言回答文本 | Moka AI LLM（新Prompt） |
+| Step 4 | NLG 回答生成 | Intent + Data + Slots | 自然语言回答文本 | DeepSeek LLM（新Prompt） |
 | Step 5 | TTS 音频生成 | 回答文本 | 音频URL | Edge-TTS / CachedTTS |
 
 ### 4.6.2 核心实现
@@ -3242,7 +3242,7 @@ graph TD
 ## 4.7 NLG（Natural Language Generation）— 自然语言生成 [0.2.1新增]
 
 > **策略**: Prompt-based NLG（非训练模型）。
-> 使用 Moka AI LLM 将结构化数据转换为自然语言口语化回答。
+> 使用 DeepSeek LLM 将结构化数据转换为自然语言口语化回答。
 > **每种意图一个 NLG Prompt 模板**，无需训练数据，灵活可调。
 
 ### 4.7.1 设计原则
@@ -3438,14 +3438,14 @@ NLG_PROMPTS: dict[NLGTemplate, str] = {
 class NLGGenerator:
     """自然语言生成器 — Prompt-based NLG [0.2.1新增]
 
-    复用 Moka AI LLM Client，通过精心设计的Prompt模板
+    复用 DeepSeek LLM Client，通过精心设计的Prompt模板
     将结构化API数据转换为口语化中文回答。
     """
 
     def __init__(self, llm_client, config: dict = None):
         """
         Args:
-            llm_client: Moka AI LLMClient 实例（复用现有基础设施）
+            llm_client: DeepSeek LLMClient 实例（复用现有基础设施）
             config: NLG配置（temperature, max_tokens等）
         """
         self.llm = llm_client
@@ -3500,7 +3500,7 @@ class NLGGenerator:
         if slots:
             prompt += f"\n\n额外上下文（槽位）：{json.dumps(slots, ensure_ascii=False)}"
 
-        # 4. 调用Moka AI LLM生成
+        # 4. 调用DeepSeek LLM生成
         try:
             result = await self.llm.call(
                 prompt=prompt,
@@ -3541,7 +3541,7 @@ class NLGGenerator:
 | 输出 | JSON（实体/Todo/资源） | 纯文本（口语化中文） |
 | 使用场景 | 后台数据处理 | 前端语音交互 |
 | 复用关系 | NLG的输入常来自LLM模板的输出 | NLG是下游消费方 |
-| LLM Provider | Moka AI moka/claude-sonnet-4-6 | ✅ 同一Provider |
+| LLM Provider | DeepSeek deepseek-v4-flash | ✅ 同一Provider |
 
 ---
 
@@ -4593,11 +4593,11 @@ async def test_carrymem_degradation():
 ### 8.1 环境变量
 
 ```bash
-# LLM（[0.2.0更新] Moka AI）
-LLM_PROVIDER=moka
-LLM_API_KEY=sk-moka-xxx
-LLM_BASE_URL=https://api.moka-ai.com/v1
-LLM_MODEL=moka/claude-sonnet-4-6
+# LLM（[0.2.0更新] DeepSeek）
+LLM_PROVIDER=deepseek
+LLM_API_KEY=sk-deepseek-xxx
+LLM_BASE_URL=https://api.deepseek.com/v1
+LLM_MODEL=deepseek-v4-flash
 LLM_TIMEOUT=30
 LLM_MAX_RETRIES=3
 LLM_MAX_TOKENS=4000
@@ -4645,9 +4645,9 @@ CACHE_FALLBACK=true            # Redis不可用时内存fallback
 # [0.2.0更新] POC阶段配置
 
 llm:
-  provider: moka
-  base_url: https://api.moka-ai.com/v1
-  model: moka/claude-sonnet-4-6
+  provider: deepseek
+  base_url: https://api.deepseek.com/v1
+  model: deepseek-v4-flash
   timeout: 30
   max_retries: 3
   max_tokens: 4000          # [0.2.0] 提升至4000
@@ -5163,12 +5163,12 @@ Pipeline Step 11: AssociationDiscoveryEngine（含语义增强）
 - Event创建时触发embed
 - 批量场景（build_index）由POST /api/v1/search/reindex触发
 
-### 13.2 Moka AI API调用链 [v2.7新增]
+### 13.2 DeepSeek API调用链 [v2.7新增]
 
 ```
 EmbeddingProvider.embed(text)
     ↓
-httpx.AsyncClient.post("https://api.moka-ai.com/v1/embeddings")
+httpx.AsyncClient.post("https://api.deepseek.com/v1/embeddings")
     Headers: Authorization: Bearer {LLM_API_KEY}
     Body: {model: "text-embedding-3-small", input: [text]}
     ↓

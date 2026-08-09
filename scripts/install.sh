@@ -245,7 +245,7 @@ configure_env() {
     if grep -q "LLM_API_KEY=sk-your-key-here" "$PROJECT_ROOT/.env" 2>/dev/null; then
         print_warn "LLM_API_KEY 未配置（仍为默认值）"
         print_info  "AI 功能将不可用，请编辑 .env 设置 LLM_API_KEY"
-        print_info  "推荐：Moka AI (https://moka-ai.com) 或 DeepSeek (新用户有免费额度)"
+        print_info  "推荐：DeepSeek (https://platform.deepseek.com) 或 OpenAI"
     else
         print_ok "LLM_API_KEY 已配置"
     fi

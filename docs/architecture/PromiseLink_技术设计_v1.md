@@ -1987,7 +1987,7 @@ PoC阶段聚焦降低输入摩擦，语音输入（F-50）是最低摩擦方式�
 
 #### 4.12.1 EmbeddingProvider
 
-通过Moka AI API调用text-embedding-3-small模型，完全兼容OpenAI SDK，只需替换base_url和api_key。
+通过DeepSeek/OpenAI兼容API调用text-embedding-3-small模型，完全兼容OpenAI SDK，只需替换base_url和api_key。
 
 - 批量embedding接口（最多2048条/批）
 - 缓存策略：相同文本不重复调用API
@@ -1998,8 +1998,8 @@ from openai import AsyncOpenAI
 class EmbeddingProvider:
     def __init__(self):
         self.client = AsyncOpenAI(
-            base_url="https://api.moka-ai.com/v1",
-            api_key=settings.moka_api_key,
+            base_url="https://api.deepseek.com/v1",
+            api_key=settings.llm_api_key,
         )
         self.model = "text-embedding-3-small"
         self._cache = {}  # text -> embedding
@@ -2802,7 +2802,7 @@ POST /api/v1/events
 | API框架 | FastAPI | 异步、自动文档、类型校验 |
 | 数据库 | PostgreSQL 15 | JSONB支持、GIN索引、成熟稳定 |
 | 缓存 | Redis 7 | 会话、限流、热数据缓存 |
-| LLM | Moka AI (Claude Sonnet) | 中文理解能力强、成本可控 |
+| LLM | DeepSeek (deepseek-v4-flash) | 中文理解能力强、成本可控 |
 | 配置 | YAML | 可读性好、支持行业定制 |
 | 部署 | Docker Compose | 开发阶段简单，生产可升级K8s |
 | CarryMem集成 | Protocol接口 | 优雅降级、可测试、可替换 |
@@ -4022,7 +4022,7 @@ curl -f https://promiselink.example.com/health || echo "HEALTH CHECK FAILED"
                     ↓
           标注"AI调用"请求头 X-AI-Call: true
                     ↓
-          relay_client → 中继网关(AI代理) → Moka AI API → 返回
+          relay_client → 中继网关(AI代理) → DeepSeek API → 返回
                     ↓
           本地Docker组装响应 → 浏览器
 ```

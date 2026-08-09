@@ -28,8 +28,8 @@ _LLM_TAG_PATTERNS = [
 def _strip_llm_tags(text: str) -> str:
     """Remove LLM thinking-process tags and media reference tags from text.
 
-    Some LLM models (e.g. Claude via rsxermu666, DeepSeek-R1) return
-    ``<think>...</think>`` reasoning blocks before the actual answer.
+    Some LLM models (e.g. DeepSeek-R1/V4) return
+    `` thinking...</think>`` reasoning blocks before the actual answer.
     WeChat mini-app forwarded messages may contain ``<RichMediaReference>``
     tags. These must be stripped before storing as event title.
     """

@@ -29,7 +29,7 @@
 >
 > **Architectural layering**:
 > - **Core algorithm layer** (entity resolution / Todo state machine / promise fulfillment / association discovery / dynamic scoring) — **main logic is pure algorithm implementation** (NetworkX + RapidFuzz + numpy), with optional LLM enhancement dimensions (entity_resolution step 5 llm_reasoning / promise_fulfillment's llm_semantic dimension), all with complete degradation mechanisms (weight 0.0 in PoC), runs offline, auditable, reproducible
-> - **LLM enhancement layer** (entity extraction / NLG response generation) — optional LLM enhancement, requires `LLM_API_KEY` (Moka AI / OpenAI / Anthropic, any one)
+> - **LLM enhancement layer** (entity extraction / NLG response generation) — optional LLM enhancement, requires `LLM_API_KEY` (DeepSeek / OpenAI / Anthropic, any one)
 >
 > **Not included**: voice input, voice query, email sync, WeChat forwarding, OCR business card scanning, private data management — these are Pro edition features.
 > The basic edition can optionally connect to the Pro edition cloud gateway via `relay_client` to use cloud AI capabilities (requires Pro License).
@@ -80,7 +80,7 @@ pip install -e '.[dev]'
 
 # 2. Configure environment variables
 cp .env.basic.example .env
-# Edit .env and fill in LLM_API_KEY (any one of Moka AI / OpenAI / Anthropic)
+# Edit .env and fill in LLM_API_KEY (any one of DeepSeek / OpenAI / Anthropic)
 
 # 3. Start the app (run locally directly, no Docker required)
 python -m uvicorn promiselink.main:app --host 0.0.0.0 --port 8000
@@ -233,7 +233,7 @@ PromiseLink/
 │   │   ├── promise_fulfillment.py  # Promise fulfillment tracking (no LLM)
 │   │   ├── association_discovery.py # Association discovery (3 strategies, no LLM)
 │   │   ├── priority_scorer.py      # Dynamic priority scoring (no LLM)
-│   │   ├── llm_client.py           # LLM client (Moka AI)
+│   │   ├── llm_client.py           # LLM client (DeepSeek)
 │   │   ├── semantic_search.py      # Vector semantic search
 │   │   ├── memory_provider.py      # CarryMem integration
 │   │   └── ...                     # (20+ other service modules)
@@ -311,7 +311,7 @@ PromiseLink/
 | **Framework**  | FastAPI 0.109+ (Python 3.11+)                                          |
 | **Database** | SQLite (basic edition + Pro edition long-term plan) / PostgreSQL 15 (custom edition)                         |
 | **ORM** | SQLAlchemy 2.0+ (async)                                                |
-| **LLM** | Moka AI (Claude Sonnet 4.6) / OpenAI (GPT-5.5) / Anthropic             |
+| **LLM** | DeepSeek (deepseek-v4-flash) / OpenAI (GPT-5.5) / Anthropic             |
 | **Vector**  | sqlite-vec (basic edition + Pro edition) / pgvector (custom edition)                                  |
 | **Cache**  | Redis (custom edition)                                                            |
 | **Algorithm**  | NetworkX + RapidFuzz + numpy (core algorithm layer, no LLM dependency)                            |

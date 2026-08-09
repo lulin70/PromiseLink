@@ -26,11 +26,12 @@ _LICENSE_PREFIX = "/api/v1/pro/license"
 _HEALTH_PATH = "/api/v1/pro/health"
 
 # Default relay model (gateway selects the actual backend model)
-# Updated 2026-07-28: align with rsxermu666.cn backend (was moka/claude-sonnet-4-6)
-_DEFAULT_LLM_MODEL = "claude-opus-5"
+# Updated 2026-08-08: switch to DeepSeek (was rsxermu666/claude-opus-5)
+_DEFAULT_LLM_MODEL = "deepseek-v4-flash"
 _DEFAULT_ASR_MODEL = "whisper-1"
-_DEFAULT_TTS_MODEL = "moka-tts"
-_DEFAULT_OCR_MODEL = "moka-vision"
+# TTS/OCR 走阿里云 NLS（阿里云是唯一 provider）
+_DEFAULT_TTS_MODEL = "sambert-zhixiaochun"
+_DEFAULT_OCR_MODEL = "recognize-advanced"
 
 # Token refresh safety margin (refresh 60s before expiry)
 _TOKEN_REFRESH_MARGIN = 60

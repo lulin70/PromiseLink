@@ -23,7 +23,7 @@ llm = LLMClient(config)
 # 调用模板1：名片信息提取
 result = await llm.call(
     prompt=TEMPLATE_1_CARD_EXTRACTION.format(ocr_text=raw_ocr_text),
-    model="moka/claude-sonnet-4-6",
+    model="deepseek-v4-flash",
     temperature=0.3,
 )
 ```
@@ -32,29 +32,29 @@ result = await llm.call(
 
 | 模板 | 推荐模型 | 原因 |
 |------|---------|------|
-| 模板1 名片提取 | moka/claude-sonnet-4-6 | 结构化提取，简单任务 |
-| 模板0 input_scope分类 | moka/claude-sonnet-4-6 | 分类任务，需要理解scope语义 |
-| 模板2 语音实体抽取 | moka/claude-sonnet-4-6 | 需要理解上下文 |
-| 模板3 Todo生成 | moka/claude-sonnet-4-6 | 需要理解6种action_type策略+降噪规则 |
-| 模板4 商机优化 | moka/claude-sonnet-4-6 | 文本优化，中等任务 |
-| 模板5 实体归一 | moka/claude-sonnet-4-6 | 需要推理判断 |
-| 模板6 关系发现 | moka/claude-sonnet-4-6 | 需要综合分析 |
-| 模板7 资源识别 | moka/claude-sonnet-4-6 | 需要深度理解 |
-| 模板8 需求提取 | moka/claude-sonnet-4-6 | 需要深度理解 |
-| 模板9 敏感度判断 | moka/claude-sonnet-4-6 | 需要安全判断 |
-| 模板10 关系维护 | moka/claude-sonnet-4-6 | 基于规则+模板生成 |
-| 模板11 承诺提取 | moka/claude-sonnet-4-6 | 需要理解承诺语义 |
-| 模板12 关注点提取 | moka/claude-sonnet-4-6 | 需要理解关注意图 |
-| 模板13 RelationshipBrief生成 | moka/claude-sonnet-4-6 | 12模块结构化填充 |
-| 模板14 RelationshipStage推进建议 | moka/claude-sonnet-4-6 | 关系阶段分析推理 |
-| 模板16 NLU意图识别(Stage 2) | moka/claude-sonnet-4-6 | [F-50新增]语音意图精确分类,需低temperature+JSON-only |
-| 模板17 NLG-日程查询回答 | moka/claude-sonnet-4-6 | [F-50新增]车载场景口语化短文本生成 |
-| 模板18 NLG-承诺追踪回答 | moka/claude-sonnet-4-6 | [F-50新增]待办数据→口语化回答 |
-| 模板19 NLG-关系状态回答 | moka/claude-sonnet-4-6 | [F-50新增]关系进展→口语化回答 |
-| 模板20 NLG-范围日程回答 | moka/claude-sonnet-4-6 | [F-50 1.2新增]多日日程概览生成 |
-| 模板21 NLG-行动建议回答 | moka/claude-sonnet-4-6 | [F-50 1.2新增]关系优先级→行动建议生成 |
-| 模板22 Concern/Capability提取 | moka/claude-sonnet-4-6 | [0.3.0新增]Person实体关注点+能力提取,受控词表+自由文本 |
-| 模板23 Event标题生成 | moka/claude-sonnet-4-6 | [0.3.0新增]raw_text→简洁事件标题,≤20字 |
+| 模板1 名片提取 | deepseek-v4-flash | 结构化提取，简单任务 |
+| 模板0 input_scope分类 | deepseek-v4-flash | 分类任务，需要理解scope语义 |
+| 模板2 语音实体抽取 | deepseek-v4-flash | 需要理解上下文 |
+| 模板3 Todo生成 | deepseek-v4-flash | 需要理解6种action_type策略+降噪规则 |
+| 模板4 商机优化 | deepseek-v4-flash | 文本优化，中等任务 |
+| 模板5 实体归一 | deepseek-v4-flash | 需要推理判断 |
+| 模板6 关系发现 | deepseek-v4-flash | 需要综合分析 |
+| 模板7 资源识别 | deepseek-v4-flash | 需要深度理解 |
+| 模板8 需求提取 | deepseek-v4-flash | 需要深度理解 |
+| 模板9 敏感度判断 | deepseek-v4-flash | 需要安全判断 |
+| 模板10 关系维护 | deepseek-v4-flash | 基于规则+模板生成 |
+| 模板11 承诺提取 | deepseek-v4-flash | 需要理解承诺语义 |
+| 模板12 关注点提取 | deepseek-v4-flash | 需要理解关注意图 |
+| 模板13 RelationshipBrief生成 | deepseek-v4-flash | 12模块结构化填充 |
+| 模板14 RelationshipStage推进建议 | deepseek-v4-flash | 关系阶段分析推理 |
+| 模板16 NLU意图识别(Stage 2) | deepseek-v4-flash | [F-50新增]语音意图精确分类,需低temperature+JSON-only |
+| 模板17 NLG-日程查询回答 | deepseek-v4-flash | [F-50新增]车载场景口语化短文本生成 |
+| 模板18 NLG-承诺追踪回答 | deepseek-v4-flash | [F-50新增]待办数据→口语化回答 |
+| 模板19 NLG-关系状态回答 | deepseek-v4-flash | [F-50新增]关系进展→口语化回答 |
+| 模板20 NLG-范围日程回答 | deepseek-v4-flash | [F-50 1.2新增]多日日程概览生成 |
+| 模板21 NLG-行动建议回答 | deepseek-v4-flash | [F-50 1.2新增]关系优先级→行动建议生成 |
+| 模板22 Concern/Capability提取 | deepseek-v4-flash | [0.3.0新增]Person实体关注点+能力提取,受控词表+自由文本 |
+| 模板23 Event标题生成 | deepseek-v4-flash | [0.3.0新增]raw_text→简洁事件标题,≤20字 |
 | 模板24 Entity文本组合(Embedding) | 无LLM(纯文本组合) | [0.4.0新增]Entity属性→标准文本,供EmbeddingProvider输入 |
 
 ### AI输出语言规则（所有模板必须遵守）
@@ -1596,7 +1596,7 @@ Action类型（必须从6种中选择最匹配的一种）：
 
 **用途**: 当规则引擎无法高置信度匹配时，调用LLM进行精确意图识别（Voice Pipeline Stage 2）
 
-**LLM**: moka/claude-sonnet-4-6
+**LLM**: deepseek-v4-flash
 
 **触发条件**: rule_match confidence < 0.85 或规则未命中
 
@@ -1661,7 +1661,7 @@ Action类型（必须从6种中选择最匹配的一种）：
 
 **用途**: 根据日程数据生成简洁自然的口语化中文回答，通过TTS语音播报给用户（车载场景）
 
-**LLM**: moka/claude-sonnet-4-6
+**LLM**: deepseek-v4-flash
 
 **输入变量**:
 
@@ -1700,7 +1700,7 @@ Action类型（必须从6种中选择最匹配的一种）：
 
 **用途**: 根据待办承诺数据生成口语化中文回答（车载场景）
 
-**LLM**: moka/claude-sonnet-4-6
+**LLM**: deepseek-v4-flash
 
 **输入变量**:
 
@@ -1736,7 +1736,7 @@ Action类型（必须从6种中选择最匹配的一种）：
 
 **用途**: 根据人物关系进展数据生成口语化回答（车载场景）
 
-**LLM**: moka/claude-sonnet-4-6
+**LLM**: deepseek-v4-flash
 
 **输入变量**:
 
@@ -1770,7 +1770,7 @@ Action类型（必须从6种中选择最匹配的一种）：
 
 **用途**: 支持多日范围的日程概览生成（Phase 1.2多日查询）
 
-**LLM**: moka/claude-sonnet-4-6
+**LLM**: deepseek-v4-flash
 
 **输入变量**:
 
@@ -1805,7 +1805,7 @@ Action类型（必须从6种中选择最匹配的一种）：
 
 **用途**: 根据关系优先级数据生成行动建议（车载场景）
 
-**LLM**: moka/claude-sonnet-4-6
+**LLM**: deepseek-v4-flash
 
 **输入变量**:
 
@@ -1840,7 +1840,7 @@ Action类型（必须从6种中选择最匹配的一种）：
 
 **用途**: 在实体提取阶段（Pipeline Step 5）为每个Person实体提取关注点（concerns）和能力（capabilities），用于Insight Engine动态评分和关系经营建议
 
-**LLM**: moka/claude-sonnet-4-6
+**LLM**: deepseek-v4-flash
 
 **输入变量**:
 
@@ -1972,7 +1972,7 @@ Action类型（必须从6种中选择最匹配的一种）：
 
 **用途**: 在事件创建阶段（Pipeline Step 4）从raw_text自动生成简洁的Event标题，用于事件列表展示和快速识别
 
-**LLM**: moka/claude-sonnet-4-6
+**LLM**: deepseek-v4-flash
 
 **输入变量**:
 
@@ -2186,7 +2186,7 @@ def compose_event_text(event) -> str:
 | 最大重试次数 | 3 | 超过3次返回错误 |
 | 退避策略 | 指数退避 | 1s → 2s → 4s |
 | 超时时间 | 30s | 单次请求超时 |
-| 降级策略 | Provider切换 | Moka AI → 规则降级 |
+| 降级策略 | Provider切换 | DeepSeek → 规则降级 |
 
 ```python
 import asyncio
@@ -2197,7 +2197,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
     wait=wait_exponential(multiplier=1, min=1, max=4),
     retry=retry_if_exception_type((LLMTimeoutError, LLMRateLimitError)),
 )
-async def call_with_retry(prompt: str, model: str = "moka/claude-sonnet-4-6") -> str:
+async def call_with_retry(prompt: str, model: str = "deepseek-v4-flash") -> str:
     return await llm_client.call(prompt, model=model)
 ```
 
@@ -2207,7 +2207,7 @@ async def call_with_retry(prompt: str, model: str = "moka/claude-sonnet-4-6") ->
 |------|---|------|
 | 单次请求Token上限 | 4000 | 防止过长prompt（v2.0提升以支持12模块填充） |
 | 每日Token配额 | 10万 | 控制日成本 |
-| 模型选择策略 | 统一使用Moka AI | moka/claude-sonnet-4-6 |
+| 模型选择策略 | 统一使用DeepSeek | deepseek-v4-flash |
 | 缓存策略 | 相同prompt缓存24h | 避免重复调用 |
 
 ## 附录C：F-50 语音助手 Prompt 架构说明 [0.2.1新增]

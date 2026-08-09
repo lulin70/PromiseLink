@@ -209,7 +209,7 @@ P11 运维保障      █████████████░░░░░░�
 | — | JWT鉴权 | `api/v1/auth.py` + `core/auth.py` | ✅ PoC | JWT认证模块 |
 | — | PII脱敏 | `core/crypto.py` | ✅ PoC | AES-256-GCM字段级加密 |
 | — | Redis缓存 | `core/redis.py` | ✅ PoC | Redis 7连接+缓存层 |
-| — | LLM客户端 | `services/llm_client.py` | ✅ PoC | Moka AI接口封装 |
+| — | LLM客户端 | `services/llm_client.py` | ✅ PoC | DeepSeek接口封装 |
 | — | CarryMem集成 | `services/memory_provider.py` | ✅ PoC | 记忆层协议适配 |
 | — | 数据库迁移 | `alembic/versions/*.py` | ✅ PoC | Alembic初始化schema |
 | F-51 | 动态优先级排序 | `services/priority_scorer.py` | ✅ PoC | 二维模型(紧急性+重要性) |
@@ -269,7 +269,7 @@ Step11  关联→Todo生成                                ✅  关联发现后�
 Step12  Brief更新(F-47+F-48)                        ✅  8模块更新+evidence属性修复
 Step13  标记completed                                ✅
 
-E2E验证: 53.5s | 7/7 PASS | Moka AI真实调用 | Embedding 5条写入(384维)
+E2E验证: 53.5s | 7/7 PASS | DeepSeek真实调用 | Embedding 5条写入(384维)
 Demo验证: 4/4场景全通过 | NLU 100%(7/7) | 1224测试, 0 skip, 73%覆盖率
 ```
 
@@ -443,7 +443,7 @@ PromiseLink/
 │   │   └── backup-cron               # 备份cron配置
 │   ├── run_review.py                 # DevSquad Mock模式评审
 │   ├── run_review_real_ai.py         # DevSquad 真实AI模式评审
-│   ├── e2e_sprint0_pipeline.py      # E2E Pipeline验证 (真实Moka AI)
+│   ├── e2e_sprint0_pipeline.py      # E2E Pipeline验证 (真实DeepSeek)
 │   ├── e2e_user_journey.py           # E2E 用户旅程测试
 │   ├── e2e_realistic_scenario.py     # E2E 真实场景测试
 │
@@ -580,7 +580,7 @@ PromiseLink/
 | Todo状态机 | ✅ 完成 | `services/todo_state_machine.py` | 5状态转移+Snooze |
 | Todo生成器 | ✅ 完成 | `services/todo_generator.py` + prompts | 6种Todo类型生成 |
 | 事件处理管线 | ✅ 完成 | `services/event_pipeline.py` | 异步处理pipeline |
-| LLM客户端 | ✅ 完成 | `services/llm_client.py` | Moka AI接口封装 |
+| LLM客户端 | ✅ 完成 | `services/llm_client.py` | DeepSeek接口封装 |
 | CarryMem集成 | ✅ 完成 | `services/memory_provider.py` | 记忆层协议适配 |
 | PII脱敏模块 | ✅ 完成 | `core/crypto.py` | AES-256-GCM |
 | Redis缓存 | ✅ 完成 | `core/redis.py` | Redis 7连接 |

@@ -1660,12 +1660,12 @@ Score = 0.30 × urgency + 0.35 × importance + 0.20 × dependency + 0.15 × cont
 
 #### 2.15.1 核心思路
 
-EmbeddingProvider负责将Entity/Event的文本描述转换为向量（embedding），供SemanticSearchEngine进行语义搜索。API模式使用Moka AI的text-embedding-3-small模型（768维），本地降级模式使用all-MiniLM-L6-v2模型（384维）。通过SHA256缓存避免重复调用，支持批量嵌入。
+EmbeddingProvider负责将Entity/Event的文本描述转换为向量（embedding），供SemanticSearchEngine进行语义搜索。API模式使用DeepSeek/OpenAI兼容API的text-embedding-3-small模型（768维），本地降级模式使用all-MiniLM-L6-v2模型（384维）。通过SHA256缓存避免重复调用，支持批量嵌入。
 
 **核心类**: `EmbeddingProvider`
 
 **关键参数**:
-- 模型: `text-embedding-3-small`（Moka AI API，768维）/ `all-MiniLM-L6-v2`（本地降级，384维）
+- 模型: `text-embedding-3-small`（DeepSeek/OpenAI兼容API，768维）/ `all-MiniLM-L6-v2`（本地降级，384维）
 - 向量维度: API模式768维，本地降级384维（SemanticSearchEngine._actual_dims动态检测）
 - 批量上限: 2048 items/batch
 - 缓存策略: SHA256(text)→embedding，内存存储，重启清空
@@ -1695,7 +1695,7 @@ class EmbeddingProvider:
     LOCAL_EMBEDDING_DIMENSIONS = 384 # 本地降级模式维度(all-MiniLM-L6-v2)
     MAX_BATCH = 2048
 
-    def __init__(self, api_key: str, base_url: str = "https://api.moka-ai.com/v1"):
+    def __init__(self, api_key: str, base_url: str = "https://api.deepseek.com/v1"):
         self.api_key = api_key
         self.base_url = base_url
         self._cache: dict[str, list[float]] = {}  # SHA256(text) → embedding
@@ -1742,7 +1742,7 @@ class EmbeddingProvider:
         return results
 
     async def _call_api(self, texts: list[str]) -> list[list[float]]:
-        """调用Moka AI Embedding API"""
+        """调用DeepSeek/OpenAI兼容Embedding API"""
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 f"{self.base_url}/embeddings",
@@ -4018,7 +4018,7 @@ class IntentClassifier:
     """NLU 意图识别两阶段分类器"""
 
     RULE_CONFIDENCE_THRESHOLD = 0.85
-    LLM_MODEL = "moka/claude-sonnet-4-6"
+    LLM_MODEL = "deepseek-v4-flash"
 
     def __init__(self, llm_client=None):
         self.llm = llm_client
@@ -4298,7 +4298,7 @@ class SlotFiller:
 | Voice Pipeline 独立性 | 独立于 Event Pipeline | 故障隔离,独立部署 |
 | 适配层设计 | QueryOrchestrator 作为适配层 | 将 NLU 结果转换为现有 REST API 调用 |
 | API 兼容性 | 不修改任何现有 API 的核心逻辑 | 只增加 summary_level / summary_format 参数 |
-| LLM 选型 | moka/claude-sonnet-4-6 | 中文理解能力强,响应速度满足要求 |
+| LLM 选型 | deepseek-v4-flash | 中文理解能力强,响应速度满足要求 |
 
 **QueryOrchestrator 适配层伪代码**：
 

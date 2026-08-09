@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """End-to-end verification script for PromiseLink PoC.
 
-Tests the full pipeline with real LLM calls (Moka AI).
+Tests the full pipeline with real LLM calls (DeepSeek).
 Run: python scripts/e2e_verify.py
 
 Verifies:
-1. LLM client can call Moka AI API
+1. LLM client can call DeepSeek API
 2. Entity extraction from card_save and meeting events
 3. Todo generation from extracted entities
 4. Full pipeline: Event → Extract → Generate → Memory → Status
@@ -79,7 +79,7 @@ TEST_USER_ID = str(uuid.UUID("00000000-0000-0000-0000-000000000001"))
 
 
 async def verify_llm_client(settings: Settings) -> bool:
-    """Step 1: Verify LLM client can call Moka AI API."""
+    """Step 1: Verify LLM client can call DeepSeek API."""
     print("\n" + "=" * 60)
     print("Step 1: LLM Client 真实调用验证")
     print("=" * 60)

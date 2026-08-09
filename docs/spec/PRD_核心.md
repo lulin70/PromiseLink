@@ -664,7 +664,7 @@ Phase 2扩展：滑动手势语义分化（需原生APP）
 
 | 组件 | 选型 | 说明 |
 |------|------|------|
-| Embedding模型 | text-embedding-3-small | 通过Moka AI API，API模式768维/本地降级384维，兼容OpenAI SDK |
+| Embedding模型 | text-embedding-3-small | 通过DeepSeek/OpenAI兼容API，API模式768维/本地降级384维，兼容OpenAI SDK |
 | 向量存储 | sqlite-vec扩展 | 与PoC部署模型一致，零额外依赖 |
 | Phase 2迁移路径 | sqlite-vec → pgvector | PostgreSQL迁移时 |
 

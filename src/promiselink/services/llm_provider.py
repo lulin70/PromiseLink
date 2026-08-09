@@ -7,7 +7,7 @@ Architecture:
     PromiseLink 业务层 (Pipeline/NLU/NLG/EntityExtraction)
          ↕ LLMProvider Protocol (4 methods)
          ↕ Implementation
-    LLMClient (Moka AI / OpenAI-compatible)
+    LLMClient (DeepSeek / OpenAI-compatible)
 """
 
 from __future__ import annotations

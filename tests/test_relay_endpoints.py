@@ -143,14 +143,14 @@ class TestParseLLMResponse:
         data = {
             "data": {
                 "content": "hello world",
-                "model": "moka-1",
+                "model": "deepseek-v4-flash",
                 "usage": {"tokens": 10},
                 "billing": {"cost": 0.01},
             }
         }
         result = RelayEndpointsMixin._parse_llm_response(data)
         assert result["content"] == "hello world"
-        assert result["model"] == "moka-1"
+        assert result["model"] == "deepseek-v4-flash"
         assert result["usage"] == {"tokens": 10}
         assert result["billing"] == {"cost": 0.01}
 
@@ -473,7 +473,7 @@ class TestXAICallHeader:
         client = _MockRelayClientWithHTTP()
         await client.chat_completion(
             messages=[{"role": "user", "content": "hi"}],
-            model="moka/claude",
+            model="deepseek-v4-flash",
             stream=False,
         )
         assert len(client.captured_posts) == 1
@@ -486,7 +486,7 @@ class TestXAICallHeader:
         client = _MockRelayClientWithHTTP()
         result = await client.chat_completion(
             messages=[{"role": "user", "content": "hi"}],
-            model="moka/claude",
+            model="deepseek-v4-flash",
             stream=True,
         )
         # chat_completion(stream=True) returns {"stream": <coroutine>}

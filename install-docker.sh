@@ -89,8 +89,7 @@ if [ -z "$CURRENT_KEY" ] || [ "$CURRENT_KEY" = "sk-your-key-here" ] || [ "$CURRE
     echo -e "${YELLOW}请输入您的 LLM API Key:${NC}"
     echo -e "${YELLOW}  推荐方案:${NC}"
     echo -e "${YELLOW}    1. DeepSeek — https://platform.deepseek.com (新用户有免费额度)${NC}"
-    echo -e "${YELLOW}    2. Moka AI  — https://moka-ai.com${NC}"
-    echo -e "${YELLOW}    3. OpenAI   — https://platform.openai.com${NC}"
+    echo -e "${YELLOW}    2. OpenAI   — https://platform.openai.com${NC}"
     echo -e "${YELLOW}  费用参考: 日均10条交互约 ¥0.1-0.5${NC}"
     echo -e "${YELLOW}API Key:${NC}"
     read -r USER_KEY

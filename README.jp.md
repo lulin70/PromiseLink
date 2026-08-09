@@ -29,7 +29,7 @@
 >
 > **アーキテクチャの階層化**:
 > - **コアアルゴリズム層**（エンティティ正規化 / Todo状態機械 / 約束履行 / 関連発見 / 動的スコアリング）— **メインロジックは純粋なアルゴリズム実装**（NetworkX + RapidFuzz + numpy）、オプションのLLM拡張次元あり（entity_resolution 第5歩 llm_reasoning / promise_fulfillment の llm_semantic 次元）、いずれも完全な縮退メカニズム付き（PoCでは重み0.0）、オフライン動作、監査可能、再現可能
-> - **LLM拡張層**（エンティティ抽出 / NLG応答生成）— 任意のLLM拡張、`LLM_API_KEY`の設定が必要（Moka AI / OpenAI / Anthropic からいずれか一つ）
+> - **LLM拡張層**（エンティティ抽出 / NLG応答生成）— 任意のLLM拡張、`LLM_API_KEY`の設定が必要（DeepSeek / OpenAI / Anthropic からいずれか一つ）
 >
 > **含まれないもの**: 音声入力、音声クエリ、メール同期、WeChat転送、OCR名刺スキャン、プライベートデータ管理 — これらはプロ版の機能です。
 > 基本版は `relay_client` を介してプロ版のクラウドゲートウェイにオプションで接続し、クラウドAI機能を利用できます（プロ版ライセンスが必要）。
@@ -80,7 +80,7 @@ pip install -e '.[dev]'
 
 # 2. 環境変数を設定
 cp .env.basic.example .env
-# .env を編集して LLM_API_KEY を入力（Moka AI / OpenAI / Anthropic からいずれか一つ）
+# .env を編集して LLM_API_KEY を入力（DeepSeek / OpenAI / Anthropic からいずれか一つ）
 
 # 3. アプリを起動（ローカルで直接実行、Docker不要）
 python -m uvicorn promiselink.main:app --host 0.0.0.0 --port 8000
@@ -233,7 +233,7 @@ PromiseLink/
 │   │   ├── promise_fulfillment.py  # 約束履行追跡（LLM不依存）
 │   │   ├── association_discovery.py # 関連発見（3戦略、LLM不依存）
 │   │   ├── priority_scorer.py      # 動的優先度スコアリング（LLM不依存）
-│   │   ├── llm_client.py           # LLMクライアント（Moka AI）
+│   │   ├── llm_client.py           # LLMクライアント（DeepSeek）
 │   │   ├── semantic_search.py      # ベクトル意味検索
 │   │   ├── memory_provider.py      # CarryMem統合
 │   │   └── ...                     # （20以上の他のサービスモジュール）
@@ -311,7 +311,7 @@ PromiseLink/
 | **フレームワーク**  | FastAPI 0.109+ (Python 3.11+)                                          |
 | **データベース** | SQLite（基本版 + プロ版長期計画） / PostgreSQL 15（カスタム版）                         |
 | **ORM** | SQLAlchemy 2.0+ (async)                                                |
-| **LLM** | Moka AI (Claude Sonnet 4.6) / OpenAI (GPT-5.5) / Anthropic             |
+| **LLM** | DeepSeek (deepseek-v4-flash) / OpenAI (GPT-5.5) / Anthropic             |
 | **ベクトル**  | sqlite-vec（基本版 + プロ版） / pgvector（カスタム版）                                  |
 | **キャッシュ**  | Redis（カスタム版）                                                            |
 | **アルゴリズム**  | NetworkX + RapidFuzz + numpy（コアアルゴリズム層、LLM不依存）                            |

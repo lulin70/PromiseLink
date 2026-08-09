@@ -1,6 +1,6 @@
 """LLM client module for PromiseLink.
 
-Uses Moka AI API (OpenAI-compatible interface) via httpx async calls.
+Uses DeepSeek API (OpenAI-compatible interface) via httpx async calls.
 Supports retry with exponential backoff, timeout, and graceful degradation.
 """
 
@@ -54,7 +54,7 @@ async def close_shared_client() -> None:
 
 
 class LLMClient:
-    """Async LLM client for Moka AI (OpenAI-compatible) API calls.
+    """Async LLM client for DeepSeek (OpenAI-compatible) API calls.
 
     Features:
         - Exponential backoff retry (manual, no tenacity)
