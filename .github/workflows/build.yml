@@ -114,33 +114,34 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "short_version=${VERSION#v}" >> $GITHUB_OUTPUT
 
-      - name: Build with PyInstaller (onedir mode)
-        run: |
-          # Build onedir bundle (creates dist/PromiseLink.exe/ directory on Windows)
-          pyinstaller promiselink.spec --clean --noconfirm
-
-      - name: Package EXE as zip
+      - name: Build with PyInstaller
         shell: bash
         run: |
-          # PyInstaller onedir mode creates a directory, not a file.
-          # Zip it so it can be uploaded as a single artifact.
+          # promiselink.spec 将 a.binaries/a.datas 直接传入 EXE()，为 onefile 模式，
+          # 在 Windows 上产出单个 dist/PromiseLink.exe（非 onedir 目录）。
+          pyinstaller promiselink.spec --clean --noconfirm
+          ls -lh dist/PromiseLink.exe
+
+      - name: Rename EXE to versioned artifact
+        shell: bash
+        run: |
+          # 直接重命名为下载页引用的 .exe 文件名，避免 zip 往返
           VERSION=${{ steps.version.outputs.short_version }}
-          cd dist
-          powershell -Command "Compress-Archive -Path PromiseLink.exe -DestinationPath PromiseLink-${VERSION}-windows.zip -Force"
-          ls -lh PromiseLink-${VERSION}-windows.zip
+          mv dist/PromiseLink.exe "dist/PromiseLink-${VERSION}-windows.exe"
+          ls -lh "dist/PromiseLink-${VERSION}-windows.exe"
 
       - name: Upload release asset
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/PromiseLink-${{ steps.version.outputs.short_version }}-windows.zip
+            dist/PromiseLink-${{ steps.version.outputs.short_version }}-windows.exe
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: PromiseLink-windows-${{ steps.version.outputs.short_version }}
-          path: dist/PromiseLink-${{ steps.version.outputs.short_version }}-windows.zip
+          path: dist/PromiseLink-${{ steps.version.outputs.short_version }}-windows.exe
 
   # ── Job 3: Deploy to server (after all builds succeed) ─────────────────────
   deploy-to-server:
@@ -184,13 +185,8 @@ jobs:
           strip_components: 0
           overwrite: true
           command: |
-            # Unzip Windows EXE
-            cd /opt/promiselink-pro/website/downloads/
-            for f in *.zip; do
-              unzip -o "$f" -d . && rm -f "$f"
-            done
-            # Rename .zip-extracted folder to .exe if needed
-            ls -lh
+            # 直接上传 .dmg/.exe（不再有 zip，无需 unzip）
+            ls -lh /opt/promiselink-pro/website/downloads/
           timeout: 300
 
       - name: Update download page on server
