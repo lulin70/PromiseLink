@@ -18,14 +18,12 @@ const EVENT_TYPES = [
   { value: 'manual', label: '手动录入' },
   { value: 'meeting', label: '会议' },
   { value: 'call', label: '电话' },
-  { value: 'wechat_forward', label: '微信转发' },
 ]
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   manual: '手动录入',
   meeting: '会议',
   call: '电话',
-  wechat_forward: '微信转发',
 }
 
 interface EventDetail {
