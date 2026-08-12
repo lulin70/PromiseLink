@@ -6,10 +6,10 @@
 
 <p align="center">
   <a href="https://promiselink.cn"><img src="https://img.shields.io/badge/🌐_官网-promiselink.cn-blue?style=for-the-badge" alt="Website"></a>
-  <a href="https://github.com/lulin70/PromiseLink/releases"><img src="https://img.shields.io/badge/version-v0.9.0-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/lulin70/PromiseLink/releases"><img src="https://img.shields.io/badge/version-v0.9.6-blue?style=flat-square" alt="Version"></a>
   <br/>
   <a href="https://github.com/lulin70/PromiseLink/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/lulin70/PromiseLink/ci.yml?branch=main&label=CI&logo=github" alt="CI"></a>
-  <img src="https://img.shields.io/badge/tests-1904%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-1922%20passed-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/coverage-89%25-green" alt="Coverage">
   <img src="https://img.shields.io/badge/mypy-0%20errors-brightgreen" alt="mypy">
   <img src="https://img.shields.io/badge/ruff-0%20errors-brightgreen" alt="ruff">
@@ -43,7 +43,7 @@
 | 优势 | 数据证明 | 对比传统 CRM |
 |------|---------|-------------|
 | 🔐 **数据主权 · 不提供 SaaS** | 100% 本地 SQLite 存储 / 数据从不出家门 / 离线可用 / 符合 PIPL & GDPR | SaaS AI-CRM 数据上云，关系资产交给第三方托管 |
-| 🏭 **工业级质量** | 1904 测试通过 / 89% 覆盖率 / mypy 0 / ruff 0 / 50 安全测试 / 17 性能测试 | 多数开源 CRM < 30% 覆盖率 |
+| 🏭 **工业级质量** | 1922 测试通过 / 89% 覆盖率 / mypy 0 / ruff 0 / 50 安全测试 / 17 性能测试 | 多数开源 CRM < 30% 覆盖率 |
 | 🧠 **核心算法层主逻辑纯算法** | 实体归一 / Todo 状态机 / 承诺履行 / 关联发现 / 动态评分 — 主逻辑纯算法实现（NetworkX + RapidFuzz + numpy），含可选 LLM 增强维度（均具备降级机制），可离线运行、可审计 | 主流 AI-CRM 全链路依赖 GPT API |
 | 🚀 **便携零部署** | `pip install -e .` + `bash scripts/start.sh` 即用，无需 Docker / K8s | 同类工具需 docker-compose |
 
@@ -74,10 +74,10 @@
 
 ### 方式一：一键下载安装包（推荐非技术用户）
 
-**v0.9.0 直接下载**（双击安装，无需 Python 环境）：
+**v0.9.6 直接下载**（双击安装，无需 Python 环境）：
 
-- **macOS**: [PromiseLink-0.9.0-mac.dmg](https://github.com/lulin70/PromiseLink/releases/download/v0.9.0/PromiseLink-0.9.0-mac.dmg)（Apple Silicon / Intel，~192 MB）
-- **Windows**: [PromiseLink-0.9.0-windows.exe](https://github.com/lulin70/PromiseLink/releases/download/v0.9.0/PromiseLink-0.9.0-windows.exe)（Windows 10/11 64-bit，~26 MB）
+- **macOS**: [PromiseLink-0.9.6-mac.dmg](https://github.com/lulin70/PromiseLink/releases/download/v0.9.6/PromiseLink-0.9.6-mac.dmg)（Apple Silicon / Intel，~82 MB）
+- **Windows**: [PromiseLink-0.9.6-windows.exe](https://github.com/lulin70/PromiseLink/releases/download/v0.9.6/PromiseLink-0.9.6-windows.exe)（Windows 10/11 64-bit，~42 MB）
 
 或从 [Releases 页面](https://github.com/lulin70/PromiseLink/releases) 下载所有版本。
 
@@ -125,7 +125,7 @@ bash scripts/start.sh
 git clone https://github.com/lulin70/PromiseLink
 cd PromiseLink
 pip install -e '.[dev]'
-pytest --co -q | tail -1   # 应显示 1953 tests collected
+pytest --co -q | tail -1   # 应显示 1971 tests collected
 pytest tests/test_security_comprehensive.py -q --no-cov   # 50 项安全测试
 ```
 
@@ -135,7 +135,7 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50 项安全测试
 
 | 指标       | 数值                                                               |
 | -------- | ---------------------------------------------------------------- |
-| 测试用例     | **1904 passed**, 49 skipped, 0 failed (含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏 + 50 安全 + 17 性能 + 6 真实 LLM E2E) |
+| 测试用例     | **1922 passed**, 49 skipped, 0 failed (含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏 + 50 安全 + 17 性能 + 6 真实 LLM E2E) |
 | 代码覆盖率    | **89%**                                                          |
 | mypy 类型检查 | **0 错误** (112 源文件全部通过)                                             |
 | ruff 代码检查 | **0 错误**                                                          |
@@ -145,7 +145,7 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50 项安全测试
 | 服务模块     | **38 个**                                                          |
 | 数据模型     | **8 个文件，10 个模型类**                                                  |
 | 文档版本     | PRD v5.8 / Tech v3.2                                             |
-| 软件版本     | v0.9.0                                                           |
+| 软件版本     | v0.9.6                                                           |
 | 产品层级     | 基础版(本地免费) / 专业版(网关中继) / 小程序(手机竖屏) / 定制版(团队)                      |
 | 总体进度     | **89%** (基础版 E2E 81/0/0 零 skip 达成)                              |
 
@@ -270,7 +270,7 @@ PromiseLink/
 │   ├── prompts/                # LLM Prompt 模板
 │   └── main.py                 # FastAPI 入口
 ├── docs/                       # 文档体系
-├── tests/                      # 测试（67 个文件 / 1953 用例）
+├── tests/                      # 测试（67 个文件 / 1971 用例）
 ├── data/                       # SQLite 数据存储
 ├── scripts/                    # 一键安装/启动脚本 + E2E 测试
 └── frontend/                   # Taro H5 前端
@@ -316,7 +316,7 @@ PromiseLink/
 - [x] DataSourceAdapter 抽象层（手动 / CSV；语音 / 微信 / 邮件为专业版功能）
 - [x] CarryMem 协议解耦（NullMemoryProvider 优雅降级）
 - [x] 加密体系（HMAC-SHA256 + 字段级加密 + 行级安全）
-- [x] 67 个测试文件 / **1953 测试用例**（含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏 + 6 真实 LLM E2E）/ **89% 覆盖率**
+- [x] 67 个测试文件 / **1971 测试用例**（含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏 + 6 真实 LLM E2E）/ **89% 覆盖率**
 - [x] CI/CD + Alembic 就绪
 - [x] PoC Demo 4/4 场景通过
 - [x] 一键安装 / 启动脚本（本地直接运行，无需 Docker）

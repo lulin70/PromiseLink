@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from promiselink.models.entity import Entity
 from promiselink.models.event import Event
-from promiselink.services.entity_extractor import ExtractionResult, ExtractedPerson
+from promiselink.services.entity_extractor import ExtractedPerson, ExtractionResult
 from promiselink.services.event_pipeline import process_event_with_short_transactions
 from promiselink.services.steps import (
     Step01_VerifyEvent,

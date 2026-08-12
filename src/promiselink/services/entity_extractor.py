@@ -14,8 +14,8 @@ from typing import Any, cast
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from promiselink.core.logging import get_logger
 from promiselink.core.crypto import encrypt_pii_in_properties
+from promiselink.core.logging import get_logger
 from promiselink.core.text_utils import sanitize_llm_input
 from promiselink.models.entity import Entity
 from promiselink.models.event import Event
