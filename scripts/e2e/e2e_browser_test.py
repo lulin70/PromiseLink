@@ -66,7 +66,7 @@ async def main():
                         print("  ✓ Filled password field")
                     elif "user" in placeholder.lower() or "id" in placeholder.lower():
                         if not value:
-                            await inp.fill("poc-user")
+                            await inp.fill("local_user")
                             print("  ✓ Filled user ID field")
 
             # === STEP 3: Click Login ===

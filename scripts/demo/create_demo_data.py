@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create demo data for poc-user so they see real content on login"""
+"""Create demo data for local_user so they see real content on login"""
 import json
 import time
 
@@ -8,11 +8,11 @@ import httpx
 BASE = "http://localhost:8002/api/v1"
 c = httpx.Client(timeout=60)
 
-# Login as poc-user
-r = c.post(f"{BASE}/auth/login", json={"poc_secret": "promiselink2026", "user_id": "poc-user"})
+# Login as local_user
+r = c.post(f"{BASE}/auth/login", json={"poc_secret": "promiselink2026", "user_id": "local_user"})
 token = r.json()["access_token"]
 h = {"Authorization": f"Bearer {token}"}
-print("Logged in as poc-user")
+print("Logged in as local_user")
 
 # Create 3 demo events with real Chinese business scenarios
 events = [
@@ -56,7 +56,7 @@ for i, evt in enumerate(events):
         print("      Pipeline timeout")
 
 # Check results
-print("\n=== Results for poc-user ===")
+print("\n=== Results for local_user ===")
 d = c.get(f"{BASE}/dashboard/day-view", headers=h).json()
 s = d.get("summary", {})
 print(f"Dashboard: events={s.get('total_events',0)} todos={s.get('total_todos',0)} overdue={s.get('overdue_todos',0)} promises={s.get('pending_promises',0)}")

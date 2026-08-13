@@ -88,6 +88,25 @@ async def login(request: LoginRequest) -> Any:
     return LoginResponse(access_token=token, user_id=user_id)
 
 
+# Local single-user identity (Gateway as Identity Broker, v0.9.7).
+# The basic edition is a single-user local app: one install = one person.
+# All local business data belongs to this fixed identity. Both direct
+# browser access (via /auth/auto) and relay requests (via the gateway's
+# injected X-Local-User-Id, consumed by the WSS client) resolve to it, so
+# the miniapp and the local browser always see the same data.
+LOCAL_USER_ID = "local_user"
+
+
+@router.post("/auth/auto", response_model=LoginResponse)
+async def auto_login() -> Any:
+    """基础版单用户模式：自动登录为 local_user，无需密钥。
+
+    仅限本机（127.0.0.1 / ::1）访问，由 FastAPI 中间件或 network 绑定
+    保证。本机访问权等价于完整机器访问权，因此信任为 local_user 安全。
+    """
+    return LoginResponse(access_token=create_access_token(LOCAL_USER_ID), user_id=LOCAL_USER_ID)
+
+
 class WeChatLoginRequest(BaseModel):
     code: str = Field(..., description="wx.login() 返回的 code")
 

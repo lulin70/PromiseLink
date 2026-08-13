@@ -2,6 +2,21 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [0.9.7] - 2026-08-13
+
+### Added — 身份统一：网关身份代理 (local_user) + 自动登录 (2026-08-13)
+
+身份统一（Gateway as Identity Broker）：网关作为身份权威，基础版统一为单用户本地身份 `local_user`，解决小程序与本地浏览器数据不一致问题。
+
+- **新增 POST /api/v1/auth/auto 端点**：单用户本地应用自动登录为 `local_user`，无需密钥，打开即用
+- **relay_wss_client.py 身份统一**：不再透传小程序 X-User-Token，改为读取网关注入的 `X-Local-User-Id` 生成本地 JWT（身份统一，解决小程序与本地浏览器数据不一致）
+- **前端 LoginGate 自动登录**：挂载时自动调用 `/auth/auto`（打开即用），PoC 密钥登录保留为 fallback
+- **前端默认 user_id 调整**：auth.ts / api.ts 默认 user_id 由 `poc-user` 改为 `local_user`
+- **新增数据迁移脚本** [scripts/migrate_to_local_user.sql](scripts/migrate_to_local_user.sql)：将历史分散的多 user_id 合并为 `local_user`
+- **新增单元测试** [tests/test_auth_auto_identity.py](tests/test_auth_auto_identity.py)
+- **测试/e2e 脚本 user_id 迁移**：由 `poc-user` 迁移为 `local_user`
+- **Sass @import→@use 迁移**：6 个 scss 文件迁移，消除 Dart Sass 3.0 弃用警告
+
 ## [0.9.1] - 2026-08-08
 
 ### Fixed — DevSquad 批判性审核 P0/P1/P2 问题修复 (2026-08-08)

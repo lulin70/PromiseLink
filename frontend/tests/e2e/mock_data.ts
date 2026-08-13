@@ -310,6 +310,15 @@ export async function setupMockApi(page: Page): Promise<void> {
     const method = route.request().method()
 
     // ── Auth ──────────────────────────────────────────────────────────────
+    // v0.9.7: LoginGate auto-login calls /auth/auto. Mock it so the auto-login
+    // flow completes in mock-based tests (single-user local app, no secret).
+    if (url.includes('/auth/auto') && method === 'POST') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ access_token: MOCK_TOKEN, token_type: 'bearer', user_id: MOCK_USER_ID }),
+      })
+    }
     if (url.includes('/auth/login') && method === 'POST') {
       return route.fulfill({
         status: 200,

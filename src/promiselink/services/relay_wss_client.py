@@ -40,6 +40,7 @@ import httpx
 import websockets
 from websockets.exceptions import ConnectionClosed
 
+from promiselink.core.auth import create_access_token
 from promiselink.core.logging import get_logger
 from promiselink.services.relay_client import RelayClient
 from promiselink.services.relay_models import _RELAY_PREFIX
@@ -342,20 +343,21 @@ class RelayWSSClient:
                 "authorization", "x-api-key",
             }
         }
-        # Convert X-User-Token to Authorization so the local FastAPI auth
-        # middleware (which expects Authorization: Bearer <jwt>) works in
-        # relay mode. The gateway strips Authorization (relay JWT) so we
-        # carry the user JWT via X-User-Token from the mini-app.
-        user_token = headers.get("X-User-Token") or headers.get("x-user-token")
-        if user_token:
-            # 2026-07-29 fix: HTTPBearer expects "Bearer <jwt>" scheme prefix.
-            # Without it, the local auth middleware returns 401, causing
-            # "undefined is not iterable" in the mini-app (r.items is undefined
-            # because the body is {"detail":"Not authenticated"} not PaginatedResponse).
-            if user_token.startswith("Bearer "):
-                forwarded_headers["Authorization"] = user_token
-            else:
-                forwarded_headers["Authorization"] = f"Bearer {user_token}"
+        # Identity consumption (Gateway as Identity Broker, v0.9.7):
+        # The gateway injects X-Local-User-Id into the WSS envelope so the
+        # basic edition serves the same local_user data regardless of which
+        # client (miniapp via relay, or local browser) originated the request.
+        # The value travels inside the TLS WSS tunnel (not forgeable from
+        # outside); we consume it as the local data-ownership identity.
+        # The gateway's own Authorization/X-User-Token creds are never
+        # forwarded to the local FastAPI.
+        local_user_id = (
+            headers.get("X-Local-User-Id")
+            or headers.get("x-local-user-id")
+            or "local_user"
+        )
+        local_token = create_access_token(local_user_id)
+        forwarded_headers["Authorization"] = f"Bearer {local_token}"
 
         url = f"{self.local_api_url}{path}"
         if query:

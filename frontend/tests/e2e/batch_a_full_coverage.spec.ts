@@ -544,7 +544,7 @@ test.describe('Batch A — 6 子操作缺口补全 @sub-ops', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // 批次 3.3：真实后端待办详情 E2E
 // 从「6 子操作缺口补全」迁移 2 个推迟 modal 测试到真实后端。
-// 真实后端有 pending todos（poc-user 有 124 个 pending），无需 mock 数据。
+// 真实后端有 pending todos（local_user 有 pending 数据），无需 mock 数据。
 // ─────────────────────────────────────────────────────────────────────────────
 
 test.describe('Batch A — 真实后端待办详情 E2E @todo-detail @real-backend', () => {

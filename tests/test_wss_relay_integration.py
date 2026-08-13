@@ -328,8 +328,12 @@ class TestWSSRelayHeaderFiltering:
 
         await wss_client._handle_http_request(ws, msg)
 
-        # Gateway credentials must not be forwarded
-        assert "Authorization" not in captured_headers
+        # v0.9.7: gateway Authorization (gateway-jwt) is NOT forwarded; a local
+        # identity JWT (sub=local_user) is injected instead. X-API-Key/Host/
+        # Content-Length must not be forwarded.
+        auth = captured_headers.get("Authorization", "")
+        assert auth.startswith("Bearer ")
+        assert "gateway-jwt" not in auth
         assert "X-API-Key" not in captured_headers
         assert "Host" not in captured_headers
         assert "Content-Length" not in captured_headers

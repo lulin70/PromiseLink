@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { View, Text, Input } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { login as apiLogin } from '../../services/api'
-import { setToken, setUserId, saveLoginCredentials } from '../../services/auth'
+import { setToken, setUserId, saveLoginCredentials, autoLogin } from '../../services/auth'
 import './index.scss'
 
 interface LoginGateProps {
@@ -35,12 +35,26 @@ export default function LoginGate({
   subtitle,
   showUserIdField = false,
   showBackHomeButton = false,
-  defaultUserId = 'poc-user',
+  defaultUserId = 'local_user',
 }: LoginGateProps) {
   const [secret, setSecret] = useState('')
   const [userId, setUserIdInput] = useState(defaultUserId)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Auto login (v0.9.7): the basic edition is a single-user local app and no
+  // longer requires a secret. Try /auth/auto on mount; if it succeeds we skip
+  // the login form entirely. If unavailable (e.g. PoC/dev mode), fall back to
+  // showing the secret-based form.
+  useEffect(() => {
+    let cancelled = false
+    autoLogin().then((ok) => {
+      if (ok && !cancelled) onLoginSuccess?.()
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [onLoginSuccess])
 
   async function handleLogin() {
     if (!secret.trim()) {

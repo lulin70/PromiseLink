@@ -8,7 +8,11 @@
 const TOKEN_KEY = 'promiselink_token'
 const USER_ID_KEY = 'promiselink_user_id'
 const SECRET_KEY = 'promiselink_poc_secret'  // sessionStorage only
-const DEFAULT_USER_ID = 'poc-user'
+// Local single-user identity (v0.9.7): all local business data belongs to
+// this fixed id. Both /auth/auto and the gateway-injected X-Local-User-Id
+// (consumed by the relay WSS client) resolve to it, so the miniapp and the
+// local browser always see the same data.
+const DEFAULT_USER_ID = 'local_user'
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
@@ -75,5 +79,27 @@ export async function directLogin(secret: string, userId: string): Promise<strin
     return data.access_token || null
   } catch {
     return null
+  }
+}
+
+// Auto login (v0.9.7): the basic edition is a single-user local app and no
+// longer requires a secret. /auth/auto issues a JWT for the fixed local_user
+// identity. Returns true on success, false if unavailable (e.g. PoC mode).
+export async function autoLogin(): Promise<boolean> {
+  try {
+    const res = await fetch('/api/v1/auth/auto', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    })
+    if (!res.ok) return false
+    const data = await res.json()
+    if (data.access_token) {
+      setToken(data.access_token)
+      if (data.user_id) setUserId(data.user_id)
+      return true
+    }
+    return false
+  } catch {
+    return false
   }
 }

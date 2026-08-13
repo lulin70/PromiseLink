@@ -262,7 +262,7 @@ async def seed():
     async with httpx.AsyncClient(base_url="http://localhost:8002", timeout=TIMEOUT) as c:
         # Login
         r = await c.post(f"{BASE_URL}/auth/login", json={
-            "user_id": "poc-user",
+            "user_id": "local_user",
             "poc_secret": "promiselink2026",
         })
         if r.status_code != 200:

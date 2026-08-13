@@ -261,7 +261,11 @@ async def test_handle_http_request_strips_hop_by_hop_headers():
     forwarded_headers = mock_http_client.request.call_args.kwargs["headers"]
     assert "Host" not in forwarded_headers
     assert "Content-Length" not in forwarded_headers
-    assert "Authorization" not in forwarded_headers
+    # v0.9.7: gateway Authorization (gateway-jwt) is NOT forwarded; instead a
+    # local identity JWT (sub=local_user) is injected for the local API.
+    auth = forwarded_headers.get("Authorization", "")
+    assert auth.startswith("Bearer ")
+    assert "gateway-jwt" not in auth
     assert "X-API-Key" not in forwarded_headers
     assert forwarded_headers.get("Content-Type") == "application/json"
     assert forwarded_headers.get("X-Custom") == "custom-value"

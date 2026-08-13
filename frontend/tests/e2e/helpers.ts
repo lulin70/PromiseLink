@@ -12,7 +12,8 @@ import { APIRequestContext, Page, expect } from '@playwright/test'
 
 // PoC 登录密钥（与 scripts/e2e/e2e_browser_test.py 保持一致）
 export const POC_SECRET = process.env.PROMISELINK_POC_SECRET || 'promiselink2026'
-export const POC_USER_ID = 'poc-user'
+// v0.9.7: 基础版为单用户本地应用，固定身份为 local_user
+export const POC_USER_ID = 'local_user'
 
 // 后端 API 基础 URL（与 playwright.config.ts webServer 一致）
 export const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000'
@@ -47,17 +48,16 @@ export async function waitForPageReady(page: Page, elementSelector = 'body') {
 }
 
 /**
- * 通过 UI 操作完成 PoC 登录（首页内联登录表单）。
+ * 通过 UI 完成登录。
  *
- * 首页未登录时会渲染内联登录卡片：
- *   - 用户 ID 输入框（placeholder 'poc-user'）
- *   - PoC 密钥输入框（type 'safe-password'，placeholder '请输入 PoC Secret'）
- *   - 登录按钮（文本 '登 录'）
+ * v0.9.7：LoginGate 在挂载时自动调用 /auth/auto（单用户本地应用，无需密钥）。
+ * 因此登录流程优先等待自动登录完成（token 写入 localStorage）；若后端为
+ * PoC/dev 模式（/auth/auto 不可用）则回退到内联表单密钥登录。
  *
- * 登录成功后 token 写入 localStorage，密钥写入 sessionStorage。
+ * 登录成功后 token 写入 localStorage。
  */
 export async function loginViaUi(page: Page, userId = POC_USER_ID, secret = POC_SECRET) {
-  // 前往首页，未登录会显示内联登录表单
+  // 前往首页，未登录会显示内联登录卡片
   await page.goto('/pages/index/index', { waitUntil: 'domcontentloaded' })
   await waitForPageReady(page, '.login-card, .page-index')
 
@@ -65,7 +65,17 @@ export async function loginViaUi(page: Page, userId = POC_USER_ID, secret = POC_
   const token = await page.evaluate((k) => localStorage.getItem(k), TOKEN_KEY)
   if (token) return
 
-  // 等待登录卡片出现
+  // 优先等待 LoginGate 自动登录完成（/auth/auto 成功写入 token）
+  const autoLoggedIn = await expect
+    .poll(async () => page.evaluate((k) => localStorage.getItem(k), TOKEN_KEY), {
+      timeout: 10000,
+      message: '等待 /auth/auto 自动登录写入 token',
+    })
+    .then(() => true)
+    .catch(() => false)
+  if (autoLoggedIn) return
+
+  // 回退：自动登录不可用（PoC/dev 模式），手动填表单
   await page.waitForSelector('.login-card', { state: 'visible', timeout: 10000 })
 
   // 填写用户 ID（Taro H5 渲染为 <taro-input-core class="input">，内部含 <input>）

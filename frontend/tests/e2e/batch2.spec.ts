@@ -428,7 +428,7 @@ test.describe('Batch 2 UI 整改 @batch2', () => {
       await expect(page.locator('.stats-bar'), '提醒页应有状态条').toBeVisible()
     })
 
-    test('设置页退出登录后回到首页登录态', async ({ page }) => {
+    test('设置页退出登录后自动重新登录回到首页', async ({ page }) => {
       await page.goto('/pages/mine/index', { waitUntil: 'domcontentloaded' })
       await waitForPageReady(page, '.mine-page')
 
@@ -436,8 +436,15 @@ test.describe('Batch 2 UI 整改 @batch2', () => {
       await page.locator('.mine-logout-btn').first().evaluate((el: HTMLElement) => el.click())
       await page.waitForTimeout(1000)
 
-      // 应跳回首页，显示登录卡片
-      await expect(page.locator('.login-card'), '退出后应回到首页登录卡片').toBeVisible({ timeout: 5000 })
+      // v0.9.7: 基础版单用户自动登录。退出登录后 LoginGate 会立即调用
+      // /auth/auto 自动重新登录，回到首页仪表盘（无需密钥），而非停留在登录表单。
+      await expect
+        .poll(() => page.evaluate((k) => localStorage.getItem(k), 'promiselink_token'), {
+          timeout: 10000,
+          message: '退出登录后应自动重新登录写入 token',
+        })
+        .toBeTruthy()
+      await expect(page.locator('.page-index'), '退出后自动重新登录回到首页').toBeVisible({ timeout: 10000 })
     })
   })
 })

@@ -48,7 +48,7 @@ from playwright.async_api import (
 BASE_URL = "http://localhost:3000"
 API_URL = "http://localhost:8000"
 POC_SECRET = "promiselink2026"
-POC_USER = "poc-user"
+POC_USER = "local_user"
 VIEWPORT = {"width": 1280, "height": 800}  # 电脑宽屏，符合基础版定位
 SCREENSHOT_DIR = Path("/tmp/e2e_screenshots")
 REPORT_PATH = Path("/tmp/promiselink_playwright_ui_report.json")
@@ -355,7 +355,7 @@ async def step_login(runner: TestRunner, r: StepResult) -> None:
         return
 
     # 输入用户 ID
-    user_input = await page.query_selector("input[placeholder='poc-user']") or await page.query_selector(
+    user_input = await page.query_selector("input[placeholder='local_user']") or await page.query_selector(
         ".form-group input"
     )
     if user_input:
@@ -874,7 +874,7 @@ async def step_mine_page(runner: TestRunner, r: StepResult) -> None:
     content = await page.content()
     checks = {
         "user_header": "mine-header" in content or "mine-avatar" in content,
-        "user_id_shown": "poc-user" in content,
+        "user_id_shown": "local_user" in content,
         "edition_label": "基础版" in content,
         "pro_upgrade_entry": "升级专业版" in content,
         "export_entry": "导出我的数据" in content or "导出" in content,

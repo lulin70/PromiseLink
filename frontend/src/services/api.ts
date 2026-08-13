@@ -82,7 +82,7 @@ export interface LoginResponse {
   user_id: string
 }
 
-export async function login(pocSecret: string, userId: string = 'poc-user'): Promise<LoginResponse> {
+export async function login(pocSecret: string, userId: string = 'local_user'): Promise<LoginResponse> {
   return request<LoginResponse>({
     method: 'POST',
     path: '/auth/login',

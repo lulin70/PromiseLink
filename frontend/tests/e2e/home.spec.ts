@@ -78,7 +78,7 @@ test.describe('首页加载 @home', () => {
     ).toHaveLength(0)
   })
 
-  test('未登录时显示内联登录表单', async ({ page }) => {
+  test('自动登录：清除登录态后打开首页直接可用（无需密钥）', async ({ page }) => {
     // 清除可能存在的登录态
     await page.goto('/pages/index/index', { waitUntil: 'domcontentloaded' })
     await page.evaluate(() => {
@@ -89,8 +89,13 @@ test.describe('首页加载 @home', () => {
     await page.reload({ waitUntil: 'domcontentloaded' })
     await waitForPageReady(page)
 
-    // 未登录应显示登录卡片
-    await expect(page.locator('.login-card'), '未登录应显示登录卡片').toBeVisible({ timeout: 10000 })
-    await expect(page.locator('.login-title'), '登录卡片应含 PromiseLink 标题').toContainText('PromiseLink')
+    // v0.9.7: 基础版单用户自动登录（/auth/auto），无需密钥即进入首页仪表盘
+    await expect
+      .poll(() => page.evaluate((k) => localStorage.getItem(k), 'promiselink_token'), {
+        timeout: 15000,
+        message: '自动登录后应写入 token',
+      })
+      .toBeTruthy()
+    await expect(page.locator('.page-index'), '自动登录后应进入首页仪表盘').toBeVisible({ timeout: 15000 })
   })
 })
