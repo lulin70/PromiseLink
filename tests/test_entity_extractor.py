@@ -63,6 +63,36 @@ CONVERSATION_RESPONSE = {
     "requires_confirmation": False,
 }
 
+# Structured meeting minutes (非对话转写格式) — 用于验证 prompt 自适应
+STRUCTURED_MINUTES_RESPONSE = {
+    "persons": [
+        {
+            "name": "李总",
+            "company": "盛恒资本",
+            "title": "合伙人",
+            "city": "上海",
+            "industry": "投资",
+            "resource": ["早期项目投资渠道"],
+            "demand": ["寻找AI项目"],
+        },
+        {
+            "name": "张总",
+            "company": "智源科技",
+            "title": "CTO",
+            "city": "北京",
+            "industry": "人工智能",
+            "resource": ["AI算法研发"],
+            "demand": ["融资"],
+        },
+    ],
+    "events": [{"name": "AI项目对接会", "time": "2026-08-14", "location": "上海", "topic": "AI项目投资对接"}],
+    "keywords": ["AI投资", "项目路演", "融资"],
+    "summary": "李总与张总就AI项目投资与融资需求对接",
+    "is_ai_inference": False,
+    "confidence_level": "confirmed",
+    "requires_confirmation": False,
+}
+
 
 def _make_llm_client(json_return=None, call_return=None) -> MagicMock:
     """Create a mock LLMClient with configurable responses."""
@@ -216,6 +246,43 @@ class TestExtractConversation:
         assert result.is_ai_inference is False
         assert result.confidence_level == "confirmed"
         assert result.requires_confirmation is False
+
+    @pytest.mark.asyncio
+    async def test_extract_conversation_structured_minutes(self, db_session):
+        """结构化会议纪要（非对话转写）也能正确提取人物。
+
+        验证改进后的 Template 2 prompt 自适应处理结构化纪要格式。
+        输入为"参会人：...议题：..."格式，而非"李总说：..."对话格式。
+        """
+        llm = _make_llm_client(json_return=STRUCTURED_MINUTES_RESPONSE)
+        extractor = EntityExtractor(llm, db_session)
+
+        structured_text = (
+            "会议时间：2026-08-14\n"
+            "参会人：李总（盛恒资本合伙人）、张总（智源科技CTO）\n"
+            "议题：AI项目投资对接\n"
+            "纪要：李总寻找AI项目投资机会，张总的智源科技正在寻求融资。"
+        )
+        result = await extractor._extract_conversation(structured_text, language="zh-CN")
+
+        # 验证 LLM 被调用
+        llm.call_json.assert_called_once()
+        # 验证 prompt 包含自适应格式说明
+        call_kwargs = llm.call_json.call_args
+        prompt = call_kwargs.kwargs.get("prompt") or call_kwargs[1].get("prompt") or call_kwargs[0][0]
+        assert "结构化纪要" in prompt, "prompt 应包含结构化纪要的自适应说明"
+        assert "参会人" in prompt or "出席" in prompt, "prompt 应指引从结构化字段识别人物"
+
+        # 验证人物提取结果
+        assert isinstance(result, ExtractionResult)
+        assert len(result.persons) == 2
+        assert result.persons[0].name == "李总"
+        assert result.persons[0].company == "盛恒资本"
+        assert result.persons[0].title == "合伙人"
+        assert result.persons[0].city == "上海"
+        assert result.persons[1].name == "张总"
+        assert result.persons[1].company == "智源科技"
+        assert result.persons[1].demand == ["融资"]
 
 
 # ── Tests: extract_from_event ──

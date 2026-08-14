@@ -2,6 +2,20 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [0.9.9] - 2026-08-14
+
+### Improved — 实体提取 Prompt 自适应结构化会议纪要 (2026-08-14)
+
+改进 `TEMPLATE_2_CONVERSATION_EXTRACTION` prompt，使其能自适应处理「对话转写」和「结构化会议纪要」两种输入格式。根因：原 prompt 针对对话转写设计（"说话人和被提及的人"），对结构化纪要（"参会人：李总、张总"）提取效果差，导致人脉未提取。
+
+- **prompt 标题泛化**："商务对话分析专家" → "商务交流信息提取专家"
+- **输入格式自适应说明**：新增"输入格式说明"段落，指引 LLM 自适应识别对话转写或结构化纪要
+- **人物提取规则增强**：规则1 增加"从'参会人''出席''与会''参与人''汇报人''主持人'等字段识别人物"
+- **输入描述泛化**："对话文本" → "交流记录文本"
+- **保留所有现有规则**：虚拟角色过滤、concern/capability 受控词表、输出语言规则等不变，不破坏对话转写提取能力
+- **新增测试** [tests/test_entity_extractor.py](tests/test_entity_extractor.py)：`test_extract_conversation_structured_minutes` 验证结构化纪要输入的 prompt 自适应和人物提取
+- **测试验证**：24/24 测试通过（含新增 1 个），ruff 全清洁，test_concern_capability 5/5 通过
+
 ## [0.9.8] - 2026-08-14
 
 ### Fixed — Windows sqlite 启动失败修复 (2026-08-14)
