@@ -1,3 +1,3 @@
 """PromiseLink - AI-driven private resource management assistant."""
 
-__version__ = "0.9.7"
+__version__ = "0.9.8"

@@ -1,12 +1,20 @@
 """Application configuration management."""
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, cast
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from promiselink import __version__
+
+# Cross-platform default data directory: ~/.promiselink/data
+# - Avoids relative-path issues on Windows where PyInstaller sets CWD to
+#   System32 or Program Files (read-only), causing "unable to open database
+#   file" at startup.
+# - Home directory is writable on all platforms (macOS/Linux/Windows).
+_DEFAULT_DATA_DIR = str(Path.home() / ".promiselink" / "data")
 
 LLM_PRESETS: dict[str, dict[str, str]] = {
     "deepseek": {"base_url": "https://api.deepseek.com/v1", "model": "deepseek-v4-flash"},
@@ -68,7 +76,7 @@ class Settings(BaseSettings):
         return cast(list[str], v)
 
     # Database
-    database_url: str = "sqlite:///./data/promiselink.db"
+    database_url: str = f"sqlite:///{_DEFAULT_DATA_DIR}/promiselink.db"
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"

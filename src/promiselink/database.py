@@ -4,6 +4,7 @@ import asyncio
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Generator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import create_engine, event
@@ -25,6 +26,41 @@ logger = get_logger("promiselink.database")
 _pipeline_locks: dict[str, asyncio.Lock] = {}
 
 settings = get_settings()
+
+
+def _ensure_data_dir_exists() -> None:
+    """Ensure parent directory of SQLite database file exists.
+
+    Fixes Windows "unable to open database file" error when:
+    - PyInstaller-packaged app launches with CWD=System32 (read-only)
+    - Default URL points to ~/.promiselink/data which may not exist yet
+    - User supplies custom DATABASE_URL with non-existent parent dir
+    """
+    url = settings.database_url
+    if not url.startswith("sqlite"):
+        return
+    # Strip scheme prefixes: sqlite:/// or sqlite+aiosqlite:///
+    for prefix in ("sqlite+aiosqlite:///", "sqlite:///"):
+        if url.startswith(prefix):
+            path_str = url[len(prefix):]
+            break
+    else:
+        return
+    # On Windows, urlparse treats "C:/Users/..." as scheme=C; avoid it.
+    # Just use Path directly — pathlib normalizes both / and \ on Windows.
+    # If path is relative, resolve relative to CWD (shouldn't happen post-fix).
+    db_path = Path(path_str)
+    parent = db_path.parent
+    if str(parent) and not parent.exists():
+        try:
+            parent.mkdir(parents=True, exist_ok=True)
+            logger.info("database_dir_created", path=str(parent))
+        except OSError as exc:
+            logger.error("database_dir_create_failed", path=str(parent), error=str(exc))
+            raise
+
+
+_ensure_data_dir_exists()
 
 
 # ── Dialect detection (used by models for SQLite/PG compatibility) ──

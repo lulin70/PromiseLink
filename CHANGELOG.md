@@ -2,6 +2,16 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [0.9.8] - 2026-08-14
+
+### Fixed — Windows sqlite 启动失败修复 (2026-08-14)
+
+修复 Windows 上 PyInstaller 打包的 PromiseLink.exe 启动时报错 `unable to open database file` 的问题。根因：默认 DATABASE_URL 用相对路径 `sqlite:///./data/promiselink.db`，Windows 从开始菜单启动时 CWD 为 `C:\Windows\System32\`（只读）或 `C:\Program Files\PromiseLink\`（只读），无法创建数据库文件。
+
+- **config.py 默认路径跨平台化**：`sqlite:///./data/promiselink.db` → `sqlite:///{Path.home()}/.promiselink/data/promiselink.db`，使用用户家目录（macOS/Linux/Windows 均可写）
+- **database.py 新增 `_ensure_data_dir_exists()` 函数**：模块加载时自动创建数据库父目录（`parents=True, exist_ok=True`），覆盖用户自定义 DATABASE_URL 场景
+- **本机验证**：后端 uvicorn v0.9.8 启动成功，`database_initialized` 无 sqlite 错误；环境变量覆盖测试 `_ensure_data_dir_exists()` 正确创建 `~/.promiselink/data/` 目录
+
 ## [0.9.7] - 2026-08-13
 
 ### Added — 身份统一：网关身份代理 (local_user) + 自动登录 (2026-08-13)
