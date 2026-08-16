@@ -27,13 +27,20 @@ UPDATE todos SET user_id = 'local_user' WHERE user_id != 'local_user';
 -- 4. 迁移 associations
 UPDATE associations SET user_id = 'local_user' WHERE user_id != 'local_user';
 
--- 5. 验证：各表 distinct user_id 数（预期均为 1）
+-- 5. 迁移 relationship_briefs（2026-08-16 补充：v0.9.7 初版迁移遗漏本表，
+--    导致小程序/基础版关系页只剩 7 阶段进度条——brief 查询 404，
+--    所有模块（最近互动/对方关注/我方承诺/下一步建议）不渲染）
+UPDATE relationship_briefs SET user_id = 'local_user' WHERE user_id != 'local_user';
+
+-- 6. 验证：各表 distinct user_id 数（预期均为 1）
 SELECT 'events' AS tbl, COUNT(DISTINCT user_id) AS distinct_users FROM events
 UNION ALL
 SELECT 'entities', COUNT(DISTINCT user_id) FROM entities
 UNION ALL
 SELECT 'todos', COUNT(DISTINCT user_id) FROM todos
 UNION ALL
-SELECT 'associations', COUNT(DISTINCT user_id) FROM associations;
+SELECT 'associations', COUNT(DISTINCT user_id) FROM associations
+UNION ALL
+SELECT 'relationship_briefs', COUNT(DISTINCT user_id) FROM relationship_briefs;
 
 COMMIT;
