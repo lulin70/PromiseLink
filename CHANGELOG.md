@@ -4,6 +4,16 @@ All notable changes to PromiseLink will be documented in this file.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-16
+
+### Added — 重复客户人工处理完整链路 (2026-08-16)
+
+- **后端**：entity_merge_service（merge_entities/confirm_entity/find_duplicate_groups）+ 3 个 REST 端点（GET /entities/duplicates、POST /entities/{id}/confirm、POST /entities/{target_id}/merge），支持 status 筛选
+- **前端**：人脉列表 provisional"待确认"徽标 + 一键确认 + 疑似重复横幅 + 合并弹窗（搜索/对比/选保留方向）
+- **解析失败原因人话展示**：explainFailedSteps 将 failed_steps 映射为可理解提示
+- **LLM 分级重试**（flash→pro + 分级 timeout）：attempt >= 3 时自动升级更强模型，fallback 结果缓存
+- **测试**：22 单测 + 10 集成测试 + E2E 19/19 PASS + 42 LLM 分级重试测试
+
 ### Fixed — 待办跨事件去重失效修复 (2026-08-16)
 
 修复重复待办持续累积的问题（如 "[关注] 王总 — 交付时间" x4、"安排李总和王总交流" x3）。根因有二：`todo_generator` 从未将用户已有开放待办传入去重器（仅批内去重，跨事件重复全部漏检）；优先级旁路允许相似度极高甚至完全相同的新待办与旧待办并存。

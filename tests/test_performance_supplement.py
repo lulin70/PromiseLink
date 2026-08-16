@@ -246,7 +246,7 @@ class TestLLMDegradation:
 
         call_count = 0
 
-        async def mock_http_call_with_rate_limit(messages, max_tokens, temperature):
+        async def mock_http_call_with_rate_limit(messages, max_tokens, temperature, **kwargs):
             nonlocal call_count
             call_count += 1
             if call_count < 3:
