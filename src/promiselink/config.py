@@ -113,6 +113,20 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.3
     llm_timeout: int = 60
     llm_max_retries: int = 3
+    # Tiered retry (Pipeline_Reliability_2026-08-16 §4): escalate to a
+    # stronger model after N failed attempts. Empty fallback model = disabled.
+    llm_fallback_model: str = Field(
+        default="",
+        description="升级重试模型（如 deepseek-v4-pro）；留空则不启用分级重试",
+    )
+    llm_fallback_after_attempts: int = Field(
+        default=3,
+        description="从第 N 次尝试起切换 fallback 模型（1-based）",
+    )
+    llm_fallback_timeout: int = Field(
+        default=120,
+        description="fallback 模型请求超时（秒），应大于主模型超时",
+    )
 
     # Embedding Provider
     embedding_provider: str = Field(default="local", description="Embedding provider: local (sentence-transformers) or api (OpenAI-compatible)")

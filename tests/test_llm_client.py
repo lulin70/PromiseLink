@@ -511,13 +511,140 @@ class TestEmptyContentRetry:
         # Simulate poisoned entry written by the old code path
         await cache_service.set(cache_key, {"content": "", "usage": {}}, ttl=86400)
 
-        ok = _make_httpx_response(200, json_data=_make_openai_response("real answer"))
+        ok = _make_httpx_response(
+            200, json_data=_make_openai_response("real answer")
+        )
         mock_client = _make_mock_http_client(post_return=ok)
         llm_client._get_client = AsyncMock(return_value=mock_client)
 
-        result = await llm_client._call_with_retry(messages=messages, max_tokens=100, temperature=0.3)
+        result = await llm_client._call_with_retry(
+            messages=messages, max_tokens=100, temperature=0.3
+        )
         assert result == "real answer"
         assert mock_client.post.call_count == 1  # cache was treated as miss
+
+
+class TestTieredRetry:
+    """Tiered retry (Pipeline_Reliability_2026-08-16 §4): flash for early
+    attempts, escalate to fallback model (e.g. deepseek-v4-pro) from
+    fallback_after_attempts onward with a larger timeout."""
+
+    @pytest.fixture
+    def tiered_client(self, settings):
+        settings.llm_fallback_model = "deepseek-v4-pro"
+        settings.llm_fallback_after_attempts = 3
+        settings.llm_fallback_timeout = 120
+        from promiselink.core.redis import cache_service
+
+        cache_service._memory_cache.clear()
+        client = LLMClient(settings)
+        yield client
+        cache_service._memory_cache.clear()
+
+    async def test_escalates_model_on_third_attempt(self, tiered_client):
+        """Attempts 1-2 use primary model; attempt 3+ switch to fallback."""
+        responses = [
+            httpx.TimeoutException("timeout"),
+            httpx.TimeoutException("timeout"),
+            _make_httpx_response(200, json_data=_make_openai_response("ok")),
+        ]
+        mock_client = _make_mock_http_client()
+        mock_client.post = AsyncMock(side_effect=responses)
+        tiered_client._get_client = AsyncMock(return_value=mock_client)
+
+        with patch("promiselink.services.llm_client.asyncio.sleep", new_callable=AsyncMock):
+            result = await tiered_client._call_with_retry(
+                messages=[{"role": "user", "content": "hi"}],
+                max_tokens=100,
+                temperature=0.3,
+            )
+        assert result == "ok"
+        models_used = [
+            (c.kwargs.get("json") or c[1].get("json"))["model"]
+            for c in mock_client.post.call_args_list
+        ]
+        assert models_used == [
+            "deepseek-v4-flash",
+            "deepseek-v4-flash",
+            "deepseek-v4-pro",
+        ]
+
+    async def test_fallback_uses_fallback_timeout(self, tiered_client):
+        """Fallback attempts carry the larger fallback timeout."""
+        responses = [
+            httpx.TimeoutException("timeout"),
+            httpx.TimeoutException("timeout"),
+            _make_httpx_response(200, json_data=_make_openai_response("ok")),
+        ]
+        mock_client = _make_mock_http_client()
+        mock_client.post = AsyncMock(side_effect=responses)
+        tiered_client._get_client = AsyncMock(return_value=mock_client)
+
+        with patch("promiselink.services.llm_client.asyncio.sleep", new_callable=AsyncMock):
+            await tiered_client._call_with_retry(
+                messages=[{"role": "user", "content": "hi"}],
+                max_tokens=100,
+                temperature=0.3,
+            )
+        timeouts = [
+            c.kwargs.get("timeout") for c in mock_client.post.call_args_list
+        ]
+        # Primary attempts use client default (60 via Settings fixture=30);
+        # fallback attempt uses fallback_timeout=120
+        assert timeouts[2] is not None and timeouts[2].read == 120
+
+    async def test_no_escalation_when_fallback_not_configured(self, llm_client):
+        """Without a fallback model, all attempts stay on the primary model."""
+        # Force-disable fallback: the developer .env may configure
+        # LLM_FALLBACK_MODEL globally, which must not leak into this test.
+        llm_client.fallback_model = ""
+        assert llm_client.fallback_model == ""
+        responses = [
+            httpx.TimeoutException("timeout"),
+            httpx.TimeoutException("timeout"),
+            httpx.TimeoutException("timeout"),
+        ]
+        mock_client = _make_mock_http_client()
+        mock_client.post = AsyncMock(side_effect=responses)
+        llm_client._get_client = AsyncMock(return_value=mock_client)
+
+        with patch("promiselink.services.llm_client.asyncio.sleep", new_callable=AsyncMock):
+            with pytest.raises(LLMTimeoutError):
+                await llm_client._call_with_retry(
+                    messages=[{"role": "user", "content": "hi"}],
+                    max_tokens=100,
+                    temperature=0.3,
+                )
+        models_used = [
+            (c.kwargs.get("json") or c[1].get("json"))["model"]
+            for c in mock_client.post.call_args_list
+        ]
+        assert models_used == ["deepseek-v4-flash"] * 3
+
+    async def test_fallback_success_cached_under_primary_key(self, tiered_client):
+        """A fallback success is cached under the primary-model key, so the
+        next identical prompt hits cache without re-escalating."""
+        from promiselink.core.redis import cache_service
+
+        responses = [
+            httpx.TimeoutException("timeout"),
+            httpx.TimeoutException("timeout"),
+            _make_httpx_response(200, json_data=_make_openai_response("cached-ok")),
+        ]
+        mock_client = _make_mock_http_client()
+        mock_client.post = AsyncMock(side_effect=responses)
+        tiered_client._get_client = AsyncMock(return_value=mock_client)
+
+        messages = [{"role": "user", "content": "unique-prompt-x"}]
+        with patch("promiselink.services.llm_client.asyncio.sleep", new_callable=AsyncMock):
+            r1 = await tiered_client._call_with_retry(
+                messages=messages, max_tokens=100, temperature=0.3
+            )
+            r2 = await tiered_client._call_with_retry(
+                messages=messages, max_tokens=100, temperature=0.3
+            )
+        assert r1 == r2 == "cached-ok"
+        assert mock_client.post.call_count == 3  # second call: pure cache hit
 
 
 # ── generate() tests ──

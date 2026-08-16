@@ -79,6 +79,10 @@ class LLMClient:
         self.timeout: int = config.llm_timeout
         self.max_retries: int = config.llm_max_retries
         self.provider: str = config.llm_provider
+        # Tiered retry config (Pipeline_Reliability_2026-08-16 §4)
+        self.fallback_model: str = config.llm_fallback_model
+        self.fallback_after_attempts: int = config.llm_fallback_after_attempts
+        self.fallback_timeout: int = config.llm_fallback_timeout
 
         self._client: httpx.AsyncClient | None = None
 
@@ -95,6 +99,8 @@ class LLMClient:
         messages: list[dict[str, str]],
         max_tokens: int,
         temperature: float,
+        model: str | None = None,
+        timeout: int | None = None,
     ) -> dict[str, Any]:
         """Execute the HTTP call to the LLM API.
 
@@ -102,6 +108,8 @@ class LLMClient:
             messages: Chat messages in OpenAI format.
             max_tokens: Maximum tokens to generate.
             temperature: Sampling temperature.
+            model: Override model for this call (tiered retry escalation).
+            timeout: Override request timeout in seconds for this call.
 
         Returns:
             Parsed JSON response from the API.
@@ -112,9 +120,11 @@ class LLMClient:
             LLMQuotaExceeded: On HTTP 402/403.
             LLMError: On other HTTP errors.
         """
+        effective_model = model or self.model
+        effective_timeout = timeout or self.timeout
         url = f"{self.base_url}/chat/completions"
         payload: dict[str, Any] = {
-            "model": self.model,
+            "model": effective_model,
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": temperature,
@@ -129,10 +139,10 @@ class LLMClient:
                     "Authorization": f"Bearer {self.api_key}",
                     "Content-Type": "application/json",
                 },
-                timeout=httpx.Timeout(self.timeout, connect=10.0),
+                timeout=httpx.Timeout(effective_timeout, connect=10.0),
             )
         except httpx.TimeoutException:
-            raise LLMTimeoutError(provider=self.provider, timeout=self.timeout)
+            raise LLMTimeoutError(provider=self.provider, timeout=effective_timeout)
         except httpx.HTTPError as exc:
             error_detail = str(exc) or f"{type(exc).__name__} (no detail)"
             raise LLMError(
@@ -230,8 +240,23 @@ class LLMClient:
         current_max_tokens = max_tokens
 
         for attempt in range(self.max_retries):
+            # Tiered retry (Pipeline_Reliability_2026-08-16 §4): escalate to
+            # the fallback model from fallback_after_attempts onward.
+            use_fallback = bool(
+                self.fallback_model
+                and attempt + 1 >= self.fallback_after_attempts
+            )
+            attempt_model = self.fallback_model if use_fallback else None
+            attempt_timeout = self.fallback_timeout if use_fallback else None
+
             try:
-                response_data = await self._http_call(messages, current_max_tokens, temperature)
+                response_data = await self._http_call(
+                    messages,
+                    current_max_tokens,
+                    temperature,
+                    model=attempt_model,
+                    timeout=attempt_timeout,
+                )
                 result = self._parse_response(response_data)
 
                 latency_ms = int((time.monotonic() - start_time) * 1000)
@@ -241,7 +266,8 @@ class LLMClient:
                 logger.info(
                     "llm_call_completed",
                     provider=self.provider,
-                    model=self.model,
+                    model=attempt_model or self.model,
+                    tier="fallback" if use_fallback else "primary",
                     tokens_used=tokens_used,
                     latency_ms=latency_ms,
                     attempt=attempt + 1,
