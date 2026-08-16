@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { View, Text, ScrollView } from '@tarojs/components'
 import Taro from '@tarojs/taro'
-import { getEvents, getEventDetail, retryEvent, updateTodoStatus, dismissTodo, deleteEvent, confirmTodo, getScheduledEvents, cancelScheduledEvent, createScheduledEvent, EventResponse, EventDetailResponse, ScheduledEventResponse } from '../../services/api'
+import { getEvents, getEventDetail, retryEvent, updateTodoStatus, dismissTodo, deleteEvent, confirmTodo, getScheduledEvents, cancelScheduledEvent, createScheduledEvent, EventResponse, EventDetailResponse, ScheduledEventResponse, explainFailedSteps } from '../../services/api'
 import { isLoggedIn } from '../../services/auth'
 import { navigateToEntity, navigateToEventDetail } from '../../services/navigation'
 import { NAV_EVENTS } from '../../services/navigation'
@@ -432,6 +432,9 @@ export default function EventsPage() {
                     </View>
                   )}
                 </View>
+                {(event.status === 'failed' || event.status === 'awaiting_retry') && (
+                  <Text className='fail-hint'>展开查看失败原因，可一键重新处理</Text>
+                )}
               </View>
               <Text className='expand-arrow'>{expandedId === event.id ? '▲' : '▼'}</Text>
             </View>
@@ -460,6 +463,15 @@ export default function EventsPage() {
                     )}
                   </View>
                 </View>
+                {(expandedDetail.status === 'failed' || expandedDetail.status === 'awaiting_retry') && (
+                  <View className='detail-row'>
+                    <Text className='detail-label'>失败原因</Text>
+                    <Text className='detail-value fail-reason'>
+                      {explainFailedSteps(expandedDetail.failed_steps)}
+                      ，点击"重新处理"可自动重试（会用更强模型再试一次）
+                    </Text>
+                  </View>
+                )}
                 <View className='detail-row'>
                   <Text className='detail-label'>创建时间</Text>
                   <Text className='detail-value'>{new Date(expandedDetail.created_at).toLocaleString('zh-CN')}</Text>

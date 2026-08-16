@@ -297,6 +297,277 @@
     }
   }
 
+  // ── Duplicate handling (design 2026-08-16): filter chips + banner + merge modal ──
+
+  .entity-filter-bar {
+    display: flex;
+    gap: 12px;
+    padding: 12px 24px;
+    background: #fff;
+
+    .filter-chip {
+      padding: 8px 28px;
+      border-radius: 28px;
+      background: #E8EEF0;
+      Text {
+        font-size: 24px;
+        color: #6B6B6B;
+      }
+
+      &.active {
+        background: #A0B0C4;
+        Text { color: #fff; }
+      }
+    }
+  }
+
+  .duplicates-banner {
+    margin: 12px 24px;
+    background: #D9C8C0;
+    border-radius: 12px;
+    padding: 16px 20px;
+
+    .duplicates-banner-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .duplicates-banner-text {
+      font-size: 24px;
+      color: #5C4A42;
+    }
+
+    .duplicates-banner-arrow {
+      font-size: 22px;
+      color: #7A6A62;
+    }
+
+    .duplicates-group {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(92, 74, 66, 0.15);
+
+      .duplicates-group-name {
+        font-size: 26px;
+        font-weight: bold;
+        color: #5C4A42;
+        margin-bottom: 8px;
+      }
+
+      .duplicates-group-member {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 0;
+      }
+
+      .duplicates-member-info {
+        flex: 1;
+      }
+
+      .duplicates-member-name {
+        font-size: 24px;
+        color: #4A3B34;
+      }
+
+      .duplicates-member-meta {
+        font-size: 20px;
+        color: #7A6A62;
+        margin-left: 10px;
+      }
+
+      .duplicates-member-open {
+        font-size: 22px;
+        color: #fff;
+        background: #A89490;
+        padding: 6px 20px;
+        border-radius: 20px;
+        flex-shrink: 0;
+
+        &:active { opacity: 0.7; }
+      }
+    }
+  }
+
+  .entity-name-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .provisional-badge {
+    font-size: 18px;
+    color: #5C4A30;
+    background: #C4B89C;
+    padding: 2px 12px;
+    border-radius: 12px;
+    flex-shrink: 0;
+  }
+
+  .confirm-btn {
+    font-size: 22px;
+    color: #fff;
+    background: #8FA68C;
+    padding: 8px 24px;
+    border-radius: 24px;
+    flex-shrink: 0;
+
+    &:active { opacity: 0.7; }
+  }
+
+  .confirm-detail-btn {
+    display: inline-block;
+    font-size: 24px;
+    color: #fff;
+    background: #8FA68C;
+    padding: 10px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 12px;
+
+    &:active { opacity: 0.7; }
+  }
+
+  .merge-entry-btn {
+    display: inline-block;
+    font-size: 26px;
+    color: #A0938C;
+    padding: 10px 24px;
+    border: 1px solid #C4B89C;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 12px;
+
+    &:active { background: #F2EBE4; }
+  }
+
+  .merged-notice {
+    background: #E8EEF0;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    .merged-notice-text { font-size: 24px; color: #5C6B7A; }
+    .merged-notice-link {
+      font-size: 24px;
+      color: #A0B0C4;
+      cursor: pointer;
+      &:active { opacity: 0.7; }
+    }
+  }
+
+  // Merge modal
+  .merge-modal {
+    .merge-step-label {
+      display: block;
+      font-size: 24px;
+      color: #6B6B6B;
+      margin-bottom: 14px;
+    }
+
+    .merge-search-input {
+      width: 100%;
+      height: 64px;
+      background: #f5f5f5;
+      border-radius: 32px;
+      padding: 0 24px;
+      font-size: 26px;
+      box-sizing: border-box;
+      margin-bottom: 14px;
+    }
+
+    .merge-candidates {
+      max-height: 360px;
+
+      .merge-candidate {
+        padding: 16px;
+        border-radius: 10px;
+        background: #FAFAFA;
+        margin-bottom: 8px;
+        cursor: pointer;
+
+        &:active { background: #F0EDE8; }
+
+        .merge-candidate-name { font-size: 26px; color: #333; }
+        .merge-candidate-meta { font-size: 22px; color: #6B6B6B; margin-left: 10px; }
+      }
+
+      .merge-no-result {
+        display: block;
+        text-align: center;
+        font-size: 24px;
+        color: #9B9B9B;
+        padding: 30px 0;
+      }
+    }
+
+    .merge-compare {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+
+      .merge-option {
+        flex: 1;
+        border: 2px solid #E0E0E0;
+        border-radius: 10px;
+        padding: 16px;
+        position: relative;
+        cursor: pointer;
+
+        &.selected { border-color: #A0B0C4; background: #F5F7FA; }
+
+        .merge-option-name { font-size: 26px; color: #333; display: block; }
+        .merge-option-meta { font-size: 20px; color: #6B6B6B; display: block; margin-top: 6px; }
+        .merge-option-tag {
+          position: absolute;
+          top: -12px;
+          right: 12px;
+          font-size: 18px;
+          color: #fff;
+          background: #A0B0C4;
+          padding: 2px 12px;
+          border-radius: 10px;
+        }
+      }
+    }
+
+    .merge-hint {
+      display: block;
+      font-size: 20px;
+      color: #9B8B84;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    .merge-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+
+      .merge-cancel {
+        font-size: 24px;
+        color: #6B6B6B;
+        padding: 10px 24px;
+
+        &:active { opacity: 0.7; }
+      }
+
+      .merge-submit {
+        font-size: 24px;
+        color: #fff;
+        background: #C4A7A0;
+        padding: 10px 36px;
+        border-radius: 8px;
+
+        &:active, &.disabled { opacity: 0.6; }
+      }
+    }
+  }
+
   // F-E3: Dormant Contacts
   .dormant-entry {
     background: linear-gradient(135deg, #E8EEF0 0%, #E8EEF0 100%);
@@ -626,6 +897,70 @@
       .dormant-entry-icon { font-size: 16px; }
       .dormant-entry-text { font-size: 14px; }
       .dormant-entry-desc { font-size: 11px; }
+    }
+
+    // Duplicate handling (desktop)
+    .entity-filter-bar {
+      padding: 8px 24px;
+      gap: 8px;
+      .filter-chip { padding: 4px 16px; border-radius: 14px; Text { font-size: 12px; } }
+    }
+
+    .duplicates-banner {
+      margin: 8px 24px 12px;
+      border-radius: 8px;
+      padding: 10px 14px;
+      .duplicates-banner-text { font-size: 13px; }
+      .duplicates-banner-arrow { font-size: 12px; }
+      .duplicates-group {
+        margin-top: 8px; padding-top: 8px;
+        .duplicates-group-name { font-size: 13px; margin-bottom: 4px; }
+        .duplicates-group-member { padding: 4px 0; }
+        .duplicates-member-name { font-size: 12px; }
+        .duplicates-member-meta { font-size: 11px; }
+        .duplicates-member-open { font-size: 11px; padding: 3px 12px; border-radius: 10px; }
+      }
+    }
+
+    .entity-card {
+      .provisional-badge { font-size: 10px; padding: 1px 8px; border-radius: 8px; }
+      .confirm-btn { font-size: 11px; padding: 4px 14px; border-radius: 12px; }
+    }
+
+    .modal-content {
+      .confirm-detail-btn { font-size: 12px; padding: 6px 14px; border-radius: 6px; }
+      .merge-entry-btn { font-size: 12px; padding: 6px 14px; border-radius: 6px; }
+      .merged-notice {
+        padding: 10px 14px;
+        .merged-notice-text, .merged-notice-link { font-size: 12px; }
+      }
+      .merge-modal {
+        .merge-step-label { font-size: 12px; margin-bottom: 10px; }
+        .merge-search-input { height: 34px; border-radius: 17px; padding: 0 16px; font-size: 13px; margin-bottom: 10px; }
+        .merge-candidates {
+          max-height: 220px;
+          .merge-candidate {
+            padding: 8px 12px;
+            .merge-candidate-name { font-size: 13px; }
+            .merge-candidate-meta { font-size: 11px; }
+          }
+          .merge-no-result { font-size: 12px; padding: 20px 0; }
+        }
+        .merge-compare {
+          gap: 8px; margin-bottom: 12px;
+          .merge-option {
+            border-width: 1px; border-radius: 6px; padding: 10px;
+            .merge-option-name { font-size: 13px; }
+            .merge-option-meta { font-size: 11px; margin-top: 4px; }
+            .merge-option-tag { font-size: 10px; top: -9px; padding: 1px 8px; border-radius: 6px; }
+          }
+        }
+        .merge-hint { font-size: 11px; margin-bottom: 14px; }
+        .merge-actions {
+          .merge-cancel { font-size: 12px; padding: 6px 14px; }
+          .merge-submit { font-size: 12px; padding: 6px 22px; border-radius: 6px; }
+        }
+      }
     }
 
     // ── Detail modal → centered modal on desktop (global .pl-detail handles right column) ──

@@ -20,7 +20,7 @@ from promiselink.core.crypto import (
 )
 from promiselink.core.exceptions import NotFoundError
 from promiselink.core.logging import get_logger, new_request_id
-from promiselink.database import get_async_session
+from promiselink.database import commit_with_retry, get_async_session
 from promiselink.models.association import Association
 from promiselink.models.entity import Entity
 from promiselink.models.event import Event
@@ -178,6 +178,55 @@ async def get_dormant_contacts(
     )
 
 
+# ── Duplicate Detection (MUST be before /{entity_id} to avoid route conflict) ──
+
+
+class DuplicateEntityItem(BaseModel):
+    id: UUIDStr
+    name: str
+    company: str | None = None
+    title: str | None = None
+    status: str
+
+
+class DuplicateGroup(BaseModel):
+    name: str
+    entities: list[DuplicateEntityItem]
+    hint: str
+
+
+class DuplicatesResponse(BaseModel):
+    groups: list[DuplicateGroup]
+
+
+@router.get("/entities/duplicates", response_model=DuplicatesResponse)
+async def get_duplicate_groups(
+    session: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user_id),
+) -> DuplicatesResponse:
+    """Find suspected duplicate person entities (same-name active groups).
+
+    Same (user_id, name) active entities form a group; groups with >= 2
+    members are returned. On-the-spot query — no background job.
+    Design: docs/design/Duplicate_Entity_Manual_Handling_2026-08-16.md §2.1-C.
+    """
+    new_request_id()
+
+    from promiselink.services.entity_merge_service import find_duplicate_groups
+
+    groups = await find_duplicate_groups(session, user_id)
+    return DuplicatesResponse(
+        groups=[
+            DuplicateGroup(
+                name=g["name"],
+                hint=g["hint"],
+                entities=[DuplicateEntityItem(**e) for e in g["entities"]],
+            )
+            for g in groups
+        ]
+    )
+
+
 @router.get("/entities/{entity_id}", response_model=EntityDetailResponse)
 async def get_entity(
     entity_id: uuid.UUID,
@@ -274,6 +323,91 @@ async def delete_entity(
     )
 
     return None
+
+
+# ── Manual Duplicate Handling (design 2026-08-16) ──
+
+
+@router.post("/entities/{entity_id}/confirm", response_model=EntityDetailResponse)
+async def confirm_entity(
+    entity_id: uuid.UUID,
+    session: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user_id),
+) -> Any:
+    """Confirm a provisional entity (status → confirmed).
+
+    Errors: 404 not found / 409 status is not provisional.
+    Design: docs/design/Duplicate_Entity_Manual_Handling_2026-08-16.md §2.1-A.
+    """
+    new_request_id()
+
+    from promiselink.services.entity_merge_service import confirm_entity as confirm_svc
+
+    entity = await confirm_svc(session, user_id, str(entity_id))
+    await commit_with_retry(session)
+    await session.refresh(entity)  # reload onupdate columns before serialization
+
+    # Decrypt PII for response
+    if entity.properties:
+        entity.properties = decrypt_pii_in_properties(entity.properties)
+
+    return entity
+
+
+class MergeRequest(BaseModel):
+    source_id: UUIDStr
+
+
+class MergeMigrationStats(BaseModel):
+    todos: int
+    associations: int
+    association_conflicts: int
+    embeddings: int
+
+
+class MergeResponse(BaseModel):
+    target: EntityDetailResponse
+    migrated: MergeMigrationStats
+
+
+@router.post("/entities/{target_id}/merge", response_model=MergeResponse)
+async def merge_entity(
+    target_id: uuid.UUID,
+    request: MergeRequest,
+    session: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user_id),
+) -> MergeResponse:
+    """Merge source entity into target (target survives, single transaction).
+
+    Properties deep-merge, aliases append, todos/associations/embeddings
+    references migrate, source tombstoned as 'merged' with merged_into audit.
+    Errors: 422 self-merge / 404 missing / 409 already merged.
+    Design: docs/design/Duplicate_Entity_Manual_Handling_2026-08-16.md §2.1-B.
+    """
+    new_request_id()
+
+    from promiselink.services.entity_merge_service import merge_entities
+
+    result = await merge_entities(
+        session, user_id, str(target_id), str(request.source_id)
+    )
+    await commit_with_retry(session)
+    target = result.target
+    await session.refresh(target)  # reload onupdate columns before serialization
+
+    # Decrypt PII for response (merge re-encrypted properties)
+    if target.properties:
+        target.properties = decrypt_pii_in_properties(target.properties)
+
+    return MergeResponse(
+        target=EntityDetailResponse.model_validate(target),
+        migrated=MergeMigrationStats(
+            todos=result.migrated_todos,
+            associations=result.migrated_associations,
+            association_conflicts=result.merged_association_conflicts,
+            embeddings=result.migrated_embeddings,
+        ),
+    )
 
 
 # ── Entity History Endpoint ──

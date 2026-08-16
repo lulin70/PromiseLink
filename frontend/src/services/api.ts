@@ -164,6 +164,46 @@ export interface EventDetailResponse extends EventResponse {
   related_todos?: EventTodoRef[]
   related_entities?: EventEntityDetail[]
   related_associations?: EventAssociationRef[]
+  failed_steps?: string[] | null
+}
+
+// Human-readable failure reasons for pipeline steps (design 2026-08-16 §4.4)
+export function explainFailedSteps(steps: string[] | null | undefined): string {
+  if (!steps || steps.length === 0) return '解析未完成，原因未知'
+  const reasons = steps.map(s => {
+    if (s.includes('step02') || s.includes('extract')) {
+      return 'AI 提取人物信息失败（已自动重试并升级更强模型）'
+    }
+    if (s.includes('step01') || s.includes('verify')) {
+      return '事件内容校验失败（内容可能过短或无法识别）'
+    }
+    if (s.includes('step04') || s.includes('todo')) {
+      return 'AI 生成待办失败'
+    }
+    if (s.includes('step05') || s.includes('promise')) {
+      return 'AI 分析承诺失败'
+    }
+    if (s.includes('step03') || s.includes('embedding')) {
+      return '语义索引未生成（不影响其他功能）'
+    }
+    if (s.includes('step07')) {
+      return '优先级评分未完成（使用默认优先级）'
+    }
+    if (s.includes('step08')) {
+      return '通知未发送'
+    }
+    if (s.includes('step09')) {
+      return '记忆存储跳过'
+    }
+    if (s.includes('step10') || s.includes('association')) {
+      return '人脉关联未生成'
+    }
+    if (s.includes('step12') || s.includes('brief')) {
+      return '关系简报未生成'
+    }
+    return '部分处理步骤未完成'
+  })
+  return Array.from(new Set(reasons)).join('；')
 }
 
 export interface PaginatedResponse<T> {
@@ -447,12 +487,13 @@ export interface EntityDetailResponse extends EntityResponse {
 export async function getEntities(
   search?: string,
   limit: number = 50,
-  offset: number = 0
+  offset: number = 0,
+  status?: string
 ): Promise<PaginatedResponse<EntityResponse>> {
   return request<PaginatedResponse<EntityResponse>>({
     method: 'GET',
     path: '/entities',
-    params: { search, limit, offset },
+    params: { search, limit, offset, status },
   })
 }
 
@@ -479,6 +520,63 @@ export async function deleteEntity(entityId: string): Promise<void> {
   return request<void>({
     method: 'DELETE',
     path: `/entities/${entityId}`,
+  })
+}
+
+// ── Manual Duplicate Handling (design 2026-08-16) ──
+
+// Confirm a provisional entity (status → confirmed)
+export async function confirmEntity(entityId: string): Promise<EntityDetailResponse> {
+  return request<EntityDetailResponse>({
+    method: 'POST',
+    path: `/entities/${entityId}/confirm`,
+  })
+}
+
+export interface MergeMigrationStats {
+  todos: number
+  associations: number
+  association_conflicts: number
+  embeddings: number
+}
+
+export interface MergeResponse {
+  target: EntityDetailResponse
+  migrated: MergeMigrationStats
+}
+
+// Merge source into target (target survives; source tombstoned as merged)
+export async function mergeEntities(targetId: string, sourceId: string): Promise<MergeResponse> {
+  return request<MergeResponse>({
+    method: 'POST',
+    path: `/entities/${targetId}/merge`,
+    body: { source_id: sourceId },
+  })
+}
+
+export interface DuplicateEntityItem {
+  id: string
+  name: string
+  company?: string | null
+  title?: string | null
+  status: string
+}
+
+export interface DuplicateGroup {
+  name: string
+  entities: DuplicateEntityItem[]
+  hint: string
+}
+
+export interface DuplicatesResponse {
+  groups: DuplicateGroup[]
+}
+
+// Find suspected duplicate person entities (same-name active groups)
+export async function getDuplicateGroups(): Promise<DuplicatesResponse> {
+  return request<DuplicatesResponse>({
+    method: 'GET',
+    path: '/entities/duplicates',
   })
 }
 

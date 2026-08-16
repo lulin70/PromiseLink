@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { View, Text, Input, ScrollView } from '@tarojs/components'
-import { getEntities, getEntityDetail, getEntityHistory, EntityResponse, EntityDetailResponse, EntityHistoryResponse, DormantContactItem, getDormantContacts, CreditScoreResponse, getCreditScore, StageInfoResponse, getStageInfo, dismissTodo, updateEntity, deleteEntity } from '../../services/api'
+import { getEntities, getEntityDetail, getEntityHistory, EntityResponse, EntityDetailResponse, EntityHistoryResponse, DormantContactItem, getDormantContacts, CreditScoreResponse, getCreditScore, StageInfoResponse, getStageInfo, dismissTodo, updateEntity, deleteEntity, confirmEntity, mergeEntities, getDuplicateGroups, DuplicateGroup } from '../../services/api'
 import { isLoggedIn } from '../../services/auth'
 import { NAV_EVENTS, navigateToEvent, navigateToEntityDetail } from '../../services/navigation'
 import Taro from '@tarojs/taro'
@@ -27,6 +27,15 @@ export default function EntitiesPage() {
   const [stageInfo, setStageInfo] = useState<StageInfoResponse | null>(null)
   // Cross-navigation: entity history state
   const [entityHistory, setEntityHistory] = useState<EntityHistoryResponse | null>(null)
+  // Duplicate handling (design 2026-08-16): filter + duplicates banner + merge modal
+  const [statusFilter, setStatusFilter] = useState<'all' | 'provisional'>('all')
+  const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[]>([])
+  const [showDuplicates, setShowDuplicates] = useState(false)
+  const [mergeVisible, setMergeVisible] = useState(false)
+  const [mergePeer, setMergePeer] = useState<EntityResponse | null>(null)
+  const [mergeSearch, setMergeSearch] = useState('')
+  const [mergeKeepCurrent, setMergeKeepCurrent] = useState(true)
+  const [merging, setMerging] = useState(false)
 
   useEffect(() => {
     if (!isLoggedIn()) { setShowLogin(true); setLoading(false); return }
@@ -56,18 +65,52 @@ export default function EntitiesPage() {
     )
   }
 
-  async function loadEntities(searchVal?: string) {
+  async function loadEntities(searchVal?: string, status?: 'all' | 'provisional') {
     try {
       setLoading(true)
       setError('')
-      const res = await getEntities(searchVal || undefined)
+      const effectiveStatus = status || statusFilter
+      const res = await getEntities(
+        searchVal || undefined,
+        50,
+        0,
+        effectiveStatus === 'provisional' ? 'provisional' : undefined
+      )
       setEntities(res.items)
+      loadDuplicateGroups()
     } catch (err) {
       const msg = err instanceof Error ? err.message : '加载失败'
       if (msg.includes('401')) { setShowLogin(true); setError('') }
       else { setError(msg) }
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadDuplicateGroups() {
+    try {
+      const res = await getDuplicateGroups()
+      setDuplicateGroups(res.groups)
+    } catch {
+      setDuplicateGroups([])
+    }
+  }
+
+  function handleFilterChange(next: 'all' | 'provisional') {
+    setStatusFilter(next)
+    loadEntities(search || undefined, next)
+  }
+
+  // AC1.3/AC1.4: confirm provisional entity (optimistic, rollback on failure)
+  async function handleConfirmEntity(entityId: string) {
+    const prev = entities
+    setEntities(cur => cur.map(e => e.id === entityId ? { ...e, status: 'confirmed' } : e))
+    try {
+      await confirmEntity(entityId)
+      loadDuplicateGroups()
+    } catch (err) {
+      setEntities(prev)
+      Taro.showToast({ title: '确认失败', icon: 'error' })
     }
   }
 
@@ -225,6 +268,60 @@ export default function EntitiesPage() {
     }
   }
 
+  // ── Manual merge (US-2, design 2026-08-16) ──
+
+  const [mergeCandidates, setMergeCandidates] = useState<EntityResponse[]>([])
+
+  function openMergeModal() {
+    setMergeVisible(true)
+    setMergePeer(null)
+    setMergeSearch('')
+    setMergeKeepCurrent(true)
+    setMergeCandidates([])
+  }
+
+  async function handleMergeSearch(val: string) {
+    setMergeSearch(val)
+    if (!detail || !val.trim()) { setMergeCandidates([]); return }
+    try {
+      const res = await getEntities(val.trim(), 20)
+      setMergeCandidates(res.items.filter(e => e.id !== detail.id))
+    } catch {
+      setMergeCandidates([])
+    }
+  }
+
+  async function handleMergeConfirm() {
+    if (!detail || !mergePeer) return
+    const targetName = mergeKeepCurrent ? detail.name : mergePeer.name
+    const sourceName = mergeKeepCurrent ? mergePeer.name : detail.name
+    try {
+      const res = await Taro.showModal({
+        title: '确认合并（不可撤销）',
+        content: `将「${sourceName}」并入「${targetName}」？对方的历史事件、待办、关联都会转移到保留档案`,
+        confirmText: '合并',
+        cancelText: '取消',
+        confirmColor: '#C4A7A0',
+      })
+      if (!res.confirm) return
+      setMerging(true)
+      const targetId = mergeKeepCurrent ? detail.id : mergePeer.id
+      const sourceId = mergeKeepCurrent ? mergePeer.id : detail.id
+      const result = await mergeEntities(targetId, sourceId)
+      Taro.showToast({
+        title: `已合并（待办迁移 ${result.migrated.todos} 项）`,
+        icon: 'success',
+      })
+      setMergeVisible(false)
+      closeDetail()
+      loadEntities()
+    } catch (err) {
+      Taro.showToast({ title: '合并失败', icon: 'error' })
+    } finally {
+      setMerging(false)
+    }
+  }
+
   return (
     <View className='page-entities'>
       <View className='header'>
@@ -241,12 +338,61 @@ export default function EntitiesPage() {
         />
       </View>
 
+      {/* AC1.2: status filter chips */}
+      <View className='entity-filter-bar'>
+        <View
+          className={`filter-chip ${statusFilter === 'all' ? 'active' : ''}`}
+          onClick={() => handleFilterChange('all')}
+        >
+          <Text>全部</Text>
+        </View>
+        <View
+          className={`filter-chip ${statusFilter === 'provisional' ? 'active' : ''}`}
+          onClick={() => handleFilterChange('provisional')}
+        >
+          <Text>待确认</Text>
+        </View>
+      </View>
+
       {/* F-E3: Dormant Contacts Entry */}
       <View className='dormant-entry' onClick={handleShowDormant}>
         <Text className='dormant-entry-icon'>搜</Text>
         <Text className='dormant-entry-text'>发现沉睡人脉</Text>
         <Text className='dormant-entry-desc'>找出值得重新联系的人</Text>
       </View>
+
+      {/* AC3.2: suspected duplicates banner */}
+      {duplicateGroups.length > 0 && (
+        <View className='duplicates-banner'>
+          <View className='duplicates-banner-head' onClick={() => setShowDuplicates(!showDuplicates)}>
+            <Text className='duplicates-banner-text'>
+              发现 {duplicateGroups.length} 组疑似重复人脉（同名）
+            </Text>
+            <Text className='duplicates-banner-arrow'>{showDuplicates ? '收起' : '展开'}</Text>
+          </View>
+          {showDuplicates && duplicateGroups.map((group, gi) => (
+            <View key={gi} className='duplicates-group'>
+              <Text className='duplicates-group-name'>{group.name}</Text>
+              {group.entities.map(e => (
+                <View key={e.id} className='duplicates-group-member'>
+                  <View className='duplicates-member-info'>
+                    <Text className='duplicates-member-name'>{e.name}</Text>
+                    <Text className='duplicates-member-meta'>
+                      {[e.company, e.title].filter(Boolean).join(' · ') || '暂无公司信息'}
+                    </Text>
+                  </View>
+                  <Text
+                    className='duplicates-member-open'
+                    onClick={() => handleEntityTap(e.id)}
+                  >
+                    处理
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ))}
+        </View>
+      )}
 
       {loading && <View className='loading'><Text>加载中...</Text></View>}
       {error && <View className='error'><Text>{error}</Text></View>}
@@ -267,7 +413,12 @@ export default function EntitiesPage() {
               </Text>
             </View>
             <View className='entity-info'>
-              <Text className='entity-name'>{entity.name}</Text>
+              <View className='entity-name-row'>
+                <Text className='entity-name'>{entity.name}</Text>
+                {entity.status === 'provisional' && (
+                  <Text className='provisional-badge'>待确认</Text>
+                )}
+              </View>
               <Text className='entity-type'>
                 {ENTITY_TYPE_MAP[entity.entity_type] || entity.entity_type}
               </Text>
@@ -277,7 +428,19 @@ export default function EntitiesPage() {
                 </Text>
               ) : null}
             </View>
-            <Text className='entity-arrow'>›</Text>
+            {entity.status === 'provisional' ? (
+              <Text
+                className='confirm-btn'
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleConfirmEntity(entity.id)
+                }}
+              >
+                确认
+              </Text>
+            ) : (
+              <Text className='entity-arrow'>›</Text>
+            )}
           </View>
         ))}
       </ScrollView>
@@ -291,6 +454,22 @@ export default function EntitiesPage() {
               <Text className='modal-close' onClick={closeDetail}>×</Text>
             </View>
             <View className='modal-body'>
+              {/* AC2.4: merged entity — redirect hint */}
+              {detail.status === 'merged' && (
+                <View className='merged-notice'>
+                  <Text className='merged-notice-text'>
+                    此档案已并入另一档案（保留完整历史）
+                  </Text>
+                  {Boolean(detail.properties?.['merged_into']) && (
+                    <Text
+                      className='merged-notice-link'
+                      onClick={() => handleEntityTap(String(detail.properties?.['merged_into']))}
+                    >
+                      查看保留档案 ›
+                    </Text>
+                  )}
+                </View>
+              )}
               <View className='detail-row'>
                 <Text className='detail-label'>类型</Text>
                 <Text className='detail-value'>
@@ -341,6 +520,38 @@ export default function EntitiesPage() {
                 <Text className='detail-label'>置信度</Text>
                 <Text className='detail-value'>{(detail.confidence * 100).toFixed(0)}%</Text>
               </View>
+
+              {/* Confirm provisional entity */}
+              {detail.status === 'provisional' && (
+                <View className='detail-row'>
+                  <Text
+                    className='confirm-detail-btn'
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleConfirmEntity(detail.id).then(() => {
+                        getEntityDetail(detail.id).then(setDetail).catch(() => {})
+                      })
+                    }}
+                  >
+                    确认为正式人脉
+                  </Text>
+                </View>
+              )}
+
+              {/* Merge duplicates entry (active entities only) */}
+              {detail.status !== 'merged' && (
+                <View className='detail-row'>
+                  <Text
+                    className='merge-entry-btn'
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      openMergeModal()
+                    }}
+                  >
+                    合并重复人脉
+                  </Text>
+                </View>
+              )}
 
               {/* Delete entity button */}
               <View className='detail-row'>
@@ -523,6 +734,91 @@ export default function EntitiesPage() {
                 </ScrollView>
               </>
             )}
+          </View>
+        </View>
+      )}
+
+      {/* Manual Merge Modal (US-2) */}
+      {mergeVisible && detail && (
+        <View className='modal-overlay' onClick={() => setMergeVisible(false)}>
+          <View className='modal-content merge-modal' onClick={e => e.stopPropagation()}>
+            <View className='modal-header'>
+              <Text className='modal-title'>合并重复人脉</Text>
+              <Text className='modal-close' onClick={() => setMergeVisible(false)}>×</Text>
+            </View>
+            <View className='modal-body'>
+              {/* Step 1: search and select the peer entity */}
+              {!mergePeer && (
+                <>
+                  <Text className='merge-step-label'>
+                    第 1 步：搜索要合并的另一个人脉档案
+                  </Text>
+                  <Input
+                    className='merge-search-input'
+                    value={mergeSearch}
+                    onInput={e => handleMergeSearch(e.detail.value)}
+                    placeholder='输入人名搜索...'
+                  />
+                  <ScrollView scrollY className='merge-candidates'>
+                    {mergeCandidates.map(c => (
+                      <View key={c.id} className='merge-candidate' onClick={() => setMergePeer(c)}>
+                        <Text className='merge-candidate-name'>{c.name}</Text>
+                        <Text className='merge-candidate-meta'>
+                          {[c.properties?.['company'], c.properties?.['title']]
+                            .filter(Boolean).join(' · ') || '暂无公司信息'}
+                        </Text>
+                      </View>
+                    ))}
+                    {mergeSearch && mergeCandidates.length === 0 && (
+                      <Text className='merge-no-result'>未找到匹配的人脉</Text>
+                    )}
+                  </ScrollView>
+                </>
+              )}
+
+              {/* Step 2: compare and choose keep direction */}
+              {mergePeer && (
+                <>
+                  <Text className='merge-step-label'>第 2 步：选择保留哪个档案</Text>
+                  <View className='merge-compare'>
+                    <View
+                      className={`merge-option ${mergeKeepCurrent ? 'selected' : ''}`}
+                      onClick={() => setMergeKeepCurrent(true)}
+                    >
+                      <Text className='merge-option-name'>{detail.name}（当前）</Text>
+                      <Text className='merge-option-meta'>
+                        {[detail.properties?.['company'], detail.properties?.['title']]
+                          .filter(Boolean).join(' · ') || '暂无公司信息'}
+                      </Text>
+                      {mergeKeepCurrent && <Text className='merge-option-tag'>保留</Text>}
+                    </View>
+                    <View
+                      className={`merge-option ${!mergeKeepCurrent ? 'selected' : ''}`}
+                      onClick={() => setMergeKeepCurrent(false)}
+                    >
+                      <Text className='merge-option-name'>{mergePeer.name}</Text>
+                      <Text className='merge-option-meta'>
+                        {[mergePeer.properties?.['company'], mergePeer.properties?.['title']]
+                          .filter(Boolean).join(' · ') || '暂无公司信息'}
+                      </Text>
+                      {!mergeKeepCurrent && <Text className='merge-option-tag'>保留</Text>}
+                    </View>
+                  </View>
+                  <Text className='merge-hint'>
+                    保留档案继承双方属性（冲突以保留方为准），被并档案的历史事件、待办、关联全部转移。合并后不可撤销。
+                  </Text>
+                  <View className='merge-actions'>
+                    <Text className='merge-cancel' onClick={() => setMergePeer(null)}>上一步</Text>
+                    <Text
+                      className={`merge-submit ${merging ? 'disabled' : ''}`}
+                      onClick={() => { if (!merging) handleMergeConfirm() }}
+                    >
+                      {merging ? '合并中...' : '确认合并'}
+                    </Text>
+                  </View>
+                </>
+              )}
+            </View>
           </View>
         </View>
       )}
