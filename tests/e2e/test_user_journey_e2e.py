@@ -200,7 +200,13 @@ class FakeLLMClient:
             )
 
         # 5. 对话实体抽取
-        if "商务对话分析专家" in prompt or "对话转写文本中提取" in prompt:
+        # v0.9.9 prompt 更新: "商务对话分析专家"→"商务交流信息提取专家"
+        if (
+            "商务交流信息提取专家" in prompt
+            or "商务对话分析专家" in prompt
+            or "交流记录文本中提取" in prompt
+            or "对话转写文本中提取" in prompt
+        ):
             return json.dumps(
                 {
                     "persons": [

@@ -40,6 +40,11 @@ class TodoDeduplicator:
     # Similarity threshold
     SIMILARITY_THRESHOLD = 0.6
 
+    # Near-identical threshold: at/above this, a new todo is dropped regardless
+    # of priority (2026-08-16 fix: priority bypass allowed exact-duplicate
+    # titles like "[关注] 王总 — 交付时间" x4 to accumulate across events)
+    NEAR_IDENTICAL_THRESHOLD = 0.9
+
     def __init__(self) -> None: ...
 
     def deduplicate(
@@ -96,6 +101,11 @@ class TodoDeduplicator:
                 removed_todo = d.get("removed_todo")
                 if removed_todo is not None and removed_todo.id is not None:
                     pending_deletions.append(removed_todo.id)
+                # Near-identical + strictly more important new todo replaces
+                # the existing one: delete the old row so no duplicate remains.
+                replaced = d.get("replaced_existing")
+                if replaced is not None and replaced.id is not None:
+                    pending_deletions.append(replaced.id)
 
         # Step 3: Within-batch similarity dedup
         todos, within_dup_info = self._within_batch_dedup(todos)
@@ -108,12 +118,20 @@ class TodoDeduplicator:
         # Step 4: Sort by priority (ascending: 1=highest first)
         todos.sort(key=lambda t: t.priority)
 
+        # Dedupe deletion IDs (multiple new todos may replace the same existing)
+        seen_ids: set[uuid.UUID] = set()
+        unique_pending_deletions: list[uuid.UUID] = []
+        for tid in pending_deletions:
+            if tid not in seen_ids:
+                seen_ids.add(tid)
+                unique_pending_deletions.append(tid)
+
         return DeduplicationResult(
             todos=todos,
             original_count=original_count,
             removed_count=original_count - len(todos),
             duplicates=all_duplicates,
-            pending_deletions=pending_deletions,
+            pending_deletions=unique_pending_deletions,
         )
 
     def _apply_per_event_cap(self, todos: list[Todo]) -> tuple[list[Todo], list[Todo]]:
@@ -183,13 +201,38 @@ class TodoDeduplicator:
                     best_match_existing = existing
 
             if best_match_existing is not None:
-                # Priority-based selection
-                if new_todo.priority <= best_match_existing.priority:
-                    # New one is more important or equal: keep new, record but don't remove existing
+                # 2026-08-16 fix: near-identical todos never coexist. If the
+                # new one is strictly more important it REPLACES the existing
+                # row (old one queued for DB deletion); otherwise it is dropped.
+                # Previously the priority bypass let exact-duplicate titles
+                # like "[关注] 王总 — 交付时间" x4 accumulate across events.
+                if best_similarity >= self.NEAR_IDENTICAL_THRESHOLD:
+                    if (
+                        new_todo.priority < best_match_existing.priority
+                        and best_match_existing.id is not None
+                    ):
+                        # Keep new, replace existing (delete old row)
+                        duplicates_info.append({
+                            "removed_todo": None,
+                            "replaced_existing": best_match_existing,
+                            "kept_todo": new_todo,
+                            "similarity": round(best_similarity, 4),
+                            "reason": "replace_lower_priority",
+                        })
+                    else:
+                        is_duplicate = True
+                        duplicates_info.append({
+                            "removed_todo": new_todo,
+                            "kept_todo": best_match_existing,
+                            "similarity": round(best_similarity, 4),
+                            "reason": "near_identical",
+                        })
+                elif new_todo.priority < best_match_existing.priority:
+                    # New one is strictly more important: keep new, existing stays
                     # (we only filter new_todos, not modify existing_todos)
                     pass  # Keep the new todo
                 else:
-                    # Existing is more important: skip the new one
+                    # Existing is at least as important: skip the new one
                     is_duplicate = True
                     duplicates_info.append({
                         "removed_todo": new_todo,

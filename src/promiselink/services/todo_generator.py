@@ -298,8 +298,27 @@ class TodoGenerator:
         # F-46: Apply deduplication (v4.4)
         from promiselink.services.todo_deduplicator import TodoDeduplicator
 
+        # 2026-08-16 fix: load this user's open todos so cross-event duplicates
+        # are caught (previously existing_todos was never passed, so identical
+        # todos like "[关注] 王总 — 交付时间" accumulated across events).
+        existing_open_todos = list(
+            (
+                await self.session.execute(
+                    select(Todo).where(
+                        Todo.user_id == str(event.user_id),
+                        Todo.status.in_(("pending", "snoozed")),
+                        Todo.id.not_in([t.id for t in persisted_todos if t.id]),
+                    )
+                )
+            ).scalars().all()
+        )
+
         deduplicator = TodoDeduplicator()
-        dedup_result = deduplicator.deduplicate(persisted_todos, user_id=str(event.user_id))
+        dedup_result = deduplicator.deduplicate(
+            persisted_todos,
+            user_id=str(event.user_id),
+            existing_todos=existing_open_todos,
+        )
         persisted_todos = dedup_result.todos
 
         # F-46b: DB-level deletion of duplicates

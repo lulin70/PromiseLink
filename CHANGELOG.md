@@ -2,6 +2,20 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [Unreleased]
+
+### Fixed — 待办跨事件去重失效修复 (2026-08-16)
+
+修复重复待办持续累积的问题（如 "[关注] 王总 — 交付时间" x4、"安排李总和王总交流" x3）。根因有二：`todo_generator` 从未将用户已有开放待办传入去重器（仅批内去重，跨事件重复全部漏检）；优先级旁路允许相似度极高甚至完全相同的新待办与旧待办并存。
+
+- **跨事件去重** [todo_generator.py](src/promiselink/services/todo_generator.py)：生成待办后加载该用户全部开放待办（pending/snoozed）作为 `existing_todos` 参与比对，并在去重后按 `pending_deletions` 执行 DB 级删除
+- **近似重复阈值** [todo_deduplicator.py](src/promiselink/services/todo_deduplicator.py)：新增 `NEAR_IDENTICAL_THRESHOLD=0.9`——相似度 ≥0.9 时无论优先级一律去重；若新待办严格更重要（优先级数字更小）则**替换**旧待办（旧行入删除队列），二者绝不共存
+- **优先级判定收紧**：中等相似（0.6~0.9）时仅"严格更重要"的新待办可保留，同等优先级不再并存
+- **`pending_deletions` 去重**：多个新待办替换同一旧待办时避免重复删除 ID
+- **存量数据清理**：开发库 9 组精确重复（13 条）已清理，开放待办 205→192，每组（user, title）仅保留优先级最高/最早创建一条
+- **修复 e2e 测试漂移**：v0.9.9 prompt 更名（"商务对话分析专家"→"商务交流信息提取专家"）导致 [test_pipeline_mock_e2e.py](tests/e2e/test_pipeline_mock_e2e.py)、[test_user_journey_e2e.py](tests/e2e/test_user_journey_e2e.py) 中 FakeLLM 匹配失配（落到默认响应→0 人提取→pipeline failed），更新匹配词后恢复
+- **测试验证**：全量 2020 通过 / 49 跳过 / 0 失败（1 个 pipeline e2e 失败修复后全量跑过，另 1 个 user_journey e2e 失败为同根因、修复后单文件 21/21 通过），ruff 全清洁
+
 ## [0.9.9] - 2026-08-14
 
 ### Improved — 实体提取 Prompt 自适应结构化会议纪要 (2026-08-14)
