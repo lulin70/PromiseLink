@@ -575,6 +575,59 @@ class TestGenerateTodos:
         assert "risk" in types
 
     @pytest.mark.asyncio
+    async def test_generate_todos_all_deduped_reports_stats(self, db_session):
+        """2026-08-16 regression: cross-event dedup removes todos identical to
+        existing open ones; generator must report dedup_removed>0 so Step04
+        treats the run as success (not LLM-degradation failure)."""
+        llm = _make_llm_client()
+        generator = TodoGenerator(llm, db_session)
+
+        event = _make_event(event_type="card_save", raw_text="张总的名片和对话")
+        entities = [_make_entity(name="张总")]
+
+        # Seed an existing OPEN todo identical to the LLM output
+        existing = Todo(
+            id=str(uuid.uuid4()),
+            user_id=event.user_id,
+            todo_type="promise",
+            title="兑现承诺: 发送资料",
+            priority=1,
+            status="pending",
+        )
+        db_session.add(existing)
+        await db_session.commit()
+
+        promise_todo = GeneratedTodo(
+            todo_type="promise",
+            title="兑现承诺: 发送资料",
+            priority=1,
+            due_date=datetime.now(UTC) + timedelta(days=3),
+        )
+        care_todo = GeneratedTodo(
+            todo_type="care",
+            title="关注: 张总 — 项目需求",
+            priority=3,
+            due_date=datetime.now(UTC) + timedelta(days=7),
+        )
+        generator._extract_promises = AsyncMock(return_value=[promise_todo])
+        generator._extract_cares = AsyncMock(return_value=[care_todo])
+        generator._generate_typed_todo = AsyncMock(return_value=None)
+
+        async def mock_persist(gen, user_id, event_id):
+            return _make_todo_from_generated(gen, user_id, event_id)
+
+        generator._persist_todo = AsyncMock(side_effect=mock_persist)
+
+        result = await generator.generate_todos(event, entities)
+
+        # Identical promise deduped away; distinct care survives
+        titles = [t.title for t in result]
+        assert "兑现承诺: 发送资料" not in titles
+        assert "关注: 张总 — 项目需求" in titles
+        assert generator.last_run_stats["dedup_removed"] >= 1
+        assert generator.last_run_stats["generated"] >= 2
+
+    @pytest.mark.asyncio
     async def test_generate_todos_card_save_event(self, db_session):
         """card_save event: promise + care only (no cooperation_signal/risk)."""
         llm = _make_llm_client()

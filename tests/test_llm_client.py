@@ -45,6 +45,7 @@ def settings():
 @pytest.fixture
 def llm_client(settings):
     from promiselink.core.redis import cache_service
+
     cache_service._memory_cache.clear()
     client = LLMClient(settings)
     yield client
@@ -65,9 +66,7 @@ def _make_openai_response(content: str, usage: dict | None = None) -> dict:
     }
 
 
-def _make_httpx_response(
-    status_code: int = 200, json_data: dict | None = None
-) -> MagicMock:
+def _make_httpx_response(status_code: int = 200, json_data: dict | None = None) -> MagicMock:
     """Build a mock httpx.Response."""
     resp = MagicMock(spec=httpx.Response)
     resp.status_code = status_code
@@ -80,9 +79,7 @@ def _make_httpx_response(
     return resp
 
 
-def _make_mock_http_client(
-    post_return=None, post_side_effect=None
-) -> MagicMock:
+def _make_mock_http_client(post_return=None, post_side_effect=None) -> MagicMock:
     """Build a mock httpx.AsyncClient with is_closed=False.
 
     This is necessary because _get_client() checks `self._client.is_closed`
@@ -140,7 +137,7 @@ class TestExtractJson:
 
     def test_extract_json_returns_dict_only(self):
         """If the top-level JSON is a list (not dict), it should fall through."""
-        text = '[1, 2, 3]'
+        text = "[1, 2, 3]"
         with pytest.raises(LLMResponseParseError):
             LLMClient._extract_json(text)
 
@@ -191,9 +188,7 @@ class TestHttpExceptionMapping:
 
     async def test_timeout_raises_llm_timeout_error(self, llm_client):
         """httpx.TimeoutException → LLMTimeoutError."""
-        mock_client = _make_mock_http_client(
-            post_side_effect=httpx.TimeoutException("timeout")
-        )
+        mock_client = _make_mock_http_client(post_side_effect=httpx.TimeoutException("timeout"))
         llm_client._get_client = AsyncMock(return_value=mock_client)
 
         with pytest.raises(LLMTimeoutError) as exc_info:
@@ -207,9 +202,7 @@ class TestHttpExceptionMapping:
 
     async def test_rate_limit_raises_llm_rate_limit_error(self, llm_client):
         """HTTP 429 → LLMRateLimitError."""
-        mock_client = _make_mock_http_client(
-            post_return=_make_httpx_response(429)
-        )
+        mock_client = _make_mock_http_client(post_return=_make_httpx_response(429))
         llm_client._get_client = AsyncMock(return_value=mock_client)
 
         with pytest.raises(LLMRateLimitError) as exc_info:
@@ -222,9 +215,7 @@ class TestHttpExceptionMapping:
 
     async def test_quota_exceeded_raises_error(self, llm_client):
         """HTTP 402 → LLMQuotaExceeded."""
-        mock_client = _make_mock_http_client(
-            post_return=_make_httpx_response(402)
-        )
+        mock_client = _make_mock_http_client(post_return=_make_httpx_response(402))
         llm_client._get_client = AsyncMock(return_value=mock_client)
 
         with pytest.raises(LLMQuotaExceeded) as exc_info:
@@ -237,9 +228,7 @@ class TestHttpExceptionMapping:
 
     async def test_forbidden_raises_quota_exceeded(self, llm_client):
         """HTTP 403 → LLMQuotaExceeded (same as 402)."""
-        mock_client = _make_mock_http_client(
-            post_return=_make_httpx_response(403)
-        )
+        mock_client = _make_mock_http_client(post_return=_make_httpx_response(403))
         llm_client._get_client = AsyncMock(return_value=mock_client)
 
         with pytest.raises(LLMQuotaExceeded):
@@ -251,9 +240,7 @@ class TestHttpExceptionMapping:
 
     async def test_other_http_error_raises_llm_error(self, llm_client):
         """HTTP 500 → LLMError."""
-        mock_client = _make_mock_http_client(
-            post_return=_make_httpx_response(500)
-        )
+        mock_client = _make_mock_http_client(post_return=_make_httpx_response(500))
         llm_client._get_client = AsyncMock(return_value=mock_client)
 
         with pytest.raises(LLMError, match="HTTP 500"):
@@ -265,9 +252,7 @@ class TestHttpExceptionMapping:
 
     async def test_http_error_generic(self, llm_client):
         """httpx.HTTPError (non-timeout) → LLMError."""
-        mock_client = _make_mock_http_client(
-            post_side_effect=httpx.HTTPError("connection reset")
-        )
+        mock_client = _make_mock_http_client(post_side_effect=httpx.HTTPError("connection reset"))
         llm_client._get_client = AsyncMock(return_value=mock_client)
 
         with pytest.raises(LLMError, match="LLM HTTP error"):
@@ -287,9 +272,7 @@ class TestCallMethods:
     async def test_call_success(self, llm_client):
         """call() returns parsed text from successful LLM response."""
         response_data = _make_openai_response("Hello from LLM")
-        mock_client = _make_mock_http_client(
-            post_return=_make_httpx_response(200, json_data=response_data)
-        )
+        mock_client = _make_mock_http_client(post_return=_make_httpx_response(200, json_data=response_data))
         llm_client._get_client = AsyncMock(return_value=mock_client)
 
         result = await llm_client.call("Say hello")
@@ -299,9 +282,7 @@ class TestCallMethods:
         """call_json() returns parsed JSON dict from LLM response."""
         json_content = '{"name": "Alice", "company": "Acme"}'
         response_data = _make_openai_response(json_content)
-        mock_client = _make_mock_http_client(
-            post_return=_make_httpx_response(200, json_data=response_data)
-        )
+        mock_client = _make_mock_http_client(post_return=_make_httpx_response(200, json_data=response_data))
         llm_client._get_client = AsyncMock(return_value=mock_client)
 
         result = await llm_client.call_json("Extract person info")
@@ -310,9 +291,7 @@ class TestCallMethods:
     async def test_call_json_parse_failure(self, llm_client):
         """call_json() raises LLMResponseParseError when JSON extraction fails."""
         response_data = _make_openai_response("This is just plain text, no JSON")
-        mock_client = _make_mock_http_client(
-            post_return=_make_httpx_response(200, json_data=response_data)
-        )
+        mock_client = _make_mock_http_client(post_return=_make_httpx_response(200, json_data=response_data))
         llm_client._get_client = AsyncMock(return_value=mock_client)
 
         with pytest.raises(LLMResponseParseError):
@@ -321,9 +300,7 @@ class TestCallMethods:
     async def test_call_uses_default_params(self, llm_client):
         """call() uses default max_tokens and temperature when not overridden."""
         response_data = _make_openai_response("ok")
-        mock_client = _make_mock_http_client(
-            post_return=_make_httpx_response(200, json_data=response_data)
-        )
+        mock_client = _make_mock_http_client(post_return=_make_httpx_response(200, json_data=response_data))
         llm_client._get_client = AsyncMock(return_value=mock_client)
 
         await llm_client.call("test")
@@ -337,9 +314,7 @@ class TestCallMethods:
     async def test_call_overrides_params(self, llm_client):
         """call() uses provided max_tokens and temperature overrides."""
         response_data = _make_openai_response("ok")
-        mock_client = _make_mock_http_client(
-            post_return=_make_httpx_response(200, json_data=response_data)
-        )
+        mock_client = _make_mock_http_client(post_return=_make_httpx_response(200, json_data=response_data))
         llm_client._get_client = AsyncMock(return_value=mock_client)
 
         await llm_client.call("test", max_tokens=500, temperature=0.7)
@@ -358,9 +333,7 @@ class TestRetryLogic:
 
     async def test_retry_on_timeout(self, llm_client):
         """Timeout triggers retries; after max_retries, LLMTimeoutError is raised."""
-        mock_client = _make_mock_http_client(
-            post_side_effect=httpx.TimeoutException("timeout")
-        )
+        mock_client = _make_mock_http_client(post_side_effect=httpx.TimeoutException("timeout"))
         llm_client._get_client = AsyncMock(return_value=mock_client)
 
         with patch("promiselink.services.llm_client.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
@@ -380,9 +353,7 @@ class TestRetryLogic:
 
     async def test_retry_on_rate_limit(self, llm_client):
         """429 triggers retries with exponential backoff; after max_retries, LLMRateLimitError."""
-        mock_client = _make_mock_http_client(
-            post_return=_make_httpx_response(429)
-        )
+        mock_client = _make_mock_http_client(post_return=_make_httpx_response(429))
         llm_client._get_client = AsyncMock(return_value=mock_client)
 
         with patch("promiselink.services.llm_client.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
@@ -400,9 +371,7 @@ class TestRetryLogic:
 
     async def test_no_retry_on_quota_exceeded(self, llm_client):
         """LLMQuotaExceeded is not retryable — raised immediately."""
-        mock_client = _make_mock_http_client(
-            post_return=_make_httpx_response(402)
-        )
+        mock_client = _make_mock_http_client(post_return=_make_httpx_response(402))
         llm_client._get_client = AsyncMock(return_value=mock_client)
 
         with pytest.raises(LLMQuotaExceeded):
@@ -438,6 +407,119 @@ class TestRetryLogic:
         assert mock_client.post.call_count == 2
 
 
+class TestEmptyContentRetry:
+    """2026-08-16 fix: reasoning models can exhaust max_tokens on
+    reasoning_content, leaving content="". Must retry with a doubled
+    token budget instead of caching/returning the empty response."""
+
+    @staticmethod
+    def _reasoning_response(finish_reason: str = "length") -> dict:
+        """Build a response where reasoning consumed the entire budget."""
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "",
+                        "reasoning_content": "thinking... (truncated)",
+                    },
+                    "index": 0,
+                    "finish_reason": finish_reason,
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 1000,
+                "completion_tokens": 4000,
+                "total_tokens": 5000,
+            },
+        }
+
+    async def test_parse_response_empty_content_raises(self, llm_client):
+        """Empty content raises LLMEmptyContentError (not silent '')."""
+        from promiselink.core.exceptions import LLMEmptyContentError
+
+        with pytest.raises(LLMEmptyContentError):
+            llm_client._parse_response(self._reasoning_response())
+
+    async def test_empty_content_retries_with_doubled_max_tokens(self, llm_client):
+        """First attempt (4000 tokens) returns empty content; retry must
+        double the budget and succeed once content is produced."""
+        from promiselink.core.exceptions import LLMEmptyContentError
+
+        empty = _make_httpx_response(200, json_data=self._reasoning_response())
+        ok = _make_httpx_response(200, json_data=_make_openai_response('{"persons": []}'))
+        mock_client = _make_mock_http_client()
+        mock_client.post = AsyncMock(side_effect=[empty, ok])
+        llm_client._get_client = AsyncMock(return_value=mock_client)
+
+        result = await llm_client._call_with_retry(
+            messages=[{"role": "user", "content": "extract"}],
+            max_tokens=4000,
+            temperature=0.3,
+        )
+        assert result == '{"persons": []}'
+        assert mock_client.post.call_count == 2
+        # Second call must carry doubled max_tokens
+        second_payload = mock_client.post.call_args_list[1].kwargs.get("json") or mock_client.post.call_args_list[1][
+            1
+        ].get("json")
+        assert second_payload["max_tokens"] == 8000
+
+    async def test_empty_content_all_attempts_fail_raises(self, llm_client):
+        """If every retry still returns empty content, raise after max_retries."""
+        from promiselink.core.exceptions import LLMEmptyContentError
+
+        mock_client = _make_mock_http_client(
+            post_return=_make_httpx_response(200, json_data=self._reasoning_response())
+        )
+        llm_client._get_client = AsyncMock(return_value=mock_client)
+
+        with pytest.raises(LLMEmptyContentError):
+            await llm_client._call_with_retry(
+                messages=[{"role": "user", "content": "extract"}],
+                max_tokens=4000,
+                temperature=0.3,
+            )
+        assert mock_client.post.call_count == 3  # llm_max_retries from fixture
+
+    async def test_empty_content_never_cached(self, llm_client):
+        """Empty responses must not poison the LLM response cache."""
+        from promiselink.core.redis import cache_service
+
+        response_data = self._reasoning_response()
+        mock_client = _make_mock_http_client(post_return=_make_httpx_response(200, json_data=response_data))
+        llm_client._get_client = AsyncMock(return_value=mock_client)
+
+        from promiselink.core.exceptions import LLMEmptyContentError
+
+        with pytest.raises(LLMEmptyContentError):
+            await llm_client._call_with_retry(
+                messages=[{"role": "user", "content": "extract"}],
+                max_tokens=4000,
+                temperature=0.3,
+            )
+        # Memory cache must contain no entry for this prompt
+        assert not cache_service._memory_cache
+
+    async def test_poisoned_cache_entry_is_purged(self, llm_client):
+        """A pre-fix cached empty entry is deleted and treated as a miss."""
+        from promiselink.core.redis import cache_service
+
+        messages = [{"role": "user", "content": "extract"}]
+        messages_str = json.dumps(messages, sort_keys=True)
+        cache_key = await cache_service.llm_cache_key(messages_str, llm_client.model)
+        # Simulate poisoned entry written by the old code path
+        await cache_service.set(cache_key, {"content": "", "usage": {}}, ttl=86400)
+
+        ok = _make_httpx_response(200, json_data=_make_openai_response("real answer"))
+        mock_client = _make_mock_http_client(post_return=ok)
+        llm_client._get_client = AsyncMock(return_value=mock_client)
+
+        result = await llm_client._call_with_retry(messages=messages, max_tokens=100, temperature=0.3)
+        assert result == "real answer"
+        assert mock_client.post.call_count == 1  # cache was treated as miss
+
+
 # ── generate() tests ──
 
 
@@ -447,9 +529,7 @@ class TestGenerate:
     async def test_generate_uses_low_temperature(self, llm_client):
         """generate() always uses temperature=0.0 for deterministic output."""
         response_data = _make_openai_response("0.95")
-        mock_client = _make_mock_http_client(
-            post_return=_make_httpx_response(200, json_data=response_data)
-        )
+        mock_client = _make_mock_http_client(post_return=_make_httpx_response(200, json_data=response_data))
         llm_client._get_client = AsyncMock(return_value=mock_client)
 
         result = await llm_client.generate("Rate confidence", max_tokens=10)

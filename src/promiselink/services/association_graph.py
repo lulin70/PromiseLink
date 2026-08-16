@@ -55,6 +55,10 @@ class AssociationGraphMixin:
             .where(
                 Entity.user_id == user_id,
                 Entity.entity_type == "person",
+                # 2026-08-16 fix: merged/deleted entities are tombstones —
+                # scanning them re-links duplicates into the graph (and legacy
+                # merged rows carry malformed properties that crash parsing).
+                Entity.status.not_in(("merged", "deleted")),
             )
             .order_by(Entity.id)
         )
@@ -100,11 +104,13 @@ class AssociationGraphMixin:
             if len(group) < 2:
                 continue
             # Pre-build work_history company → entity_id inverted index for ex_colleague check
+            # 2026-08-16 fix: work_history items may be plain strings (legacy
+            # rows / LLM drift) — treat a string item as the company name.
             work_company_index: dict[str, list[int]] = {}
             for idx, entity in enumerate(group):
                 history = (entity.properties or {}).get("work_history", [])
                 for h in history:
-                    h_company = h.get("company") or ""
+                    h_company = (h.get("company") or "") if isinstance(h, dict) else str(h)
                     if h_company:
                         work_company_index.setdefault(h_company, []).append(idx)
 
@@ -117,7 +123,7 @@ class AssociationGraphMixin:
                     is_ex_colleague = False
                     history_i = (group[i].properties or {}).get("work_history", [])
                     for ha in history_i:
-                        ha_company = ha.get("company") or ""
+                        ha_company = (ha.get("company") or "") if isinstance(ha, dict) else str(ha)
                         if (
                             ha_company
                             and ha_company in work_company_index
@@ -227,7 +233,13 @@ class AssociationGraphMixin:
         while offset < MAX_ENTITY_LIMIT:
             stmt = (
                 select(Entity)
-                .where(Entity.user_id == user_id, Entity.entity_type == "person")
+                .where(
+                    Entity.user_id == user_id,
+                    Entity.entity_type == "person",
+                    # 2026-08-16 fix: skip merged/deleted tombstones (see
+                    # _discover_batch_sql_pushdown)
+                    Entity.status.not_in(("merged", "deleted")),
+                )
                 .order_by(Entity.updated_at.desc())
                 .limit(BATCH_SIZE)
                 .offset(offset)

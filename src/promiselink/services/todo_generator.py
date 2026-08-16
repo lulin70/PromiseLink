@@ -124,6 +124,8 @@ class TodoGenerator:
     def __init__(self, llm_client: LLMProvider | LLMClient, session: AsyncSession):
         self.llm = llm_client
         self.session = session
+        # Stats from the last generate_todos run (see Step04 failure logic)
+        self.last_run_stats: dict = {"generated": 0, "persisted": 0, "dedup_removed": 0}
 
     async def generate_todos(
         self,
@@ -241,6 +243,7 @@ class TodoGenerator:
                     todo_type=gen.todo_type,
                     title=gen.title[:50],
                 )
+        pre_filtered_count = len(all_generated) - len(unique_generated)
 
         # Rule-based fallback: if LLM generated nothing but text contains
         # promise/care/followup keywords, create basic todos
@@ -320,6 +323,17 @@ class TodoGenerator:
             existing_todos=existing_open_todos,
         )
         persisted_todos = dedup_result.todos
+
+        # 2026-08-16 fix: expose run stats so Step04 can distinguish
+        # "LLM produced nothing" (failure) from "all todos deduped away"
+        # (success — cross-event duplicates were correctly suppressed).
+        # dedup_removed counts BOTH layers: pre-persist filter + post-persist
+        # TodoDeduplicator.
+        self.last_run_stats = {
+            "generated": len(all_generated),
+            "persisted": len(persisted_todos),
+            "dedup_removed": pre_filtered_count + dedup_result.removed_count,
+        }
 
         # F-46b: DB-level deletion of duplicates
         if hasattr(dedup_result, 'pending_deletions') and dedup_result.pending_deletions:

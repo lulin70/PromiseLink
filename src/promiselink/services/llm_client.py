@@ -13,6 +13,7 @@ import httpx
 
 from promiselink.config import Settings
 from promiselink.core.exceptions import (
+    LLMEmptyContentError,
     LLMError,
     LLMQuotaExceeded,
     LLMRateLimitError,
@@ -160,9 +161,7 @@ class LLMClient:
             result: dict[str, Any] = response.json()
             return result
         except json.JSONDecodeError as exc:
-            raise LLMResponseParseError(
-                parse_error=f"Invalid JSON in API response: {exc}"
-            )
+            raise LLMResponseParseError(parse_error=f"Invalid JSON in API response: {exc}")
 
     @staticmethod
     def _parse_response(data: dict[str, Any]) -> str:
@@ -178,14 +177,19 @@ class LLMClient:
             LLMResponseParseError: If response structure is unexpected.
         """
         try:
-            content: str = data["choices"][0]["message"]["content"]
+            message = data["choices"][0]["message"]
+            content: str = message["content"]
             if content is None:
                 raise LLMResponseParseError(parse_error="LLM returned null content")
+            if not content.strip():
+                # 2026-08-16 fix: reasoning models (deepseek-v4-flash) can
+                # exhaust max_tokens on reasoning_content, leaving content="".
+                # Raise a retryable error instead of caching an empty response.
+                finish_reason = data["choices"][0].get("finish_reason")
+                raise LLMEmptyContentError(finish_reason=finish_reason)
             return content.strip()
         except (KeyError, IndexError, TypeError) as exc:
-            raise LLMResponseParseError(
-                parse_error=f"Unexpected response structure: {exc}"
-            )
+            raise LLMResponseParseError(parse_error=f"Unexpected response structure: {exc}")
 
     async def _call_with_retry(
         self,
@@ -208,19 +212,26 @@ class LLMClient:
         """
         # Check cache
         from promiselink.core.redis import cache_service
+
         messages_str = json.dumps(messages, sort_keys=True)
         cache_key = await cache_service.llm_cache_key(messages_str, self.model)
         cached = await cache_service.get(cache_key)
-        if cached:
+        if cached and cached.get("content"):
             logger.debug("llm_cache_hit", key=cache_key)
             return cast(str, cached["content"])
+        if cached and not cached.get("content"):
+            # 2026-08-16 fix: purged poisoned empty-content cache entries
+            # (written by the pre-fix code path) instead of returning them.
+            logger.warning("llm_cache_poisoned_empty", key=cache_key)
+            await cache_service.delete(cache_key)
 
         start_time = time.monotonic()
         last_error: Exception | None = None
+        current_max_tokens = max_tokens
 
         for attempt in range(self.max_retries):
             try:
-                response_data = await self._http_call(messages, max_tokens, temperature)
+                response_data = await self._http_call(messages, current_max_tokens, temperature)
                 result = self._parse_response(response_data)
 
                 latency_ms = int((time.monotonic() - start_time) * 1000)
@@ -236,15 +247,16 @@ class LLMClient:
                     attempt=attempt + 1,
                 )
 
-                # Cache the response
-                await cache_service.set(cache_key, {"content": result, "usage": usage}, ttl=86400)
+                # Cache the response (never cache empty content — defensive)
+                if result.strip():
+                    await cache_service.set(cache_key, {"content": result, "usage": usage}, ttl=86400)
 
                 return result
 
             except LLMTimeoutError:
                 last_error = LLMTimeoutError(provider=self.provider, timeout=self.timeout)
                 if attempt < self.max_retries - 1:
-                    wait = 2 ** attempt  # 1s, 2s, 4s
+                    wait = 2**attempt  # 1s, 2s, 4s
                     logger.warning(
                         "llm_timeout_retrying",
                         provider=self.provider,
@@ -269,6 +281,24 @@ class LLMClient:
                     continue
                 raise
 
+            except LLMEmptyContentError as exc:
+                # 2026-08-16 fix: reasoning model exhausted max_tokens on
+                # reasoning_content → empty content. Retry with a doubled
+                # token budget so reasoning can finish and content can be
+                # produced. Cap at 8192 (DeepSeek hard limit).
+                last_error = exc
+                if attempt < self.max_retries - 1:
+                    current_max_tokens = min(current_max_tokens * 2, 8192)
+                    logger.warning(
+                        "llm_empty_content_retrying",
+                        provider=self.provider,
+                        attempt=attempt + 1,
+                        max_tokens=current_max_tokens,
+                        finish_reason=exc.details.get("finish_reason"),
+                    )
+                    continue
+                raise
+
             except LLMError as exc:
                 # Retry generic LLM errors (e.g., HTTP connection errors)
                 # but NOT quota errors which are permanent
@@ -276,7 +306,7 @@ class LLMClient:
                     raise
                 last_error = exc
                 if attempt < self.max_retries - 1:
-                    wait = 2 ** attempt  # 1s, 2s, 4s
+                    wait = 2**attempt  # 1s, 2s, 4s
                     logger.warning(
                         "llm_error_retrying",
                         provider=self.provider,
@@ -362,9 +392,7 @@ class LLMClient:
         try:
             return extract_json_from_text(text)
         except json.JSONDecodeError as exc:
-            raise LLMResponseParseError(
-                parse_error=str(exc)
-            )
+            raise LLMResponseParseError(parse_error=str(exc))
 
     async def generate(self, prompt: str, max_tokens: int = 10) -> str:
         """Short generation for simple tasks (e.g., confidence score).

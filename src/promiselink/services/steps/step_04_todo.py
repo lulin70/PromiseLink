@@ -33,6 +33,7 @@ class Step04_TodoGeneration(PipelineStep):
         assert llm_client is not None
 
         todos: list[Todo] = []
+        generator: TodoGenerator | None = None
         try:
             async with AsyncSessionLocal() as session:
                 generator = TodoGenerator(llm_client=llm_client, session=session)
@@ -77,7 +78,12 @@ class Step04_TodoGeneration(PipelineStep):
         )
 
         # Track todo generation failure for Step13 partial status
-        if len(todos) == 0 and len(context.entities) > 0:
+        # 2026-08-16 fix: 0 todos after dedup is a SUCCESS (all generated todos
+        # were cross-event duplicates) — only flag failure when nothing was
+        # produced at all (LLM degradation) or persistence dropped everything.
+        stats = getattr(generator, "last_run_stats", None) or {}
+        dedup_removed = stats.get("dedup_removed", 0) if generator else 0
+        if len(todos) == 0 and len(context.entities) > 0 and dedup_removed == 0:
             context.failed_steps.append(self.name)
 
         return context

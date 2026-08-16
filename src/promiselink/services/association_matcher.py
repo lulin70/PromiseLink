@@ -74,6 +74,10 @@ class AssociationMatcherMixin:
                 Entity.user_id == user_id,
                 Entity.entity_type == "person",
                 Entity.id != str(new_entity.id),
+                # 2026-08-16 fix: exclude merged/deleted entities — merged
+                # duplicates (e.g. legacy 王总 x8) were matched as candidates,
+                # producing self-name associations "安排王总和王总交流".
+                Entity.status.not_in(("merged", "deleted")),
             )
         ).options(
             # Only load columns needed for candidate matching, skip large JSON fields

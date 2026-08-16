@@ -50,12 +50,23 @@ class Step11_AssociationTodos(PipelineStep):
                     )
                     entity_map = {str(eid): name for eid, name in ent_result.all()}
 
+                    # 2026-08-16 fix: track titles added in THIS transaction.
+                    # autoflush=False means DB existence checks cannot see
+                    # pending inserts, so identical titles (one assoc per pair)
+                    # all passed the check and duplicated x6.
+                    added_titles: set[str] = set()
+
                     for assoc in new_assocs:
                         src_name = entity_map.get(str(assoc.source_entity_id), "")
                         tgt_name = entity_map.get(str(assoc.target_entity_id), "")
                         todo_title = None
                         todo_type = "followup"
                         priority = 3
+
+                        # 2026-08-16 fix: skip self-name pairs (two entities of
+                        # the same person, e.g. merged duplicate vs survivor).
+                        if src_name and src_name == tgt_name:
+                            continue
 
                         atype = assoc.association_type
                         evidence = (assoc.properties or {}).get("evidence", {})
@@ -88,14 +99,20 @@ class Step11_AssociationTodos(PipelineStep):
                             priority = 4
 
                         if todo_title:
+                            # In-transaction guard first (autoflush=False)
+                            if todo_title in added_titles:
+                                continue
+                            # 2026-08-16 fix: .first() instead of
+                            # scalar_one_or_none() — duplicate titles in DB
+                            # raised MultipleResultsFound and failed the step.
                             existing = await session.execute(
                                 select(Todo).where(
                                     Todo.user_id == user_id,
                                     Todo.title == todo_title,
                                     Todo.status == "pending",
-                                )
+                                ).limit(1)
                             )
-                            if not existing.scalar_one_or_none():
+                            if not existing.scalars().first():
                                 todo = Todo(
                                     user_id=user_id,
                                     title=todo_title,
@@ -105,6 +122,7 @@ class Step11_AssociationTodos(PipelineStep):
                                     source_event_id=event_id,
                                 )
                                 session.add(todo)
+                                added_titles.add(todo_title)
 
                     await commit_with_retry(session)
         except Exception as step12_err:  # Broadened — DB failure logs and continues pipeline

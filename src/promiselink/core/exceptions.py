@@ -188,6 +188,22 @@ class LLMResponseParseError(LLMError):
         )
 
 
+class LLMEmptyContentError(LLMError):
+    """LLM returned an empty content field.
+
+    Reasoning models (e.g. deepseek-v4-flash) emit reasoning_content first;
+    when reasoning exhausts max_tokens, content is an empty string. Retryable
+    with a larger max_tokens budget.
+    """
+
+    def __init__(self, finish_reason: str | None = None):
+        super().__init__(
+            message="LLM returned empty content (reasoning may have exhausted max_tokens)",
+            code="LLM_EMPTY_CONTENT",
+            details={"finish_reason": finish_reason},
+        )
+
+
 class PromptInjectionError(LLMError):
     """Raised when prompt injection is detected in input text.
 
