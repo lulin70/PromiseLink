@@ -85,6 +85,10 @@ async def list_entities(
         query = query.where(Entity.entity_type == entity_type)
     if status:
         query = query.where(Entity.status == status)
+    else:
+        # 默认排除已合并/已删除实体（合并项保留行以维持 source_event_id 事件历史，
+        # 但不应出现在人脉列表中——2026-08-16 修复重复实体合并后仍显示的问题）
+        query = query.where(Entity.status.not_in(("merged", "deleted")))
     if search:
         escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         query = query.where(Entity.name.ilike(f"%{escaped}%", escape="\\"))
@@ -95,6 +99,8 @@ async def list_entities(
         count_query = count_query.where(Entity.entity_type == entity_type)
     if status:
         count_query = count_query.where(Entity.status == status)
+    else:
+        count_query = count_query.where(Entity.status.not_in(("merged", "deleted")))
     if search:
         escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         count_query = count_query.where(Entity.name.ilike(f"%{escaped}%", escape="\\"))

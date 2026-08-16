@@ -332,7 +332,10 @@ class EntityResolutionEngine:
         stmt = select(Entity).where(
             Entity.user_id == user_id,
             Entity.entity_type == "person",
-            Entity.status.in_(["provisional", "confirmed", "merged"]),
+            # 2026-08-16 修复：排除 merged 实体。合并项已由幸存者继承别名/属性，
+            # 若保留在候选索引中，同名匹配（如"李总"x8）可能命中已合并项而非幸存者，
+            # 导致新数据写入废弃实体。
+            Entity.status.in_(["provisional", "confirmed"]),
         )
         result = await self.session.execute(stmt)
         for e in result.scalars().all():
