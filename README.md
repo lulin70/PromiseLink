@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://promiselink.cn"><img src="https://img.shields.io/badge/🌐_官网-promiselink.cn-blue?style=for-the-badge" alt="Website"></a>
-  <a href="https://github.com/lulin70/PromiseLink/releases"><img src="https://img.shields.io/badge/version-v1.0.0-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/lulin70/PromiseLink/releases"><img src="https://img.shields.io/badge/version-v1.0.1-blue?style=flat-square" alt="Version"></a>
   <br/>
   <a href="https://github.com/lulin70/PromiseLink/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/lulin70/PromiseLink/ci.yml?branch=main&label=CI&logo=github" alt="CI"></a>
   <img src="https://img.shields.io/badge/tests-2035%20passed-brightgreen" alt="Tests">
@@ -74,10 +74,10 @@
 
 ### 方式一：一键下载安装包（推荐非技术用户）
 
-**v1.0.0 直接下载**（双击安装，无需 Python 环境）：
+**v1.0.1 直接下载**（双击安装，无需 Python 环境）：
 
-- **macOS**: [PromiseLink-1.0.0-mac.dmg](https://github.com/lulin70/PromiseLink/releases/download/v1.0.0/PromiseLink-1.0.0-mac.dmg)（Apple Silicon / Intel，~82 MB）
-- **Windows**: [PromiseLink-1.0.0-windows.exe](https://github.com/lulin70/PromiseLink/releases/download/v1.0.0/PromiseLink-1.0.0-windows.exe)（Windows 10/11 64-bit，~42 MB）
+- **macOS**: [PromiseLink-1.0.1-mac.dmg](https://github.com/lulin70/PromiseLink/releases/download/v1.0.1/PromiseLink-1.0.1-mac.dmg)（Apple Silicon / Intel，~82 MB）
+- **Windows**: [PromiseLink-1.0.1-windows.exe](https://github.com/lulin70/PromiseLink/releases/download/v1.0.1/PromiseLink-1.0.1-windows.exe)（Windows 10/11 64-bit，~42 MB）
 
 或从 [Releases 页面](https://github.com/lulin70/PromiseLink/releases) 下载所有版本。
 
@@ -145,7 +145,7 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50 项安全测试
 | 服务模块     | **38 个**                                                          |
 | 数据模型     | **8 个文件，10 个模型类**                                                  |
 | 文档版本     | PRD v5.8 / Tech v3.2                                             |
-| 软件版本     | v1.0.0                                                           |
+| 软件版本     | v1.0.1                                                           |
 | 产品层级     | 基础版(本地免费) / 专业版(网关中继) / 小程序(手机竖屏) / 定制版(团队)                      |
 | 总体进度     | **89%** (基础版 E2E 156/0/0 零 skip 达成)                              |
 

@@ -4,6 +4,12 @@ All notable changes to PromiseLink will be documented in this file.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-08-17
+
+### Fixed — TodoResponse 承诺字段缺失 (2026-08-17)
+
+修复 TodoResponse API 响应中缺少 `action_type`、`fulfillment_status`、`confirmation_status`、`evidence_quote` 四个字段的问题，导致承诺相关待办在前端展示异常。
+
 ## [1.0.0] - 2026-08-16
 
 ### Added — 重复客户人工处理完整链路 (2026-08-16)
