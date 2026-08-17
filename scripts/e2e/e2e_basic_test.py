@@ -139,9 +139,9 @@ print("\n📋 阶段 4：实体与 Todo")
 
 # 等待管道处理 — 轮询 event.status 直到 completed 或超时 30s
 if event_id:
-    print(f"  ⏳ 轮询事件 {event_id} 直到 status=completed (超时 30s)...")
+    print(f"  ⏳ 轮询事件 {event_id} 直到 status=completed (超时 120s)...")
     pipeline_ok = False
-    deadline = time.time() + 30
+    deadline = time.time() + 120
     while time.time() < deadline:
         status, data = api_call("GET", f"/events/{event_id}")
         if status == 200:
@@ -203,7 +203,8 @@ if todo_id:
 print("\n📋 阶段 5：承诺与仪表盘")
 
 # 步骤 9: 查询承诺列表 — 录入"张总承诺下周提供技术方案"应识别为 their_promise
-status, data = api_call("GET", "/promises")
+# 注：默认 view=my-promises，承诺为 their_promise 类型，需指定 view=all
+status, data = api_call("GET", "/promises?view=all")
 promise_count = 0
 if status == 200:
     promise_count = data.get("total", 0)

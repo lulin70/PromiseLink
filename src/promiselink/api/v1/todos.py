@@ -197,6 +197,10 @@ async def list_todos(
             source_event_title=event_titles.get(str(t.source_event_id)) if t.source_event_id else None,
             source_event_date=event_dates.get(str(t.source_event_id)) if t.source_event_id else None,
             created_at=t.created_at,
+            action_type=t.action_type,
+            fulfillment_status=t.fulfillment_status,
+            confirmation_status=t.confirmation_status,
+            evidence_quote=t.evidence_quote,
         )
         items.append(item)
 
