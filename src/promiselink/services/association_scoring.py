@@ -337,7 +337,7 @@ class AssociationScoringMixin:
 
         # Normalize capabilities: support both str list and dict list (F-53)
         def _norm_capabilities(props: dict) -> set[str]:
-            caps = (props.get("resource", {}) or {}).get("capabilities", [])
+            caps = ((props.get("resource", {}) or {}).get("capabilities", []) or [])
             result = set()
             for c in caps:
                 if isinstance(c, dict):

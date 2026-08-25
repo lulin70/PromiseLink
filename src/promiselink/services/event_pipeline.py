@@ -217,6 +217,7 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
             logger.exception("pipeline_error", event_id=str(event_id), error=str(e))
             result.status = "failed"
             result.error = str(e)
+            result.failed_steps = list(ctx.failed_steps) if ctx else []
             result.completed_at = datetime.now(UTC)
 
             # Try to mark event as failed
@@ -230,6 +231,13 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
                         if event and event.status == "processing":
                             event.status = "failed"
                             event.processed_at = datetime.now(UTC)
+                            # P1-4: 把异常栈也写入 failed_steps, 前端可见
+                            if ctx and ctx.failed_steps:
+                                event.failed_steps = list(ctx.failed_steps)
+                            else:
+                                # 把异常类名+消息写入, 便于前端展示排查
+                                exc_name = type(e).__name__
+                                event.failed_steps = [f"{exc_name}: {str(e)[:200]}"]
             except SQLAlchemyError as mark_failed_err:
                 logger.error("pipeline_failed_to_mark_failed", event_id=str(event_id), error=str(mark_failed_err))
 

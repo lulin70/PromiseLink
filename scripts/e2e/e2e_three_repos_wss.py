@@ -38,7 +38,24 @@ import httpx
 GATEWAY_URL = os.environ.get("GATEWAY_URL", "https://gateway.promiselink.cn")
 BASIC_URL = os.environ.get("BASIC_URL", "http://localhost:8000")
 LICENSE_KEY = os.environ.get("PRO_LICENSE_KEY", "PL-PRO-EE3B-8344-5372")
-DEVICE_FINGERPRINT = "sha256:5f5146fa2d306c7e4d14f2dd8d5a8161bf4800e3782a2104a33b648f6188f9de"
+
+
+def _derive_device_fingerprint(license_key: str) -> str:
+    """派生 device_fingerprint：与基础版 relay_client._derive_device_fingerprint 一致。
+
+    保证基础版 WSS 中继 + E2E 脚本 + Pro 网关 activate 同一 license 时使用
+    同一指纹，避免 DEVICE_FINGERPRINT_MISMATCH。
+
+    关键：必须和 src/promiselink/services/relay_client.py::RelayClient._derive_device_fingerprint
+    的算法保持一致 (sha256(license_key))。
+    """
+    import hashlib
+
+    digest = hashlib.sha256(license_key.encode("utf-8")).hexdigest()
+    return f"sha256:{digest}"
+
+
+DEVICE_FINGERPRINT = _derive_device_fingerprint(LICENSE_KEY)
 
 # 颜色输出
 GREEN = "\033[92m"
