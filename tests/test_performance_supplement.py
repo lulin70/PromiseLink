@@ -211,24 +211,27 @@ class TestLLMDegradation:
 
         Mock LLM failure, verify EmbeddingProvider falls back to local/pseudo embedding.
         """
+        from unittest.mock import MagicMock
+
         from promiselink.config import get_settings
         from promiselink.services.embedding_provider import EmbeddingProvider
 
         settings = get_settings()
         settings.embedding_provider = "api"  # Use API mode so _client is created
         provider = EmbeddingProvider(settings=settings)
+        # 2026-08-26: lazily inject mock client (was previously None because
+        # the test env has no OPENAI_API_KEY — see embedding_provider lazy init).
+        mock_client = MagicMock()
+        mock_client.embeddings.create.side_effect = Exception("API unavailable")
+        provider._client = mock_client
 
-        # Mock the API client to always fail
-        with patch.object(provider._client, "embeddings") as mock_embeddings:
-            mock_embeddings.create.side_effect = Exception("API unavailable")
+        # Should fall back to local/pseudo embedding
+        embedding = await provider.embed("测试文本")
 
-            # Should fall back to local/pseudo embedding
-            embedding = await provider.embed("测试文本")
-
-            # Should return a valid embedding vector
-            assert isinstance(embedding, list)
-            assert len(embedding) > 0
-            assert all(isinstance(x, float) for x in embedding)
+        # Should return a valid embedding vector
+        assert isinstance(embedding, list)
+        assert len(embedding) > 0
+        assert all(isinstance(x, float) for x in embedding)
 
     @pytest.mark.asyncio
     async def test_tc_perf_002_llm_rate_limit_retry(self):
@@ -282,27 +285,29 @@ class TestLLMDegradation:
 
         Test full degradation chain: API fails → local model unavailable → pseudo embedding.
         """
+        from unittest.mock import MagicMock
+
         from promiselink.config import get_settings
         from promiselink.services.embedding_provider import EmbeddingProvider
 
         settings = get_settings()
         settings.embedding_provider = "api"  # Use API mode so _client is created
         provider = EmbeddingProvider(settings=settings)
+        # 2026-08-26: lazily inject mock client (was previously None).
+        mock_client = MagicMock()
+        mock_client.embeddings.create.side_effect = Exception("API down")
+        provider._client = mock_client
 
-        # Force API to fail and sentence_transformers to not be available
-        with patch.object(provider._client, "embeddings") as mock_api:
-            mock_api.create.side_effect = Exception("API down")
+        with patch.dict("sys.modules", {"sentence_transformers": None}):
+            # Force local model to be None so it falls to pseudo
+            provider._local_model = None
 
-            with patch.dict("sys.modules", {"sentence_transformers": None}):
-                # Force local model to be None so it falls to pseudo
-                provider._local_model = None
+            # Patch the import inside _embed_local to raise ImportError
+            original_embed_local = provider._embed_local
 
-                # Patch the import inside _embed_local to raise ImportError
-                original_embed_local = provider._embed_local
-
-                async def mock_embed_local(text, cache_key):
-                    # Simulate sentence_transformers not available
-                    return provider._pseudo_embedding(text, cache_key)
+            async def mock_embed_local(text, cache_key):
+                # Simulate sentence_transformers not available
+                return provider._pseudo_embedding(text, cache_key)
 
                 with patch.object(provider, "_embed_local", side_effect=mock_embed_local):
                     embedding = await provider.embed("降级测试文本")

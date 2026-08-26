@@ -87,11 +87,10 @@ class EmbeddingProvider:
         self._provider = self._settings.embedding_provider  # "local" or "api"
         self._model = self._settings.embedding_model
         self._client = None
-        if self._provider == "api":
-            self._client = AsyncOpenAI(
-                base_url=self._settings.llm_base_url,
-                api_key=self._settings.llm_api_key,
-            )
+        # 2026-08-26: build AsyncOpenAI client lazily via embed()/embed_batch()
+        # so an empty llm_api_key (test env / CI) does NOT raise OpenAIError
+        # at construction time. The client is created on first use and
+        # gracefully falls back to local model if the key is missing.
         # OrderedDict for LRU eviction; prevents unbounded memory growth.
         self._cache: OrderedDict[str, list[float]] = OrderedDict()
         self._cache_hits = 0
@@ -146,27 +145,35 @@ class EmbeddingProvider:
             return await self._embed_local(text, key)
 
         # API provider: try API first, fall back to local model
-        try:
+        if self._provider == "api":
             if self._client is None:
-                raise RuntimeError("Embedding API client not initialized")
-            response = await self._client.embeddings.create(
-                model=self._model,
-                input=text,
-            )
-            embedding = response.data[0].embedding
-            self._cache_put(key, embedding)
-
-            logger.debug(
-                "embedding_created_api",
-                text_len=len(text),
-                dims=len(embedding),
-            )
-            return embedding
-        except Exception as api_err:  # External API — keep broad catch for resilience
-            if "model_not_found" in str(api_err):
-                logger.debug("embedding_api_model_unavailable", note="API does not support embedding model, using local fallback")
-            else:
-                logger.warning("embedding_api_failed_fallback_local", error=str(api_err))
+                try:
+                    self._client = AsyncOpenAI(
+                        base_url=self._settings.llm_base_url,
+                        api_key=self._settings.llm_api_key,
+                    )
+                except Exception as exc:
+                    logger.warning("embedding_api_init_failed", error=str(exc))
+                    self._client = None
+            if self._client is not None:
+                try:
+                    response = await self._client.embeddings.create(
+                        model=self._model,
+                        input=text,
+                    )
+                    embedding = response.data[0].embedding
+                    self._cache_put(key, embedding)
+                    logger.debug(
+                        "embedding_created_api",
+                        text_len=len(text),
+                        dims=len(embedding),
+                    )
+                    return embedding
+                except Exception as api_err:  # External API — keep broad catch for resilience
+                    if "model_not_found" in str(api_err):
+                        logger.debug("embedding_api_model_unavailable", note="API does not support embedding model, using local fallback")
+                    else:
+                        logger.warning("embedding_api_failed_fallback_local", error=str(api_err))
 
         # Fallback to local model
         return await self._embed_local(text, key)

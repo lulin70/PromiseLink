@@ -3,14 +3,15 @@
 确保 /api/v1/dashboard 和 /api/v1/dashboard/summary 返回 200，
 为前端 dashboard 调用提供兼容路径。
 """
-import pytest
-from httpx import AsyncClient, ASGITransport
 from unittest.mock import MagicMock
 
-from promiselink.main import app
-from promiselink.database import get_async_session
-from promiselink.core.auth import get_current_user_id
+import pytest
+from httpx import ASGITransport, AsyncClient
+
 from promiselink.api.dependencies import rate_limit_dependency
+from promiselink.core.auth import get_current_user_id
+from promiselink.database import get_async_session
+from promiselink.main import app
 
 
 class TestDashboardRootAndSummary:

@@ -2,8 +2,9 @@
 
 确保前端用户能看到为什么 pipeline 失败。
 """
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 
 class TestPipelineFailedSteps:

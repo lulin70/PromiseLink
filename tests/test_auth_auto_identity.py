@@ -20,6 +20,14 @@ from promiselink.api.v1.auth import LOCAL_USER_ID
 @pytest.fixture(autouse=True)
 def _clean_app_state(monkeypatch):
     """Prevent lifespan WSS startup during these offline tests."""
+    import asyncio
+
+    async def _noop_async() -> None:
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            return
+
     try:
         from promiselink.main import app
         if hasattr(app.state, "relay_wss_client"):
@@ -28,6 +36,22 @@ def _clean_app_state(monkeypatch):
         pass
     monkeypatch.setattr("promiselink.main.settings.pro_license_key", "")
     monkeypatch.setattr("promiselink.main.settings.relay_wss_enabled", False)
+    # 2026-08-26: disable background _pair_auto_poll + _scheduled_event_maintenance
+    # to avoid TestClient lifespan context blocking on gateway HTTP polling.
+    monkeypatch.setattr("promiselink.main._pair_auto_poll", _noop_async, raising=False)
+    monkeypatch.setattr("promiselink.main._scheduled_event_maintenance", _noop_async, raising=False)
+    # 2026-08-26: short-circuit lifespan so _pending_tasks.wait(timeout=30) returns fast.
+    monkeypatch.setattr("promiselink.main._pending_tasks", set(), raising=False)
+    # 2026-08-26: also short-circuit the asyncio.wait timeout itself (was 30s).
+    import contextlib
+    original_wait = asyncio.wait
+
+    async def _fast_wait(aws, **kw):
+        kw.pop("timeout", None)
+        kw["timeout"] = 0.01
+        return await original_wait(aws, **kw)
+
+    monkeypatch.setattr("promiselink.main.asyncio.wait", _fast_wait, raising=False)
     yield
     try:
         from promiselink.main import app

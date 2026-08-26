@@ -44,7 +44,7 @@
 | Advantage | Proof | vs. Traditional CRM |
 |------|---------|-------------|
 | 🔐 **Data Sovereignty · No SaaS** | 100% local SQLite storage / data never leaves your home / offline-capable / PIPL & GDPR compliant | SaaS AI-CRMs upload data to the cloud, entrusting relationship assets to a third party |
-| 🏭 **Industrial-grade quality** | 1922 tests passed / 89% coverage / mypy 0 / ruff 0 / 50 security tests / 17 performance tests | Most open-source CRMs have < 30% coverage |
+| 🏭 **Industrial-grade quality** | 2035 tests passed / 89% coverage / mypy 0 / ruff 0 / 50 security tests / 17 performance tests | Most open-source CRMs have < 30% coverage |
 | 🧠 **Core algorithm layer: main logic is pure algorithm** | Entity resolution / Todo state machine / promise fulfillment / association discovery / dynamic scoring — main logic is pure algorithm implementation (NetworkX + RapidFuzz + numpy), with optional LLM enhancement dimensions (all with degradation mechanisms), runs offline, auditable | Mainstream AI-CRMs depend on GPT API across the full chain |
 | 🚀 **Portable, zero deployment** | `pip install -e .` + `bash scripts/start.sh` ready to use, no Docker / K8s required | Similar tools require docker-compose |
 
@@ -291,7 +291,7 @@ PromiseLink/
 - [x] DataSourceAdapter abstraction layer (manual / CSV; voice / WeChat / email are Pro edition features)
 - [x] CarryMem protocol decoupling (NullMemoryProvider graceful degradation)
 - [x] Encryption system (HMAC-SHA256 + field-level encryption + row-level security)
-- [x] 67 test files / **1971 test cases** (incl. 50 relay_client robustness + 12 v5.6 corrections + 6 real LLM E2E) / **89% coverage**
+- [x] 67 test files / **2084 test cases** (incl. 50 relay_client robustness + 12 v5.6 corrections + 6 real LLM E2E) / **89% coverage**
 - [x] CI/CD + Alembic ready
 - [x] PoC Demo 4/4 scenarios passed
 - [x] One-click install / start scripts (run locally directly, no Docker required)

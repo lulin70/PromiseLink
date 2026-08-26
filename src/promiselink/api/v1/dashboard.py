@@ -39,7 +39,7 @@ router.include_router(relationship_health_router)
 # 修复：聚合 day-view 字段作为 summary，向后兼容前端已有调用。
 # ─────────────────────────────────────────────────────────────
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import Request
@@ -48,7 +48,7 @@ from fastapi import Request
 @router.get("", summary="Dashboard root - summary of today")
 async def dashboard_root(request: Request) -> dict[str, Any]:
     """Dashboard 根路径 — 返回今日聚合 summary（兼容旧前端）。"""
-    today = datetime.now(timezone.utc).date().isoformat()
+    today = datetime.now(UTC).date().isoformat()
     return {
         "date": today,
         "summary": {

@@ -524,9 +524,15 @@ class TestCacheAndStorage:
 
         provider = EmbeddingProvider(settings=mock_settings)
 
+        # 2026-08-26: lazily inject a mock client — previous code relied on
+        # the constructor creating an AsyncOpenAI instance with api_key
+        # 'test-key', which used to work but now fails because the constructor
+        # was switched to lazy init (so empty/invalid keys don't crash).
+        mock_client = MagicMock()
+        provider._client = mock_client
+
         # Mock the API call to track invocations
         api_call_count = 0
-        original_embed = provider._client.embeddings.create
 
         async def mock_create(**kwargs):
             nonlocal api_call_count
