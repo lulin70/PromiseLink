@@ -1,0 +1,35 @@
+{
+  "timestamp": "2026-09-05T14:15:50.659707+00:00",
+  "contract_hash_doc": "f3b3ba49a983",
+  "contract_hash_runtime": "f3b3ba49a983",
+  "event_ids": {
+    "S1": "4292a2a1-5185-4e88-9246-b945f4b52ea4",
+    "S2": "51a2ef73-3fe3-4068-a931-ff20bb809829"
+  },
+  "s1_detail_keys": [
+    "created_at",
+    "entities",
+    "event_type",
+    "failed_steps",
+    "id",
+    "metadata_",
+    "pipeline",
+    "processed_at",
+    "raw_text",
+    "related_associations",
+    "related_entities",
+    "related_todos",
+    "source",
+    "status",
+    "timestamp",
+    "title",
+    "user_id"
+  ],
+  "s1_status": "completed",
+  "s1_related_count": {
+    "entities": 0,
+    "todos": 3,
+    "associations": 0
+  },
+  "extract_started_log_count": 4
+}

@@ -11,6 +11,7 @@ All notable changes to PromiseLink will be documented in this file.
 - **黄金基准集（W2）**：`tests/golden/` 30 条三分层用例（must_extract ×15 / must_not ×5 / ambiguous ×10，全合成数据 + 虚构名池）；Mock 模式每次推送零 LLM 成本校验用例合法性与契约同步；LLM 模式 `GOLDEN_RUN_LLM=1` 显式 opt-in 跑字段级基准（informational 不阻塞合入）
 - **CI**：test workflow 新增 contract-consistency 步骤；新增 `golden-baseline.yml`（手动 + 每周定时，裁决②双层触发）
 - **可观测**：`extract_started` 日志新增 `contract_version` 字段
+- **G3 发布门禁 e2e**：`scripts/e2e/e2e_semantic_contract.py` 模拟真实用户录入两个事件（5 人会议纪要含同名歧义 + 结构化纪要），执行 5 项断言（E1 日志含 contract_version / E2 EntityProperties 校验 / E3 同名歧义纠偏入口可达 / E4 4 类详情页互跳 / E5 哈希字节级一致），2026-09-05 跑通 5/5 PASS，证据归档 [docs/e2e_evidence/semantic_contract_w1w2/](docs/e2e_evidence/semantic_contract_w1w2/)
 - 文档：[PRD](docs/spec/PRD_解析语义契约_v1.md) / [技术设计](docs/design/TECH_DESIGN_解析语义契约_v1.md) / [测试计划](docs/design/TEST_PLAN_解析语义契约_v1.md) / [规划](docs/planning/ONTOLOGY_SEMANTIC_CONTRACT_PLAN.md)（四项裁决已落档）
 
 ## [1.0.1] - 2026-08-17

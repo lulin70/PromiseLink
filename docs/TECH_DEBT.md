@@ -1,6 +1,6 @@
 # PromiseLink 基础版技术债跟踪文档
 
-> **文档版本** v2.2 / 2026-08-09 / LLM Provider 迁移至 DeepSeek，TD-B12 RESOLVED（rsxermu666.cn 间歇性 503 已随迁移消除）+ TD-B13 RESOLVED（小程序 e2e 真实后端模式）
+> **文档版本** v2.3 / 2026-09-05 / G3 发布门禁 e2e PASS，TD-B15 RESOLVED
 > **关联文档** [PROJECT_STATUS.md](PROJECT_STATUS.md) · [CHANGELOG.md](../CHANGELOG.md) · [ROADMAP.md](ROADMAP.md) · [PromiseLink-Pro TECH_DEBT.md](../PromiseLink-Pro/docs/TECH_DEBT.md)
 > **用途**：量化跟踪技术债，按优先级清理，防止技术债积累导致项目可维护性下降
 > **更新原则**：每次清理后更新状态（OPEN→RESOLVED），新增技术债及时登记
@@ -271,6 +271,8 @@
 
 ### TD-B14: catch_all 路由 405 vs 404 问题 ✅ RESOLVED
 
+### TD-B15: G3 经验
+
 - **状态**：RESOLVED (2026-08-03)
 - **描述**：`main.py` 的 `_catch_all_non_get` 匹配 `/{path:path}` 的 POST/PUT/DELETE/PATCH 方法。当 GET 请求到不存在的 API 路径（如 `/api/v1/nonexistent_route`）时，`/{path:path}` 路由匹配了路径但不允许 GET 方法，FastAPI 返回 405 Method Not Allowed 而非 404 Not Found。
 - **影响**：5 个测试失败（test_api_integration + test_coverage_boost + test_security_comprehensive 3 个 path_traversal 测试），全部 `assert 405 == 404`。
@@ -282,6 +284,15 @@
   - `test_security_comprehensive.py::test_path_traversal_in_event_id`: `assert resp.status_code in (404, 422, 405)`
   - `test_coverage_boost.py::test_404_handler`: `assert resp.status_code in (404, 405)`
 - **验收**：`assert resp.status_code in (404, 405)` 模式，5 个测试全部修复
+
+### TD-B15: G3 发布门禁 e2e 经验（2026-09-05）✅ RESOLVED
+
+- **状态**：RESOLVED (2026-09-05)
+- **描述**：执行 W1+W2 G3 发布门禁 e2e（scripts/e2e/e2e_semantic_contract.py）模拟真实用户录入走契约校验，发现 3 类工程问题，均已修复：
+  1. **SECRET_KEY 不一致**：旧服务启动时 .env SECRET_KEY=dev-secret-key-poc-only，但运行时若 env 已被脚本改写，会触发自动生成回退；e2e 进程读取本地 .env 后 JWT 签名不一致 → 401。修复：e2e 启动命令明确 set -a; source .env; set +a; 注入完整 .env。
+  2. **/entities 响应结构**：实际为 `{items, total, limit, offset}`，旧 e2e 脚本当作 list 迭代 → AttributeError。修复：payload["items"] 兜底。
+  3. **pipeline 等待超时**：原 timeout=60s 对真 LLM 重试不够。修复：timeout=120s + 终态判断 completed/failed。
+- **关联**：[scripts/e2e/e2e_semantic_contract.py](../scripts/e2e/e2e_semantic_contract.py) / [docs/e2e_evidence/semantic_contract_w1w2/](../e2e_evidence/semantic_contract_w1w2/) / [CHANGELOG.md](../CHANGELOG.md) [Unreleased]
 - **后续建议**：如需彻底修复路由设计（替代方案），可调整路由优先级或为 catch_all 添加 GET 处理，但当前方案简单有效且符合 HTTP 标准
 - **关联**：2026-08-03 DevSquad 7 角色上线就绪性评审 + [2026-08-03_PromiseLink_7Role_Launch_Readiness_Review.md](review/2026-08-03_PromiseLink_7Role_Launch_Readiness_Review.md)
 
