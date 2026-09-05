@@ -4,6 +4,7 @@
 > **日期**: 2026-07-01
 > **来源**: [竞品研究 Agent-Reach & cognee](design/Competitive_Research_AgentReach_Cognee.md) + 内部讨论
 > **状态**: 待团队 review 和决策
+> **关联**: 2026-09-05 Ontology 语义契约规划已合流 B4/L4 条目 → [ONTOLOGY_SEMANTIC_CONTRACT_PLAN.md](planning/ONTOLOGY_SEMANTIC_CONTRACT_PLAN.md)
 
 ---
 
