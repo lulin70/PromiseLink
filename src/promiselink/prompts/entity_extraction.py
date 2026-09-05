@@ -1,4 +1,13 @@
-"""Entity extraction prompt templates."""
+"""Entity extraction prompt templates.
+
+受控词表（concern/capability）通过 format 注入，唯一事实源在
+promiselink.core.contract（W1 语义契约：词表变更会改变契约哈希）。
+"""
+
+from promiselink.core.contract import CAPABILITY_TERMS, CONCERN_TERMS
+
+_CONCERN_STR = "、".join(CONCERN_TERMS)
+_CAPABILITY_STR = "、".join(CAPABILITY_TERMS)
 
 TEMPLATE_1_CARD_EXTRACTION = """你是一个商务名片信息提取专家。请从以下OCR识别的文本中提取结构化信息。
 
@@ -10,8 +19,8 @@ TEMPLATE_1_CARD_EXTRACTION = """你是一个商务名片信息提取专家。请
 5. 如果无法推断resource/demand，设为空数组
 6. concern字段：从此人的职位/行业/公司业务推断此人当前最关注的业务问题或挑战（受控词表+自由文本）
 7. capability字段：从此人的职位/公司推断此人的核心专业能力（受控词表+自由文本）
-8. concern受控词表：融资、招聘、销售、技术选型、合规、市场拓展、成本控制、供应链、数字化转型、人才保留
-9. capability受控词表：投资决策、技术架构、产品设计、项目管理、渠道资源、行业人脉、政策解读、数据分析、品牌营销、团队管理
+8. concern受控词表：{concern_terms}
+9. capability受控词表：{capability_terms}
 10. 如果无法推断concern/capability，设为空数组
 
 输出语言规则：
@@ -65,8 +74,8 @@ TEMPLATE_2_CONVERSATION_EXTRACTION = """你是一个商务交流信息提取专�
 7. 如果信息不足以判断，对应字段设为null
 8. concern识别：识别每个人物当前最关注的业务问题或挑战
 9. capability识别：识别每个人物的核心专业能力
-10. concern受控词表：融资、招聘、销售、技术选型、合规、市场拓展、成本控制、供应链、数字化转型、人才保留
-11. capability受控词表：投资决策、技术架构、产品设计、项目管理、渠道资源、行业人脉、政策解读、数据分析、品牌营销、团队管理
+10. concern受控词表：{concern_terms}
+11. capability受控词表：{capability_terms}
 
 虚拟角色过滤规则（重要）：
 - 仅提取真实存在的人物，不要提取角色名或虚拟身份

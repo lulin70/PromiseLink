@@ -14,12 +14,17 @@ from typing import Any, cast
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from promiselink.core.contract import (
+    compute_contract_version,
+)
 from promiselink.core.crypto import encrypt_pii_in_properties
 from promiselink.core.logging import get_logger
 from promiselink.core.text_utils import sanitize_llm_input
 from promiselink.models.entity import Entity
 from promiselink.models.event import Event
 from promiselink.prompts.entity_extraction import (
+    _CAPABILITY_STR,
+    _CONCERN_STR,
     TEMPLATE_1_CARD_EXTRACTION,
     TEMPLATE_2_CONVERSATION_EXTRACTION,
 )
@@ -133,6 +138,7 @@ class EntityExtractor:
             event_id=str(event.id),
             event_type=event.event_type,
             text_length=len(raw_text),
+            contract_version=compute_contract_version(),
         )
 
         # Step 1-3: Select template and call LLM
@@ -256,7 +262,11 @@ class EntityExtractor:
             ExtractionResult with a single ExtractedPerson.
         """
         sanitized = sanitize_llm_input(raw_text)
-        prompt = TEMPLATE_1_CARD_EXTRACTION.format(ocr_text=sanitized)
+        prompt = TEMPLATE_1_CARD_EXTRACTION.format(
+            ocr_text=sanitized,
+            concern_terms=_CONCERN_STR,
+            capability_terms=_CAPABILITY_STR,
+        )
 
         try:
             response = await self.llm.call_json(
@@ -310,6 +320,8 @@ class EntityExtractor:
         prompt = TEMPLATE_2_CONVERSATION_EXTRACTION.format(
             language=language,
             transcript=sanitized,
+            concern_terms=_CONCERN_STR,
+            capability_terms=_CAPABILITY_STR,
         )
 
         try:

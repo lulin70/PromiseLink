@@ -4,6 +4,15 @@ All notable changes to PromiseLink will be documented in this file.
 
 ## [Unreleased]
 
+### Added — 解析语义契约 W1+W2（2026-09-05， Ontology 语义契约规划）
+
+- **语义契约显式化（W1）**：`promiselink/core/contract.py` 以五个代码事实（EntityProperties schema / ORM 模型 / 受控词表 / InputScope 枚举 / ExtractionResult 输出结构）计算内容哈希作为契约版本（单一事实源，运行时 <2ms）；`scripts/generate_semantic_contract.py` 从代码生成 [解析语义契约文档](docs/spec/PARSING_SEMANTIC_CONTRACT.md)（`--check` 供 CI 防漂移，人工语义说明段自动保留）
+- **受控词表单一化**：concern/capability 受控词表从 prompt 文本提取为 `CONCERN_TERMS`/`CAPABILITY_TERMS` 常量，format 注入模板（渲染结果不变，词表变更必改哈希）
+- **黄金基准集（W2）**：`tests/golden/` 30 条三分层用例（must_extract ×15 / must_not ×5 / ambiguous ×10，全合成数据 + 虚构名池）；Mock 模式每次推送零 LLM 成本校验用例合法性与契约同步；LLM 模式 `GOLDEN_RUN_LLM=1` 显式 opt-in 跑字段级基准（informational 不阻塞合入）
+- **CI**：test workflow 新增 contract-consistency 步骤；新增 `golden-baseline.yml`（手动 + 每周定时，裁决②双层触发）
+- **可观测**：`extract_started` 日志新增 `contract_version` 字段
+- 文档：[PRD](docs/spec/PRD_解析语义契约_v1.md) / [技术设计](docs/design/TECH_DESIGN_解析语义契约_v1.md) / [测试计划](docs/design/TEST_PLAN_解析语义契约_v1.md) / [规划](docs/planning/ONTOLOGY_SEMANTIC_CONTRACT_PLAN.md)（四项裁决已落档）
+
 ## [1.0.1] - 2026-08-17
 
 ### Fixed — TodoResponse 承诺字段缺失 (2026-08-17)

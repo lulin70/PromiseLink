@@ -52,6 +52,9 @@ jobs:
       - name: Run linting
         run: ruff check src/ tests/
 
+      - name: Contract consistency (W1, zero-cost push gate)
+        run: python scripts/generate_semantic_contract.py --check
+
       - name: Run type checking
         run: python3 -m mypy src/promiselink --ignore-missing-imports
 

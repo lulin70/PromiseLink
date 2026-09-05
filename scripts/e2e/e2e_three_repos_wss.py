@@ -29,7 +29,6 @@ import json
 import os
 import sys
 import time
-from pathlib import Path
 from typing import Any
 
 import httpx
@@ -113,7 +112,7 @@ async def test_gateway_health() -> dict[str, Any]:
     if ws_count >= 1:
         ok(f"active_ws_connections={ws_count} (WSS 中继已建立)")
     elif ws_count == 0:
-        fail(f"active_ws_connections=0 (基础版 WSS 未连接)")
+        fail("active_ws_connections=0 (基础版 WSS 未连接)")
     else:
         fail(f"active_ws_connections={ws_count} (BUG-3 修复未生效)")
 
@@ -417,7 +416,7 @@ async def test_relay_pipeline_status(relay_token: str, user_token: str, event_id
             info(f"[{waited}s] status={status}, failed_steps={failed_steps}")
 
             if status == "completed":
-                ok(f"Pipeline 完成!")
+                ok("Pipeline 完成!")
                 # 查询关联的实体/待办/承诺
                 await _verify_extraction_results(relay_token, user_token, event_id)
                 return True

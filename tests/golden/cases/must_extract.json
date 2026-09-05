@@ -1,0 +1,94 @@
+{
+  "cases": [
+    {
+      "id": "me-001", "layer": "must_extract", "event_type": "meeting",
+      "input_text": "与青梧科技的林晚秋开会，她负责技术选型，会中提出希望下周三前收到我们的集成方案。我答应她周五先发一版大纲。",
+      "expected": {"min_persons": 1, "person_names": ["林晚秋"], "must_have_person_fields": ["company"], "notes": "待办+承诺双产出场景"},
+      "notes": "双人会议：1 人脉 + 承诺（周五发大纲）+ 待办（周三前集成方案）"
+    },
+    {
+      "id": "me-002", "layer": "must_extract", "event_type": "call",
+      "input_text": "电话沟通：远山资本的程既明说他们正在寻求A轮，关注融资进展，问我们能否引荐审计资源。我介绍他联系临江制造的财务顾问费晚棠。",
+      "expected": {"min_persons": 2, "person_names": ["程既明", "费晚棠"], "must_have_person_fields": ["concern"], "notes": "concern=融资"},
+      "notes": "concern=融资 场景 + 引荐关系"
+    },
+    {
+      "id": "me-003", "layer": "must_extract", "event_type": "meeting",
+      "input_text": "参加百川智能的产品评审会，参会人：沈书白（产品总监）、顾清和（架构师）、我。决议：下季度上线渠道资源对接模块。",
+      "expected": {"min_persons": 2, "person_names": ["沈书白", "顾清和"], "notes": "结构化纪要格式，参会人字段识别人物"},
+      "notes": "结构化纪要输入（参会人字段）"
+    },
+    {
+      "id": "me-004", "layer": "must_extract", "event_type": "meeting",
+      "input_text": "周慕云说他认识望津物流的仓库负责人，可以帮我们对接仓储渠道。他说下周带我去参观临江制造的工厂。",
+      "expected": {"min_persons": 1, "person_names": ["周慕云"], "must_have_person_fields": ["resource"], "notes": "resource=仓储渠道人脉"},
+      "notes": "资源识别（人脉/渠道）"
+    },
+    {
+      "id": "me-005", "layer": "must_extract", "event_type": "call",
+      "input_text": "苏念真来电，栖云数据正在做数字化转型，她负责供应商遴选，需要成本控制方面的解决方案。",
+      "expected": {"min_persons": 1, "person_names": ["苏念真"], "must_have_person_fields": ["concern", "company"], "notes": "concern=数字化转型/成本控制"},
+      "notes": "concern=数字化转型 + 成本控制"
+    },
+    {
+      "id": "me-006", "layer": "must_extract", "event_type": "meeting",
+      "input_text": "叶望舒是澄海生物的投资负责人，专注早期科技投资决策，她说下个月看一批生物检测项目。",
+      "expected": {"min_persons": 1, "person_names": ["叶望舒"], "must_have_person_fields": ["capability"], "notes": "capability=投资决策"},
+      "notes": "capability=投资决策"
+    },
+    {
+      "id": "me-007", "layer": "must_extract", "event_type": "meeting",
+      "input_text": "行业沙龙交流，认识三人：南山新材的冯至远谈供应链出海；韶光能源的方念北在招储能工程师；温故在做品牌营销咨询。",
+      "expected": {"min_persons": 3, "person_names": ["冯至远", "方念北", "温故"], "notes": "三人各自 concern/capability"},
+      "notes": "三人场景，各自 concern/capability"
+    },
+    {
+      "id": "me-008", "layer": "must_extract", "event_type": "wechat_forward",
+      "input_text": "微信聊天转发：许静之说：你们的数据平台什么时候能给我们试用？我说：月底前一定安排。她回复：那我等月底，别再拖了。",
+      "expected": {"min_persons": 1, "person_names": ["许静之"], "notes": "我对她的承诺：月底试用"},
+      "notes": "微信转发对话 + 我方承诺"
+    },
+    {
+      "id": "me-009", "layer": "must_extract", "event_type": "followup",
+      "input_text": "跟进事项：孟繁星提出的合规审查需求还没答复，这周内要回复他；另外记得把他介绍给贺疏桐。",
+      "expected": {"min_persons": 2, "person_names": ["孟繁星", "贺疏桐"], "notes": "待办：本周回复 + 引荐"},
+      "notes": "跟进类输入（followup）"
+    },
+    {
+      "id": "me-010", "layer": "must_extract", "event_type": "meeting",
+      "input_text": "纪春生说他们公司望津物流总部在杭州，主要做跨境电商仓储，年营收三个亿。",
+      "expected": {"min_persons": 1, "person_names": ["纪春生"], "must_have_person_fields": ["company"], "notes": "公司城市/行业推断"},
+      "notes": "公司城市/行业可推断（结构化推断规则6）"
+    },
+    {
+      "id": "me-011", "layer": "must_extract", "event_type": "manual",
+      "input_text": "陆知行，临江制造 CTO，毕业于江南理工大学，之前在百川智能做技术架构。",
+      "expected": {"min_persons": 1, "person_names": ["陆知行"], "must_have_person_fields": ["company", "title"], "notes": "院校+工作履历"},
+      "notes": "院校 + 过往工作单位（结构化推断规则6）"
+    },
+    {
+      "id": "me-012", "layer": "must_extract", "event_type": "meeting",
+      "input_text": "与秦望山讨论技术方案，涉及知识图谱构建、向量化检索和 RAG 链路优化三个技术方向。",
+      "expected": {"min_persons": 1, "person_names": ["秦望山"], "notes": "tech_stack 关键词提取"},
+      "notes": "tech_stack 提取"
+    },
+    {
+      "id": "me-013", "layer": "must_extract", "event_type": "call",
+      "input_text": "电话里费晚棠提到她妹妹在星野传媒做招聘，正在扩内容团队，让我留意合适的人选。",
+      "expected": {"min_persons": 1, "person_names": ["费晚棠"], "must_have_person_fields": ["concern"], "notes": "concern=招聘（亲属转述）"},
+      "notes": "concern=招聘（转述场景）"
+    },
+    {
+      "id": "me-014", "layer": "must_extract", "event_type": "meeting",
+      "input_text": "青梧科技的季度经营会：沈书白汇报产品线毛利率下滑，讨论成本控制三项措施；顾清和提出技术架构改造降低运维成本。",
+      "expected": {"min_persons": 2, "person_names": ["沈书白", "顾清和"], "notes": "concern=成本控制 双人"},
+      "notes": "成本控制 concern + 架构能力"
+    },
+    {
+      "id": "me-015", "layer": "must_extract", "event_type": "manual",
+      "input_text": "重点人脉：崔颢然，望津物流销售副总裁，手里有华东区零售渠道资源，需求是数字化营销工具。",
+      "expected": {"min_persons": 1, "person_names": ["崔颢然"], "must_have_person_fields": ["resource", "demand"], "notes": "resource+demand 齐全"},
+      "notes": "resource + demand 双识别"
+    }
+  ]
+}

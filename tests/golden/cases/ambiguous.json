@@ -1,0 +1,64 @@
+{
+  "cases": [
+    {
+      "id": "am-001", "layer": "ambiguous", "event_type": "meeting",
+      "input_text": "和张总聊了合作，回头把资料发他。备注：之前还认识一个远山资本的张总，别搞混。",
+      "expected": {"min_persons": 1, "expect_confirmation": true},
+      "notes": "同名「张总」——必须进入纠偏（多候选人脉选择）"
+    },
+    {
+      "id": "am-002", "layer": "ambiguous", "event_type": "meeting",
+      "input_text": "林晚秋说下周三给我答复，但没说是哪个方案，先记下来。",
+      "expected": {"min_persons": 1, "expect_confirmation": true},
+      "notes": "方案指代不明——确认流程"
+    },
+    {
+      "id": "am-003", "layer": "ambiguous", "event_type": "call",
+      "input_text": "通话里聊到我答应帮忙的事，具体是我先找他还是他先发需求没谈清楚。",
+      "expected": {"min_persons": 0, "expect_confirmation": true},
+      "notes": "承诺方向歧义（Step05 双向无法判定）"
+    },
+    {
+      "id": "am-004", "layer": "ambiguous", "event_type": "manual",
+      "input_text": "我朋友说可以帮我们对接望津物流，但我朋友具体叫什么一时想不起来，回头翻聊天记录。",
+      "expected": {"min_persons": 0, "expect_confirmation": true},
+      "notes": "「我朋友」无名指代——不允许静默落库"
+    },
+    {
+      "id": "am-005", "layer": "ambiguous", "event_type": "meeting",
+      "input_text": "百川智能的人来拜访，来的好像是姓程的总监，也可能是姓沈的，记不清了。",
+      "expected": {"min_persons": 0, "expect_confirmation": true},
+      "notes": "来访人身份不确定——确认流程"
+    },
+    {
+      "id": "am-006", "layer": "ambiguous", "event_type": "meeting",
+      "input_text": "会上她提到下月初要出差，回来后对接供应商的事。她是我们的重要客户。",
+      "expected": {"min_persons": 0, "expect_confirmation": true},
+      "notes": "「她」无上下文人名 + 「月初」时间模糊"
+    },
+    {
+      "id": "am-007", "layer": "ambiguous", "event_type": "meeting",
+      "input_text": "两个都叫凌未寒的，一个是青梧科技的，一个是栖云数据的，今天来电的是其中之一，说的事和融资有关。",
+      "expected": {"min_persons": 1, "expect_confirmation": true},
+      "notes": "同名同人名+公司归属二选一"
+    },
+    {
+      "id": "am-008", "layer": "ambiguous", "event_type": "call",
+      "input_text": "转述：纪春生说有人答应给我们引荐投资人，但他也没说是谁承诺的。",
+      "expected": {"min_persons": 1, "expect_confirmation": true},
+      "notes": "第三方转述的模糊承诺——承诺主体不明"
+    },
+    {
+      "id": "am-009", "layer": "ambiguous", "event_type": "meeting",
+      "input_text": "和许总（PM）吃饭，聊到他之前在临江制造的经历。另有一个产品经理也姓许，经常搞混。",
+      "expected": {"min_persons": 1, "expect_confirmation": true},
+      "notes": "真实人名+职能词混合（prompt 边缘 case）——同名风险需确认"
+    },
+    {
+      "id": "am-010", "layer": "ambiguous", "event_type": "manual",
+      "input_text": "记一下：帮助下个月来华的那位冯总安排行程，具体是冯至远还是另一位冯总，等确认后补全。",
+      "expected": {"min_persons": 1, "expect_confirmation": true},
+      "notes": "待确认人脉 + 待补全信息——用户自标歧义"
+    }
+  ]
+}

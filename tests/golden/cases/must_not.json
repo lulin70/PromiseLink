@@ -1,0 +1,34 @@
+{
+  "cases": [
+    {
+      "id": "mn-001", "layer": "must_not", "event_type": "manual",
+      "input_text": "今天感冒了，头疼得厉害，下午请了半天假在家休息，什么工作都没做。",
+      "expected": {"min_persons": 0, "max_persons": 0},
+      "notes": "个人日志，无外部人脉"
+    },
+    {
+      "id": "mn-002", "layer": "must_not", "event_type": "manual",
+      "input_text": "读完了《置身事内》前三章，笔记整理中。这本书讲地方政府与经济发展的关系，后面写读书笔记。",
+      "expected": {"min_persons": 0, "max_persons": 0},
+      "notes": "读书笔记，作者名是公开出版物作者且未在商务语境出现"
+    },
+    {
+      "id": "mn-003", "layer": "must_not", "event_type": "meeting",
+      "input_text": "复盘这次架构评审：PM 建议砍需求，架构师坚持分层设计，测试要求补回归用例。各方立场都合理，下次再议。",
+      "expected": {"min_persons": 0, "max_persons": 0},
+      "notes": "纯职能词（PM/架构师/测试）——prompt 虚拟角色过滤规则的直接靶例"
+    },
+    {
+      "id": "mn-004", "layer": "must_not", "event_type": "manual",
+      "input_text": "今天通勤路上听了一期播客，讲大模型在客服场景的落地，记两个要点：先做意图分类再做生成；评测集比模型更重要。",
+      "expected": {"min_persons": 0, "max_persons": 0},
+      "notes": "内容学习笔记，无商务人脉"
+    },
+    {
+      "id": "mn-005", "layer": "must_not", "event_type": "manual",
+      "input_text": "整理通讯录，把三年没联系的旧号码标记归档，周末再做一批。",
+      "expected": {"min_persons": 0, "max_persons": 0},
+      "notes": "通讯录整理自述，无人名"
+    }
+  ]
+}
