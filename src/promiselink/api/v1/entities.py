@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import func, select
+from sqlalchemy import bindparam, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.api.dependencies import rate_limit_dependency
@@ -575,4 +575,75 @@ async def get_entity_history(
         todos=todos,
         associations=associations,
     )
+
+
+@router.get("/entities/{entity_id}/frequent-contacts")
+async def get_frequent_contacts(
+    entity_id: uuid.UUID,
+    session: AsyncSession = Depends(get_async_session),
+    user_id: str = Depends(get_current_user_id),
+) -> dict:
+    """W4 — list entities that co-occurred with this entity above the threshold.
+
+    Reads the ``Entity.properties['frequent_contact']`` marker written by
+    ``scan_frequent_contacts``. Returns 404 if the entity does not exist or
+    is owned by a different user.
+    """
+    new_request_id()
+
+    result = await session.execute(
+        select(Entity).where(
+            Entity.id == str(entity_id),
+            Entity.user_id == user_id,
+        )
+    )
+    entity = result.scalar_one_or_none()
+    if not entity:
+        raise NotFoundError("Entity not found")
+
+    import json
+
+    props = entity.properties or {}
+    if isinstance(props, str):
+        try:
+            props = json.loads(props) if props else {}
+        except Exception:
+            props = {}
+    marker = props.get("frequent_contact") if isinstance(props, dict) else None
+    if not marker:
+        return {
+            "entity_id": str(entity_id),
+            "frequent_contacts": [],
+            "window_days": None,
+            "count": 0,
+        }
+
+    partner_ids = [pid for pid in (marker.get("partners") or []) if pid]
+    if not partner_ids:
+        return {
+            "entity_id": str(entity_id),
+            "frequent_contacts": [],
+            "window_days": marker.get("window_days"),
+            "count": marker.get("count", 0),
+        }
+
+    rows = (
+        await session.execute(
+            text(
+                "SELECT id, name FROM entities WHERE user_id = :uid AND id IN :ids"
+            ).bindparams(bindparam("ids", expanding=True)),
+            {"uid": user_id, "ids": tuple(partner_ids)},
+        )
+    ).fetchall()
+
+    return {
+        "entity_id": str(entity_id),
+        "frequent_contacts": [
+            {"entity_id": str(r.id), "name": r.name} for r in rows
+        ],
+        "window_days": marker.get("window_days"),
+        "count": marker.get("count", 0),
+        "since": marker.get("since"),
+        "last_seen": marker.get("last_seen"),
+    }
 

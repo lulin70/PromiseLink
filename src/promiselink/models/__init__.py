@@ -2,6 +2,7 @@
 
 from promiselink.models.association import Association
 from promiselink.models.entity import Entity
+from promiselink.models.entity_correction import EntityCorrection
 from promiselink.models.event import Event
 from promiselink.models.relationship_brief import RelationshipBrief
 from promiselink.models.reminder import ReminderLog, ReminderPreference
@@ -15,6 +16,7 @@ from promiselink.models.todo import SnoozeSchedule, Todo
 __all__ = [
     "Event",
     "Entity",
+    "EntityCorrection",
     "Association",
     "RelationshipBrief",
     "Todo",

@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from promiselink.core.crypto import encrypt_pii_in_properties
 from promiselink.core.logging import get_logger
 from promiselink.models.entity import Entity
+from promiselink.services.synonym_dict import load_synonyms
 
 logger = get_logger("promiselink.entity_resolution")
 
@@ -69,6 +70,10 @@ class EntityResolutionEngine:
         auto_merge_threshold: float = 0.85,
         confirm_threshold: float = 0.70,
         llm_client: LLMProvider | LLMClient | None = None,
+        *,
+        person_synonyms: dict[str, list[str]] | None = None,
+        company_synonyms: dict[str, list[str]] | None = None,
+        difflib_cutoff: float = 0.80,
     ):
         self.session = session
         self.auto_merge_threshold = auto_merge_threshold
@@ -79,6 +84,34 @@ class EntityResolutionEngine:
         self._surname_index: dict[str, list[Entity]] = {}
         self._alias_index: dict[str, list[Entity]] = {}
         self._index_loaded = False
+        # W4: controlled synonym dictionaries (loaded once per resolution session).
+        self._person_synonyms = person_synonyms if person_synonyms is not None else {}
+        self._company_synonyms = company_synonyms if company_synonyms is not None else {}
+        self._synonym_dicts = (self._person_synonyms, self._company_synonyms)
+        # W4: difflib cutoff is configurable (NFR-W4-1; never write hard-coded).
+        self._difflib_cutoff = difflib_cutoff
+
+    def configure_synonyms(
+        self,
+        *,
+        person_synonyms: dict[str, list[str]] | None = None,
+        company_synonyms: dict[str, list[str]] | None = None,
+        difflib_cutoff: float | None = None,
+        synonym_dict_path: str | None = None,
+    ) -> None:
+        """Hot-swap controlled dictionaries (useful in tests)."""
+        if synonym_dict_path is not None:
+            person, company = load_synonyms(synonym_dict_path)
+            self._person_synonyms = person
+            self._company_synonyms = company
+        else:
+            if person_synonyms is not None:
+                self._person_synonyms = dict(person_synonyms)
+            if company_synonyms is not None:
+                self._company_synonyms = dict(company_synonyms)
+        self._synonym_dicts = (self._person_synonyms, self._company_synonyms)
+        if difflib_cutoff is not None:
+            self._difflib_cutoff = float(difflib_cutoff)
 
     def clear_index(self) -> None:
         """Release in-memory entity indexes.
@@ -143,10 +176,12 @@ class EntityResolutionEngine:
             logger.info("resolution_no_candidates", entity_name=new_entity_data.get("name"))
             return result
 
-        # Execute 4 deterministic steps in priority order
+        # Execute deterministic steps in priority order
         steps = [
             ("exact_match", self._step_exact),
             ("alias_match", self._step_alias),
+            ("synonym_match", self._step_synonym),
+            ("difflib_match", self._step_difflib_fuzzy),
             ("fuzzy_match", self._step_fuzzy),
             ("context_match", self._step_context),
         ]
@@ -527,16 +562,40 @@ class EntityResolutionEngine:
             return first_char
         return ""
 
+    # ── Step 2c: difflib 80% Cutoff (W4) ──
+
+    def _step_difflib_fuzzy(
+        self, new: dict[str, Any], existing: Entity
+    ) -> tuple[float, dict[str, Any]]:
+        """Step 2c: Stdlib difflib SequenceMatcher ratio against ``self._difflib_cutoff``.
+
+        Returns confidence 0.82 when ``ratio >= cutoff``. The value is
+        intentionally below ``auto_merge_threshold`` so difflib hits only
+        produce CONFIRM candidates (never MERGE).
+        """
+        from difflib import SequenceMatcher
+
+        new_name = (new.get("name") or "").strip()
+        existing_name = (existing.name or "").strip()
+        if not new_name or not existing_name:
+            return 0.0, {}
+        ratio = SequenceMatcher(None, new_name, existing_name).ratio()
+        if ratio >= self._difflib_cutoff:
+            return 0.82, {
+                "method": "difflib",
+                "name": round(ratio, 4),
+                "cutoff": self._difflib_cutoff,
+            }
+        return 0.0, {}
+
     # ── Step 3: Fuzzy Match ──
 
     def _step_fuzzy(
         self, new: dict[str, Any], existing: Entity
     ) -> tuple[float, dict[str, float]]:
         """Step 3: Fuzzy name match using rapidfuzz.
-
         Score = name_sim * 0.5 + company_sim * 0.3 + title_sim * 0.2
         Capped at 0.90 to prevent false merges.
-
         Returns:
             (confidence, matched_fields) tuple.
         """

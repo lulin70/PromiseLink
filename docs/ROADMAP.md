@@ -58,7 +58,7 @@
 
 | 编号 | 功能 | 借鉴来源 | 开发量 | 优先级 |
 |------|------|---------|--------|--------|
-| B4 | 实体规范化（同义词字典 + difflib 80% cutoff + 用户确认） | cognee Ontology | 1.5 周 | P0 |
+| B4 | 实体规范化（同义词字典 + difflib 80% cutoff + 用户确认） | cognee Ontology | 1.5 周 | P0 ✅ **2026-09-06 实现完成（W4）** |
 | B5 | SQLite recursive CTE 多跳查询（2-3 跳关系链） | — | 1 周 | P1 |
 | B6 | NetworkX 社区发现 + 中心性分析（内存计算） | cognee 图分析 | 1 周 | P1 |
 | B7 | RelationshipBrief 基于互动频率动态强化 | cognee memify | 0.5 周 | P2 |

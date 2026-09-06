@@ -14,6 +14,17 @@ All notable changes to PromiseLink will be documented in this file.
 - **G3 发布门禁 e2e**：`scripts/e2e/e2e_semantic_contract.py` 模拟真实用户录入两个事件（5 人会议纪要含同名歧义 + 结构化纪要），执行 5 项断言（E1 日志含 contract_version / E2 EntityProperties 校验 / E3 同名歧义纠偏入口可达 / E4 4 类详情页互跳 / E5 哈希字节级一致），2026-09-05 跑通 5/5 PASS，证据归档 [docs/e2e_evidence/semantic_contract_w1w2/](docs/e2e_evidence/semantic_contract_w1w2/)
 - 文档：[PRD](docs/spec/PRD_解析语义契约_v1.md) / [技术设计](docs/design/TECH_DESIGN_解析语义契约_v1.md) / [测试计划](docs/design/TEST_PLAN_解析语义契约_v1.md) / [规划](docs/planning/ONTOLOGY_SEMANTIC_CONTRACT_PLAN.md)（四项裁决已落档）
 
+### Added — 解析语义契约 W3 纠偏回流 + W4 实体规范化（2026-09-06）
+
+- **W3 纠偏回流（审计落地）**：`entity_corrections` 表 + `record_correction` 服务（5 类纠偏 × 8 action 审计行，原文经 `redact_pii_from_text` 5 类 PII 脱敏 + 日志键值白名单零原文）；`/events/{id}/correct` 5 类分支埋点 + 同事务原子性（rollback 时业务写入与审计一同回滚）；`cleanup_entity_corrections` 180 天清理 worker（24h 循环 + `_shutdown_event` 协同）；`GET /entity-corrections{,/aggregations}` 只读 API（聚合只返 4 元组 `{correction_type, action, count, last_seen}`，零原文 / 零候选 id）；`select_existing` 分支复用 `entity_merge_service.merge_entities` 统一迁移 todos/associations/vector_embeddings；前端 `EventCorrectResponse` 补齐 `promises_created` 与 `associations_updated` 字段
+- **W4 实体规范化（零自动合并硬边界）**：`synonym_dict.py` 双层（JSON 文件 + 代码种子 5 人 3 公司，正反向查询）；`EntityResolutionEngine` 在 `exact/alias/synonym/difflib/fuzzy/context` 6 步流水线中插入 `synonym_match`（0.97 命中 → CONFIRM）与 `difflib_match`（80% cutoff → 0.82 命中 → CONFIRM），两者均**低于 0.85 自动合并门槛**（数学上无法自动合并）；`frequent_contact_scanner` `LEAST/GREATEST` 无序配对聚合，3 次/90 天阈值写 `Entity.properties["frequent_contact"]`（零 schema 变更）；`Step10b_FrequentContactScan` 在 Step10/Step11 之间注册；`GET /entities/{id}/frequent-contacts` 读 marker
+- **配置可调**：`Settings.entity_correction_retention_days=180` / `synonym_dict_path="data/synonyms.json"` / `difflib_cutoff=0.80` / `co_occurrence_threshold=3` / `co_occurrence_window_days=90`（编码角色意见落实，避免硬编码）
+- **SQLite/PG 兼容修复**：record_correction 对 UUID 列在 SQLite 下回退 str；retention bulk-delete 加 `synchronize_session=False`；frequent_contact last_seen 字符串/日期类型自适应；`text(...).bindparams(bindparam("ids", expanding=True))` 替换 `IN :ids` tuple 绑定（SQLAlchemy 2.x 要求）
+- **测试**：W3 单元/集成 [tests/test_entity_correction_w3.py](tests/test_entity_correction_w3.py)（6 项 PASS：PII 脱敏 / 投影零原文 / 180d 清理 / 聚合隔离 / 同事务提交 / 同事务回滚）；W4 [tests/test_w4_semantic_contract.py](tests/test_w4_semantic_contract.py)（11 项 PASS：synonym 正反向 / load_synonyms 合并种子 / synonym_match 0.97 / difflib 0.82 / 零自动合并 / 3/90 触发 / 2 次不触发 / 91 天不触发 / 跨用户隔离 / Step10b 注册）
+- **G3 真实用户 e2e**：[scripts/e2e/e2e_w3_w4_real_user.py](scripts/e2e/e2e_w3_w4_real_user.py) 12 场景（事件录入 / 同名选择已有 / 创建新 / 忽略误识别 / 复合纠偏 / PII 脱敏 / 聚合隐私 / 同义词 / difflib / 2 次共现 / 91 天窗口 / 跨用户隔离）2026-09-06 跑通 12/12 PASS；每个场景使用独立文件 SQLite 实例，避免状态污染
+- 文档：[PRD](docs/spec/PRD_解析语义契约_W3W4_v1.md) / [技术设计](docs/design/TECH_DESIGN_解析语义契约_W3W4_v1.md) / [测试计划](docs/design/TEST_PLAN_解析语义契约_W3W4_v1.md)
+
+
 ## [1.0.1] - 2026-08-17
 
 ### Fixed — TodoResponse 承诺字段缺失 (2026-08-17)

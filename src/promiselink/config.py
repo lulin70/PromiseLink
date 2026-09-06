@@ -41,6 +41,17 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     app_edition: str = "basic"  # "basic" or "pro"
 
+    # ── W3/W4 Ontology 解析语义契约 ──
+    # W3: 纠偏回流保留天数（0 = 关闭 cleanup worker）
+    entity_correction_retention_days: int = 180
+    # W4: 同义词字典路径（首次启动从代码常量填充）
+    synonym_dict_path: str = "data/synonyms.json"
+    # W4: difflib 80% cutoff（可配置）
+    difflib_cutoff: float = 0.80
+    # W4: 共现阈值与窗口（可配置，父规划裁决④）
+    co_occurrence_threshold: int = 3
+    co_occurrence_window_days: int = 90
+
     # API
     api_host: str = "0.0.0.0"  # nosec B104 — container must bind all interfaces; port mapping controls exposure
     api_port: int = 8000

@@ -338,6 +338,8 @@ export interface EventCorrectResponse {
   promises_confirmed: number
   promises_ignored: number
   promises_modified: number
+  promises_created: number
+  associations_updated: number
 }
 
 export async function correctEvent(eventId: string, data: EventCorrectRequest): Promise<EventCorrectResponse> {
