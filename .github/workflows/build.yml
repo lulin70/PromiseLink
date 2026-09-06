@@ -184,9 +184,6 @@ jobs:
           target: /opt/promiselink-pro/website/downloads/
           strip_components: 0
           overwrite: true
-          command: |
-            # 直接上传 .dmg/.exe（不再有 zip，无需 unzip）
-            ls -lh /opt/promiselink-pro/website/downloads/
           timeout: 300s
 
       - name: Update download page on server
@@ -196,26 +193,23 @@ jobs:
           username: root
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: 22
-          command: |
+          timeout: 60s
+          script: |
             # Update download.html to point to local files (not GitHub CDN)
             WEBSITE=/opt/promiselink-pro/website
             VERSION=${{ steps.version.outputs.short_version }}
 
-            # Update macOS DMG link to local file
-            if [ -f $WEBSITE/downloads/PromiseLink-${VERSION}-mac.dmg ]; then
+            if [ -f "$WEBSITE/downloads/PromiseLink-${VERSION}-mac.dmg" ]; then
               sed -i "s|https://github.com/lulin70/PromiseLink/releases/download/v${VERSION}/PromiseLink-${VERSION}-mac.dmg|downloads/PromiseLink-${VERSION}-mac.dmg|g" \
-                $WEBSITE/download.html 2>/dev/null || true
+                "$WEBSITE/download.html" 2>/dev/null || true
               echo "macOS DMG link updated to local"
             fi
 
-            # Update Windows EXE link to local file (if .exe exists after unzip)
-            if [ -f $WEBSITE/downloads/PromiseLink-${VERSION}-windows.exe ]; then
+            if [ -f "$WEBSITE/downloads/PromiseLink-${VERSION}-windows.exe" ]; then
               sed -i "s|https://github.com/lulin70/PromiseLink/releases/download/v${VERSION}/PromiseLink-${VERSION}-windows.exe|downloads/PromiseLink-${VERSION}-windows.exe|g" \
-                $WEBSITE/download.html 2>/dev/null || true
+                "$WEBSITE/download.html" 2>/dev/null || true
               echo "Windows EXE link updated to local"
             fi
 
-            # Reload nginx to serve new static files
             nginx -t && nginx -s reload || echo "nginx reload skipped"
-            echo "=== Server downloads ===" && ls -lh $WEBSITE/downloads/
-          timeout: 60s
+            echo "=== Server downloads ===" && ls -lh "$WEBSITE/downloads/"
