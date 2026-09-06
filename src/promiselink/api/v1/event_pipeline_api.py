@@ -22,6 +22,8 @@ from promiselink.core.logging import get_logger, new_request_id
 from promiselink.database import get_async_session
 from promiselink.models import Association, Entity, Event
 from promiselink.models.todo import Todo as _Todo
+from promiselink.services.entity_correction_service import record_correction
+from promiselink.services.entity_merge_service import merge_entities
 from promiselink.services.event_processor import process_event_background
 
 logger = get_logger("promiselink.api.events")
@@ -372,15 +374,25 @@ async def correct_event(
             continue
 
         if ent_item.action == "select_existing" and ent_item.selected_entity_id:
-            # Mark extracted entity as merged, re-point todos to selected entity
-            extracted.status = "merged"
-            # Update todos that referenced the extracted entity
-            todo_update_result = await session.execute(
-                select(_Todo).where(_Todo.related_entity_id == ent_item.extracted_entity_id)
+            # Reuse the canonical merge path so todos, associations, and embeddings migrate atomically.
+            original_name = extracted.name
+            await merge_entities(
+                session,
+                user_id=user_id,
+                target_id=ent_item.selected_entity_id,
+                source_id=ent_item.extracted_entity_id,
             )
-            for todo in todo_update_result.scalars().all():
-                todo.related_entity_id = ent_item.selected_entity_id  # type: ignore[assignment]
             resp.entities_updated += 1
+            await record_correction(
+                session,
+                user_id=user_id,
+                event_id=str(event_id),
+                correction_type="entity",
+                action="select_existing",
+                entity_id=ent_item.extracted_entity_id,
+                original_canonical_name=original_name,
+                selected_entity_id=ent_item.selected_entity_id,
+            )
 
         elif ent_item.action == "create_new":
             # Update extracted entity with user-provided info
@@ -402,10 +414,29 @@ async def correct_event(
                 flag_modified(extracted, "properties")
             extracted.status = "confirmed"
             resp.entities_created += 1
+            await record_correction(
+                session,
+                user_id=user_id,
+                event_id=str(event_id),
+                correction_type="entity",
+                action="create_new",
+                entity_id=extracted.id and str(extracted.id),
+                original_canonical_name=extracted.name,
+                original_extracted_text=f"new_company={ent_item.new_company or ''}; new_title={ent_item.new_title or ''}",
+            )
 
         elif ent_item.action == "ignore":
             extracted.status = "deleted"
             resp.entities_ignored += 1
+            await record_correction(
+                session,
+                user_id=user_id,
+                event_id=str(event_id),
+                correction_type="entity",
+                action="ignore",
+                entity_id=extracted.id and str(extracted.id),
+                original_canonical_name=extracted.name,
+            )
 
     # ── 待办纠偏 ──
     for todo_item in request.corrected_todos:
@@ -495,6 +526,15 @@ async def correct_event(
             )
             session.add(new_promise)
             resp.promises_created += 1
+            await record_correction(
+                session,
+                user_id=user_id,
+                event_id=str(event_id),
+                correction_type="promise",
+                action="add",
+                entity_id=beneficiary_id or promisor_id,
+                original_extracted_text=prom_item.content,
+            )
             continue
 
         prom_result = await session.execute(
@@ -510,11 +550,29 @@ async def correct_event(
         if prom_item.action == "confirm":
             promise.confirmation_status = "confirmed"
             resp.promises_confirmed += 1
+            await record_correction(
+                session,
+                user_id=user_id,
+                event_id=str(event_id),
+                correction_type="promise",
+                action="confirm",
+                entity_id=promise.related_entity_id and str(promise.related_entity_id),
+                original_extracted_text=promise.description,
+            )
 
         elif prom_item.action == "ignore":
             promise.confirmation_status = "rejected"
             promise.status = "dismissed"
             resp.promises_ignored += 1
+            await record_correction(
+                session,
+                user_id=user_id,
+                event_id=str(event_id),
+                correction_type="promise",
+                action="ignore",
+                entity_id=promise.related_entity_id and str(promise.related_entity_id),
+                original_extracted_text=promise.description,
+            )
 
         elif prom_item.action == "modify":
             if prom_item.content is not None:
@@ -525,6 +583,15 @@ async def correct_event(
                 promise.action_type = prom_item.promise_type
             promise.confirmation_status = "confirmed"
             resp.promises_modified += 1
+            await record_correction(
+                session,
+                user_id=user_id,
+                event_id=str(event_id),
+                correction_type="promise",
+                action="modify",
+                entity_id=promise.related_entity_id and str(promise.related_entity_id),
+                original_extracted_text=promise.description,
+            )
 
     # ── 关系纠偏 ──
     for assoc_item in request.corrected_associations:
@@ -545,9 +612,25 @@ async def correct_event(
             if assoc_item.strength is not None:
                 assoc.strength = assoc_item.strength
             resp.associations_updated += 1
+            await record_correction(
+                session,
+                user_id=user_id,
+                event_id=str(event_id),
+                correction_type="association",
+                action="modify",
+                entity_id=assoc_item.source_entity_id,
+            )
         elif assoc_item.action == "delete":
             await session.delete(assoc)
             resp.associations_updated += 1
+            await record_correction(
+                session,
+                user_id=user_id,
+                event_id=str(event_id),
+                correction_type="association",
+                action="delete",
+                entity_id=assoc_item.source_entity_id,
+            )
 
     await session.commit()
 

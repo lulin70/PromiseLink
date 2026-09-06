@@ -87,6 +87,43 @@ async def _scheduled_event_maintenance() -> None:
             pass  # Normal: continue loop
 
 
+async def _entity_correction_retention_maintenance() -> None:
+    """Background task: enforce 180-day retention on entity_corrections (W3).
+
+    Runs every 24 hours. First run after 60 seconds delay. Shares the
+    global _shutdown_event with the scheduled_event worker so SIGTERM
+    cleanly stops both.
+    """
+    import structlog
+
+    logger = structlog.get_logger()
+    await asyncio.sleep(60)  # let app fully start
+
+    # Reload settings each loop so test overrides (retention_days=0) take effect.
+    while not _shutdown_event.is_set():
+        try:
+            from promiselink.config import get_settings
+            from promiselink.database import AsyncSessionLocal
+            from promiselink.services.entity_correction_retention import (
+                cleanup_entity_corrections,
+            )
+
+            current_settings = get_settings()
+            retention_days = int(current_settings.entity_correction_retention_days)
+            if retention_days > 0:
+                async with AsyncSessionLocal() as session:
+                    await cleanup_entity_corrections(session, retention_days=retention_days)
+        except Exception as exc:  # Startup/shutdown — keep broad catch for resilience
+            logger.error("correction_retention_error", error=str(exc))
+
+        # 24h loop, or until shutdown
+        try:
+            await asyncio.wait_for(_shutdown_event.wait(), timeout=86400)
+            break
+        except TimeoutError:
+            pass
+
+
 async def _pair_auto_poll() -> None:
     """Background task: automatically poll gateway pair status and activate when matched.
 
@@ -533,6 +570,17 @@ app.include_router(reminders.router, prefix=settings.api_prefix, tags=["Reminder
 app.include_router(scheduled_events.router, prefix=settings.api_prefix, tags=["ScheduledEvents"])
 app.include_router(privacy.router, prefix=settings.api_prefix, tags=["Privacy"])
 app.include_router(pair.router, prefix=settings.api_prefix, tags=["Pairing"])
+
+# W3 EntityCorrections — explicit import after the main import block to avoid
+# the api/v1/__init__.py ↔ main.py import cycle (entity_corrections is exported
+# by api.v1 but is not in the top-level star import above).
+from promiselink.api.v1 import entity_corrections as _entity_corrections_router
+
+app.include_router(
+    _entity_corrections_router.router,
+    prefix=settings.api_prefix,
+    tags=["EntityCorrections"],
+)
 
 # Pro-only routes (voice/media/email_sync/wechat_forward/import_csv)
 # have been migrated to the PromiseLink-Pro repository.

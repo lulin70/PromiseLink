@@ -11,6 +11,7 @@ Execution order (sequential Step01 → Step13):
   Step08 — Notification
   Step09 — Memory storage
   Step10 — Association discovery
+  Step10b — Frequent contact scan (W4, configurable 3 hits / 90 days)
   Step11 — Association → Todo generation
   Step12 — Relationship brief update
   Step13 — Mark event as completed
@@ -31,6 +32,7 @@ from promiselink.services.steps.step_07_priority import Step07_PriorityScoring
 from promiselink.services.steps.step_08_notification import Step08_Notification
 from promiselink.services.steps.step_09_memory import Step09_MemoryStorage
 from promiselink.services.steps.step_10_association import Step10_AssociationDiscovery
+from promiselink.services.steps.step_10b_frequent_contact import Step10b_FrequentContactScan
 from promiselink.services.steps.step_11_assoc_todos import Step11_AssociationTodos
 from promiselink.services.steps.step_12_brief import Step12_RelationshipBriefUpdate
 from promiselink.services.steps.step_13_complete import Step13_CompleteEvent
@@ -48,6 +50,7 @@ __all__ = [
     "Step08_Notification",
     "Step09_MemoryStorage",
     "Step10_AssociationDiscovery",
+    "Step10b_FrequentContactScan",
     "Step11_AssociationTodos",
     "Step12_RelationshipBriefUpdate",
     "Step13_CompleteEvent",

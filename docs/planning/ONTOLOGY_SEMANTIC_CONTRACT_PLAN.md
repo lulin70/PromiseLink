@@ -1,8 +1,8 @@
 # PromiseLink 解析语义契约（Ontology 化）后期规划
 
 > **版本**: v1.0
-> **日期**: 2026-09-05
-> **状态**: DevSquad 七角色共识达成，待用户裁决排期
+> **日期**: 2026-09-05（v1.0）；2026-09-06 W3+W4 实现已交付
+> **状态**: DevSquad 七角色共识达成；W1+W2 已落档（commit 8bf08f6 / f576a06），W3+W4 已完成实现（2026-09-06，CHANGELOG [Unreleased]）
 > **评审方式**: DevSquad 多角色协作（架构师/PM/安全/测试/编码/运维/UI，宿主 LLM 执行）
 > **关联文档**: [ROADMAP.md](../ROADMAP.md)（B4/L4 合流）、[TECH_DEBT.md](../TECH_DEBT.md)、[PRD_v1.md](spec/PRD_v1.md)
 

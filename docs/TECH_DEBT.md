@@ -296,6 +296,22 @@
 - **后续建议**：如需彻底修复路由设计（替代方案），可调整路由优先级或为 catch_all 添加 GET 处理，但当前方案简单有效且符合 HTTP 标准
 - **关联**：2026-08-03 DevSquad 7 角色上线就绪性评审 + [2026-08-03_PromiseLink_7Role_Launch_Readiness_Review.md](review/2026-08-03_PromiseLink_7Role_Launch_Readiness_Review.md)
 
+### TD-B16: W3+W4 真实用户 e2e 经验（2026-09-06）✅ RESOLVED
+
+- **状态**：RESOLVED (2026-09-06)
+- **描述**：执行 W3/W4 G3 发布门禁 e2e（scripts/e2e/e2e_w3_w4_real_user.py）模拟真实用户纠偏回流与实体规范化，发现 4 类工程问题，均已修复：
+  1. **SQLite UUID 绑定不兼容**：`entity_correction_service.record_correction` 把 `uuid.UUID` 直接 bind 到 `String(36)` 列触发 `type 'UUID' is not supported`。修复：`_uid()` helper 在 `IS_SQLITE` 时返回 `str(uuid.UUID(value))`，PostgreSQL 保留 `uuid.UUID` 提升类型安全。
+  2. **`text(... IN :ids)` tuple 绑定失败**：SQLAlchemy 2.x 需显式 `bindparam("ids", expanding=True)`，否则 SQL 渲染为 `IN ?` 而非 `IN (?, ?, ?)`。修复：`frequent_contact_scanner` + `entities.frequent_contacts` 两处添加 expanding。
+  3. **`r.last_seen.isoformat()` 在 SQLite 抛 AttributeError**：SQLite `MAX(timestamp)` 返回字符串、PostgreSQL 返回 datetime。修复：`_iso_or_none()` 适配两种类型；`entity_corrections.aggregations` 同样加 isinstance 守卫。
+  4. **bulk-delete 后再次 evaluate 触发 offset-naive/aware 报错**：`cleanup_entity_corrections` 加 `execution_options(synchronize_session=False)`。
+- **关联**：[scripts/e2e/e2e_w3_w4_real_user.py](../scripts/e2e/e2e_w3_w4_real_user.py) / [tests/test_entity_correction_w3.py](../tests/test_entity_correction_w3.py) / [tests/test_w4_semantic_contract.py](../tests/test_w4_semantic_contract.py) / [CHANGELOG.md](../CHANGELOG.md) [Unreleased]
+- **教训**：
+  - L-V4-W3W4-001：跨 dialect 适配在 `_uid` helper 内集中处理，避免在每一处 `record_correction` 重复分支
+  - L-V4-W3W4-002：原生 SQL `IN :ids` 永远要 `.bindparams(bindparam(..., expanding=True))`，SQLAlchemy 2.x 强约束
+  - L-V4-W3W4-003：e2e 多场景必须独立 DB（每场景文件 SQLite + `unlink(missing_ok=True)`），共享 in-memory 会因 ORM identity map / 失败回滚跨场景污染
+  - L-V4-W3W4-004：`MAX(timestamp)` 跨 dialect 返回类型不同，序列化函数需 typeof 兜底
+  - L-V4-W3W4-005：业务集成测试要把业务代码与 fixture 在 SQLite 上真实跑一遍 —— 仅 type-checker 通过不等于运行时通过（4 个 latent bug 全部由 e2e 在 SQLite 路径上抓到）
+
 ---
 
 ## 4. 变更历史
