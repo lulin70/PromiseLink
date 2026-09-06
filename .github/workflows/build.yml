@@ -182,7 +182,7 @@ jobs:
           port: 22
           source: artifacts/*
           target: /opt/promiselink-pro/website/downloads/
-          strip_components: 0
+          strip_components: 1
           overwrite: true
           timeout: 300s
 
