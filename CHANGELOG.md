@@ -2,6 +2,12 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [1.0.5] - 2026-09-06
+
+### Fixed — 发布产物落盘路径
+
+- 修正服务器部署工作流的 SCP 路径剥离配置，确保 macOS DMG 与 Windows EXE 直接落在网站 `downloads/` 目录，下载页可正确引用。
+
 ## [Unreleased]
 
 ### Added — 解析语义契约 W1+W2（2026-09-05， Ontology 语义契约规划）
