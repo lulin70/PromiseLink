@@ -7,6 +7,8 @@ All notable changes to PromiseLink will be documented in this file.
 ### Fixed — 发布产物落盘路径
 
 - 修正服务器部署工作流的 SCP 路径剥离配置，确保 macOS DMG 与 Windows EXE 直接落在网站 `downloads/` 目录，下载页可正确引用。
+- 发布验证：GitHub Actions run [34033889946](https://github.com/lulin70/PromiseLink/actions/runs/34033889946) 中 macOS 构建、Windows 构建、GitHub Release 资产上传、SCP 上传和 SSH 下载页更新全部成功；服务器已确认存在 `PromiseLink-1.0.5-mac.dmg` 与 `PromiseLink-1.0.5-windows.exe`。
+- 服务器当前未安装 nginx，工作流按预期输出 `nginx reload skipped`；这不影响静态文件上传和下载页链接更新。
 
 ## [Unreleased]
 
