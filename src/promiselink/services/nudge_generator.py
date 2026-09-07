@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from promiselink.config import Settings
 from promiselink.models.entity import Entity
 from promiselink.models.todo import Todo
-from promiselink.services.llm_client import LLMClient
+from promiselink.services.llm_client import create_llm_client
 
 # Beijing timezone
 _TZ_CN = timezone(timedelta(hours=8))
@@ -87,7 +87,7 @@ async def generate_gentle_nudge(
 
     # Try LLM generation with fallback to template
     try:
-        llm = LLMClient(config)
+        llm = create_llm_client(config)
         message = await llm.generate(prompt, max_tokens=100)
         if message and len(message.strip()) > 5:
             return message.strip()[:120] + " — via PromiseLink"  # Cap at 120 chars + branding

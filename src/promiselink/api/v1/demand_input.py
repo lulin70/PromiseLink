@@ -23,7 +23,7 @@ from promiselink.core.text_utils import sanitize_llm_input
 from promiselink.database import get_async_session
 from promiselink.models.entity import Entity
 from promiselink.models.event import Event
-from promiselink.services.llm_client import LLMClient
+from promiselink.services.llm_client import create_llm_client
 
 logger = get_logger("promiselink.api.demand_input")
 router = APIRouter(dependencies=[Depends(rate_limit_llm_dependency)])
@@ -246,7 +246,7 @@ async def create_demand(
 async def _extract_demand(text: str) -> dict:
     """Extract demand info from text using LLM, with keyword fallback."""
     try:
-        llm_client = LLMClient(config=settings)
+        llm_client = create_llm_client(settings)
         prompt = _DEMAND_EXTRACTION_PROMPT.format(text=sanitize_llm_input(text))
         result = await llm_client.call_json(prompt, max_tokens=200, temperature=0.1)
 

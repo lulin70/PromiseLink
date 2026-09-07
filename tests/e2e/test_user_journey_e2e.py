@@ -569,7 +569,7 @@ class TestFirstEventInputAndAIParsing:
         # 2. 直接调用 Pipeline（FakeLLMClient + mock 外部依赖）
         fake_llm = FakeLLMClient()
         with patch(
-            "promiselink.services.event_pipeline.LLMClient", return_value=fake_llm
+            "promiselink.services.event_pipeline.create_llm_client", return_value=fake_llm
         ), _patch_non_llm_externals():
             result = await process_event_with_short_transactions(event_id)
 

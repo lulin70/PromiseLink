@@ -146,8 +146,8 @@ if event_id:
         status, data = api_call("GET", f"/events/{event_id}")
         if status == 200:
             ev_status = data.get("status")
-            if ev_status == "completed":
-                log_ok("管道处理完成 (status=completed)")
+            if ev_status in ("completed", "degraded_completed"):
+                log_ok(f"管道处理完成 (status={ev_status})")
                 pipeline_ok = True
                 break
             elif ev_status == "failed":

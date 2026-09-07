@@ -447,3 +447,88 @@ class LLMClient:
         at app shutdown instead.
         """
         pass
+
+
+class MockLLMClient(LLMClient):
+    """Deterministic offline LLM client (``llm_provider="mock"``).
+
+    Purpose: CI e2e gates and offline demo mode. This is NOT real NLP —
+    extraction prompts return a fixed demo person (张总) so entity-dependent
+    end-to-end assertions have stable data; every other prompt returns an
+    empty JSON object, which makes LLM-dependent steps degrade exactly the
+    way they do on LLM failure (non-critical warnings).
+
+    Subclasses :class:`LLMClient` for type compatibility at every injection
+    point; overrides all network-touching methods — no HTTP is ever made.
+    """
+
+    def __init__(self, config: Settings | None = None) -> None:
+        self.provider = "mock"
+
+    async def call(
+        self,
+        prompt: str,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> str:
+        """Return the mock response as a JSON string."""
+        return json.dumps(self._mock_response(prompt), ensure_ascii=False)
+
+    async def call_json(
+        self,
+        prompt: str,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> dict[str, Any]:
+        """Return the mock response as a parsed dict."""
+        return self._mock_response(prompt)
+
+    async def generate(self, prompt: str, max_tokens: int = 10) -> str:
+        """Return a fixed offline-mode notice (nudge generator falls back)."""
+        return "离线演示模式（mock LLM）"
+
+    async def close(self) -> None:
+        """No resources held — no-op."""
+        pass
+
+    @staticmethod
+    def _mock_response(prompt: str) -> dict[str, Any]:
+        """Deterministic response keyed by prompt template markers."""
+        # EntityExtractor conversation / card extraction templates.
+        if "商务交流信息提取" in prompt or "名片信息提取" in prompt:
+            return {
+                "persons": [
+                    {
+                        "name": "张总",
+                        "company": None,
+                        "title": None,
+                        "city": None,
+                        "industry": None,
+                        "schools": [],
+                        "tech_stack": [],
+                        "work_history": [],
+                        "resource": [],
+                        "demand": [],
+                        "concern": [],
+                        "capability": [],
+                    }
+                ],
+                "keywords": [],
+                "summary": "",
+                "events": [],
+                "is_ai_inference": False,
+                "confidence_level": "confirmed",
+                "requires_confirmation": False,
+            }
+        return {}
+
+
+def create_llm_client(settings: Settings) -> LLMClient | MockLLMClient:
+    """Select the LLM client implementation from ``settings.llm_provider``.
+
+    ``"mock"`` returns the deterministic offline client; anything else
+    constructs the real API client.
+    """
+    if settings.llm_provider == "mock":
+        return MockLLMClient(settings)
+    return LLMClient(config=settings)

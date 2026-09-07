@@ -195,7 +195,7 @@ class TestProcessEventPipeline:
         fake_event_id = str(uuid.uuid4())
 
         with patch("promiselink.database.AsyncSessionLocal", session_factory), \
-             patch("promiselink.services.event_pipeline.LLMClient") as mock_llm_cls, \
+             patch("promiselink.services.event_pipeline.create_llm_client") as mock_llm_cls, \
              patch("promiselink.services.event_pipeline.create_memory_provider"):
 
             mock_llm = AsyncMock()
@@ -226,7 +226,7 @@ class TestProcessEventPipeline:
         await session.commit()
 
         with patch("promiselink.database.AsyncSessionLocal", session_factory), \
-             patch("promiselink.services.event_pipeline.LLMClient") as mock_llm_cls, \
+             patch("promiselink.services.event_pipeline.create_llm_client") as mock_llm_cls, \
              patch("promiselink.services.event_pipeline.create_memory_provider"):
 
             mock_llm = AsyncMock()
@@ -272,7 +272,7 @@ class TestProcessEventPipeline:
         mocks["extraction"].persisted_entities = [mock_entity]
 
         with patch("promiselink.database.AsyncSessionLocal", session_factory), \
-             patch("promiselink.services.event_pipeline.LLMClient", return_value=mocks["llm"]), \
+             patch("promiselink.services.event_pipeline.create_llm_client", return_value=mocks["llm"]), \
              patch("promiselink.services.event_pipeline.create_memory_provider", return_value=mocks["memory"]), \
              patch("promiselink.services.input_scope_classifier.InputScopeClassifier", return_value=mocks["scope"]), \
              patch("promiselink.services.entity_extractor.EntityExtractor", return_value=mocks["extractor"]), \
@@ -326,7 +326,7 @@ class TestProcessEventPipeline:
         mocks["generator"].generate_todos = AsyncMock(return_value=[todo])
 
         with patch("promiselink.database.AsyncSessionLocal", session_factory), \
-             patch("promiselink.services.event_pipeline.LLMClient", return_value=mocks["llm"]), \
+             patch("promiselink.services.event_pipeline.create_llm_client", return_value=mocks["llm"]), \
              patch("promiselink.services.event_pipeline.create_memory_provider", return_value=mocks["memory"]), \
              patch("promiselink.services.input_scope_classifier.InputScopeClassifier", return_value=mocks["scope"]), \
              patch("promiselink.services.entity_extractor.EntityExtractor", return_value=mocks["extractor"]), \
@@ -372,7 +372,7 @@ class TestProcessEventPipeline:
         mock_memory.store_raw = AsyncMock(return_value=None)
 
         with patch("promiselink.database.AsyncSessionLocal", session_factory), \
-             patch("promiselink.services.event_pipeline.LLMClient", return_value=mock_llm), \
+             patch("promiselink.services.event_pipeline.create_llm_client", return_value=mock_llm), \
              patch("promiselink.services.event_pipeline.create_memory_provider", return_value=mock_memory), \
              patch("promiselink.services.input_scope_classifier.InputScopeClassifier", return_value=mock_scope):
 
@@ -414,7 +414,7 @@ class TestProcessEventPipeline:
         mocks["generator"].generate_todos = AsyncMock(return_value=[])
 
         with patch("promiselink.database.AsyncSessionLocal", session_factory), \
-             patch("promiselink.services.event_pipeline.LLMClient", return_value=mocks["llm"]), \
+             patch("promiselink.services.event_pipeline.create_llm_client", return_value=mocks["llm"]), \
              patch("promiselink.services.event_pipeline.create_memory_provider", return_value=mocks["memory"]), \
              patch("promiselink.services.input_scope_classifier.InputScopeClassifier", return_value=mocks["scope"]), \
              patch("promiselink.services.entity_extractor.EntityExtractor", return_value=mocks["extractor"]), \
@@ -466,7 +466,7 @@ class TestProcessEventPipeline:
         mocks["extraction"].persisted_entities = [mock_entity]
 
         with patch("promiselink.database.AsyncSessionLocal", session_factory), \
-             patch("promiselink.services.event_pipeline.LLMClient", return_value=mocks["llm"]), \
+             patch("promiselink.services.event_pipeline.create_llm_client", return_value=mocks["llm"]), \
              patch("promiselink.services.event_pipeline.create_memory_provider", return_value=mocks["memory"]), \
              patch("promiselink.services.input_scope_classifier.InputScopeClassifier", return_value=mocks["scope"]), \
              patch("promiselink.services.entity_extractor.EntityExtractor", return_value=mocks["extractor"]), \
@@ -506,7 +506,7 @@ class TestProcessEventPipeline:
         mocks = _pipeline_mocks()
 
         with patch("promiselink.database.AsyncSessionLocal", session_factory), \
-             patch("promiselink.services.event_pipeline.LLMClient", return_value=mocks["llm"]), \
+             patch("promiselink.services.event_pipeline.create_llm_client", return_value=mocks["llm"]), \
              patch("promiselink.services.event_pipeline.create_memory_provider", return_value=mocks["memory"]), \
              patch("promiselink.services.input_scope_classifier.InputScopeClassifier", return_value=mocks["scope"]), \
              patch("promiselink.services.entity_extractor.EntityExtractor", return_value=mocks["extractor"]), \
@@ -549,7 +549,7 @@ class TestProcessEventPipeline:
         )
 
         with patch("promiselink.database.AsyncSessionLocal", session_factory), \
-             patch("promiselink.services.event_pipeline.LLMClient", return_value=mocks["llm"]), \
+             patch("promiselink.services.event_pipeline.create_llm_client", return_value=mocks["llm"]), \
              patch("promiselink.services.event_pipeline.create_memory_provider", return_value=mocks["memory"]), \
              patch("promiselink.services.input_scope_classifier.InputScopeClassifier", return_value=mocks["scope"]), \
              patch("promiselink.services.entity_extractor.EntityExtractor", return_value=mocks["extractor"]), \
@@ -603,7 +603,7 @@ class TestProcessEventPipeline:
         mocks["extraction"].persisted_entities = [mock_entity]
 
         with patch("promiselink.database.AsyncSessionLocal", session_factory), \
-             patch("promiselink.services.event_pipeline.LLMClient", return_value=mocks["llm"]), \
+             patch("promiselink.services.event_pipeline.create_llm_client", return_value=mocks["llm"]), \
              patch("promiselink.services.event_pipeline.create_memory_provider", return_value=mocks["memory"]), \
              patch("promiselink.services.input_scope_classifier.InputScopeClassifier", return_value=mocks["scope"]), \
              patch("promiselink.services.entity_extractor.EntityExtractor", return_value=mocks["extractor"]), \

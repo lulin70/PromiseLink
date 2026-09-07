@@ -91,7 +91,7 @@ class TestGenerateGentleNudgeSuccess:
 
         mock_llm = MagicMock()
         mock_llm.generate = AsyncMock(return_value="张总，之前的技术方案进展如何？")
-        with patch("promiselink.services.nudge_generator.LLMClient", return_value=mock_llm):
+        with patch("promiselink.services.nudge_generator.create_llm_client", return_value=mock_llm):
             result = await generate_gentle_nudge(db_session, todo, config=MagicMock())
 
         assert "张总" in result
@@ -114,7 +114,7 @@ class TestGenerateGentleNudgeSuccess:
         long_message = "这是一段非常长的催促消息" * 30  # > 120 chars
         mock_llm = MagicMock()
         mock_llm.generate = AsyncMock(return_value=long_message)
-        with patch("promiselink.services.nudge_generator.LLMClient", return_value=mock_llm):
+        with patch("promiselink.services.nudge_generator.create_llm_client", return_value=mock_llm):
             result = await generate_gentle_nudge(db_session, todo, config=MagicMock())
 
         # Message body capped at 120 + " — via PromiseLink" suffix
@@ -146,7 +146,7 @@ class TestGenerateGentleNudgeFallback:
 
         mock_llm = MagicMock()
         mock_llm.generate = AsyncMock(side_effect=Exception("LLM API timeout"))
-        with patch("promiselink.services.nudge_generator.LLMClient", return_value=mock_llm):
+        with patch("promiselink.services.nudge_generator.create_llm_client", return_value=mock_llm):
             result = await generate_gentle_nudge(db_session, todo, config=MagicMock())
 
         assert "王总" in result
@@ -168,7 +168,7 @@ class TestGenerateGentleNudgeFallback:
 
         mock_llm = MagicMock()
         mock_llm.generate = AsyncMock(return_value="ok")  # <5 chars
-        with patch("promiselink.services.nudge_generator.LLMClient", return_value=mock_llm):
+        with patch("promiselink.services.nudge_generator.create_llm_client", return_value=mock_llm):
             result = await generate_gentle_nudge(db_session, todo, config=MagicMock())
 
         assert "赵总" in result
@@ -189,7 +189,7 @@ class TestGenerateGentleNudgeFallback:
 
         mock_llm = MagicMock()
         mock_llm.generate = AsyncMock(return_value="   \n  ")
-        with patch("promiselink.services.nudge_generator.LLMClient", return_value=mock_llm):
+        with patch("promiselink.services.nudge_generator.create_llm_client", return_value=mock_llm):
             result = await generate_gentle_nudge(db_session, todo, config=MagicMock())
 
         assert "钱总" in result
@@ -214,7 +214,7 @@ class TestGenerateGentleNudgeEntityLookup:
 
         mock_llm = MagicMock()
         mock_llm.generate = AsyncMock(side_effect=Exception("force fallback"))
-        with patch("promiselink.services.nudge_generator.LLMClient", return_value=mock_llm):
+        with patch("promiselink.services.nudge_generator.create_llm_client", return_value=mock_llm):
             result = await generate_gentle_nudge(db_session, todo, config=MagicMock())
 
         assert "对方" in result
@@ -229,7 +229,7 @@ class TestGenerateGentleNudgeEntityLookup:
 
         mock_llm = MagicMock()
         mock_llm.generate = AsyncMock(side_effect=Exception("force fallback"))
-        with patch("promiselink.services.nudge_generator.LLMClient", return_value=mock_llm):
+        with patch("promiselink.services.nudge_generator.create_llm_client", return_value=mock_llm):
             result = await generate_gentle_nudge(db_session, todo, config=MagicMock())
 
         assert "对方" in result
@@ -266,7 +266,7 @@ class TestGenerateGentleNudgeOverdueDays:
 
         mock_llm = MagicMock()
         mock_llm.generate = _capture_prompt
-        with patch("promiselink.services.nudge_generator.LLMClient", return_value=mock_llm):
+        with patch("promiselink.services.nudge_generator.create_llm_client", return_value=mock_llm):
             await generate_gentle_nudge(db_session, todo, config=MagicMock())
 
         assert len(captured_prompt) == 1
@@ -301,7 +301,7 @@ class TestGenerateGentleNudgeOverdueDays:
 
         mock_llm = MagicMock()
         mock_llm.generate = _capture
-        with patch("promiselink.services.nudge_generator.LLMClient", return_value=mock_llm):
+        with patch("promiselink.services.nudge_generator.create_llm_client", return_value=mock_llm):
             await generate_gentle_nudge(db_session, todo, config=MagicMock())
 
         assert "距今已过: 0天" in captured_prompt[0]

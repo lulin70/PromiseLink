@@ -160,7 +160,7 @@ def _full_pipeline_patches(session_factory, mocks: dict) -> list:
         # Real DB session factory used by all steps
         "promiselink.database.AsyncSessionLocal",
         # Shared orchestrator services
-        "promiselink.services.event_pipeline.LLMClient",
+        "promiselink.services.event_pipeline.create_llm_client",
         "promiselink.services.event_pipeline.create_memory_provider",
         # Step01: InputScopeClassifier
         "promiselink.services.input_scope_classifier.InputScopeClassifier",

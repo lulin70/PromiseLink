@@ -1374,7 +1374,7 @@ class TestMiniappDemandInputLink:
         Scenario: 小程序 createDemand 提交一句话需求
         Expected: 返回 demand_id, DB 中创建 Entity（orphan_demand 或关联已有）
         """
-        with patch("promiselink.api.v1.demand_input.LLMClient") as mock_llm_cls:
+        with patch("promiselink.api.v1.demand_input.create_llm_client") as mock_llm_cls:
             mock_client = AsyncMock()
             mock_client.call_json = AsyncMock(
                 return_value={"tag": "融资", "detail": "需要融资", "person_name": None}
