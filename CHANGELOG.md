@@ -2,6 +2,20 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [1.0.6] - 2026-09-07
+
+### Fixed — CI 质量门禁恢复 + W3/W4 潜伏缺陷修复
+
+CI `test (3.11)` 作业自 2026-09-03 起在 mypy 阶段失败，导致 pytest 全量回归在 CI 从未执行，W3/W4 合并时的 15 个新单测只被 collect、从未真正运行。本版本让 CI 重新跑绿，并修复真实执行暴露的缺陷：
+
+- **mypy 0 错误**：修复 12 个类型错误（`entity_resolution` / `entity_correction_service` / `entity_correction_retention` / `frequent_contact_scanner` / `embedding_provider` / `event_pipeline_api`），`record_correction.entity_id` 参数拓宽为 `str | UUID | None`。
+- **`_step_synonym` 缺失方法（严重）**：`EntityResolutionEngine` 六步管线引用了从未定义的 `_step_synonym`，任何有候选者的 `resolve()` 调用都会抛 `AttributeError`。已按契约实现（置信度 0.97、CONFIRM-only、不自动合并），并将同义词步骤置于 alias 敬语匹配之前（受控字典是更强信号）。
+- **W4 规范化零自动合并硬边界**：`synonym_match` / `difflib_match` 在 `resolve()` 循环中标记为 confirm-only，置信度再高也不触发自动合并。
+- **W4 高频联系人在生产不可达（设计缺陷）**：关联发现按无序对规范化 + 唯一约束保证每对实体只有一行 co_occurrence，而扫描器按 `COUNT(DISTINCT e.id) ≥ 3` 设计——生产中每对最多计 1 次，阈值永远达不到。修复：重复共现改为**更新既有行**（`properties.evidence.shared_event_ids` 累积 + `last_interaction` 刷新），扫描器改为 Python 侧按窗口计数（SQLite/PostgreSQL 可移植，无方言 JSON SQL）。此前单测/e2e 用生产不可能产生的"反向边"数据自我验证通过，属测试诚实性缺陷，已一并修正（测试数据模型与生产对齐，e2e W4-01/02 改走真实 `resolve()` 公开路径）。
+- **Step10b 管线注册清单**：`_PIPELINE_STEPS` 补录 `Step10b_FrequentContactScan`。
+- **EntityCorrection SQLite 绑定**：`record_correction` 主键改为方言感知生成（此前 `id=uuid.uuid4()` 在 SQLite String(36) 列绑定 UUID 对象直接失败，12 个纠偏 API 覆盖测试潜伏失败）。
+- 验证：mypy 125 文件 0 错误；ruff 0；W3/W4 单测 15/15；关联/管线回归 109 用例 0 failed；真实用户 e2e 12/12 PASS（W4-01 `synonym_match` 0.97 CONFIRM、W4-02 `difflib_match` 0.82 CONFIRM 均经真实 `resolve()` 验证）。
+
 ## [1.0.5] - 2026-09-06
 
 ### Fixed — 发布产物落盘路径

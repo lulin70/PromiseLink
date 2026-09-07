@@ -86,7 +86,7 @@ class EmbeddingProvider:
         self._settings = settings or get_settings()
         self._provider = self._settings.embedding_provider  # "local" or "api"
         self._model = self._settings.embedding_model
-        self._client = None
+        self._client: AsyncOpenAI | None = None
         # 2026-08-26: build AsyncOpenAI client lazily via embed()/embed_batch()
         # so an empty llm_api_key (test env / CI) does NOT raise OpenAIError
         # at construction time. The client is created on first use and

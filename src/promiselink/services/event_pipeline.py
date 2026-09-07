@@ -79,6 +79,7 @@ _PIPELINE_STEPS = [
     "Step08_Notification",
     "Step09_MemoryStorage",
     "Step10_AssociationDiscovery",
+    "Step10b_FrequentContactScan",
     "Step11_AssociationTodos",
     "Step12_RelationshipBriefUpdate",
     "Step13_CompleteEvent",

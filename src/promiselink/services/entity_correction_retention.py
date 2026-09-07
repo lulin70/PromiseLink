@@ -8,8 +8,10 @@ Called from the background worker registered in main.py
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import Any, cast
 
 from sqlalchemy import delete
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.core.logging import get_logger
@@ -36,7 +38,7 @@ async def cleanup_entity_corrections(
         .where(EntityCorrection.created_at < cutoff)
         .execution_options(synchronize_session=False)
     )
-    deleted = int(result.rowcount or 0)
+    deleted = int(cast(CursorResult[Any], result).rowcount or 0)
     if deleted > 0:
         logger.info(
             "correction_retention_run",

@@ -8,17 +8,43 @@ fetch existing edge sets for deduplication. These methods are mixed into
 
 from __future__ import annotations
 
+import uuid
+from datetime import UTC, datetime
 from typing import Any, cast
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 
 from promiselink.core.logging import get_logger
+from promiselink.database import IS_SQLITE
 from promiselink.models.association import Association
 from promiselink.models.entity import Entity
 
 logger = get_logger("promiselink.association_discovery")
 
 __all__ = ["AssociationGraphMixin"]
+
+
+def _as_assoc_id(value: str) -> Any:
+    """Bind entity/event ids in the column's native type (str on SQLite, UUID on PG)."""
+    return value if IS_SQLITE else uuid.UUID(value)
+
+
+def _append_shared_event(assoc: Association, ev_id: str) -> None:
+    """Record ``ev_id`` on a co_occurrence row's evidence (idempotent, W4)."""
+    props = dict(assoc.properties or {})
+    evidence = dict(props.get("evidence") or {})
+    shared = [str(v) for v in (evidence.get("shared_event_ids") or [])]
+    legacy = evidence.get("shared_event_id")
+    if legacy and str(legacy) not in shared:
+        shared.append(str(legacy))
+    if ev_id not in shared:
+        shared.append(ev_id)
+    evidence["shared_event_ids"] = shared
+    evidence["shared_event_id"] = ev_id
+    props["evidence"] = evidence
+    assoc.properties = props
+    assoc.source_event_id = _as_assoc_id(ev_id)
+    assoc.last_interaction = datetime.now(UTC)
 
 
 class AssociationGraphMixin:
@@ -160,7 +186,7 @@ class AssociationGraphMixin:
 
         return results
 
-    def _discover_co_occurrence_by_event(
+    async def _discover_co_occurrence_by_event(
         self,
         entities: list[Entity],
         existing_pairs: set[tuple],
@@ -183,7 +209,15 @@ class AssociationGraphMixin:
                 event_entities.setdefault(ev_id, []).append(eid)
 
         entity_map = {str(e.id): e for e in entities}
-        new_associations = []
+        new_associations: list[Association] = []
+        # W4: repeated co-occurrence must accumulate shared events on the one
+        # canonical row (uq_association_user_source_target_type enforces a
+        # single row per unordered pair per type). Track rows created in this
+        # batch so a second shared event inside the same batch updates the
+        # pending row instead of issuing a doomed DB query.
+        batch_rows: dict[tuple[str, str], Association] = {}
+        repeated: list[tuple[str, str, str]] = []
+        repeated_db_rows: list[tuple[str, str, str]] = []
 
         for ev_id, eids in event_entities.items():
             if len(eids) < 2:
@@ -196,6 +230,7 @@ class AssociationGraphMixin:
                         a_id, b_id = b_id, a_id
                     key = (a_id, b_id, "co_occurrence")
                     if key in existing_pairs:
+                        repeated.append((eids[i], eids[j], ev_id))
                         continue
                     a = entity_map.get(eids[i])
                     b = entity_map.get(eids[j])
@@ -207,15 +242,69 @@ class AssociationGraphMixin:
                         assoc_data={
                             "association_type": "co_occurrence",
                             "confidence": 0.6,
-                            "evidence": {"shared_event_id": ev_id},
+                            "evidence": {
+                                "shared_event_id": ev_id,
+                                "shared_event_ids": [ev_id],
+                            },
                             "status": "confirmed",
                         },
                         event_id=event_id,
                     )
                     new_associations.append(assoc)
                     existing_pairs.add(key)
+                    batch_rows[(a_id, b_id)] = assoc
+
+        for a_id, b_id, ev_id in repeated:
+            pair_key = (a_id, b_id) if a_id < b_id else (b_id, a_id)
+            pending = batch_rows.get(pair_key)
+            if pending is not None:
+                _append_shared_event(pending, ev_id)
+            else:
+                repeated_db_rows.append((pair_key[0], pair_key[1], ev_id))
+
+        if repeated_db_rows:
+            await self._accumulate_co_occurrence_events(repeated_db_rows)
 
         return new_associations
+
+    async def _accumulate_co_occurrence_events(
+        self, repeated: list[tuple[str, str, str]]
+    ) -> int:
+        """Accumulate shared events onto existing co_occurrence rows (W4).
+
+        Each entry holds ``(entity_a_id, entity_b_id, event_id)`` for a pair
+        whose canonical row already exists. Updates ``last_interaction``,
+        points ``source_event_id`` at the latest shared event and appends to
+        ``properties.evidence.shared_event_ids`` so the frequent-contact
+        scanner can count distinct shared events per pair within its window.
+        """
+        now = datetime.now(UTC)
+        updated = 0
+        for a_id, b_id, ev_id in repeated:
+            x, y = (a_id, b_id) if a_id < b_id else (b_id, a_id)
+            stmt = select(Association).where(
+                Association.association_type == "co_occurrence",
+                or_(
+                    and_(
+                        Association.source_entity_id == _as_assoc_id(x),
+                        Association.target_entity_id == _as_assoc_id(y),
+                    ),
+                    and_(
+                        Association.source_entity_id == _as_assoc_id(y),
+                        Association.target_entity_id == _as_assoc_id(x),
+                    ),
+                ),
+            )
+            assoc = (await self.session.execute(stmt)).scalar_one_or_none()
+            if assoc is None:
+                # Row vanished (merge/cleanup raced) — nothing to accumulate.
+                continue
+            _append_shared_event(assoc, ev_id)
+            assoc.last_interaction = now
+            updated += 1
+        if updated:
+            await self.session.flush()
+        return updated
 
     # ── Helper Methods ──
 
