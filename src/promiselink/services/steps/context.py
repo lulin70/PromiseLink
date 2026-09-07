@@ -14,7 +14,7 @@ from promiselink.config import Settings
 from promiselink.models.entity import Entity
 from promiselink.models.todo import Todo
 from promiselink.services.entity_extractor import ExtractionResult
-from promiselink.services.llm_client import LLMClient
+from promiselink.services.llm_client import LLMClient, MockLLMClient
 from promiselink.services.memory_provider import MemoryProvider
 
 
@@ -46,7 +46,7 @@ class PipelineContext:
     # Populated after Step1
     user_id: str | None = None
     # Shared services (set by orchestrator)
-    llm_client: LLMClient | None = None
+    llm_client: LLMClient | MockLLMClient | None = None
     memory: MemoryProvider | None = None
     settings: Settings | None = None
     # Accumulated result

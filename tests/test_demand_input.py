@@ -99,7 +99,7 @@ async def client(db_session):
 # ── Test 1: POST /demands 成功创建orphan demand ──────────────────
 
 
-@patch("promiselink.api.v1.demand_input.LLMClient")
+@patch("promiselink.api.v1.demand_input.create_llm_client")
 async def test_create_demand_orphan_success(mock_llm_cls, client):
     """POST /demands creates an orphan demand when no entity matches."""
     mock_llm_instance = MagicMock()
@@ -131,7 +131,7 @@ async def test_create_demand_orphan_success(mock_llm_cls, client):
 # ── Test 2: POST /demands 关联到已有Entity ──────────────────────
 
 
-@patch("promiselink.api.v1.demand_input.LLMClient")
+@patch("promiselink.api.v1.demand_input.create_llm_client")
 async def test_create_demand_linked_to_entity(mock_llm_cls, client, db_session):
     """POST /demands links demand to existing person entity by name."""
     event, entity = _create_test_entity(TEST_USER_ID, "张总")
@@ -168,7 +168,7 @@ async def test_create_demand_linked_to_entity(mock_llm_cls, client, db_session):
 # ── Test 3: LLM失败时使用fallback ──────────────────────────────
 
 
-@patch("promiselink.api.v1.demand_input.LLMClient")
+@patch("promiselink.api.v1.demand_input.create_llm_client")
 async def test_demand_uses_fallback_on_llm_failure(mock_llm_cls, client):
     """POST /demands falls back to keyword extraction when LLM fails."""
     mock_llm_instance = MagicMock()
@@ -234,7 +234,7 @@ async def test_invalid_source_returns_422(client):
 # ── Test 5: source默认值为text ──────────────────────────────────
 
 
-@patch("promiselink.api.v1.demand_input.LLMClient")
+@patch("promiselink.api.v1.demand_input.create_llm_client")
 async def test_default_source_is_text(mock_llm_cls, client):
     """Default source value is 'text' when not specified."""
     mock_llm_instance = MagicMock()
@@ -261,7 +261,7 @@ async def test_default_source_is_text(mock_llm_cls, client):
 # ── Test 6: alias匹配Entity ──────────────────────────────────────
 
 
-@patch("promiselink.api.v1.demand_input.LLMClient")
+@patch("promiselink.api.v1.demand_input.create_llm_client")
 async def test_demand_matches_entity_by_alias(mock_llm_cls, client, db_session):
     """POST /demands matches entity by alias when name doesn't match."""
     event, entity = _create_test_entity(TEST_USER_ID, "张伟", aliases=["老张"])
@@ -325,7 +325,7 @@ def test_fallback_extract_no_keyword():
 # ── Test 8: concern追加到已有Entity ──────────────────────────────
 
 
-@patch("promiselink.api.v1.demand_input.LLMClient")
+@patch("promiselink.api.v1.demand_input.create_llm_client")
 async def test_concern_appended_to_existing_entity(mock_llm_cls, client, db_session):
     """New concern is appended to existing entity's concern list."""
     existing_concern = [{"tag": "招聘", "detail": "需要招人", "source": "text", "created_at": "2026-01-01T00:00:00"}]
@@ -364,7 +364,7 @@ async def test_concern_appended_to_existing_entity(mock_llm_cls, client, db_sess
 # ── Test 9: voice来源标记 ──────────────────────────────────────
 
 
-@patch("promiselink.api.v1.demand_input.LLMClient")
+@patch("promiselink.api.v1.demand_input.create_llm_client")
 async def test_voice_source_stored_in_concern(mock_llm_cls, client):
     """Voice source is stored correctly in the concern entry."""
     mock_llm_instance = MagicMock()
@@ -392,7 +392,7 @@ async def test_voice_source_stored_in_concern(mock_llm_cls, client):
 # ── Test 10: LLM返回缺少字段时fallback ──────────────────────────
 
 
-@patch("promiselink.api.v1.demand_input.LLMClient")
+@patch("promiselink.api.v1.demand_input.create_llm_client")
 async def test_llm_missing_fields_triggers_fallback(mock_llm_cls, client):
     """When LLM returns incomplete data, fallback extraction is used."""
     mock_llm_instance = MagicMock()

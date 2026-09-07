@@ -23,7 +23,7 @@ from promiselink.core.exceptions import (
     LLMResponseParseError,
     LLMTimeoutError,
 )
-from promiselink.services.llm_client import LLMClient
+from promiselink.services.llm_client import LLMClient, MockLLMClient, create_llm_client
 
 # ── Fixtures ──
 
@@ -706,3 +706,55 @@ class TestClientLifecycle:
         """close() is safe to call multiple times — it's a no-op."""
         await llm_client.close()  # Should not raise
         await llm_client.close()  # Still should not raise
+
+
+class TestMockLLMClient:
+    """MockLLMClient (offline mode) + create_llm_client factory."""
+
+    def test_factory_returns_mock_when_provider_mock(self, settings):
+        settings.llm_provider = "mock"
+        client = create_llm_client(settings)
+        assert isinstance(client, MockLLMClient)
+        assert client.provider == "mock"
+
+    def test_factory_returns_real_client_when_provider_deepseek(self, settings):
+        settings.llm_provider = "deepseek"
+        client = create_llm_client(settings)
+        assert isinstance(client, LLMClient)
+        assert not isinstance(client, MockLLMClient)
+
+    @pytest.mark.asyncio
+    async def test_extraction_prompt_returns_demo_person(self):
+        """名片/商务交流提取 prompt 返回确定性演示数据（张总）。"""
+        client = MockLLMClient()
+        result = await client.call_json("名片信息提取：测试文本")
+        assert len(result["persons"]) == 1
+        assert result["persons"][0]["name"] == "张总"
+        assert result["is_ai_inference"] is False
+
+    @pytest.mark.asyncio
+    async def test_promise_prompt_returns_promises(self):
+        """Template 11 承诺提取 prompt 返回确定性承诺数组（驱动待办生成）。"""
+        client = MockLLMClient()
+        result = await client.call_json("请从以下交流内容中提取\"我答应过什么\"")
+        assert len(result["promises"]) == 1
+        assert result["promises"][0]["to_person"] == "张总"
+        assert result["promises"][0]["content"]
+
+    @pytest.mark.asyncio
+    async def test_unknown_prompt_returns_empty_dict(self):
+        """未知 prompt 返回空 dict（与 LLM 失败降级路径一致）。"""
+        client = MockLLMClient()
+        result = await client.call_json("完全无关的 prompt")
+        assert result == {}
+
+    @pytest.mark.asyncio
+    async def test_generate_returns_offline_notice(self):
+        client = MockLLMClient()
+        result = await client.generate("任何 prompt")
+        assert "离线" in result
+
+    @pytest.mark.asyncio
+    async def test_close_is_noop(self):
+        client = MockLLMClient()
+        await client.close()  # Should not raise

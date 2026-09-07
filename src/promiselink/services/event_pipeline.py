@@ -32,7 +32,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from promiselink.core.logging import get_logger
 from promiselink.services.association_discovery import AssociationDiscoveryEngine  # noqa: F401
-from promiselink.services.llm_client import LLMClient
+from promiselink.services.llm_client import create_llm_client
 from promiselink.services.memory_provider import create_memory_provider
 from promiselink.services.steps import (
     Step01_VerifyEvent,
@@ -107,7 +107,7 @@ async def process_event_with_short_transactions(event_id: str) -> PipelineResult
     from promiselink.database import get_pipeline_lock
 
     settings = get_settings()
-    llm_client = LLMClient(config=settings)
+    llm_client = create_llm_client(settings)
     memory = create_memory_provider(
         provider_type=settings.memory_provider,
         base_dir=settings.memory_file_base_dir,

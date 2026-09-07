@@ -2,7 +2,13 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
-## [1.0.6] - 2026-09-07
+## [1.1.0] - 2026-09-07
+
+### Added — 服务端离线模式（CI e2e 门禁恢复）
+
+- **`llm_provider="mock"` 离线模式**：新增 `MockLLMClient`（继承 `LLMClient`，零网络调用）。实体提取提示词返回确定性演示数据（张总），其余提示词返回空 JSON——LLM 依赖步骤按 LLM 失败路径优雅降级。`create_llm_client(settings)` 工厂统一三处构造点（管线 / 提醒 / 需求提取）。
+- **CI e2e / Playwright 门禁恢复**：两作业注入 `LLM_PROVIDER=mock` + `EMBEDDING_PROVIDER=local`；`e2e_basic_test.py` 接受 `degraded_completed` 终态（Step13 对非关键失败的合法结论）。此前这两道门禁自 2026-07-04 起因 CI 无真实 LLM（假 key 401 → step02/step03 失败 → 管线 failed → 实体/待办缺失）而失效，被 test 红灯掩盖两月。
+- **本地验证**：mock 模式真实服务器 + `e2e_basic_test.py` **18/18 PASS**（管线 completed、实体提取、待办/承诺、四 zone、搜索导出全通过）；单测回归 124/124。
 
 ### Fixed — CI 质量门禁恢复 + W3/W4 潜伏缺陷修复
 

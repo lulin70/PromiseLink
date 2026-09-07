@@ -100,7 +100,7 @@ def _standard_patches(session_factory, mock_llm, mock_extractor, mock_generator)
 
     return [
         patch("promiselink.database.AsyncSessionLocal", session_factory),
-        patch("promiselink.services.event_pipeline.LLMClient", return_value=mock_llm),
+        patch("promiselink.services.event_pipeline.create_llm_client", return_value=mock_llm),
         patch("promiselink.services.event_pipeline.create_memory_provider", return_value=mock_memory),
         patch("promiselink.services.input_scope_classifier.InputScopeClassifier", return_value=_make_mock_scope()),
         # Step02 imports directly from source modules at function level

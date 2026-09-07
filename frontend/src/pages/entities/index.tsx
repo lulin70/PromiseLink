@@ -31,6 +31,11 @@ export default function EntitiesPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'provisional'>('all')
   const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[]>([])
   const [showDuplicates, setShowDuplicates] = useState(false)
+  // Editing state for entity properties
+  // 注意：必须在 `if (showLogin) return` 早退之前声明（Rules of Hooks）。
+  // 否则 401 触发登录早退时 hooks 数量收缩，状态槽错位导致整页白屏。
+  const [editingField, setEditingField] = useState<string | null>(null)
+  const [editingValue, setEditingValue] = useState('')
   const [mergeVisible, setMergeVisible] = useState(false)
   const [mergePeer, setMergePeer] = useState<EntityResponse | null>(null)
   const [mergeSearch, setMergeSearch] = useState('')
@@ -202,10 +207,7 @@ export default function EntitiesPage() {
     work_history: '工作经历',
   }
 
-  // Editing state for entity properties
-  const [editingField, setEditingField] = useState<string | null>(null)
-  const [editingValue, setEditingValue] = useState('')
-
+  // Editing state for entity properties（useState 声明已上移至早退之前 — Rules of Hooks）
   function filterInternalFields(properties: Record<string, unknown>): Record<string, unknown> {
     const filtered: Record<string, unknown> = {}
     for (const [key, val] of Object.entries(properties)) {

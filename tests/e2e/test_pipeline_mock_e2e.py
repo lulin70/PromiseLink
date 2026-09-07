@@ -401,7 +401,7 @@ class TestEventPipelineMeetingReal:
         fake_llm = FakeLLMClient()
 
         with patch("promiselink.database.AsyncSessionLocal", session_factory), \
-             patch("promiselink.services.event_pipeline.LLMClient", return_value=fake_llm), \
+             patch("promiselink.services.event_pipeline.create_llm_client", return_value=fake_llm), \
              _patch_non_llm_externals():
 
             result = await process_event_with_short_transactions(str(event.id))
@@ -858,7 +858,7 @@ class TestPipelineErrorRecovery:
         failing_llm = FakeLLMClient(fail_mode="error")
 
         with patch("promiselink.database.AsyncSessionLocal", session_factory), \
-             patch("promiselink.services.event_pipeline.LLMClient", return_value=failing_llm), \
+             patch("promiselink.services.event_pipeline.create_llm_client", return_value=failing_llm), \
              _patch_non_llm_externals():
 
             result = await process_event_with_short_transactions(str(event.id))
@@ -918,7 +918,7 @@ class TestPipelineErrorRecovery:
         timeout_llm = FakeLLMClient(fail_mode="timeout")
 
         with patch("promiselink.database.AsyncSessionLocal", session_factory), \
-             patch("promiselink.services.event_pipeline.LLMClient", return_value=timeout_llm), \
+             patch("promiselink.services.event_pipeline.create_llm_client", return_value=timeout_llm), \
              _patch_non_llm_externals():
 
             result = await process_event_with_short_transactions(str(event.id))
