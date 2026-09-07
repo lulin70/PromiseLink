@@ -402,3 +402,60 @@ GET /entities/{id}/frequent-contacts
 | **UI** | 前端 TS 类型补字段无功能变更；零 UI 改动（仅类型断言补全），与七角色评审一致 | 9 |
 
 **门禁结论：PASS（7/7 × 9.0+），进入测试计划与实现。**
+
+---
+
+## 7. 修订记录
+
+### 修订 1（2026-09-07，v1.0.6）：W4 共现存储模型 + 解析步骤顺序
+
+实现与真实测试执行（TD-B17）暴露本设计 v1 的两处错误假设，修订如下：
+
+**7.1 共现存储模型（取代 §3.2.3 的 LEAST/GREATEST + COUNT SQL 设计）**
+
+原设计假设同一实体对在不同事件中各有一行 co_occurrence，扫描器用
+`COUNT(DISTINCT e.id) >= threshold` 计数。实际实现与 schema 事实不符：
+
+- `Association.__table_args__` 的 `uq_association_user_source_target_type`
+  唯一约束 + 关联发现的方向规范化（smaller ID first，`_create_association`
+  与 `_get_existing_pair_set`）共同保证**每对实体每种类型只有一行**；
+- 重复共现在 `_discover_co_occurrence_by_event` 中走 `existing_pairs` 去重
+  分支被 `continue` 跳过，生产中每对最多计 1 次——原设计的阈值 ≥3 在生产
+  不可达，属功能级缺陷。
+
+修订后的模型（保持"每对一行"，零 schema 迁移）：
+
+- `_discover_co_occurrence_by_event` 改为 `async`；遇已存在对时不再跳过，
+  调用 `_append_shared_event`（模块级助手）在既有行的
+  `properties.evidence.shared_event_ids`（list，幂等去重）累积共享事件 id，
+  同步刷新 `evidence.shared_event_id`（兼容旧消费方）、`source_event_id`
+  （指向最新共现事件）与 `last_interaction`；
+- 同批次内新建行再次命中时直接更新 pending ORM 对象（`batch_rows`），
+  避免对未 flush 行的无效查询；
+- `scan_frequent_contacts` 重写：Python 侧取该用户全部 co_occurrence 行，
+  展开每对的共享事件 id 集合（兼容旧行：仅 `source_event_id` 单事件），
+  一次 `SELECT id, timestamp FROM events WHERE id IN ...` 取时间戳，
+  窗口过滤后按对计数 ≥ threshold 判定。SQLite / PostgreSQL 无方言 JSON SQL，
+  naive 时间戳按 UTC 归一（`_as_datetime`）；
+- 单测 fixture（`tests/test_w4_semantic_contract.py::_co_occurrence`）与
+  e2e 助手（`scripts/e2e/e2e_w3_w4_real_user.py::add_co_occurrence`）同步
+  改为"单行累积"模型——原"反向边"数据是生产不可达的伪造形态。
+
+**7.2 解析步骤顺序与 confirm-only 边界（取代 §D3 边界描述）**
+
+原设计将 synonym_match 排在 alias_match 之后，但 alias 的敬语启发式
+（"X总" → 姓氏匹配 0.82）会先返回，同义词命中（0.97）永远不触发。
+修订：
+
+- 步骤顺序：`exact_match → synonym_match → alias_match → difflib_match →
+  fuzzy_match → context_match`（受控字典是比敬语启发式更强的信号）；
+- `synonym_match` / `difflib_match` 标记为 confirm-only
+  （`confirm_only_steps` frozenset）：即使置信度 ≥ `auto_merge_threshold`
+  也不进入 MERGE 分支，W4 规范化"零自动合并"边界由结构保证而非数值巧合
+  （0.97 > 0.85，原"数值低于合并门槛"的论证对 synonym 不成立）。
+
+**7.3 验证（TD-B17）**
+
+mypy 125 文件 0 错误；W3/W4 单测 15/15（首次真实执行）；关联/管线回归
+109 用例 0 failed；真实用户 e2e 12/12 PASS（W4-01 synonym_match 0.97
+CONFIRM、W4-02 difflib_match 0.82 CONFIRM 均经真实 `resolve()` 公开路径）。

@@ -42,7 +42,7 @@ from promiselink.database import Base, get_async_session
 from promiselink.main import app
 from promiselink.models import Association, Entity, EntityCorrection, Event, Todo
 from promiselink.services.entity_correction_service import record_correction
-from promiselink.services.entity_resolution import EntityResolutionEngine
+from promiselink.services.entity_resolution import EntityResolutionEngine, ResolutionAction
 from promiselink.services.frequent_contact_scanner import scan_frequent_contacts
 from promiselink.services.synonym_dict import find_aliases, load_synonyms
 
@@ -143,11 +143,12 @@ async def add_association(
     source: Entity,
     target: Entity,
     *,
+    user_id: str = USER_ID,
     association_type: str = "co_occurrence",
 ) -> Association:
     association = Association(
         id=str(uuid.uuid4()),
-        user_id=USER_ID,
+        user_id=user_id,
         source_entity_id=str(source.id),
         target_entity_id=str(target.id),
         association_type=association_type,
@@ -159,6 +160,61 @@ async def add_association(
     session.add(association)
     await session.flush()
     return association
+
+
+async def add_co_occurrence(
+    session: AsyncSession,
+    event: Event,
+    source: Entity,
+    target: Entity,
+) -> Association:
+    """Model production W4 semantics: ONE canonical co_occurrence row per
+    unordered pair; repeat encounters accumulate shared event ids in
+    ``properties.evidence.shared_event_ids`` (mirrors the discovery engine)."""
+    a_id, b_id = sorted([str(source.id), str(target.id)])
+    row = (
+        await session.execute(
+            select(Association).where(
+                Association.user_id == USER_ID,
+                Association.source_entity_id == a_id,
+                Association.target_entity_id == b_id,
+                Association.association_type == "co_occurrence",
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        row = Association(
+            id=str(uuid.uuid4()),
+            user_id=USER_ID,
+            source_entity_id=a_id,
+            target_entity_id=b_id,
+            association_type="co_occurrence",
+            strength=0.8,
+            confidence=1.0,
+            status="confirmed",
+            source_event_id=str(event.id),
+            properties={
+                "evidence": {
+                    "shared_event_id": str(event.id),
+                    "shared_event_ids": [str(event.id)],
+                }
+            },
+        )
+        session.add(row)
+    else:
+        props = dict(row.properties or {})
+        evidence = dict(props.get("evidence") or {})
+        shared = [str(v) for v in (evidence.get("shared_event_ids") or [])]
+        if str(event.id) not in shared:
+            shared.append(str(event.id))
+        evidence["shared_event_ids"] = shared
+        evidence["shared_event_id"] = str(event.id)
+        props["evidence"] = evidence
+        row.properties = props
+        row.source_event_id = str(event.id)
+        row.last_interaction = datetime.now(UTC)
+    await session.flush()
+    return row
 
 
 def require(condition: bool, message: str) -> None:
@@ -405,26 +461,32 @@ async def scenario_synonym_dictionary(client: httpx.AsyncClient, session: AsyncS
         auto_merge_threshold=0.85,
         confirm_threshold=0.70,
     )
-    # 走 alias 路径（已被 surname 匹配命中），无需触发 latent 的 _step_synonym 缺失方法。
-    confidence, _ = engine._step_alias(
-        {"name": "林总", "company": "青梧科技"}, entity
+    # 走真实 resolve() 公开路径：同义词字典命中必须给出 CONFIRM 候选，
+    # 且 0.97 置信度不允许自动合并（W4 零自动合并硬边界）。
+    result = await engine.resolve(
+        {"name": "林总", "company": "青梧科技", "entity_type": "person"}, USER_ID
     )
-    require(confidence >= engine.confirm_threshold, "别名联系人置信度未达到人工确认门槛")
-    require(entity.name in (entity.name, entity.canonical_name), "未找到规范实体")
+    require(result.action == ResolutionAction.CONFIRM, "同义词命中未给出人工确认结果")
+    require(result.matched_step == "synonym_match", "同义词命中步骤标记缺失")
+    require(abs(result.confidence - 0.97) < 1e-9, "同义词命中置信度不是 0.97")
+    require(
+        result.target_entity is not None and str(result.target_entity.id) == str(entity.id),
+        "同义词未指向规范实体",
+    )
+    require(not result.is_merge, "同义词命中不允许自动合并")
 
 
 async def scenario_difflib(client: httpx.AsyncClient, session: AsyncSession) -> None:
     """W4-02：相似度达到 80% 时只生成确认候选，不自动合并。"""
     event = await add_event(session, title="英文联系人交流")
-    entity = await add_entity(session, event, name="Alice Chen")
+    await add_entity(session, event, name="Alice Chen")
     await session.commit()
     engine = EntityResolutionEngine(session=session, difflib_cutoff=0.80)
-    confidence, fields = engine._step_difflib_fuzzy(
-        {"name": "Alice Chn"}, entity
-    )
-    require(confidence == 0.82, "difflib 命中置信度不是 0.82")
-    require(fields.get("method") == "difflib", "difflib 命中方法标记缺失")
-    require(confidence < engine.auto_merge_threshold, "difflib 命中越过自动合并门槛")
+    result = await engine.resolve({"name": "Alice Chn", "entity_type": "person"}, USER_ID)
+    require(result.action == ResolutionAction.CONFIRM, "difflib 命中未给出人工确认结果")
+    require(result.matched_step == "difflib_match", "difflib 命中步骤标记缺失")
+    require(result.confidence == 0.82, "difflib 命中置信度不是 0.82")
+    require(not result.is_merge, "difflib 命中越过自动合并门槛")
 
 
 async def scenario_two_occurrences_no_trigger(client: httpx.AsyncClient, session: AsyncSession) -> None:
@@ -433,9 +495,9 @@ async def scenario_two_occurrences_no_trigger(client: httpx.AsyncClient, session
     first = await add_event(session, title="第一次共现", timestamp=base)
     source = await add_entity(session, first, name="高频联系人A")
     target = await add_entity(session, first, name="高频联系人B")
-    await add_association(session, first, source, target)
+    await add_co_occurrence(session, first, source, target)
     second = await add_event(session, title="第二次共现", timestamp=base + timedelta(days=1))
-    await add_association(session, second, target, source)
+    await add_co_occurrence(session, second, source, target)
     await session.commit()
 
     pairs = await scan_frequent_contacts(session, USER_ID, threshold=3, window_days=90)
@@ -454,15 +516,15 @@ async def scenario_old_occurrence_excluded(client: httpx.AsyncClient, session: A
     )
     source = await add_entity(session, old_event, name="窗口联系人A")
     target = await add_entity(session, old_event, name="窗口联系人B")
-    await add_association(session, old_event, source, target)
+    await add_co_occurrence(session, old_event, source, target)
     recent_event = await add_event(
         session,
         title="窗口内共现",
         timestamp=datetime.now(UTC) - timedelta(days=1),
     )
-    # Association 的唯一约束禁止同一实体对在不同事件中重复插入；
-    # 用反向边保留第二次共现，扫描时按无序实体对聚合。
-    await add_association(session, recent_event, target, source)
+    # 同一对实体再次共现：生产语义是更新既有行的 shared_event_ids，
+    # 窗口过滤后仅计入窗口内的 1 次，达不到 threshold=2。
+    await add_co_occurrence(session, recent_event, source, target)
     await session.commit()
 
     pairs = await scan_frequent_contacts(session, USER_ID, threshold=2, window_days=90)

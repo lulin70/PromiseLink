@@ -10,7 +10,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from promiselink.services.llm_client import LLMClient
@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from promiselink.core.crypto import encrypt_pii_in_properties
 from promiselink.core.logging import get_logger
 from promiselink.models.entity import Entity
-from promiselink.services.synonym_dict import load_synonyms
+from promiselink.services.synonym_dict import find_aliases, load_synonyms
 
 logger = get_logger("promiselink.entity_resolution")
 
@@ -54,14 +54,19 @@ class ResolutionResult:
 
 
 class EntityResolutionEngine:
-    """Entity Resolution 5-step Engine.
+    """Entity Resolution 6-step Engine.
 
     Steps (in priority order):
     1. exact_match — name exact match (confidence 0.85~1.0)
-    2. alias_match — name in aliases list (confidence 0.80~0.95)
-    3. fuzzy_match — rapidfuzz token_sort_ratio (confidence 0.70~0.90)
-    4. context_match — company/city/industry overlap (confidence 0.0~0.60)
-    5. llm_reasoning — LLM judgment (Phase1, PoC returns 0.0)
+    2. synonym_match — controlled synonym dictionary (W4, confirm-only, 0.97)
+    3. alias_match — name in aliases list (confidence 0.80~0.95)
+    4. difflib_match — stdlib similarity cutoff (W4, confirm-only, 0.82)
+    5. fuzzy_match — rapidfuzz token_sort_ratio (confidence 0.70~0.90)
+    6. context_match — company/city/industry overlap (confidence 0.0~0.60)
+    7. llm_reasoning — LLM judgment (Phase1, PoC returns 0.0)
+
+    W4 normalization steps (synonym_match / difflib_match) are confirm-only:
+    they never auto-merge regardless of confidence.
     """
 
     def __init__(
@@ -146,7 +151,7 @@ class EntityResolutionEngine:
     async def resolve(
         self, new_entity_data: dict[str, Any], user_id: str
     ) -> ResolutionResult:
-        """Execute 5-step resolution for a new entity.
+        """Execute 6-step resolution for a new entity.
 
         Args:
             new_entity_data: Dict with keys: name, company, title, city,
@@ -176,15 +181,17 @@ class EntityResolutionEngine:
             logger.info("resolution_no_candidates", entity_name=new_entity_data.get("name"))
             return result
 
-        # Execute deterministic steps in priority order
+        # Execute deterministic steps in priority order. W4 normalization
+        # steps (synonym/difflib) are confirm-only: they never auto-merge.
         steps = [
             ("exact_match", self._step_exact),
-            ("alias_match", self._step_alias),
             ("synonym_match", self._step_synonym),
+            ("alias_match", self._step_alias),
             ("difflib_match", self._step_difflib_fuzzy),
             ("fuzzy_match", self._step_fuzzy),
             ("context_match", self._step_context),
         ]
+        confirm_only_steps = frozenset({"synonym_match", "difflib_match"})
 
         for step_name, step_fn in steps:
             best_result: ResolutionResult | None = None
@@ -192,7 +199,7 @@ class EntityResolutionEngine:
             for candidate in candidates:
                 confidence, matched_fields = step_fn(new_entity_data, candidate)
 
-                if confidence >= self.auto_merge_threshold:
+                if confidence >= self.auto_merge_threshold and step_name not in confirm_only_steps:
                     result = ResolutionResult(
                         action=ResolutionAction.MERGE,
                         target_entity=candidate,
@@ -532,6 +539,34 @@ class EntityResolutionEngine:
                     }
                     return score, fields
 
+        return 0.0, {}
+
+    # ── Step 2: Controlled Synonym Match (W4, outranks alias honorific) ──
+
+    def _step_synonym(
+        self, new: dict[str, Any], existing: Entity
+    ) -> tuple[float, dict[str, Any]]:
+        """Match via the controlled synonym dictionary (W4).
+
+        ``new`` name is checked against the canonical name plus aliases of the
+        existing entity in the controlled dictionary for its entity type.
+        Confidence 0.97 is intentionally confirm-only: the resolve() loop
+        treats synonym_match as never-auto-merge (zero automatic merge).
+        """
+        new_name = (new.get("name") or "").strip()
+        existing_name = (existing.name or "").strip()
+        if not new_name or not existing_name:
+            return 0.0, {}
+        type_: Literal["person", "company"] = (
+            "company" if existing.entity_type == "company" else "person"
+        )
+        family = find_aliases(existing_name, type_, self._synonym_dicts)
+        if new_name in family:
+            return 0.97, {
+                "method": "synonym",
+                "name": 1.0,
+                "canonical": existing_name,
+            }
         return 0.0, {}
 
     @classmethod

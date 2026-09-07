@@ -28,7 +28,7 @@ async def record_correction(
     event_id: str,
     correction_type: str,
     action: str,
-    entity_id: str | None = None,
+    entity_id: str | uuid.UUID | None = None,
     original_extracted_text: str | None = None,
     original_canonical_name: str | None = None,
     candidate_entity_ids: list[str] | None = None,
@@ -60,23 +60,23 @@ async def record_correction(
 
     # SQLite uses String(36) columns for UUIDs, so bind plain str to avoid the
     # DBAPI bind mismatch. PostgreSQL still accepts uuid.UUID instances.
-    def _uid(value: str | None) -> uuid.UUID | str | None:
+    def _uid(value: str | uuid.UUID | None) -> uuid.UUID | str | None:
         if value is None:
             return None
         if IS_SQLITE:
-            return str(uuid.UUID(value))
-        return uuid.UUID(value)
+            return str(value if isinstance(value, uuid.UUID) else uuid.UUID(value))
+        return value if isinstance(value, uuid.UUID) else uuid.UUID(value)
 
     row = EntityCorrection(
-        id=uuid.uuid4(),
-        user_id=_uid(user_id),  # type: ignore[arg-type]
-        event_id=_uid(event_id),  # type: ignore[arg-type]
+        id=_uid(str(uuid.uuid4())),
+        user_id=_uid(user_id),
+        event_id=_uid(event_id),
         correction_type=correction_type,
-        entity_id=_uid(entity_id),  # type: ignore[arg-type]
+        entity_id=_uid(entity_id),
         original_extracted_text=redacted_text,
         original_canonical_name=original_canonical_name,
         candidate_entity_ids=list(candidate_entity_ids) if candidate_entity_ids else None,
-        selected_entity_id=_uid(selected_entity_id),  # type: ignore[arg-type]
+        selected_entity_id=_uid(selected_entity_id),
         action=action,
         created_at=datetime.now(UTC),
     )

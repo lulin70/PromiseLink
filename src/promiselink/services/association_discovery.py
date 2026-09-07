@@ -159,7 +159,7 @@ class AssociationDiscoveryEngine(
         new_associations: list[Association] = []
 
         # Step 1: Co-occurrence from the current event (most efficient)
-        co_occ = self._discover_co_occurrence_by_event(
+        co_occ = await self._discover_co_occurrence_by_event(
             new_entities, existing_pairs, event_id
         )
         for assoc in co_occ:
@@ -337,7 +337,7 @@ class AssociationDiscoveryEngine(
         new_associations: list[Association] = []
 
         # Step 1: Co-occurrence by event
-        co_occ = self._discover_co_occurrence_by_event(entities, existing_pairs, event_id)
+        co_occ = await self._discover_co_occurrence_by_event(entities, existing_pairs, event_id)
         for assoc in co_occ:
             self.session.add(assoc)
             new_associations.append(assoc)

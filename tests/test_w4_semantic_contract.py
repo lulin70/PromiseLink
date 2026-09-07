@@ -45,20 +45,54 @@ async def _co_occurrence(
     target: Entity,
     when: datetime,
 ) -> None:
+    """Model production W4 semantics: ONE canonical co_occurrence row per
+    unordered pair; repeat encounters accumulate shared event ids in
+    ``properties.evidence.shared_event_ids`` (mirrors the discovery engine's
+    ``_append_shared_event``)."""
     event = await create_test_event(session, user_id=user_id)
     event.timestamp = when
-    association = Association(
-        id=str(uuid.uuid4()),
-        user_id=user_id,
-        source_entity_id=source.id,
-        target_entity_id=target.id,
-        association_type="co_occurrence",
-        strength=0.8,
-        confidence=1.0,
-        status="confirmed",
-        source_event_id=event.id,
-    )
-    session.add(association)
+    a_id, b_id = sorted([str(source.id), str(target.id)])
+    row = (
+        await session.execute(
+            select(Association).where(
+                Association.user_id == user_id,
+                Association.source_entity_id == a_id,
+                Association.target_entity_id == b_id,
+                Association.association_type == "co_occurrence",
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        row = Association(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            source_entity_id=a_id,
+            target_entity_id=b_id,
+            association_type="co_occurrence",
+            strength=0.8,
+            confidence=1.0,
+            status="confirmed",
+            source_event_id=str(event.id),
+            properties={
+                "evidence": {
+                    "shared_event_id": str(event.id),
+                    "shared_event_ids": [str(event.id)],
+                }
+            },
+        )
+        session.add(row)
+    else:
+        props = dict(row.properties or {})
+        evidence = dict(props.get("evidence") or {})
+        shared = [str(v) for v in (evidence.get("shared_event_ids") or [])]
+        if str(event.id) not in shared:
+            shared.append(str(event.id))
+        evidence["shared_event_ids"] = shared
+        evidence["shared_event_id"] = str(event.id)
+        props["evidence"] = evidence
+        row.properties = props
+        row.source_event_id = str(event.id)
+        row.last_interaction = when
     await session.flush()
 
 

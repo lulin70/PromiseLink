@@ -1,6 +1,6 @@
 # PromiseLink 基础版技术债跟踪文档
 
-> **文档版本** v2.3 / 2026-09-05 / G3 发布门禁 e2e PASS，TD-B15 RESOLVED
+> **文档版本** v2.4 / 2026-09-07 / TD-B17 登记并修复（CI 门禁恢复 + W3/W4 潜伏缺陷清零）
 > **关联文档** [PROJECT_STATUS.md](PROJECT_STATUS.md) · [CHANGELOG.md](../CHANGELOG.md) · [ROADMAP.md](ROADMAP.md) · [PromiseLink-Pro TECH_DEBT.md](../PromiseLink-Pro/docs/TECH_DEBT.md)
 > **用途**：量化跟踪技术债，按优先级清理，防止技术债积累导致项目可维护性下降
 > **更新原则**：每次清理后更新状态（OPEN→RESOLVED），新增技术债及时登记
@@ -314,10 +314,30 @@
 
 ---
 
+### TD-B17: CI mypy 红灯掩盖的 W3/W4 潜伏缺陷（2026-09-07）✅ RESOLVED
+
+- **状态**：RESOLVED (2026-09-07)
+- **描述**：CI `test (3.11)` 自 2026-09-03 起 mypy 阶段失败（12 个类型错误），pytest 在 CI 从未执行——W3/W4 合并的 15 个新单测只被 collect 从未运行，掩盖了 3 个潜伏缺陷 + 2 个测试诚实性缺陷，全部修复：
+  1. **`_step_synonym` 方法缺失（严重）**：`EntityResolutionEngine.resolve()` 六步管线引用从未定义的方法，任何有候选者的调用抛 `AttributeError`。mypy 实际早已报 `attr-defined`，但红灯被当成"CI 环境问题"搁置。修复：按契约实现（0.97 / CONFIRM-only），并把 synonym 步骤置于 alias 敬语匹配之前。
+  2. **W4 高频联系人在生产不可达**：关联发现按无序对规范化 + `uq_association_user_source_target_type` 保证每对实体仅 1 行 co_occurrence；扫描器却按 `COUNT(DISTINCT e.id) ≥ 3` 设计，生产中每对最多计 1 次。修复：重复共现更新既有行（`evidence.shared_event_ids` 累积 + `last_interaction` 刷新，`_append_shared_event`），扫描器改 Python 侧窗口计数。
+  3. **`EntityCorrection.id` SQLite 绑定失败**：`record_correction` 显式 `id=uuid.uuid4()` 绕过方言感知 default，12 个纠偏 API 覆盖测试潜伏失败。修复：`id=_uid(str(uuid.uuid4()))`。
+  4. **Alembic 双 head**：W3/W4 迁移误以历史合并点 `e5dfa59687d6` 为 down_revision，与 `l2g3b4c5d6e7` 线形成双 head，`alembic upgrade head` 失败阻塞 CI e2e（test 红灯期间从未暴露）。修复：新增合并修订 `7bb48953af15`。
+  5. **测试数据伪造**：单测/e2e 用生产不可能生成的"反向边"绕开唯一约束自我验证；e2e W4-01/02 直呼私有 `_step_alias`/`_step_difflib_fuzzy` 绕开缺失方法。修复：测试数据模型与生产对齐（单行累积），e2e 改走真实 `resolve()` 公开路径。
+- **关联**：[CHANGELOG.md](../CHANGELOG.md) [1.0.6] / [TECH_DESIGN_解析语义契约_W3W4_v1.md](design/TECH_DESIGN_解析语义契约_W3W4_v1.md) §7 修订记录
+- **教训**：
+  - L-V4-W3W4-006：CI 红灯必须当日归因修复，"只要 job 不是全红就先放着"会让类型检查器抓到的运行时缺陷（attr-defined = 生产必崩）潜伏数天
+  - L-V4-W3W4-007：collect PASS ≠ 执行 PASS——合并前新测试必须至少真实运行一次（`pytest 新测试文件`），只看 collected 数量会漏掉 import 成功但断言路径从未走到的缺陷
+  - L-V4-W3W4-008：测试 fixture 必须使用生产代码可达的数据形态；绕过唯一约束/私有方法"让测试通过"等于没有测试
+  - L-V4-W3W4-009：新增管线步骤必须同时登记 `_PIPELINE_STEPS` 清单（步骤注册是双处的，漏一处监控/文档就失真）
+  - L-V4-W3W4-010：新增 alembic 迁移的 down_revision 必须取 `alembic heads` 的当前值，不能照抄历史文件里的 id；合并后跑 `alembic heads` 确认单 head
+
+---
+
 ## 4. 变更历史
 
 | 日期 | 版本 | 作者 | 变更 |
 |------|------|------|------|
+| 2026-09-07 | v2.4 | DevSquad | TD-B17 登记并立即修复：CI mypy 红灯（2026-09-03 起）导致 pytest 在 CI 从未执行，掩盖 3 个潜伏缺陷（`_step_synonym` 缺失 / W4 高频联系人生产不可达 / EntityCorrection SQLite 绑定）+ 2 个测试诚实性缺陷（伪造反向边数据 / e2e 绕过 resolve() 直呼私有方法）。验证：mypy 125 文件 0 错误 + 关联回归 109 用例 0 failed + e2e 12/12 PASS（真实公开路径）。详见 TD-B17。 |
 | 2026-08-03 | v2.0 | DevSquad | TD-B14 修复（5个测试失败：test_api_integration + test_coverage_boost + test_security_comprehensive×3）：修改测试期望 `assert resp.status_code in (404, 405)`，接受405作为HTTP标准合法响应。基础版技术债 10/12 RESOLVED，2项OPEN（TD-B12 LLM间歇性503非产品BUG + TD-B13 e2e mock审计部分修复）。 |
 | 2026-08-01 | v1.9 | DevSquad | TD-B13 部分修复：重命名 `test_real_llm_e2e.py` → `test_pipeline_mock_e2e.py`（诚实命名），同步更新 `test_user_journey_e2e.py` L66 注释引用。TD-B13 剩余项（小程序全 mock + 缺失 e2e 路径）仍 OPEN，优先级 P3 v0.10.0 处理。基础版技术债 9/11 RESOLVED，2 项 OPEN（TD-B12 待 LLM 稳定 + TD-B13 部分修复）。 |
 | 2026-07-31 | v1.9 | DevSquad | TD-B12 更新（rsxermu666.cn LLM 间歇性恢复，重跑 4/5 PASS，1 FAIL 因 LLM 间歇性 503 非产品 BUG）+ 新增 TD-B13（e2e mock 审计：test_real_llm_e2e.py 命名误导 + 小程序 18 文件全 mock + 基础版 e2e 模拟跑）。基础版技术债 9/11 RESOLVED，2 项 OPEN（TD-B12 待 LLM 稳定 + TD-B13 P3）。 |
