@@ -13,6 +13,7 @@ CI `test (3.11)` 作业自 2026-09-03 起在 mypy 阶段失败，导致 pytest �
 - **W4 规范化零自动合并硬边界**：`synonym_match` / `difflib_match` 在 `resolve()` 循环中标记为 confirm-only，置信度再高也不触发自动合并。
 - **W4 高频联系人在生产不可达（设计缺陷）**：关联发现按无序对规范化 + 唯一约束保证每对实体只有一行 co_occurrence，而扫描器按 `COUNT(DISTINCT e.id) ≥ 3` 设计——生产中每对最多计 1 次，阈值永远达不到。修复：重复共现改为**更新既有行**（`properties.evidence.shared_event_ids` 累积 + `last_interaction` 刷新），扫描器改为 Python 侧按窗口计数（SQLite/PostgreSQL 可移植，无方言 JSON SQL）。此前单测/e2e 用生产不可能产生的"反向边"数据自我验证通过，属测试诚实性缺陷，已一并修正（测试数据模型与生产对齐，e2e W4-01/02 改走真实 `resolve()` 公开路径）。
 - **Step10b 管线注册清单**：`_PIPELINE_STEPS` 补录 `Step10b_FrequentContactScan`。
+- **Alembic 多 head（e2e 门禁恢复）**：W3/W4 迁移误以历史合并点 `e5dfa59687d6` 为 base，与 `l2g3b4c5d6e7` 线形成双 head，`alembic upgrade head` 在 CI e2e 失败（此前 e2e 一直被 test 红灯挡住未暴露）。新增合并修订 `7bb48953af15`（parents: `l2g3b4c5d6e7` + `w3w4_entity_corrections`），恢复单 head。
 - **EntityCorrection SQLite 绑定**：`record_correction` 主键改为方言感知生成（此前 `id=uuid.uuid4()` 在 SQLite String(36) 列绑定 UUID 对象直接失败，12 个纠偏 API 覆盖测试潜伏失败）。
 - 验证：mypy 125 文件 0 错误；ruff 0；W3/W4 单测 15/15；关联/管线回归 109 用例 0 failed；真实用户 e2e 12/12 PASS（W4-01 `synonym_match` 0.97 CONFIRM、W4-02 `difflib_match` 0.82 CONFIRM 均经真实 `resolve()` 验证）。
 

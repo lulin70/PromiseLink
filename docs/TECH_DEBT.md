@@ -321,13 +321,15 @@
   1. **`_step_synonym` 方法缺失（严重）**：`EntityResolutionEngine.resolve()` 六步管线引用从未定义的方法，任何有候选者的调用抛 `AttributeError`。mypy 实际早已报 `attr-defined`，但红灯被当成"CI 环境问题"搁置。修复：按契约实现（0.97 / CONFIRM-only），并把 synonym 步骤置于 alias 敬语匹配之前。
   2. **W4 高频联系人在生产不可达**：关联发现按无序对规范化 + `uq_association_user_source_target_type` 保证每对实体仅 1 行 co_occurrence；扫描器却按 `COUNT(DISTINCT e.id) ≥ 3` 设计，生产中每对最多计 1 次。修复：重复共现更新既有行（`evidence.shared_event_ids` 累积 + `last_interaction` 刷新，`_append_shared_event`），扫描器改 Python 侧窗口计数。
   3. **`EntityCorrection.id` SQLite 绑定失败**：`record_correction` 显式 `id=uuid.uuid4()` 绕过方言感知 default，12 个纠偏 API 覆盖测试潜伏失败。修复：`id=_uid(str(uuid.uuid4()))`。
-  4. **测试数据伪造**：单测/e2e 用生产不可能生成的"反向边"绕开唯一约束自我验证；e2e W4-01/02 直呼私有 `_step_alias`/`_step_difflib_fuzzy` 绕开缺失方法。修复：测试数据模型与生产对齐（单行累积），e2e 改走真实 `resolve()` 公开路径。
+  4. **Alembic 双 head**：W3/W4 迁移误以历史合并点 `e5dfa59687d6` 为 down_revision，与 `l2g3b4c5d6e7` 线形成双 head，`alembic upgrade head` 失败阻塞 CI e2e（test 红灯期间从未暴露）。修复：新增合并修订 `7bb48953af15`。
+  5. **测试数据伪造**：单测/e2e 用生产不可能生成的"反向边"绕开唯一约束自我验证；e2e W4-01/02 直呼私有 `_step_alias`/`_step_difflib_fuzzy` 绕开缺失方法。修复：测试数据模型与生产对齐（单行累积），e2e 改走真实 `resolve()` 公开路径。
 - **关联**：[CHANGELOG.md](../CHANGELOG.md) [1.0.6] / [TECH_DESIGN_解析语义契约_W3W4_v1.md](design/TECH_DESIGN_解析语义契约_W3W4_v1.md) §7 修订记录
 - **教训**：
   - L-V4-W3W4-006：CI 红灯必须当日归因修复，"只要 job 不是全红就先放着"会让类型检查器抓到的运行时缺陷（attr-defined = 生产必崩）潜伏数天
   - L-V4-W3W4-007：collect PASS ≠ 执行 PASS——合并前新测试必须至少真实运行一次（`pytest 新测试文件`），只看 collected 数量会漏掉 import 成功但断言路径从未走到的缺陷
   - L-V4-W3W4-008：测试 fixture 必须使用生产代码可达的数据形态；绕过唯一约束/私有方法"让测试通过"等于没有测试
   - L-V4-W3W4-009：新增管线步骤必须同时登记 `_PIPELINE_STEPS` 清单（步骤注册是双处的，漏一处监控/文档就失真）
+  - L-V4-W3W4-010：新增 alembic 迁移的 down_revision 必须取 `alembic heads` 的当前值，不能照抄历史文件里的 id；合并后跑 `alembic heads` 确认单 head
 
 ---
 
