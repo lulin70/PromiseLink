@@ -6,6 +6,7 @@ Supports retry with exponential backoff, timeout, and graceful degradation.
 
 import asyncio
 import json
+import re
 import time
 from typing import Any, cast
 
@@ -516,6 +517,29 @@ class MockLLMClient(LLMClient):
                 "keywords": [],
                 "summary": "",
                 "events": [],
+                "is_ai_inference": False,
+                "confidence_level": "confirmed",
+                "requires_confirmation": False,
+            }
+        # TodoGenerator Template 11 (promise extraction) — drives pending todo
+        # creation so e2e flows depending on GET /todos have deterministic data.
+        # The E2E marker from the caller's raw_text is echoed into the promise
+        # content so per-event todos stay unique (dedup won't collapse them).
+        if "我答应过什么" in prompt:
+            marker_match = re.search(r"E2E-[A-Za-z0-9]+", prompt)
+            marker = f"（{marker_match.group(0)}）" if marker_match else ""
+            return {
+                "promises": [
+                    {
+                        "to_person": "张总",
+                        "content": f"下周三之前把方案发给他{marker}",
+                        "mentioned_deadline": "下周三",
+                        "suggested_deadline": None,
+                        "priority": "high",
+                        "source_text": "下周三之前把方案发给他",
+                    }
+                ],
+                "summary": "对张总承诺发方案",
                 "is_ai_inference": False,
                 "confidence_level": "confirmed",
                 "requires_confirmation": False,

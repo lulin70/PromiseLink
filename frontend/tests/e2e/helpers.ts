@@ -216,6 +216,49 @@ export async function setupRealApi(page: Page, options: { showGuide?: boolean } 
 }
 
 /**
+ * 通过 API 创建事件并等待管道完成（mock LLM 模式下确定生成张总的 promise 待办）。
+ * 遵循「没有数据创造数据」原则：待办详情类用例必须自造数据，
+ * 不依赖开发机上的历史 pending 数据。
+ * 返回 event_id。
+ */
+export async function createEventWithTodosViaApi(
+  request: APIRequestContext,
+  token: string,
+  rawText: string = `我和张总开会，我说了下周三之前把技术方案发给他（E2E-${Date.now()}）`,
+): Promise<string> {
+  const response = await request.post(`${BACKEND_URL}/api/v1/events`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: {
+      event_type: 'meeting',
+      source: 'e2e-test',
+      title: '待办详情E2E测试会议',
+      raw_text: rawText,
+    },
+  })
+  expect(response.ok(), 'Create event should succeed').toBeTruthy()
+  const body = await response.json()
+  const eventId: string = body.id
+
+  // 轮询管道终态（TEST_MODE + mock LLM 下秒级完成）
+  for (let i = 0; i < 30; i++) {
+    const poll = await request.get(`${BACKEND_URL}/api/v1/events/${eventId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (poll.ok()) {
+      const ev = await poll.json()
+      if (ev.status === 'completed' || ev.status === 'degraded_completed') {
+        return eventId
+      }
+      if (ev.status === 'failed') {
+        throw new Error(`Pipeline failed for event ${eventId}: ${JSON.stringify(ev.error || '')}`)
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+  }
+  throw new Error(`Pipeline did not reach terminal state within 30s for event ${eventId}`)
+}
+
+/**
  * 通过 API 登录获取 access_token（用于 API 数据准备，不经过 UI）。
  */
 export async function getApiToken(

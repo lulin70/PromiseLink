@@ -488,6 +488,9 @@ export async function setupMockApi(page: Page): Promise<void> {
     }
 
     // ── Entities ───────────────────────────────────────────────────────────
+    if (url.includes('/entities/duplicates') && method === 'GET') {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ groups: [] }) })
+    }
     if (url.includes('/entities/dormant') && method === 'GET') {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: [], total: 0 }) })
     }

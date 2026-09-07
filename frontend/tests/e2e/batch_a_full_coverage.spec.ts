@@ -8,6 +8,7 @@ import {
   recordScheduledEventViaApi,
   deleteScheduledEventViaApi,
   getFirstPendingTodoViaApi,
+  createEventWithTodosViaApi,
 } from './helpers'
 
 /**
@@ -556,8 +557,9 @@ test.describe('Batch A — 真实后端待办详情 E2E @todo-detail @real-backe
 
   // 2. 取消推迟（无 API 调用，仅验证 modal 可关闭）
   test('待办详情「推迟」modal 可取消（无 API 调用）', async ({ page, request }) => {
-    // 通过 API 获取一个 pending todo，确保有数据可测
+    // 「没有数据创造数据」：先造事件驱动管道生成 pending todo，再取用
     const token = await getApiToken(request)
+    await createEventWithTodosViaApi(request, token)
     const todo = await getFirstPendingTodoViaApi(request, token)
 
     // 直接导航到该 todo 的详情页
@@ -581,8 +583,9 @@ test.describe('Batch A — 真实后端待办详情 E2E @todo-detail @real-backe
 
   // 3. 推迟小时输入验证（POST /reminders/{id}/action snoozed）
   test('待办详情「推迟」modal 输入小时数后提交（POST /reminders/{id}/action）', async ({ page, request }) => {
-    // 通过 API 获取一个 pending todo，确保有数据可测
+    // 「没有数据创造数据」：先造事件驱动管道生成 pending todo，再取用
     const token = await getApiToken(request)
+    await createEventWithTodosViaApi(request, token)
     const todo = await getFirstPendingTodoViaApi(request, token)
 
     await page.goto(`/pages/todos/detail?id=${todo.id}`, { waitUntil: 'domcontentloaded' })
