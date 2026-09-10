@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://promiselink.local/schemas/w5-evidence-v1.json",
+  "title": "PromiseLink W5 Evidence Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "commit_sha",
+    "command",
+    "started_at",
+    "finished_at",
+    "database_backend",
+    "migration_head",
+    "config_digest",
+    "embedding_profile",
+    "sample_count",
+    "counts",
+    "metrics",
+    "artifacts",
+    "pii_scan_result",
+    "validator_version"
+  ],
+  "properties": {
+    "schema_version": { "const": "w5-evidence-v1" },
+    "commit_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "command": { "type": "string", "minLength": 1 },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "database_backend": { "enum": ["sqlite", "postgresql"] },
+    "migration_head": { "type": "string", "minLength": 1 },
+    "config_digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "embedding_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "model", "dimension", "space", "profile_version"],
+      "properties": {
+        "provider": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "dimension": { "type": "integer", "minimum": 1 },
+        "space": { "type": "string", "minLength": 1 },
+        "profile_version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "sample_count": { "type": "integer", "minimum": 1 },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pass", "fail", "skip", "xfail"],
+      "properties": {
+        "pass": { "type": "integer", "minimum": 0 },
+        "fail": { "type": "integer", "minimum": 0 },
+        "skip": { "type": "integer", "minimum": 0 },
+        "xfail": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["value", "threshold", "comparator"],
+        "properties": {
+          "value": { "type": "number" },
+          "threshold": { "type": "string", "minLength": 1 },
+          "comparator": { "enum": ["<", "<=", "=", ">=", ">"] }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "pii_scan_result": { "enum": ["pass", "fail"] },
+    "validator_version": { "const": "w5-manifest-validator-v1" },
+    "command_allowlist": {
+      "description": "可选：声明本次 manifest 关联的命令 allowlist 校验；非必填字段，但若填写则必须落在 Test Plan §16.1 列表内",
+      "type": "array",
+      "items": {
+        "enum": [
+          "w5-contract-unit",
+          "w5-integration-sqlite",
+          "w5-integration-postgresql",
+          "w5-golden",
+          "w5-e2e",
+          "w5-performance",
+          "w5-anti-ghost"
+        ]
+      }
+    },
+    "result_summary_whitelist": {
+      "description": "result_summary 序列化后字段白名单；任一字段超出视为违规，manifest validator 非零退出",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate_rank", "method", "score", "language_pair"],
+      "properties": {
+        "candidate_rank": { "type": "integer", "minimum": 0 },
+        "method": { "type": "string", "minLength": 1 },
+        "score": { "type": "number", "minimum": 0, "maximum": 1 },
+        "language_pair": { "type": "string", "pattern": "^[a-z]{2}_[a-z]{2}$" }
+      }
+    },
+    "w4_baseline_reference": {
+      "description": "W4 baseline 引用；发布候选必须存在 docs/evidence/w4_baseline.json 并 schema_version=w4-baseline-v1",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "baseline_commit", "dataset_version", "evaluator_version", "sample_count", "artifacts", "pii_scan_result"],
+      "properties": {
+        "schema_version": { "const": "w4-baseline-v1" },
+        "baseline_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "dataset_version": { "const": "w4-golden-v1" },
+        "evaluator_version": { "const": "w4-evaluator-v1" },
+        "sample_count": { "type": "integer", "minimum": 1 },
+        "artifacts": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "pii_scan_result": { "enum": ["pass", "fail"] }
+      }
+    }
+  }
+}
