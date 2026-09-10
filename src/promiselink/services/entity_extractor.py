@@ -388,8 +388,10 @@ class EntityExtractor:
         person_data = self._person_to_resolution_data(person, event_id=event_id)
 
         if self.resolution_engine:
+            # Per-execution index scope: one pipeline run per event sees a
+            # consistent candidate set; no cross-event index reuse.
             resolution = await self.resolution_engine.resolve(
-                new_entity_data=person_data, user_id=user_id
+                new_entity_data=person_data, user_id=user_id, session_id=event_id
             )
 
             if resolution.action == ResolutionAction.MERGE and resolution.target_entity:

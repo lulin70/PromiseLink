@@ -66,6 +66,10 @@ class Settings(BaseSettings):
         ],
         description="Allowed CORS origins",
     )
+    trusted_proxies: list[str] = Field(
+        default_factory=list,
+        description="Trusted reverse proxy IPs for X-Forwarded-For",
+    )
 
     @field_validator("app_edition", mode="before")
     @classmethod
@@ -113,9 +117,31 @@ class Settings(BaseSettings):
         description="PoC login secret; please change this default password immediately",
     )
     allow_insecure_key: bool = Field(default=False, description="Allow default secret key in non-test environments (development convenience)")
-    trusted_proxies: list[str] = Field(default_factory=list, description="Trusted reverse proxy IPs for X-Forwarded-For")
+    candidate_token_key_version: str = "1"
+    candidate_token_secret_v1: str = Field(default="", repr=False)
+    candidate_token_revoked_key_versions: list[str] = Field(default_factory=list)
+    candidate_token_ttl_seconds: int = 600
+    candidate_token_max_ttl_seconds: int = 600
+    cross_language_enabled: bool = False
+    cross_language_todo_enabled: bool = False
+    cross_language_embedding_enabled: bool = False
+    cross_language_resolver_version: str = "w5-resolver-v1"
+    cross_language_score_version: str = "w5-score-v1"
+    cross_language_embedding_space: str = "local/all-MiniLM-L6-v2/384"
+    # TECH_DESIGN_跨语言实体关联_W5_v1 §6.3 阈值与上限
+    cross_language_embedding_min_score: float = 0.78
+    cross_language_embedding_confirm_score: float = 0.86
+    cross_language_embedding_candidate_limit: int = Field(default=100, ge=1)
+    cross_language_embedding_timeout_ms: int = Field(default=500, ge=1)
+    cross_language_llm_fallback_enabled: bool = False
+    cross_language_llm_fallback_max_candidates: int = Field(default=5, ge=0)
+    cross_language_rejection_cooldown_days: int = Field(default=30, ge=0)
+    cross_language_todo_confirm_score: float = 0.88
+    cross_language_todo_ambiguous_score: float = 0.78
+    cross_language_rollout_percent: int = Field(default=0, ge=0, le=100)
+    cross_language_embedding_provider: str = "local"
 
-    # LLM Provider
+
     llm_provider: str = "deepseek"  # deepseek, openai, anthropic — see LLM_PRESETS
     llm_api_key: str = Field(default="")
     llm_base_url: str = Field(default="")
@@ -219,6 +245,21 @@ class Settings(BaseSettings):
                 self.llm_base_url = preset["base_url"]
             if not self.llm_model:
                 self.llm_model = preset["model"]
+        return self
+
+    @model_validator(mode="after")
+    def validate_w5_candidate_token_settings(self) -> "Settings":
+        if self.candidate_token_ttl_seconds <= 0:
+            raise ValueError("candidate_token_ttl_seconds must be positive")
+        if self.candidate_token_max_ttl_seconds <= 0:
+            raise ValueError("candidate_token_max_ttl_seconds must be positive")
+        if self.candidate_token_ttl_seconds > self.candidate_token_max_ttl_seconds:
+            raise ValueError("candidate_token_ttl_seconds cannot exceed candidate_token_max_ttl_seconds")
+        if not self.candidate_token_key_version or not self.candidate_token_key_version.isascii():
+            raise ValueError("candidate_token_key_version must be a non-empty ASCII string")
+        if self.app_env != "development" and (self.cross_language_enabled or self.cross_language_todo_enabled):
+            if not self.candidate_token_secret_v1:
+                raise ValueError("candidate_token_secret_v1 must be set when W5 is enabled")
         return self
 
     @model_validator(mode="after")

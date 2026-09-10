@@ -1,0 +1,1 @@
+"""W5 golden fixtures placeholder (no fixture files yet)."""

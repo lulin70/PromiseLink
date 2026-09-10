@@ -477,7 +477,7 @@ class TestCacheAndStorage:
             call_count = 0
 
             class MockEmbeddingProvider:
-                async def embed(self, text: str) -> list[float]:
+                async def embed(self, text: str, *, user_scope: str = "global") -> list[float]:
                     nonlocal call_count
                     call_count += 1
                     # Deterministic pseudo-embedding based on text

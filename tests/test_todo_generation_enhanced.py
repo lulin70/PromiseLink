@@ -124,6 +124,18 @@ async def _add_existing_todo(
             props["to_person"] = person
         else:
             props["person"] = person
+    # Strict FK: todos.source_event_id must reference a real event.
+    event = Event(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        event_type="meeting",
+        source="test",
+        title="dedup fixture",
+        raw_text="x",
+        status="completed",
+    )
+    session.add(event)
+    await session.flush()
     todo = Todo(
         id=str(uuid.uuid4()),
         user_id=user_id,
@@ -131,7 +143,7 @@ async def _add_existing_todo(
         title=title,
         priority=priority,
         status=status,
-        source_event_id=str(uuid.uuid4()),
+        source_event_id=str(event.id),
         properties=props,
     )
     session.add(todo)

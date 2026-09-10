@@ -58,6 +58,12 @@ async def record_correction(
     """
     redacted_text = redact_pii_from_text(original_extracted_text or "") or None
 
+    # Legacy W3 audit rows are completed facts, not outstanding W5 operations:
+    # "ignore" records a rejection decision, every other action records a
+    # confirmation. completed_at pins the fact so retention/replay queries can
+    # distinguish closed audit rows from live W5 operations.
+    legacy_operation_status = "rejected" if action == "ignore" else "confirmed"
+
     # SQLite uses String(36) columns for UUIDs, so bind plain str to avoid the
     # DBAPI bind mismatch. PostgreSQL still accepts uuid.UUID instances.
     def _uid(value: str | uuid.UUID | None) -> uuid.UUID | str | None:
@@ -67,6 +73,7 @@ async def record_correction(
             return str(value if isinstance(value, uuid.UUID) else uuid.UUID(value))
         return value if isinstance(value, uuid.UUID) else uuid.UUID(value)
 
+    now = datetime.now(UTC)
     row = EntityCorrection(
         id=_uid(str(uuid.uuid4())),
         user_id=_uid(user_id),
@@ -78,7 +85,10 @@ async def record_correction(
         candidate_entity_ids=list(candidate_entity_ids) if candidate_entity_ids else None,
         selected_entity_id=_uid(selected_entity_id),
         action=action,
-        created_at=datetime.now(UTC),
+        created_at=now,
+        operation_key=f"w3-{uuid.uuid4()}",
+        operation_status=legacy_operation_status,
+        completed_at=now,
     )
     session.add(row)
 

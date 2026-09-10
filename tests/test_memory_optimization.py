@@ -490,15 +490,15 @@ class TestSessionCleanup:
         # Trigger index loading by resolving an entity
         await engine.resolve({"name": "新实体", "city": "杭州"}, user_id)
 
-        # Index should now be loaded
-        assert engine._index_loaded is True
+        # Index should now be loaded (W5: per (user_id, session_id) scope set)
+        assert engine._index_loaded == {(user_id, "default")}
         assert engine.index_size() > 0, "Index should contain entity references after resolve()"
 
         # Clear the index
         engine.clear_index()
 
         # Index should be empty and marked as not loaded
-        assert engine._index_loaded is False
+        assert not engine._index_loaded
         assert engine.index_size() == 0, "Index should be empty after clear_index()"
         assert len(engine._name_index) == 0
         assert len(engine._surname_index) == 0
@@ -513,14 +513,14 @@ class TestSessionCleanup:
 
         engine = EntityResolutionEngine(db_session)
         await engine.resolve({"name": "重建测试", "city": "成都"}, user_id)
-        assert engine._index_loaded is True
+        assert engine._index_loaded == {(user_id, "default")}
 
         engine.clear_index()
-        assert engine._index_loaded is False
+        assert not engine._index_loaded
 
         # Next resolve should rebuild the index
         await engine.resolve({"name": "重建测试", "city": "成都"}, user_id)
-        assert engine._index_loaded is True
+        assert engine._index_loaded == {(user_id, "default")}
         assert engine.index_size() > 0
 
 

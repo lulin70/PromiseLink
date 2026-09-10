@@ -8,6 +8,7 @@ Design reference: PromiseLink_技术设计_v1.md v2.8 §4.12.1
 
 import asyncio
 import hashlib
+import unicodedata
 from collections import OrderedDict
 from typing import Optional, cast
 
@@ -25,6 +26,13 @@ EMBEDDING_DIMENSIONS = 768
 # Local embedding model (same as CarryMem, already installed)
 LOCAL_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 LOCAL_EMBEDDING_DIMENSIONS = 384
+
+# Profile version: 跨语言候选评分 cache 命名空间必须包含的版本字符串.
+# 在 PRD §6 / Tech Design §2.1 / Test Plan §9 已冻结.
+EMBEDDING_PROFILE_VERSION = "w5-v1"
+
+# Provider allowlist (per Test Plan §9.2 — 禁止静默 fallback)
+EMBEDDING_PROVIDER_ALLOWLIST = frozenset({"local", "api"})
 
 # Maximum number of embeddings to keep in the in-memory LRU cache.
 # Each 384-dim float embedding is ~3KB, so 1000 entries ≈ 3MB.
@@ -97,9 +105,32 @@ class EmbeddingProvider:
         self._cache_misses = 0
         self._local_model = None  # Lazy-loaded sentence-transformers
 
-    def _cache_key(self, text: str) -> str:
-        """Generate cache key from text."""
-        return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    def _cache_key(self, text: str, user_scope: str = "global") -> str:
+        """Build cache key for an embedding.
+
+        W5 cache namespace 必须是: profile_version + provider + model + dimension
+        + embedding_space + user_scope + content digest (per PRD §6 / Tech
+        Design §2.1 / Test Plan §9). 跨语言候选评分结果可缓存, 但 cache key
+        严禁只基于 text —— 否则会跨 embedding space 命中历史 cache.
+
+        user_scope: per-user 数据必须显式传 user_id; 默认 "global" 仅用于
+        系统级无归属内容, 生产用户数据路径禁止依赖该默认值.
+        """
+        provider = self._provider if self._provider in EMBEDDING_PROVIDER_ALLOWLIST else "local"
+        model = self._model
+        dimensions = getattr(self, "_actual_dims", None) or (
+            LOCAL_EMBEDDING_DIMENSIONS if provider == "local" else EMBEDDING_DIMENSIONS
+        )
+        embedding_space = f"{provider}/{model}/{dimensions}"
+        # Unicode NFC normalize + UTF-8; digest 用 SHA-256 (Test Plan §9.2 要求)
+        normalized = unicodedata.normalize("NFC", text).encode("utf-8")
+        content_digest = hashlib.sha256(normalized).hexdigest()
+        composite = (
+            f"v={EMBEDDING_PROFILE_VERSION}|provider={provider}|model={model}"
+            f"|dim={dimensions}|space={embedding_space}"
+            f"|user={user_scope}|digest={content_digest}"
+        )
+        return hashlib.sha256(composite.encode("utf-8")).hexdigest()
 
     def _cache_get(self, key: str) -> list[float] | None:
         """Get an embedding from the cache, marking it as recently used.
@@ -120,7 +151,7 @@ class EmbeddingProvider:
         while len(self._cache) > EMBEDDING_CACHE_MAX_SIZE:
             self._cache.popitem(last=False)
 
-    async def embed(self, text: str) -> list[float]:
+    async def embed(self, text: str, *, user_scope: str = "global") -> list[float]:
         """Get embedding for a single text string.
 
         Strategy: If embedding_provider=local, use local model directly.
@@ -128,11 +159,13 @@ class EmbeddingProvider:
 
         Args:
             text: Input text to embed
+            user_scope: Cache namespace. Per-user data MUST pass the real
+                user_id; "global" is only for system-level content.
 
         Returns:
             List of floats (384 dimensions for local, varies for API)
         """
-        key = self._cache_key(text)
+        key = self._cache_key(text, user_scope)
         cached = self._cache_get(key)
         if cached is not None:
             self._cache_hits += 1
@@ -178,11 +211,15 @@ class EmbeddingProvider:
         # Fallback to local model
         return await self._embed_local(text, key)
 
-    async def embed_batch(self, texts: list[str]) -> list[list[float]]:
+    async def embed_batch(
+        self, texts: list[str], *, user_scope: str = "global"
+    ) -> list[list[float]]:
         """Get embeddings for multiple texts in a single API call.
 
         Args:
             texts: List of input texts
+            user_scope: Cache namespace. Per-user data MUST pass the real
+                user_id; "global" is only for system-level content.
 
         Returns:
             List of embedding vectors
@@ -193,7 +230,7 @@ class EmbeddingProvider:
         uncached_texts: list[str] = []
 
         for i, text in enumerate(texts):
-            key = self._cache_key(text)
+            key = self._cache_key(text, user_scope)
             cached = self._cache_get(key)
             if cached is not None:
                 results[i] = cached
@@ -207,7 +244,7 @@ class EmbeddingProvider:
             # Local provider: skip API, embed each locally
             if getattr(self, "_provider", "local") == "local":
                 for idx, text in zip(uncached_indices, uncached_texts):
-                    key = self._cache_key(text)
+                    key = self._cache_key(text, user_scope)
                     emb = await self._embed_local(text, key)
                     results[idx] = emb
                 return cast(list[list[float]], results)
@@ -222,7 +259,7 @@ class EmbeddingProvider:
                 )
                 for idx, data in zip(uncached_indices, response.data):
                     embedding = data.embedding
-                    key = self._cache_key(uncached_texts[uncached_indices.index(idx)])
+                    key = self._cache_key(uncached_texts[uncached_indices.index(idx)], user_scope)
                     self._cache_put(key, embedding)
                     results[idx] = embedding
                     self._cache_misses += 1
@@ -240,7 +277,7 @@ class EmbeddingProvider:
                 # Fallback to local model for each text
                 results_list: list[list[float]] = []
                 for i, text in enumerate(texts):
-                    key = self._cache_key(text)
+                    key = self._cache_key(text, user_scope)
                     if results[i] is not None:
                         results_list.append(cast(list[float], results[i]))
                     else:

@@ -83,7 +83,7 @@ class TestBatchCalculate:
     @pytest.mark.asyncio
     async def test_boundary_entity_with_no_todos_returns_default_score(self, db_session):
         """无 Todo 的实体应返回默认值: my_rate=0.5, their_rate=0.5, score≈50, grade=D."""
-        eid = str(uuid.uuid4())
+        eid = await _make_event_and_entity(db_session, "user-1")
         result = await CreditScoreService.batch_calculate(
             db_session, [eid], "user-1"
         )
@@ -104,7 +104,7 @@ class TestBatchCalculate:
     async def test_happy_fulfilled_my_promise_yields_higher_score(self, db_session):
         """兑现 my_promise 应比无 Todo 情况得分高."""
         user_id = "user-2"
-        eid = str(uuid.uuid4())
+        eid = await _make_event_and_entity(db_session, user_id)
         db_session.add(_make_todo(
             user_id, related_entity_id=eid,
             action_type="my_promise", fulfillment_status="fulfilled",
@@ -126,7 +126,7 @@ class TestBatchCalculate:
     async def test_happy_all_fulfilled_with_multiple_interactions_yields_a_plus(self, db_session):
         """my+their 全兑现 + 多互动 → A+ 等级."""
         user_id = "user-3"
-        eid = str(uuid.uuid4())
+        eid = await _make_event_and_entity(db_session, user_id)
         for _ in range(3):
             db_session.add(_make_todo(
                 user_id, related_entity_id=eid,
@@ -152,7 +152,7 @@ class TestBatchCalculate:
     async def test_boundary_unfulfilled_my_promise_yields_low_score(self, db_session):
         """未兑现 my_promise 应拉低分数."""
         user_id = "user-4"
-        eid = str(uuid.uuid4())
+        eid = await _make_event_and_entity(db_session, user_id)
         db_session.add(_make_todo(
             user_id, related_entity_id=eid,
             action_type="my_promise", fulfillment_status="pending",
@@ -178,8 +178,8 @@ class TestBatchCalculate:
     async def test_happy_batch_multiple_entities_get_independent_scores(self, db_session):
         """批量计算多个实体应返回独立分数."""
         user_id = "user-5"
-        eid_a = str(uuid.uuid4())
-        eid_b = str(uuid.uuid4())
+        eid_a = await _make_event_and_entity(db_session, user_id, name="entity-a")
+        eid_b = await _make_event_and_entity(db_session, user_id, name="entity-b")
         # eid_a: fulfilled my_promise
         db_session.add(_make_todo(
             user_id, related_entity_id=eid_a,

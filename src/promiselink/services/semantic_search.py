@@ -176,7 +176,7 @@ class SemanticSearchEngine:
             text: Combined text (concern + capability + basic info)
             user_id: User ID for data isolation
         """
-        embedding = await self.provider.embed(text)
+        embedding = await self.provider.embed(text, user_scope=user_id)
         if self._actual_dims is None:
             self._actual_dims = len(embedding)
         await self._store_embedding("entity", entity_id, embedding, user_id, text)
@@ -189,7 +189,7 @@ class SemanticSearchEngine:
             text: Event raw_text or summary
             user_id: User ID for data isolation
         """
-        embedding = await self.provider.embed(text)
+        embedding = await self.provider.embed(text, user_scope=user_id)
         if self._actual_dims is None:
             self._actual_dims = len(embedding)
         await self._store_embedding("event", event_id, embedding, user_id, text)
@@ -254,7 +254,7 @@ class SemanticSearchEngine:
         Returns:
             List of SearchResult sorted by similarity (highest first)
         """
-        query_embedding = await self.provider.embed(query)
+        query_embedding = await self.provider.embed(query, user_scope=user_id)
 
         if self._vec_available:
             return await self._search_with_vec(query_embedding, user_id, top_k)

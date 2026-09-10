@@ -221,11 +221,16 @@ class TestGenerateGentleNudgeEntityLookup:
 
     @pytest.mark.asyncio
     async def test_boundary_non_existent_entity_uses_default_name(self, db_session):
-        """related_entity_id 指向不存在的实体时应使用 '对方'."""
+        """related_entity_id 指向不存在的实体时应使用 '对方'.
+
+        Strict-FK note: the dangling related_entity_id is never persisted —
+        the nudge path only reads the todo's fields and looks the entity up
+        (which returns None), so an unpersisted instance expresses the
+        "entity missing" scenario without violating todos.related_entity_id
+        FK integrity.
+        """
         user_id = "user-missing-entity"
         todo = _make_todo(user_id, related_entity_id=str(uuid.uuid4()))
-        db_session.add(todo)
-        await db_session.flush()
 
         mock_llm = MagicMock()
         mock_llm.generate = AsyncMock(side_effect=Exception("force fallback"))

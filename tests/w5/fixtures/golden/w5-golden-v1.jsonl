@@ -1,0 +1,14 @@
+{"id": "E-01", "language_pair": "zh_en", "direction": "zh_to_en", "entity_type": "person", "source": {"name": "林晚秋"}, "expected_candidates": [{"rank": 1, "canonical_name": "Lin Wanqiu", "score_min": 0.85, "method": "cross_language_match"}]}
+{"id": "E-02", "language_pair": "en_zh", "direction": "en_to_zh", "entity_type": "person", "source": {"name": "Lin Wanqiu", "company": "Acme Corp"}, "expected_candidates": [{"rank": 1, "canonical_name": "林晚秋", "score_min": 0.8, "method": "cross_language_match"}]}
+{"id": "E-03", "language_pair": "ja_zh", "direction": "ja_to_zh", "entity_type": "person", "source": {"name": "林晩秋"}, "expected_candidates": [{"rank": 1, "canonical_name": "林晚秋", "score_min": 0.8, "method": "cross_language_match"}]}
+{"id": "E-04", "language_pair": "zh_ja", "direction": "zh_to_ja", "entity_type": "person", "source": {"name": "林晚秋"}, "expected_candidates": [{"rank": 1, "canonical_name": "林晩秋", "score_min": 0.8, "method": "cross_language_match"}]}
+{"id": "E-05", "language_pair": "en_zh", "direction": "en_to_zh", "entity_type": "company", "source": {"name": "Acme Corporation", "title": "CEO"}, "expected_candidates": [{"rank": 1, "canonical_name": "Acme 公司", "score_min": 0.8, "method": "synonym_match"}]}
+{"id": "E-06", "language_pair": "zh_en", "direction": "zh_to_en", "entity_type": "company", "source": {"name": "Acme 公司"}, "expected_candidates": [{"rank": 1, "canonical_name": "Acme Corporation", "score_min": 0.8, "method": "synonym_match"}]}
+{"id": "E-N01", "language_pair": "en_zh", "direction": "en_to_zh", "entity_type": "person", "source": {"name": "John Smith"}, "expected_candidates": []}
+{"id": "E-N02", "language_pair": "zh_en", "direction": "zh_to_en", "entity_type": "person", "source": {"name": "王伟"}, "expected_candidates": []}
+{"id": "E-N03", "language_pair": "ja_zh", "direction": "ja_to_zh", "entity_type": "person", "source": {"name": "佐藤太郎"}, "expected_candidates": []}
+{"id": "E-N04", "language_pair": "zh_ja", "direction": "zh_to_ja", "entity_type": "person", "source": {"name": "张三"}, "expected_candidates": []}
+{"id": "E-N05", "language_pair": "en_zh", "direction": "en_to_zh", "entity_type": "company", "source": {"name": "XYZ Industries"}, "expected_candidates": []}
+{"id": "E-N06", "language_pair": "ja_zh", "direction": "ja_to_zh", "entity_type": "company", "source": {"name": "ヤマト運輸"}, "expected_candidates": []}
+{"id": "T-01", "language_pair": "zh_en", "direction": "zh_to_en", "entity_type": "todo", "source": {"title": "下周一前提交季度报告", "due_date": "2026-09-14"}, "expected_candidates": [{"rank": 1, "canonical_name": "Submit quarterly report by Monday", "score_min": 0.75, "method": "cross_language_match"}]}
+{"id": "T-02", "language_pair": "en_zh", "direction": "en_to_zh", "entity_type": "todo", "source": {"title": "Review the contract"}, "expected_candidates": []}

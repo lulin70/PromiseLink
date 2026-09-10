@@ -167,9 +167,10 @@ class TestEmbeddingProvider:
             provider._cache_misses = 0
             provider._local_model = None
 
-            # Pre-populate cache
-            import hashlib
-            key_alpha = hashlib.sha256(b"alpha").hexdigest()
+            # Pre-populate cache using the provider's own key derivation
+            # (W5: cache key = profile+provider+model+dims+space+user+digest,
+            # never raw text alone).
+            key_alpha = provider._cache_key("alpha")
             provider._cache = OrderedDict([(key_alpha, fake_emb_alpha)])
 
             results = await provider.embed_batch(["alpha", "beta"])
@@ -290,7 +291,7 @@ class TestSemanticSearchEngine:
             "artificial intelligence": emb_a,  # similar to "AI research"
         }
 
-        async def mock_embed(text: str) -> list[float]:
+        async def mock_embed(text: str, *, user_scope: str = "global") -> list[float]:
             return embeddings_map.get(text, _make_fake_embedding(seed=99))
 
         provider.embed = AsyncMock(side_effect=mock_embed)

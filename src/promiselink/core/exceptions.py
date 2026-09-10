@@ -78,6 +78,13 @@ class ConflictError(BusinessError):
         )
 
 
+class CandidateTokenError(BusinessError):
+    """W5 candidate token validation failure."""
+
+    def __init__(self, code: str, message: str, details: dict | None = None):
+        super().__init__(message=message, code=code, details=details or {})
+
+
 class EntityNotFoundError(BusinessError):
     """Entity not found in database."""
 

@@ -85,10 +85,13 @@ class EntityResolutionEngine:
         self.confirm_threshold = confirm_threshold
         self.llm = llm_client
         # In-memory index for O(1) candidate lookup (session-scoped)
-        self._name_index: dict[str, list[Entity]] = {}
-        self._surname_index: dict[str, list[Entity]] = {}
-        self._alias_index: dict[str, list[Entity]] = {}
-        self._index_loaded = False
+        # W5 隔离: 索引按 user_id + session_id 隔离, 严禁跨用户/跨请求复用
+        # (per PRD §6 红线 7 / Tech Design §2.1 / Test Plan §9)
+        self._name_index: dict[tuple[str, str], list[Entity]] = {}
+        self._surname_index: dict[tuple[str, str], list[Entity]] = {}
+        self._alias_index: dict[tuple[str, str], list[Entity]] = {}
+        self._index_loaded: set[tuple[str, str]] = set()
+        self._session_user_id: str | None = None
         # W4: controlled synonym dictionaries (loaded once per resolution session).
         self._person_synonyms = person_synonyms if person_synonyms is not None else {}
         self._company_synonyms = company_synonyms if company_synonyms is not None else {}
@@ -128,12 +131,13 @@ class EntityResolutionEngine:
         to allow the cached entities to be garbage-collected.
 
         The index will be transparently rebuilt on the next ``resolve()`` call
-        if needed (``_index_loaded`` is reset to ``False``).
+        if needed (``_index_loaded`` is reset to empty set, scoped by user).
         """
         self._name_index.clear()
         self._surname_index.clear()
         self._alias_index.clear()
-        self._index_loaded = False
+        self._index_loaded.clear()
+        self._session_user_id = None
 
     def index_size(self) -> int:
         """Return the total number of entity references held in the in-memory indexes.
@@ -141,15 +145,25 @@ class EntityResolutionEngine:
         Useful for memory monitoring — a single entity may appear in multiple
         indexes (name, surname, alias), so this counts references, not unique
         entities.
+
+        W5 隔离后, index 变为嵌套 dict: ``_name_index`` 的 value 是 ``{cache_key: {name: [Entity]}}``.
+        这里统计所有嵌套层实体引用计数。
         """
-        return (
-            sum(len(v) for v in self._name_index.values())
-            + sum(len(v) for v in self._surname_index.values())
-            + sum(len(v) for v in self._alias_index.values())
-        )
+        total = 0
+        for outer in self._name_index.values():
+            for bucket in outer.values():
+                total += len(bucket)
+        for outer in self._surname_index.values():
+            for bucket in outer.values():
+                total += len(bucket)
+        for outer in self._alias_index.values():
+            for bucket in outer.values():
+                total += len(bucket)
+        return total
 
     async def resolve(
-        self, new_entity_data: dict[str, Any], user_id: str
+        self, new_entity_data: dict[str, Any], user_id: str,
+        session_id: str = "default",
     ) -> ResolutionResult:
         """Execute 6-step resolution for a new entity.
 
@@ -157,6 +171,9 @@ class EntityResolutionEngine:
             new_entity_data: Dict with keys: name, company, title, city,
                 industry, entity_type, etc.
             user_id: Owner user ID for scoping.
+            session_id: Isolation scope for the in-memory candidate index.
+                Production callers MUST pass a per-execution id (e.g. the
+                event_id); ``"default"`` is W4-test compatibility only.
 
         Returns:
             ResolutionResult with action, confidence, and matched info.
@@ -165,10 +182,13 @@ class EntityResolutionEngine:
             "resolution_started",
             entity_name=new_entity_data.get("name"),
             user_id=user_id,
+            session_id=session_id,
         )
 
         name_prefix = self._extract_surname(new_entity_data.get("name") or "")
-        candidates = await self._find_candidates(new_entity_data, user_id, name_prefix=name_prefix)
+        candidates = await self._find_candidates(
+            new_entity_data, user_id, name_prefix=name_prefix, session_id=session_id
+        )
 
         if not candidates:
             result = ResolutionResult(
@@ -367,10 +387,19 @@ class EntityResolutionEngine:
         )
         return target
 
-    async def _ensure_index(self, user_id: str) -> None:
-        """Load all user entities into in-memory indexes (once per session)."""
-        if self._index_loaded:
+    async def _ensure_index(self, user_id: str, session_id: str) -> None:
+        """Load all user entities into in-memory indexes (per user, per session).
+
+        W5 隔离: 索引 key 是 (user_id, session_id), 严禁跨用户/跨请求复用
+        (per PRD §6 红线 7 / Tech Design §2.1 / Test Plan §9).
+        """
+        cache_key = (user_id, session_id)
+        if cache_key in self._index_loaded:
             return
+        # 跨用户切到时, 防止前一个用户的索引泄漏
+        if self._session_user_id is not None and self._session_user_id != user_id:
+            self.clear_index()
+        self._session_user_id = user_id
         stmt = select(Entity).where(
             Entity.user_id == user_id,
             Entity.entity_type == "person",
@@ -381,37 +410,51 @@ class EntityResolutionEngine:
         )
         result = await self.session.execute(stmt)
         for e in result.scalars().all():
-            self._add_to_index(e)
-        self._index_loaded = True
-        logger.debug("entity_index_loaded", user_id=user_id, count=len(self._name_index))
+            self._add_to_index(e, cache_key)
+        self._index_loaded.add(cache_key)
+        logger.debug(
+            "entity_index_loaded",
+            user_id=user_id,
+            session_id=session_id,
+            count=sum(len(v) for v in self._name_index.values()),
+        )
 
-    def _add_to_index(self, entity: Entity) -> None:
+    def _add_to_index(self, entity: Entity, cache_key: tuple[str, str]) -> None:
         """Add a single entity to all in-memory indexes."""
         key = entity.name.lower().strip()
-        self._name_index.setdefault(key, []).append(entity)
+        self._name_index.setdefault(cache_key, {}).setdefault(key, []).append(entity)
         surname = self._extract_surname(entity.name)
         if surname:
-            self._surname_index.setdefault(surname, []).append(entity)
+            self._surname_index.setdefault(cache_key, {}).setdefault(surname, []).append(entity)
         for alias in (entity.aliases or []):
-            self._alias_index.setdefault(alias.lower().strip(), []).append(entity)
+            self._alias_index.setdefault(cache_key, {}).setdefault(alias.lower().strip(), []).append(entity)
 
     async def _find_candidates(
-        self, new_entity_data: dict[str, Any], user_id: str, *, name_prefix: str = ""
+        self, new_entity_data: dict[str, Any], user_id: str, *, name_prefix: str = "",
+        session_id: str = "default",
     ) -> list[Entity]:
         """Find candidate entities for resolution.
 
         Uses in-memory indexes for O(1) lookup instead of O(n) SQL scan.
         Falls back to SQL query only if index is not loaded.
+
+        W5 隔离: 索引按 (user_id, session_id) 隔离, lookup 与 caller 的
+        ``user_id`` + ``session_id`` 严格一致. ``session_id`` 默认 ``"default"``,
+        兼容 W4 测试; API 层应传入 ``request_id`` 或 ``co_id`` 严格区分.
         """
-        await self._ensure_index(user_id)
+        await self._ensure_index(user_id, session_id)
+        cache_key = (user_id, session_id)
 
         name = (new_entity_data.get("name") or "").lower().strip()
         surname = name_prefix or self._extract_surname(new_entity_data.get("name") or "")
 
-        # O(1) lookups from indexes
-        by_name = self._name_index.get(name, [])
-        by_surname = self._surname_index.get(surname, []) if surname else []
-        by_alias = self._alias_index.get(name, [])
+        # O(1) lookups from indexes (per-user, per-session scoped)
+        name_bucket = self._name_index.get(cache_key, {})
+        surname_bucket = self._surname_index.get(cache_key, {})
+        alias_bucket = self._alias_index.get(cache_key, {})
+        by_name = name_bucket.get(name, [])
+        by_surname = surname_bucket.get(surname, []) if surname else []
+        by_alias = alias_bucket.get(name, [])
 
         # Merge and deduplicate
         seen: set[str] = set()

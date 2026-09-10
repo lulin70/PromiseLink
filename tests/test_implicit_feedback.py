@@ -10,14 +10,15 @@ from promiselink.services.implicit_feedback import ImplicitFeedbackCollector
 from tests.conftest import create_test_event, make_user_id
 
 
-def _create_todo(
+async def _create_todo(
     session: AsyncSession,
     user_id: str,
     todo_type: str = "promise",
     status: str = "pending",
     dynamic_score: float | None = None,
 ) -> Todo:
-    """Helper to create a Todo object for testing."""
+    """Helper to create a Todo object backed by a real event (strict FK)."""
+    event = await create_test_event(session, user_id=user_id)
     todo = Todo(
         id=str(uuid.uuid4()),
         user_id=user_id,
@@ -25,7 +26,7 @@ def _create_todo(
         title="Test todo",
         status=status,
         priority=3,
-        source_event_id=str(uuid.uuid4()),
+        source_event_id=str(event.id),
         dynamic_score=dynamic_score,
     )
     session.add(todo)
@@ -42,7 +43,7 @@ class TestRecordCompletion:
         user_id = make_user_id()
         await create_test_event(db_session, user_id=user_id)
 
-        todo = _create_todo(db_session, user_id, status="done")
+        todo = await _create_todo(db_session, user_id, status="done")
         await db_session.flush()
 
         rank = await collector.record_completion(todo, db_session)
@@ -58,19 +59,19 @@ class TestRecordCompletion:
         await create_test_event(db_session, user_id=user_id)
 
         # First todo
-        todo1 = _create_todo(db_session, user_id, status="done")
+        todo1 = await _create_todo(db_session, user_id, status="done")
         await db_session.flush()
         rank1 = await collector.record_completion(todo1, db_session)
         await db_session.flush()
 
         # Second todo
-        todo2 = _create_todo(db_session, user_id, todo_type="help", status="done")
+        todo2 = await _create_todo(db_session, user_id, todo_type="help", status="done")
         await db_session.flush()
         rank2 = await collector.record_completion(todo2, db_session)
         await db_session.flush()
 
         # Third todo
-        todo3 = _create_todo(db_session, user_id, todo_type="care", status="done")
+        todo3 = await _create_todo(db_session, user_id, todo_type="care", status="done")
         await db_session.flush()
         rank3 = await collector.record_completion(todo3, db_session)
 
@@ -87,12 +88,12 @@ class TestRecordCompletion:
         await create_test_event(db_session, user_id=user1)
         await create_test_event(db_session, user_id=user2)
 
-        todo1 = _create_todo(db_session, user1, status="done")
+        todo1 = await _create_todo(db_session, user1, status="done")
         await db_session.flush()
         rank1 = await collector.record_completion(todo1, db_session)
         await db_session.flush()
 
-        todo2 = _create_todo(db_session, user2, status="done")
+        todo2 = await _create_todo(db_session, user2, status="done")
         await db_session.flush()
         rank2 = await collector.record_completion(todo2, db_session)
 
@@ -112,17 +113,17 @@ class TestGetCompletionStats:
         await create_test_event(db_session, user_id=user_id)
 
         # Create and complete two promise todos and one help todo
-        todo1 = _create_todo(db_session, user_id, todo_type="promise", status="done", dynamic_score=0.8)
+        todo1 = await _create_todo(db_session, user_id, todo_type="promise", status="done", dynamic_score=0.8)
         await db_session.flush()
         await collector.record_completion(todo1, db_session)
         await db_session.flush()
 
-        todo2 = _create_todo(db_session, user_id, todo_type="promise", status="done", dynamic_score=0.6)
+        todo2 = await _create_todo(db_session, user_id, todo_type="promise", status="done", dynamic_score=0.6)
         await db_session.flush()
         await collector.record_completion(todo2, db_session)
         await db_session.flush()
 
-        todo3 = _create_todo(db_session, user_id, todo_type="help", status="done", dynamic_score=0.9)
+        todo3 = await _create_todo(db_session, user_id, todo_type="help", status="done", dynamic_score=0.9)
         await db_session.flush()
         await collector.record_completion(todo3, db_session)
         await db_session.flush()

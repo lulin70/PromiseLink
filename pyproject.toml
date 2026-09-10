@@ -98,9 +98,21 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "--cov=promiselink --cov-report=term-missing --cov-report=html --continue-on-collection-errors"
+# W5 admission baseline (docs/design/W5_IMPLEMENTATION_READINESS_CHECKLIST_v1.md §3.2):
+#   - no --continue-on-collection-errors (collection errors fail the run)
+#   - --strict-markers rejects unknown markers
+#   - --maxfail=1 surfaces the first real failure in CI
+#   - -ra reports non-pass results so xfail/skip masking is visible
+addopts = "--cov=promiselink --cov-report=term-missing --cov-report=html --strict-markers --maxfail=1 -ra"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "unit: pure-unit tests with no DB / network I/O",
+    "security: security-focused tests (auth, scopes, PII)",
+    "integration: integration tests touching the database",
+    "dual_db: requires PostgreSQL via --postgresql-url",
+    "performance: latency / throughput threshold tests",
+    "e2e: end-to-end API/UI scripts (real-user black box)",
+    "antighost: anti-ghost activation counters",
 ]
 
 [tool.coverage.run]
