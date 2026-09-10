@@ -344,6 +344,13 @@ async def claim_operation(session: AsyncSession, operation: EntityCorrection) ->
     )
     if result.rowcount == 1:
         operation.operation_status = "pending"
+        # W5 Anti-ghost hook: real CAS state machine reached via the
+        # production issue→pending transition.
+        try:  # never let observability break the production path
+            from promiselink.core.activation import record as _record_w5
+            _record_w5("operation_state_machine")
+        except Exception:
+            pass
         return "claimed"
     await session.refresh(operation)
     status = operation.operation_status

@@ -104,6 +104,12 @@ def issue_candidate_token(
         hashlib.sha256,
     ).hexdigest().encode("ascii")
     token = base64.urlsafe_b64encode(payload_bytes + b"." + signature).rstrip(b"=").decode("ascii")
+    # W5 Anti-ghost hook: real production call to the signer path.
+    try:  # never let observability break the production path
+        from promiselink.core.activation import record as _record_w5
+        _record_w5("issue_candidate_token")
+    except Exception:
+        pass
     return token, payload
 
 
@@ -245,6 +251,12 @@ def verify_candidate_token(
     ttl = (expires_at - issued_at).total_seconds()
     if ttl > settings.candidate_token_max_ttl_seconds:
         raise _candidate_token_error("candidate token lifetime exceeds the configured maximum")
+    # W5 Anti-ghost hook: real production call to the verifier path (success only).
+    try:  # never let observability break the production path
+        from promiselink.core.activation import record as _record_w5
+        _record_w5("verify_candidate_token")
+    except Exception:
+        pass
     return cast(dict[str, Any], payload)
 
 

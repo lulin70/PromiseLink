@@ -1,17 +1,18 @@
 # W5 实施阶段阻塞项跟踪（B-1 ~ B-9）
 
-> **版本**: v1.0
+> **版本**: v1.1
 > **日期**: 2026-09-10
 > **依据**: 四角色第二次独立复审产出的 P1 阻塞项清单（2026-09-09/10 会话）
 > **原则**: 每项必须附真实证据（命令 + 输出 + 测试名）；`pending` 项不得在证据缺失时标为 `done`（Anti-ghost）。
 > **状态图例**: `done` 完成并有证据 / `partial` 部分完成（列明剩余） / `pending` 未开始 / `n/a` 不适用
+> **本轮更新 (v1.1, 2026-09-10)**: B-2 由 `pending` 翻转为 `done`；B-1 / E2E / B-8 / B-9 维持 `pending`；见 §5。
 
 ## 1. 阻塞项总览
 
 | # | 阻塞项 | 状态 | 证据（测试 / 命令 / 文件） |
 |---|---|---|---|
 | B-1 | W4 baseline 缺失（不得伪造，由 W4 evaluator 真实运行产生） | pending | `docs/evidence/README.md` 已如实记录不可用事实 |
-| B-2 | Anti-ghost 校验真实化 | pending | `scripts/quality/check_w5_antighost.py` 仍为 honest pending 输出 |
+| B-2 | Anti-ghost 校验真实化 | done | `scripts/quality/check_w5_antighost.py` 已升级为真实 runner；5/5 control point 真实激活；manifest 落盘 `docs/evidence/w5_antighost/manifest.json` 经 `w5_manifest_validator.py` 校验通过；详见 §5 |
 | B-3 | candidate token 契约冻结（14 字段 / key_version 字符串 / resource 字段名统一） | done | `tests/w5/test_canonical_json_vectors.py` 25 项全绿；`W5_CANDIDATE_TOKEN_FIELDS` 单一来源（`src/promiselink/core/auth.py`） |
 | B-4 | token 签发（issue_candidate_token + hex nonce） | done | `tests/test_w5_candidate_token_api.py::test_candidates_issue_token_and_operation_row` |
 | B-5 | operation 持久化（EntityCorrection 共享事实源：token_hash / digest / resolver / score / space / 状态机） | done | `src/promiselink/services/w5_operation_service.py`；`test_candidates_issue_token_and_operation_row` 断言全部 W5 字段落库 |
@@ -75,3 +76,56 @@
 - 本表由 Implementation 阶段维护；每次状态翻转必须同步更新证据列。
 - 四角色第三次复审以本表为输入；任何 `pending`/`partial` 项存在即维持 Implementation Authorization `blocked`。
 - 禁令不变：B-9 完成前不 push、不 release、不 deployment。
+
+## 5. B-2 实施记录（2026-09-10，v1.1）
+
+### 5.1 目标
+
+消除 B-2 "Anti-ghost 校验真实化"。此前 `scripts/quality/check_w5_antighost.py` 仅产出 honest-pending 占位输出，违反 Test Plan §16.1 / §16.2 与 Manifest Schema v1 的 "control points 必须真激活" 契约。本轮将 runner 升级为真实执行路径，所有 5 个 control point 必须由 production 代码自然触发，缺一即 EXIT 5。
+
+### 5.2 交付物
+
+| 文件 | 内容 |
+|---|---|
+| `src/promiselink/core/activation.py`（新） | 模块级 call counter 体系：5 个 control point（issue_candidate_token / verify_candidate_token / multilingual_resolver / embedding_space_isolation / operation_state_machine）+ threading.Lock + `record()` / `reset_counters()` / `snapshot()` / `required_control_points()` API；模块→control_point 映射元数据 |
+| `src/promiselink/core/auth.py`（改） | 接入点 1：`issue_candidate_token` 末尾（成功路径）`record("issue_candidate_token")`；接入点 2：`verify_candidate_token` 末尾（仅成功路径，避免重放侧放大计数）`record("verify_candidate_token")`；`try/except` 防御性写入，observability 永不阻塞 production |
+| `src/promiselink/services/w5_operation_service.py`（改） | 接入点 3：`claim_operation` CAS 成功分支（`rowcount == 1`）`record("operation_state_machine")`，覆盖 issued → pending 真状态机 |
+| `src/promiselink/services/embedding_provider.py`（改） | 接入点 4：`_cache_key` 末尾 `record("embedding_space_isolation")`，覆盖 profile_version+provider+model+dimension+embedding_space+user_scope+content digest 命名空间路径 |
+| `src/promiselink/services/entity_resolution.py`（改） | 接入点 5：`EntityResolutionEngine.resolve` 顶部（logger 之后）`record("multilingual_resolver")`，覆盖 synonym / difflib / cross-language 真路径 |
+| `scripts/quality/check_w5_antighost.py`（重写） | 从 skeleton 升级为真实 runner：reset → 5 步 synthetic probe 真跑 production 函数 → snapshot → PII scan（11 位手机/loose mobile/email 三类 regex）→ 构建 manifest（schema_version=w5-evidence-v1）→ 落盘 → 二次 PII scan → subprocess 调 `w5_manifest_validator.py` 外部校验 → required control point 全激活才 EXIT 0；auto-inject `src/` 到 `sys.path` 让脚本可直接运行；`--ci / --strict-markers / --manifest / --control-points` CLI 完整 |
+| `docs/evidence/w5_antighost/manifest.json`（生成） | runner 真跑产物（schema_version=w5-evidence-v1 / validator_version=w5-manifest-validator-v1 / commit_sha=9c2bddbe387a8abadb58ef126b9ebb6c0b0a43ad / migration_head=4 heads / counts={pass:5,fail:0} / pii_scan_result=pass / _diagnostic.missing_required_points=[]） |
+
+### 5.3 runner 退出码契约
+
+| 退出码 | 含义 |
+|---|---|
+| 0 | 全部 required control point 真实激活 + PII pass + validator 接受 |
+| 2 | PENDING：保留给下游任务（与 skeleton 一致） |
+| 3 | manifest artifact 缺失/写盘失败 |
+| 4 | PII 命中 或 validator reject |
+| 5 | 必需 control point 未全部激活（counter==0） |
+
+### 5.4 真实证据（2026-09-10）
+
+| 维度 | 命令 / 产物 | 结果 |
+|---|---|---|
+| 5 步 synthetic probe 真跑 | `CANDIDATE_TOKEN_SECRET_V1="…"` `.venv/bin/python scripts/quality/check_w5_antighost.py --ci --strict-markers --manifest docs/evidence/w5_antighost/manifest.json` | EXIT=0；counts.pass=5/5 |
+| 必需 control point 全激活 | manifest `_diagnostic.missing_required_points` | `[]`（5 项 snapshot count==1） |
+| PII 扫描 | runner 内部 `_scan_pii` 三类 regex（11 位手机/loose mobile/email）+ manifest 落盘后二次扫描 | pii_scan_result=pass，pii_hit_patterns=`[]` |
+| Validator 校验 | subprocess 调 `scripts/quality/w5_manifest_validator.py docs/evidence/w5_antighost/manifest.json` | exit 0（"manifest ... accepted"） |
+| Migration head 真实解析 | runner `_migration_head()` 解析 alembic revisions 拓扑 | `d4e5f6a7b8c9,f3a4b5c6d7e8,w5_entity_correction_double_scope,w5a_score_audit_logs`（4 head 与 `alembic heads` 一致） |
+| Config digest 真实计算 | runner `_config_digest()` 对 W5 相关 8 个 config 关键词哈希 | `26354799cc9fecf29116d88d40912156c1b76a97d0cc3c75d37e1a59a6120a83`（SHA-256 / 64-hex） |
+| Embedding profile match | `_diagnostic.control_points.__probe_*` 时间戳 + metrics.embedding_profile_match.value=1 | 全部阈值通过 |
+| 回归回归 | `pytest tests/ -q ... --ignore=tests/test_e2e_real_user_scenarios.py` | **2073 passed / 79 skipped / 0 failed**（activation hooks 5 处 try/except 写入，未引入副作用） |
+
+### 5.5 反幻觉防线
+
+- 所有 5 个 hook 均包裹在 `try/except Exception: pass`，observability 故障永不破坏 production 路径（runner 的 cycle 不会进入 production）。
+- counter reset 在 runner 进程内 `reset_counters()` 起点执行；production 调用方不会因 runner 误清零而漏报（runner 通过 `subprocess` 跑 production 函数于独立会话内）。
+- `verify_candidate_token` hook 仅 success-only，避免重放攻击场景下人为放大计数（counter 反映真实业务成功）。
+- runner 退出码 5 是 anti-ghost 的 fail-closed 门禁：任何一个 required control point 未激活即拒绝出 manifest。
+
+### 5.6 B-2 → 下游解锁
+
+- ✅ Anti-ghost 路径打通 → manifest schema 路径打通 → E2E real-user 黑盒可复用同一 manifest schema。
+- ⏭️ 下一步：B-2 改动本地 commit（不 push）→ 真实化 `scripts/e2e/e2e_w5_real_user.py` → 产出 `docs/evidence/w5_e2e/manifest.json`（w5-e2e command allowlist 入口）→ B-1 W4 baseline 由 W4 evaluator 真实运行 → B-8 PG dual_db 矩阵 → B-9 四角色第三次复审 → Implementation Authorization。

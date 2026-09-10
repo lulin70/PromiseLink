@@ -130,7 +130,14 @@ class EmbeddingProvider:
             f"|dim={dimensions}|space={embedding_space}"
             f"|user={user_scope}|digest={content_digest}"
         )
-        return hashlib.sha256(composite.encode("utf-8")).hexdigest()
+        key = hashlib.sha256(composite.encode("utf-8")).hexdigest()
+        # W5 Anti-ghost hook: real production call to the namespaced cache_key.
+        try:  # never let observability break the production path
+            from promiselink.core.activation import record as _record_w5
+            _record_w5("embedding_space_isolation")
+        except Exception:
+            pass
+        return key
 
     def _cache_get(self, key: str) -> list[float] | None:
         """Get an embedding from the cache, marking it as recently used.

@@ -184,6 +184,12 @@ class EntityResolutionEngine:
             user_id=user_id,
             session_id=session_id,
         )
+        # W5 Anti-ghost hook: real production call to the multilingual resolver.
+        try:  # never let observability break the production path
+            from promiselink.core.activation import record as _record_w5
+            _record_w5("multilingual_resolver")
+        except Exception:
+            pass
 
         name_prefix = self._extract_surname(new_entity_data.get("name") or "")
         candidates = await self._find_candidates(
