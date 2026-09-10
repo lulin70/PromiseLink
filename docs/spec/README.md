@@ -15,9 +15,14 @@
 | PRD_v1_review_report.md | - | 2026-06-01 | ✅ 完成 | 7角色评审报告 |
 | PRD_解析语义契约_v1.md | v1.0 | 2026-09-03 | ✅ 已裁决 | W1+W2 解析语义契约：代码驱动文档生成 + 黄金集回归仪表 |
 | PRD_解析语义契约_W3W4_v1.md | v1.0 | 2026-09-05 | ✅ 已落地（PR #12） | W3 纠偏回流（EntityCorrection 审计）+ W4 实体规范化（同义词字典/difflib/高频联系人） |
-| PRD_跨语言实体关联_W5_v1.md | v1.1 | 2026-09-07 | ✅ 已裁决（D1 embedding 先行 / D2 不做翻译 / D3 L5 纳入本期），进入技术设计 | W5 跨语言实体/待办关联（= ROADMAP L4/L5）：三语字典 + confirm-only 匹配 + 纠偏闭环复用 |
+| PRD_跨语言实体关联_W5_v1.md | v1.2 | 2026-09-08 | DevSquad 复核修订版，待最终准入签署；未通过 Test Plan approval 不得进入实现 | W5 跨语言实体/待办关联：Entity/Todo 共用 operation/audit 事实模型、HMAC opaque token、`canonical_zh` 独立字段、主库事实源、派生向量空间门禁、CONFIRM-only |
 
----
+### 技术设计索引
+
+| 文件名 | 版本 | 日期 | 状态 | 说明 |
+|---|---|---|---|---|
+| [TECH_DESIGN_跨语言实体关联_W5_v1.md](../design/TECH_DESIGN_跨语言实体关联_W5_v1.md) | v1.2 | 2026-09-08 | DevSquad 复核修订版，待最终准入签署；未通过 Test Plan approval 不得进入实现 | W5 技术设计：operation/audit 事实模型、候选 token、W3 审计冷却、双数据库/向量派生边界、灰度回滚、指标告警与 E2E 准入门禁 |
+| [TEST_PLAN_跨语言实体关联_W5_v1.md](../design/TEST_PLAN_跨语言实体关联_W5_v1.md) | v1.2 | 2026-09-08 | DevSquad 复核修订版，待最终签署批准；未通过准入不得进入实现 | W5 测试计划：双数据库、真实用户 E2E、Anti-ghost、manifest、token/审计/幂等与发布门禁 |
 
 ## 📊 需求分级
 
@@ -131,4 +136,4 @@
 
 ---
 
-*最后更新: 2026-08-03 (v0.9.0 同步: PRD v5.8 + F-67/F-68/F-69/F-71/F-72 + Promise 双向分析 + F-50 迁移 Pro)*
+*最后更新: 2026-09-08（W5 v1.2：DevSquad 复核修订版，待最终准入签署；未通过 Test Plan approval 不得进入实现）*

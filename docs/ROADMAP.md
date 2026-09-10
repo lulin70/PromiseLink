@@ -85,20 +85,19 @@
 | L1 | 前端 i18n 框架集成 | react-i18next（基础版 Web）+ Taro i18n（小程序），错误提示/按钮文案本地化 | 0.5 周 | P0 |
 | L2 | 网关错误码本地化 | 网关返回 error.code + error.message_zh/en/ja，前端按语言渲染 | 0.5 周 | P0 |
 | L3 | AI 抽取多语言支持 | EntityExtractor prompt 支持中/英/日输入文本，输出统一为结构化实体 | 0.5 周 | P0 |
-| L4 | 跨语言实体关联（同义词字典 + LLM 辅助） | 中文名↔英文名↔日文名映射（如"约翰·史密斯"="John Smith"="ジョン・スミス"），基于 LLM 语义相似度 + 人工确认 | 1 周 | P1 |
-| L5 | 跨语言待办关联 | "下周跟进"="follow up next week"="来週フォローアップ" 基于时间语义 + LLM 归一化 | 0.5 周 | P1 |
+| L4 | 跨语言实体关联（embedding-first + 三语字典 + 人工确认） | 中文名↔英文名↔日文名映射；字典、accepted alias、embedding 和必要的 LLM fallback 只生成候选，所有跨语言路径严格 `CONFIRM-only`，服务端 opaque HMAC token 绑定候选与版本 | 待准入 | P1 |
+| L5 | 跨语言待办关联 | 中/英/日 Todo 只生成 confirm-only 候选；默认关闭，使用时间语义、语言归一与候选评分；确认/拒绝复用 Todo correction audit 与 cooldown，禁止触发 Entity merge，Todo 文本不得写入 Entity.aliases | 待准入 | P1 |
 
-**跨语言实体关联技术调研结论**：
-1. **可行方案**：LLM 语义相似度（DeepSeek/OpenAI兼容 embedding）+ 人工确认机制（类似现有"多候选人脉选择"纠偏流程）
-2. **不依赖**：不需要翻译 API 实时翻译（成本高、延迟大），而是依赖 LLM 在抽取阶段直接输出归一化实体
-3. **存储设计**：Entity 表新增 `aliases` 字段（JSON 数组），存储多语言别名；EntityResolutionEngine 新增跨语言匹配策略
-4. **边界**：跨语言关联准确率不可能 100%，必须保留用户纠偏入口（已有人脉纠偏 UI 可复用）
-5. **依赖**：L4/L5 依赖 L3（AI 抽取多语言支持）和 B4（v0.9.0 实体规范化）
+**跨语言实体关联技术调研结论（已由 W5 v1.2 修订）**：
+1. **候选生成**：embedding-first，复用既有 provider；仅同一 provider/model/dimension/embedding space/profile 可比较，缺失 metadata 或空间不一致时安全降级。
+2. **确认边界**：所有跨语言路径严格 `CONFIRM-only`；服务端 opaque HMAC candidate token 绑定 scope、digest、operation 和版本，客户端候选字段不可信。
+3. **翻译边界**：不做实时翻译 API，保持原文与独立 `canonical_zh`；不把抽取阶段 `canonical_zh` 自动写入 aliases。
+4. **事实源**：主数据库承载 Entity/Todo/Association/EntityCorrection operation-audit 事实；向量索引是可重建派生数据，不新增向量数据库。
+5. **发布门禁**：Test Plan approval、SQLite/PostgreSQL 真实 migration、真实用户 E2E、Anti-ghost、黄金集、性能、指标、灰度和回滚全部通过前不得实现、push 或 deploy。
 
 **决策点**：
-1. 跨语言关联是否是 v0.9.5 的最高优先级？（vs 其他功能需求）
-2. L4 用 embedding 相似度还是纯 LLM prompt 判断？embedding 需要额外向量存储
-3. 是否支持自动翻译录入文本？（当前设计不做自动翻译，保持原文 + 多语言实体）
+1. L4 的 embedding 是否满足黄金集和性能门槛；Test Plan approval、双数据库 migration、真实用户 E2E、Anti-ghost、灰度/回滚是否全部通过。
+2. 是否支持自动翻译录入文本？（当前设计不做自动翻译，保持原文 + 独立 `canonical_zh`）
 
 ---
 

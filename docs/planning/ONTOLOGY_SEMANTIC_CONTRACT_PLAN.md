@@ -2,7 +2,7 @@
 
 > **版本**: v1.0
 > **日期**: 2026-09-05（v1.0）；2026-09-06 W3+W4 实现已交付
-> **状态**: DevSquad 七角色共识达成；W1+W2 已落档（commit 8bf08f6 / f576a06），W3+W4 已完成实现（2026-09-06，CHANGELOG [Unreleased]）
+> **状态**: W5 准入评审中；Test Plan v1.2 待架构、安全、测试、产品/运维四类 DevSquad 角色最终签署。W1+W2 已落档，W3+W4 已完成实现；W5 签署前不得进入实现
 > **评审方式**: DevSquad 多角色协作（架构师/PM/安全/测试/编码/运维/UI，宿主 LLM 执行）
 > **关联文档**: [ROADMAP.md](../ROADMAP.md)（B4/L4 合流）、[TECH_DEBT.md](../TECH_DEBT.md)、[PRD_v1.md](spec/PRD_v1.md)
 
@@ -49,7 +49,7 @@
 | W4 关联推理轻量规则 | **B4 实体规范化**（同义词字典 + difflib 80% cutoff + 用户确认，借鉴 cognee Ontology） | W4 是 B4 的实施细化 |
 | W3 纠偏回流 | B4 的「用户确认机制」 | W3 为 B4 提供确认数据回流底座 |
 | W1 语义契约 | L3「AI 抽取多语言支持」的 prompt 基础 | L3 依赖 W1 契约固化 |
-| W5 跨语言关联 | **L4/L5 跨语言实体/待办关联**（v0.9.5） | W5 即 L4/L5，依赖 W1+B4 |
+| **当前状态** | W5 准入评审中：Test Plan v1.2 待架构、安全、测试、产品/运维四类 DevSquad 角色最终签署；签署前不得进入实现 |
 | 不做清单 | ❌ 图数据库 / ❌ RDF/OWL | **继承不变**（见 §6） |
 
 ---
@@ -104,9 +104,14 @@
 - SQL 共现规则：两人脉 ≥N 次同事件出现 → 「高频联系人」标签 → RelationshipBrief 强化
 - 明确边界：只做「共现/频率/别名」三类确定性规则；语义推断（「A 是 B 的领导」）留给 LLM + 用户确认
 
-### W5 — 跨语言实体关联（P2，远期，= ROADMAP L4/L5，依赖 W1+W4）
+### W5 — 跨语言实体关联（P1，准入评审中，= ROADMAP L4/L5，依赖 W1+W4）
 
-**目标**：同一主体跨语言归一（"John Smith"="约翰·史密斯"）。依赖契约（W1）与规范化（W4）先行。技术路线按 ROADMAP v0.9.5 既有结论（LLM 语义相似度 + 人工确认，不引入实时翻译 API）。
+**当前状态**：PRD v1.2、Technical Design v1.2 和 Test Plan v1.2 已形成；Test Plan 正等待架构、安全、测试、产品/运维四类 DevSquad 角色最终签署。签署前不得编写 W5 生产代码、migration、CI job 或测试占位文件。
+
+**目标**：同一主体跨语言归一（"John Smith"="约翰·史密斯"），并为中英日 Todo 提供独立的 confirm-only 候选关联。技术路线为 embedding-first，复用既有 provider；不引入实时翻译 API 或新的向量数据库。跨语言候选严格 `CONFIRM-only`；Todo L5 默认关闭，确认/拒绝复用 `EntityCorrection` 的 Todo correction audit 与 cooldown，不触发 Entity merge，Todo 文本不得写入 `Entity.aliases`。
+
+**发布前硬门禁**：PostgreSQL 为发布验证优先数据库，SQLite 保留离线/兼容矩阵；两者均须真实执行 migration。必须通过双数据库核心测试、真实用户 API/UI E2E、Anti-ghost、黄金集指标、性能、灰度/回滚和证据 manifest。任一门禁失败，W5 不得 push、deploy 或标记为完成。
+
 
 ---
 
@@ -145,7 +150,7 @@
 |---|---|---|
 | 本周 | W1 契约生成脚本 + 契约文档 v1.0.0；W2 黄金集首批 30 条 | 立即（地基，~4 天） |
 | v1.1.x | W3 纠偏回流；W4 实体规范化（B4）+ 共现规则 | 与「会后纪要」功能窗口并行评估 |
-| v0.9.5（ROADMAP） | W5 跨语言关联（L4/L5） | 依赖 W1+W4 |
+| W5 准入评审中 | W5 跨语言实体/待办关联（L4/L5） | 依赖 W1+W4；Test Plan v1.2 获四类角色批准后才进入实现 |
 | 持续 | 月度纠偏模式审核 → 契约迭代 | 每月 30 分钟 |
 
 ## 8. 裁决记录（2026-09-05，用户已裁决）
