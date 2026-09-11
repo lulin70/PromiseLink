@@ -1,0 +1,101 @@
+{
+  "schema_version": "w4-baseline-v1",
+  "baseline_commit": "ab28daa07503cf254a4cfbdd6a7bec25388b4df2",
+  "dataset_version": "w4-golden-v1",
+  "evaluator_version": "w5-evaluator-v1",
+  "sample_count": 16,
+  "overall": {
+    "positive_count": 12,
+    "negative_count": 4,
+    "recall_at_5": 0.9166666666666666,
+    "mrr_at_5": 0.9166666666666666,
+    "fpr": 0.0
+  },
+  "by_language_pair": {
+    "en_to_ja": {
+      "positive_count": 1,
+      "negative_count": 0,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "fpr": null
+    },
+    "en_to_zh": {
+      "positive_count": 5,
+      "negative_count": 2,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "fpr": 0.0
+    },
+    "ja_to_en": {
+      "positive_count": 2,
+      "negative_count": 0,
+      "recall_at_5": 0.5,
+      "mrr_at_5": 0.5,
+      "fpr": null
+    },
+    "ja_to_zh": {
+      "positive_count": 2,
+      "negative_count": 1,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "fpr": 0.0
+    },
+    "zh_to_en": {
+      "positive_count": 1,
+      "negative_count": 1,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "fpr": 0.0
+    },
+    "zh_to_ja": {
+      "positive_count": 1,
+      "negative_count": 0,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "fpr": null
+    }
+  },
+  "by_kind": {
+    "entity_company": {
+      "positive_count": 2,
+      "negative_count": 0,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "fpr": null
+    },
+    "entity_person": {
+      "positive_count": 6,
+      "negative_count": 4,
+      "recall_at_5": 0.8333333333333334,
+      "mrr_at_5": 0.8333333333333334,
+      "fpr": 0.0
+    },
+    "todo_no_time": {
+      "positive_count": 2,
+      "negative_count": 0,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "fpr": null
+    },
+    "todo_with_time": {
+      "positive_count": 2,
+      "negative_count": 0,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "fpr": null
+    }
+  },
+  "thresholds": {
+    "entity_confirm_score": 0.86,
+    "ambiguous_min_score": 0.78,
+    "recall_at_5_entity_threshold": 0.8,
+    "mrr_at_5_entity_threshold": 0.7,
+    "fpr_entity_threshold": 0.1,
+    "recall_at_5_todo_threshold": 0.75
+  },
+  "artifacts": [
+    "docs/e2e_evidence/w4_baseline/per_sample_report.json"
+  ],
+  "pii_scan_result": "pass",
+  "pii_hit_patterns": []
+}

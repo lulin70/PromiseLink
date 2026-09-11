@@ -1,0 +1,130 @@
+[
+  {
+    "case_id": "W5G-E-EN-ZH-PERSON-01",
+    "language_pair": "en_to_zh",
+    "kind": "entity_person",
+    "positive": true,
+    "candidates_returned": 1,
+    "hit_rank": 1
+  },
+  {
+    "case_id": "W5G-E-ZH-EN-PERSON-01",
+    "language_pair": "zh_to_en",
+    "kind": "entity_person",
+    "positive": true,
+    "candidates_returned": 1,
+    "hit_rank": 1
+  },
+  {
+    "case_id": "W5G-E-JA-ZH-PERSON-01",
+    "language_pair": "ja_to_zh",
+    "kind": "entity_person",
+    "positive": true,
+    "candidates_returned": 1,
+    "hit_rank": 1
+  },
+  {
+    "case_id": "W5G-E-ZH-JA-PERSON-01",
+    "language_pair": "zh_to_ja",
+    "kind": "entity_person",
+    "positive": true,
+    "candidates_returned": 1,
+    "hit_rank": 1
+  },
+  {
+    "case_id": "W5G-E-EN-JA-PERSON-01",
+    "language_pair": "en_to_ja",
+    "kind": "entity_person",
+    "positive": true,
+    "candidates_returned": 1,
+    "hit_rank": 1
+  },
+  {
+    "case_id": "W5G-E-JA-EN-PERSON-01",
+    "language_pair": "ja_to_en",
+    "kind": "entity_person",
+    "positive": true,
+    "candidates_returned": 0,
+    "hit_rank": null
+  },
+  {
+    "case_id": "W5G-E-EN-ZH-COMPANY-01",
+    "language_pair": "en_to_zh",
+    "kind": "entity_company",
+    "positive": true,
+    "candidates_returned": 1,
+    "hit_rank": 1
+  },
+  {
+    "case_id": "W5G-E-EN-ZH-COMPANY-02",
+    "language_pair": "en_to_zh",
+    "kind": "entity_company",
+    "positive": true,
+    "candidates_returned": 1,
+    "hit_rank": 1
+  },
+  {
+    "case_id": "W5G-E-NEG-ZH-01",
+    "language_pair": "zh_to_en",
+    "kind": "entity_person",
+    "positive": false,
+    "candidates_returned": 0,
+    "hit_rank": null
+  },
+  {
+    "case_id": "W5G-E-NEG-JA-01",
+    "language_pair": "ja_to_zh",
+    "kind": "entity_person",
+    "positive": false,
+    "candidates_returned": 0,
+    "hit_rank": null
+  },
+  {
+    "case_id": "W5G-E-NEG-EN-01",
+    "language_pair": "en_to_zh",
+    "kind": "entity_person",
+    "positive": false,
+    "candidates_returned": 0,
+    "hit_rank": null
+  },
+  {
+    "case_id": "W5G-E-NEG-DIFFLIB-01",
+    "language_pair": "en_to_zh",
+    "kind": "entity_person",
+    "positive": false,
+    "candidates_returned": 0,
+    "hit_rank": null
+  },
+  {
+    "case_id": "W5G-T-EN-ZH-WITH-TIME-01",
+    "language_pair": "en_to_zh",
+    "kind": "todo_with_time",
+    "positive": true,
+    "candidates_returned": 1,
+    "hit_rank": 1
+  },
+  {
+    "case_id": "W5G-T-JA-ZH-WITH-TIME-01",
+    "language_pair": "ja_to_zh",
+    "kind": "todo_with_time",
+    "positive": true,
+    "candidates_returned": 1,
+    "hit_rank": 1
+  },
+  {
+    "case_id": "W5G-T-EN-ZH-NO-TIME-01",
+    "language_pair": "en_to_zh",
+    "kind": "todo_no_time",
+    "positive": true,
+    "candidates_returned": 1,
+    "hit_rank": 1
+  },
+  {
+    "case_id": "W5G-T-JA-EN-NO-TIME-01",
+    "language_pair": "ja_to_en",
+    "kind": "todo_no_time",
+    "positive": true,
+    "candidates_returned": 1,
+    "hit_rank": 1
+  }
+]

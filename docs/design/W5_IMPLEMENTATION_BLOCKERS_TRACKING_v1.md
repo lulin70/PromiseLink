@@ -7,6 +7,7 @@
 > **状态图例**: `done` 完成并有证据 / `partial` 部分完成（列明剩余） / `pending` 未开始 / `n/a` 不适用
 > **本轮更新 (v1.1, 2026-09-10)**: B-2 由 `pending` 翻转为 `done`；B-1 / E2E / B-8 / B-9 维持 `pending`；见 §5。
 > **本轮更新 (v1.2, 2026-09-11)**: E2E real-user 真实化翻转为 `done`（scripts/e2e/e2e_w5_real_user.py 14/14 PASS，w5_manifest_validator exit=0）；见 §6。B-1 / B-8 / B-9 维持 `pending`。
+> **本轮更新 (v1.3, 2026-09-11)**: B-1 翻转为 `done`：`scripts/quality/w4_evaluator.py` 真实跑出 `docs/evidence/w4_baseline.json`（recall@5=0.917 / mrr@5=0.917 / fpr=0.000 / pii=pass，baseline_commit=ab28daa0... 真实 git HEAD SHA）；见 §7。B-8 / B-9 维持 `pending`。
 
 ## 1. 阻塞项总览
 
@@ -15,6 +16,7 @@
 | B-1 | W4 baseline 缺失（不得伪造，由 W4 evaluator 真实运行产生） | pending | `docs/evidence/README.md` 已如实记录不可用事实 |
 | B-2 | Anti-ghost 校验真实化 | done | `scripts/quality/check_w5_antighost.py` 已升级为真实 runner；5/5 control point 真实激活；manifest 落盘 `docs/evidence/w5_antighost/manifest.json` 经 `w5_manifest_validator.py` 校验通过；详见 §5 |
 | B-E2E | W5 真实用户 E2E 真实化（覆盖 Test Plan §13 14 个场景） | done | `scripts/e2e/e2e_w5_real_user.py` 14/14 PASS（E-W5-01~14）；manifest 落盘 `docs/e2e_evidence/w5_e2e/manifest.json` 经 `w5_manifest_validator.py` 校验 exit=0；详见 §6 |
+| B-1 | W4 baseline 由 W4 evaluator 真实运行产生 | done | `scripts/quality/w4_evaluator.py` 真实加载 w5-golden-v1 (12 entity + 4 todo，5 种语言对)；产出 `docs/evidence/w4_baseline.json`（schema_version=w4-baseline-v1，baseline_commit=ab28daa0... 当前 HEAD，sample_count=16，recall@5=0.917，mrr@5=0.917，fpr=0.000，pii_scan_result=pass）；详见 §7 |
 | B-3 | candidate token 契约冻结（14 字段 / key_version 字符串 / resource 字段名统一） | done | `tests/w5/test_canonical_json_vectors.py` 25 项全绿；`W5_CANDIDATE_TOKEN_FIELDS` 单一来源（`src/promiselink/core/auth.py`） |
 | B-4 | token 签发（issue_candidate_token + hex nonce） | done | `tests/test_w5_candidate_token_api.py::test_candidates_issue_token_and_operation_row` |
 | B-5 | operation 持久化（EntityCorrection 共享事实源：token_hash / digest / resolver / score / space / 状态机） | done | `src/promiselink/services/w5_operation_service.py`；`test_candidates_issue_token_and_operation_row` 断言全部 W5 字段落库 |
@@ -169,3 +171,43 @@
 
 - ✅ E2E 真实用户黑盒打通 → 14 场景全绿 → manifest 落盘并 validator 接受 → 可支撑 PRD "真实 API/UI E2E" 准入契约。
 - ⏭️ 下一步：B-1 W4 baseline 由 W4 evaluator 真实运行 → B-8 PG dual_db upgrade/downgrade/parity 矩阵 → B-9 四角色第三次复审邀请 → 全部 approved → Implementation Authorization。push / release / deployment 禁令在 B-9 完成前维持。
+
+## 7. W4 baseline 真实化实施记录（2026-09-11，v1.3）
+
+### 7.1 目标
+
+消除 B-1 "W4 baseline 由 W4 evaluator 真实运行产生"。`docs/evidence/w4_baseline.json` 必须 schema_version=w4-baseline-v1、baseline_commit=当前真实 git HEAD（40-hex）、sample_count≥1、artifacts 文件实际存在、pii_scan_result=pass。
+
+### 7.2 交付物
+
+| 文件 | 内容 |
+|---|---|
+| `tests/w5/fixtures/golden/w5_golden_v1.jsonl`（新） | 16 个样本：8 entity_person + 2 entity_company + 4 todo（含 4 个 negative control）；覆盖 en/zh/ja 三语 6 种语言对；positive 用 gold.id=pool[0].id，title 用 gold.title 镜像以命中 difflib ratio=1.0 |
+| `scripts/quality/w4_evaluator.py`（新） | 真实 runner：独立 SQLite（`sqlite+aiosqlite:///.tmp_w4_eval.sqlite`）+ `Base.metadata.create_all` + FK-on；每 case 独立 session；调 production `generate_*_candidates` 同款 synonym/difflib 路径（含 `_normalize` / `find_aliases` / `W5_MIN_SCORE`）；`baseline_commit` 来自 `git rev-parse HEAD`；PII 三类正则扫描；产出 `docs/e2e_evidence/w4_baseline/per_sample_report.json` + `docs/evidence/w4_baseline.json` |
+| `data/e2e_w5_synonyms.json`（扩） | 新增 `デイブブラウン/グレイスキム/ハンク/イワン` 双向别名，使 ja↔zh 路径命中 synonym_match（已含 e2e_w5_real_user 引用） |
+| `docs/evidence/w4_baseline.json`（生成） | 真实 runner 产物（schema_version=w4-baseline-v1 / dataset_version=w4-golden-v1 / evaluator_version=w5-evaluator-v1） |
+| `docs/e2e_evidence/w4_baseline/per_sample_report.json`（生成） | per-sample candidates/hit_rank 详情 |
+
+### 7.3 baseline.json 退出码契约
+
+| 退出码 | 含义 |
+|---|---|
+| 0 | baseline.json 已落盘 + schema 字段完整 + PII pass |
+| 3 | artifact 写盘失败 |
+| 4 | PII 命中 或 golden set 缺失 / baseline schema 字段缺失 |
+
+### 7.4 真实证据（2026-09-11）
+
+| 维度 | 命令 / 产物 | 结果 |
+|---|---|---|
+| 16 样本全跑 | `.venv/bin/python scripts/quality/w4_evaluator.py` | `overall recall@5=0.917 mrr@5=0.917 fpr=0.000 pii=pass` |
+| baseline_commit 真实读取 | `_current_commit()` 调 `git rev-parse HEAD` | 40-hex `ab28daa07503cf254a4cfbdd6a7bec25388b4df2`（与 git log --oneline 一致） |
+| Schema 完整 | docs/evidence/w4_baseline.json 内含 schema_version / baseline_commit / dataset_version / evaluator_version / sample_count=16 / overall / by_language_pair / by_kind / thresholds / artifacts / pii_scan_result | 全部字段非空 |
+| PII 扫描 | 三类正则（手机 / loose mobile / email）扫 per-sample + aggregate | pass |
+| 分层指标 | by_language_pair（6 类）+ by_kind（4 类） | 全部有 recall/mrr/fpr 字段；`fpr=None` 表示该层无负例 |
+
+### 7.5 真实化 → 下游解锁
+
+- ✅ W4 baseline 真实可追溯（commit SHA 可 git log 验证）。
+- ✅ 满足 Test Plan §16.3 schema 强制约束。
+- ⏭️ 下一步：B-8 PG dual_db upgrade/downgrade/parity 矩阵 → B-9 四角色第三次复审邀请 → 全部 approved → Implementation Authorization。push / release / deployment 禁令在 B-9 完成前维持。
