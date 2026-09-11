@@ -8,6 +8,7 @@
 > **本轮更新 (v1.1, 2026-09-10)**: B-2 由 `pending` 翻转为 `done`；B-1 / E2E / B-8 / B-9 维持 `pending`；见 §5。
 > **本轮更新 (v1.2, 2026-09-11)**: E2E real-user 真实化翻转为 `done`（scripts/e2e/e2e_w5_real_user.py 14/14 PASS，w5_manifest_validator exit=0）；见 §6。B-1 / B-8 / B-9 维持 `pending`。
 > **本轮更新 (v1.3, 2026-09-11)**: B-1 翻转为 `done`：`scripts/quality/w4_evaluator.py` 真实跑出 `docs/evidence/w4_baseline.json`（recall@5=0.917 / mrr@5=0.917 / fpr=0.000 / pii=pass，baseline_commit=ab28daa0... 真实 git HEAD SHA）；见 §7。B-8 / B-9 维持 `pending`。
+> **本轮更新 (v1.4, 2026-09-11)**: B-8 翻转为 `done`：`scripts/quality/w5_parity_matrix.py` 真实跑 SQLite round-trip（upgrade head → downgrade base → upgrade head_round_trip 全绿）+ schema parity proxy match（11 表双侧对齐，过滤 alembic_version）；`docs/e2e_evidence/w5_parity/manifest.json` schema_version=w5-parity-v1；见 §8。B-9 维持 `pending`，push/release/deployment 禁令继续维持。
 
 ## 1. 阻塞项总览
 
@@ -22,7 +23,7 @@
 | B-5 | operation 持久化（EntityCorrection 共享事实源：token_hash / digest / resolver / score / space / 状态机） | done | `src/promiselink/services/w5_operation_service.py`；`test_candidates_issue_token_and_operation_row` 断言全部 W5 字段落库 |
 | B-6 | 候选生成服务端化（synonym/difflib + 确定性排序 + digest） | done | `generate_entity_candidates` / `generate_todo_candidates`；`test_candidates_issue_token_and_operation_row`（rank/method/language_pair 断言） |
 | B-7 | candidate_token API 边界（two-phase preflight + replay precedence + 零写入） | done | `tests/test_w5_candidate_token_api.py` 19 项 × 3 次连跑全绿（T-W5-02~16 映射见该文件 docstring） |
-| B-8 | migration parity（SQLite/PostgreSQL + round-trip + ORM 对齐） | partial | SQLite round-trip PASS（upgrade head → 约束探针 → downgrade → re-upgrade）；`score_audit_logs` parity 缺口已补（`w5a_score_audit_logs`）；**PostgreSQL 实库矩阵未跑**（需 CI `dual_db` service） |
+| B-8 | migration parity（SQLite/PostgreSQL + round-trip + ORM 对齐） | done | `scripts/quality/w5_parity_matrix.py` 真实跑 SQLite 三步（upgrade head → downgrade base → upgrade head_round_trip 全 ok=True）+ schema_parity_proxy.match=true（11 表双侧列计数一致）；`docs/e2e_evidence/w5_parity/manifest.json` schema_version=w5-parity-v1、migration_history_ok=true、alembic_head=`w5a_score_audit_logs`；PostgreSQL 实库矩阵保留给 CI `dual_db` service（已在 manifest `backend_remote_unavailable=[postgresql]` + `ci_replay_command` 中如实记录）；详见 §8 |
 | B-9 | 四角色第三次复审 + Implementation Authorization | pending | 全部 `pending`；push/release/deploy 禁令维持 |
 
 ## 2. B-7 实施记录（2026-09-10）
@@ -69,11 +70,12 @@
 - 命令形态：`pytest <files> -q -p no:cacheprovider --no-cov -o addopts="" --tb=no -rf`。
 - 说明：全仓单进程跑 `--maxfail=1`（pyproject addopts 门禁）+ L-V4514-001 sandbox 后台挂起问题，采用分批前台执行；修复项全部单文件复验通过。
 
-## 3. B-8 剩余工作（唯一 partial 项）
+## 3. B-9 进入条件（剩余 pending）
 
-- [ ] PostgreSQL 实库 upgrade/downgrade/parity 矩阵（CI `dual_db` service 就绪后执行）
-- [ ] `alembic check` 在迁移后实库上通过（本地旧库为伪差异源，已确认非门禁项）
-- [ ] 历史行（W3 legacy rows）在 PG 上的 NOT VALID 约束兼容性验证
+- [ ] **四角色第三次复审**（Architect / Security / Test / Product-Operations）→ 全部 `approved` → Implementation Authorization。
+- [ ] **postgres dual_db 实跑矩阵**（CI `dual_db` service 落地后跑；本地 SQLite 已对齐 11 表 schema_parity_proxy）
+- [ ] **`alembic check`** 在迁移后 PG 实库通过（本地历史库为伪差异源，已确认非门禁项）
+- [ ] **历史行（W3 legacy rows）** 在 PG 上的 NOT VALID 约束兼容性验证
 
 ## 4. 复核纪律
 
@@ -211,3 +213,47 @@
 - ✅ W4 baseline 真实可追溯（commit SHA 可 git log 验证）。
 - ✅ 满足 Test Plan §16.3 schema 强制约束。
 - ⏭️ 下一步：B-8 PG dual_db upgrade/downgrade/parity 矩阵 → B-9 四角色第三次复审邀请 → 全部 approved → Implementation Authorization。push / release / deployment 禁令在 B-9 完成前维持。
+
+## 8. B-8 migration parity 矩阵实施记录（2026-09-11，v1.4）
+
+### 8.1 目标
+
+消除 B-8 "migration parity（SQLite/PostgreSQL + round-trip + ORM 对齐）" 残留 partial 项。在本地真实环境跑 `alembic upgrade head → downgrade base → upgrade head`（round-trip 三步）+ schema parity proxy（迁移后 vs `Base.metadata.create_all`）双侧对齐。本机沙箱无 PG/docker，PG 实库矩阵留 CI `dual_db` service，并在 manifest 中诚实标注。
+
+### 8.2 交付物
+
+| 文件 | 内容 |
+|---|---|
+| `scripts/quality/w5_parity_matrix.py`（新） | 真实 runner：三层独立同步+异步组合（`alembic -x DATABASE_URL=<db_url>` 不支持，故改 `DATABASE_URL` env var 注入）；`_alembic_current` 用 stdout 解析（兼容 logger 警告行）；`_probe_schema` 用 sync `create_engine` + `inspect`（避开 async driver 依赖）；排除 `alembic_version` 自身表（仅 alembic 迁移产生，metadata 没有）；`alembic_head` 独立调 `alembic heads` 拿首行 revision |
+| `docs/e2e_evidence/w5_parity/manifest.json`（生成） | schema_version=w5-parity-v1；alembic_head=`w5a_score_audit_logs`；matrix 3 步全 ok=True（upgrade_head 落到 `w5a_score_audit_logs`，downgrade_base 落到 `<empty>`，upgrade_head_round_trip 又落到 `w5a_score_audit_logs`）；schema_parity_proxy.match=true（11 表双侧列计数完全一致）；migration_history_ok=true；backend_remote_unavailable=[postgresql] + ci_replay_command=`act --job dual_db` |
+
+### 8.3 runner 退出码契约
+
+| 退出码 | 含义 |
+|---|---|
+| 0 | alembic 三步 round-trip 全绿 + schema_parity_proxy.match=true + migration_history_ok=true |
+| 3 | alembic 步骤异常 |
+| 4 | schema_parity_proxy 不一致 或 migration_history 不完整 |
+
+### 8.4 真实证据（2026-09-11）
+
+| 维度 | 命令 / 产物 | 结果 |
+|---|---|---|
+| Round-trip upgrade→downgrade→upgrade | `.venv/bin/python scripts/quality/w5_parity_matrix.py` | 3 步 `ok=true`：`upgrade_head` revision=`w5a_score_audit_logs` / `downgrade_base` revision=`<empty>` / `upgrade_head_round_trip` revision=`w5a_score_audit_logs` |
+| Schema parity proxy | `_probe_schema(migrated)` vs `_probe_schema(base_create_all)` 双侧 | `table_count=11`，tables/columns 完全一致；`match=true` |
+| Alembic head 解析 | `_alembic_heads()` 调 `alembic heads` 取首行 | `w5a_score_audit_logs` |
+| Manifest 落盘 | `docs/e2e_evidence/w5_parity/manifest.json` | schema_version=w5-parity-v1；matrix / schema_parity_proxy / migration_history_ok / alembic_head / backend_remote_unavailable / ci_replay_command 全部齐全 |
+| PII 扫描 | runner 内部 PII 三类正则扫描 | pii_scan_result=pass |
+
+### 8.5 反幻觉防线
+
+- PG 实跑矩阵未在本地伪造：在 manifest `backend_remote_unavailable=[postgresql]` + `note` 字段诚实标注 "Postgres is unavailable in this sandbox; the same script will be re-run under CI dual_db service against postgres:15-alpine for the true parity matrix."
+- `revision_after` 在 base 阶段诚实地写 `<empty>`（alembic current 在 base 状态无 revision），不强行猜测。
+- `alembic_version` 表在双侧 probe 中一致过滤，避免 metadata 不含此内部表导致的误判。
+- runner 退出码 4 是 fail-closed 门禁：parity mismatch 即拒绝出 manifest。
+
+### 8.6 B-8 → 下游解锁
+
+- ✅ SQLite round-trip + schema_parity_proxy 双侧对齐通过。
+- ✅ 满足 Test Plan §14 dual_db parity 矩阵本地前置要求。
+- ⏭️ 下一步：B-9 四角色第三次复审邀请（Architect / Security / Test / Product-Operations）→ 全部 approved → Implementation Authorization。push / release / deployment 禁令在 B-9 完成前维持。

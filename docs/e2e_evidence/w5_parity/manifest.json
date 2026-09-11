@@ -1,0 +1,99 @@
+{
+  "schema_version": "w5-parity-v1",
+  "backend_local": "sqlite",
+  "backend_remote_unavailable": [
+    "postgresql"
+  ],
+  "alembic_head": "w5a_score_audit_logs",
+  "matrix": [
+    {
+      "step": "upgrade_head",
+      "backend": "sqlite",
+      "ok": true,
+      "revision_after": "w5a_score_audit_logs",
+      "stderr": ""
+    },
+    {
+      "step": "downgrade_base",
+      "backend": "sqlite",
+      "ok": true,
+      "revision_after": "<empty>",
+      "stderr": ""
+    },
+    {
+      "step": "upgrade_head_round_trip",
+      "backend": "sqlite",
+      "ok": true,
+      "revision_after": "w5a_score_audit_logs",
+      "stderr": ""
+    }
+  ],
+  "schema_parity_proxy": {
+    "migrated": {
+      "table_count": 11,
+      "tables": [
+        "associations",
+        "entities",
+        "entity_corrections",
+        "events",
+        "relationship_briefs",
+        "reminder_logs",
+        "reminder_preferences",
+        "scheduled_events",
+        "score_audit_logs",
+        "snooze_schedules",
+        "todos"
+      ],
+      "per_table_column_count": {
+        "associations": 13,
+        "entities": 12,
+        "entity_corrections": 27,
+        "events": 15,
+        "relationship_briefs": 8,
+        "reminder_logs": 7,
+        "reminder_preferences": 6,
+        "scheduled_events": 15,
+        "score_audit_logs": 10,
+        "snooze_schedules": 4,
+        "todos": 31
+      }
+    },
+    "base_create_all": {
+      "table_count": 11,
+      "tables": [
+        "associations",
+        "entities",
+        "entity_corrections",
+        "events",
+        "relationship_briefs",
+        "reminder_logs",
+        "reminder_preferences",
+        "scheduled_events",
+        "score_audit_logs",
+        "snooze_schedules",
+        "todos"
+      ],
+      "per_table_column_count": {
+        "associations": 13,
+        "entities": 12,
+        "entity_corrections": 27,
+        "events": 15,
+        "relationship_briefs": 8,
+        "reminder_logs": 7,
+        "reminder_preferences": 6,
+        "scheduled_events": 15,
+        "score_audit_logs": 10,
+        "snooze_schedules": 4,
+        "todos": 31
+      }
+    },
+    "match": true,
+    "note": "Local parity proxy: SQLite-only because Postgres is unavailable in this sandbox; the same script will be re-run under CI dual_db service against postgres:15-alpine for the true parity matrix."
+  },
+  "migration_history_ok": true,
+  "artifacts": [
+    "docs/e2e_evidence/w5_parity/manifest.json"
+  ],
+  "pii_scan_result": "pass",
+  "ci_replay_command": "act --job dual_db  # via GitHub Actions service; see .github/workflows/ci.yml"
+}
