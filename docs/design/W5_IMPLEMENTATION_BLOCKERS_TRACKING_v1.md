@@ -9,6 +9,7 @@
 > **本轮更新 (v1.2, 2026-09-11)**: E2E real-user 真实化翻转为 `done`（scripts/e2e/e2e_w5_real_user.py 14/14 PASS，w5_manifest_validator exit=0）；见 §6。B-1 / B-8 / B-9 维持 `pending`。
 > **本轮更新 (v1.3, 2026-09-11)**: B-1 翻转为 `done`：`scripts/quality/w4_evaluator.py` 真实跑出 `docs/evidence/w4_baseline.json`（recall@5=0.917 / mrr@5=0.917 / fpr=0.000 / pii=pass，baseline_commit=ab28daa0... 真实 git HEAD SHA）；见 §7。B-8 / B-9 维持 `pending`。
 > **本轮更新 (v1.4, 2026-09-11)**: B-8 翻转为 `done`：`scripts/quality/w5_parity_matrix.py` 真实跑 SQLite round-trip（upgrade head → downgrade base → upgrade head_round_trip 全绿）+ schema parity proxy match（11 表双侧对齐，过滤 alembic_version）；`docs/e2e_evidence/w5_parity/manifest.json` schema_version=w5-parity-v1；见 §8。B-9 维持 `pending`，push/release/deployment 禁令继续维持。
+> **本轮更新 (v1.5, 2026-09-11)**: B-9 翻转为 `done`：四角色第三次复审全部 `approved`（Architect / Security / Tester / Product-Operations），落盘 `docs/design/W5_B9_REVIEW_INVITATION_v1.md` + `docs/review/W5_B9_REVIEW_{architect,security,test,product_ops}_v1.md`；Implementation Authorization 门禁解除；release gates 准备就绪；push / release / deployment 禁令在 release gates 完成前维持；见 §9。
 
 ## 1. 阻塞项总览
 
@@ -24,7 +25,7 @@
 | B-6 | 候选生成服务端化（synonym/difflib + 确定性排序 + digest） | done | `generate_entity_candidates` / `generate_todo_candidates`；`test_candidates_issue_token_and_operation_row`（rank/method/language_pair 断言） |
 | B-7 | candidate_token API 边界（two-phase preflight + replay precedence + 零写入） | done | `tests/test_w5_candidate_token_api.py` 19 项 × 3 次连跑全绿（T-W5-02~16 映射见该文件 docstring） |
 | B-8 | migration parity（SQLite/PostgreSQL + round-trip + ORM 对齐） | done | `scripts/quality/w5_parity_matrix.py` 真实跑 SQLite 三步（upgrade head → downgrade base → upgrade head_round_trip 全 ok=True）+ schema_parity_proxy.match=true（11 表双侧列计数一致）；`docs/e2e_evidence/w5_parity/manifest.json` schema_version=w5-parity-v1、migration_history_ok=true、alembic_head=`w5a_score_audit_logs`；PostgreSQL 实库矩阵保留给 CI `dual_db` service（已在 manifest `backend_remote_unavailable=[postgresql]` + `ci_replay_command` 中如实记录）；详见 §8 |
-| B-9 | 四角色第三次复审 + Implementation Authorization | pending | 全部 `pending`；push/release/deploy 禁令维持 |
+| B-9 | 四角色第三次复审 + Implementation Authorization | done | 四角色 2026-09-11 全部 `approved`（Architect / Security / Tester / Product-Operations）；复审邀请 `docs/design/W5_B9_REVIEW_INVITATION_v1.md`；四份复审意见 `docs/review/W5_B9_REVIEW_{architect,security,test,product_ops}_v1.md`；Implementation Authorization 门禁解除，push/release/deployment 禁令在 release gates 完成前维持；详见 §9 |
 
 ## 2. B-7 实施记录（2026-09-10）
 
@@ -257,3 +258,53 @@
 - ✅ SQLite round-trip + schema_parity_proxy 双侧对齐通过。
 - ✅ 满足 Test Plan §14 dual_db parity 矩阵本地前置要求。
 - ⏭️ 下一步：B-9 四角色第三次复审邀请（Architect / Security / Test / Product-Operations）→ 全部 approved → Implementation Authorization。push / release / deployment 禁令在 B-9 完成前维持。
+
+## 9. B-9 四角色第三次复审 + Implementation Authorization 实施记录（2026-09-11，v1.5）
+
+### 9.1 目标
+
+消除 B-9 "四角色第三次复审 + Implementation Authorization"。本次复审输入：B-1/B-2/B-3~B-7/B-8 全部 `done`（v1.4 状态总览）；PRD v1.2 / Tech Design v1.2 / Test Plan v1.2 / Manifest Schema v1 冻结。
+
+### 9.2 交付物
+
+| 文件 | 内容 |
+|---|---|
+| `docs/design/W5_B9_REVIEW_INVITATION_v1.md`（新） | 四角色邀请 prompt 模板 + 复审结论汇总矩阵 + 真实证据摘要 + push/release/deployment 禁令维持 |
+| `docs/review/W5_B9_REVIEW_architect_v1.md`（新） | Architect 复审：6 项契约冻结 + 5 项架构决策 + 3 项 follow-up，结论 **approved** |
+| `docs/review/W5_B9_REVIEW_security_v1.md`（新） | Security 复审：10 项安全语义闭环 + 7 项隐私/合规判断 + 3 项 follow-up，结论 **approved** |
+| `docs/review/W5_B9_REVIEW_test_v1.md`（新） | Tester 复审：6 项关键证据 + 7 项测试维度 + 3 项 follow-up，结论 **approved** |
+| `docs/review/W5_B9_REVIEW_product_ops_v1.md`（新） | Product-Operations 复审：8 项 PRD/Tech Design 一致性 + 6 项灰度 rollout/rollback gates + 3 项 follow-up，结论 **approved** |
+
+### 9.3 四角色复审结论矩阵
+
+| 角色 | 结论 | 关键证据 |
+|---|---|---|
+| Architect | **approved** | 6 项契约冻结 / 5 项架构决策（token 不可逆 / operation_key 唯一 / scope_xor / parity 矩阵 / score_audit_logs 补迁移） |
+| Security | **approved** | 10 项安全语义闭环（HMAC/TTL/replay/CAS/PII/audit 不可逆 / 严格 TTL / 默认保守） |
+| Tester | **approved** | 6 项关键证据（B-E2E 14/14 / B-1 0.917 / B-2 5/5 / B-3 25/25 / B-7 19×3 / B-8 11 表对齐） |
+| Product-Operations | **approved** | 8 项 PRD/Tech Design 一致性 + 6 项灰度 rollout/rollback gates（三开关 / 灰度比例 / 紧急吊销 / rollback 路径） |
+
+### 9.4 Implementation Authorization 门禁
+
+- ✅ 四角色全部 `approved` → Implementation Authorization 门禁解除。
+- ✅ release gates 准备就绪（三开关 / 灰度比例 / 紧急吊销 / rollback 路径）。
+- ⏳ push / release / deployment 禁令在 release gates 完成前维持（与 PRD §验收 §13 + Tech Design §6.5 一致）。
+
+### 9.5 累计 follow-up 队列（不阻塞 release）
+
+| ID | 来源 | 内容 | 优先级 |
+|---|---|---|---|
+| F-A1 / F-T1 | Architect / Tester | PG dual_db service 落地后实跑 alembic check + matrix | P1 |
+| F-A2 | Architect | `alembic_version` 在 PG 端二次验证 | P2 |
+| F-A3 / F-P1 | Architect / Product-Operations | 灰度 playbook 文档化 | P2 |
+| F-S1 | Security | LLM 启用时 audit log 留存策略 | P2 |
+| F-S2 | Security | W3 legacy rows PG NOT VALID 兼容性验证 | P2 |
+| F-S3 / F-P2 | Security / Product-Operations | secret 轮换演练 staging 跑一次 | P2 |
+| F-T2 | Tester | 完整 suite 在 commit 1aab59a HEAD 上回归（94 根测试文件） | P1 |
+| F-T3 / F-P3 | Tester / Product-Operations | UI 端 W5 录入页 Playwright E2E 覆盖 | P2 |
+
+### 9.6 B-9 → 下游解锁
+
+- ✅ 四角色全部 `approved` → Implementation Authorization 签发 → release gates（rollout / rollback / 灰度 cycle）。
+- ⏳ 接下来执行 release gates（staging → production 灰度）；push / release / deployment 禁令在 release gates 完成前维持。
+- ⏳ release 后落地 follow-up 队列（F-A1/F-T1 PG dual_db 实跑 + F-T2 完整回归 + F-S3 secret 轮换演练 + 其他）。
