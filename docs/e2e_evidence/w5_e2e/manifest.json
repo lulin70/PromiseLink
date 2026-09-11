@@ -1,0 +1,162 @@
+{
+  "schema_version": "w5-evidence-v1",
+  "validator_version": "w5-manifest-validator-v1",
+  "commit_sha": "a92a5f4e8ff9f78ad518e693e2f02a77ee2bb3c6",
+  "command": "w5-e2e",
+  "started_at": "2026-09-11T02:39:51.128386+00:00",
+  "finished_at": "2026-09-11T02:39:52.214117+00:00",
+  "database_backend": "sqlite",
+  "migration_head": "w5a_add_score_audit_logs_table",
+  "config_digest": "20e633deb32fdfbd73875c27b8d755db2736ec6a313816fe7457d40ab1aa1245",
+  "embedding_profile": {
+    "provider": "local",
+    "model": "all-MiniLM-L6-v2",
+    "dimension": 384,
+    "space": "local/all-MiniLM-L6-v2/384",
+    "profile_version": "w5-v1"
+  },
+  "sample_count": 14,
+  "counts": {
+    "pass": 14,
+    "fail": 0,
+    "skip": 0,
+    "xfail": 0
+  },
+  "metrics": {
+    "w5_e2e_pass_rate": {
+      "value": 1.0,
+      "threshold": "1.0",
+      "comparator": ">="
+    },
+    "w5_e2e_pii_hits": {
+      "value": 0.0,
+      "threshold": "0",
+      "comparator": "<="
+    }
+  },
+  "artifacts": [
+    "docs/e2e_evidence/w5_e2e/manifest.json"
+  ],
+  "pii_scan_result": "pass",
+  "scenario_results": [
+    {
+      "id": "E-W5-01",
+      "title": "英文实体 → 中文候选",
+      "status": "pass",
+      "details": {
+        "candidates": 1,
+        "active_entities": 2
+      }
+    },
+    {
+      "id": "E-W5-02",
+      "title": "W5 人工确认",
+      "status": "pass",
+      "details": {
+        "active_entities": 1,
+        "audits": 1
+      }
+    },
+    {
+      "id": "E-W5-03",
+      "title": "W5 人工拒绝",
+      "status": "pass",
+      "details": {
+        "rejected_audits": 1
+      }
+    },
+    {
+      "id": "E-W5-04",
+      "title": "首次提交已过期的有效 token (410)",
+      "status": "pass",
+      "details": {
+        "status_code": 410
+      }
+    },
+    {
+      "id": "E-W5-05",
+      "title": "token 篡改 (400)",
+      "status": "pass",
+      "details": {
+        "status_code": 400
+      }
+    },
+    {
+      "id": "E-W5-06",
+      "title": "token 重放",
+      "status": "pass",
+      "details": {
+        "first_replayed": false,
+        "second_replayed": true
+      }
+    },
+    {
+      "id": "E-W5-07",
+      "title": "embedding provider 不可用安全降级",
+      "status": "pass",
+      "details": {
+        "candidates": 1
+      }
+    },
+    {
+      "id": "E-W5-08",
+      "title": "dimension mismatch 拒绝跨 space",
+      "status": "pass",
+      "details": {
+        "embedding_space": "local/all-MiniLM-L6-v2/384"
+      }
+    },
+    {
+      "id": "E-W5-09",
+      "title": "LLM fallback timeout 无伪造候选",
+      "status": "pass",
+      "details": {
+        "candidates": 1
+      }
+    },
+    {
+      "id": "E-W5-10",
+      "title": "中英日 Todo confirm-only 全链路",
+      "status": "pass",
+      "details": {
+        "todo_audits": 1,
+        "todos": 3
+      }
+    },
+    {
+      "id": "E-W5-11",
+      "title": "Todo reject 不写 aliases",
+      "status": "pass",
+      "details": {
+        "status": "rejected"
+      }
+    },
+    {
+      "id": "E-W5-12",
+      "title": "双用户交错隔离",
+      "status": "pass",
+      "details": {
+        "a_candidates": 0,
+        "b_candidates": 0
+      }
+    },
+    {
+      "id": "E-W5-13",
+      "title": "灰度开启/关闭",
+      "status": "pass",
+      "details": {
+        "open_status": 200
+      }
+    },
+    {
+      "id": "E-W5-14",
+      "title": "回滚保留 W4 中文解析",
+      "status": "pass",
+      "details": {
+        "entity_ok": true,
+        "todos_created": 1
+      }
+    }
+  ],
+  "command_allowlist_entry": "w5-e2e"
+}

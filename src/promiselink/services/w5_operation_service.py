@@ -112,7 +112,8 @@ async def generate_entity_candidates(
     database state always reproduces the same candidate set (and digest).
     """
     settings = get_settings()
-    dictionaries = load_synonyms()
+    dict_path = settings.synonym_dict_path if settings.synonym_dict_path else None
+    dictionaries = load_synonyms(dict_path)
     source_name = extracted_entity.name
     confirm_score = ENTITY_CONFIRM_SCORE
 

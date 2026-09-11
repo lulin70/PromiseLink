@@ -6,6 +6,7 @@
 > **原则**: 每项必须附真实证据（命令 + 输出 + 测试名）；`pending` 项不得在证据缺失时标为 `done`（Anti-ghost）。
 > **状态图例**: `done` 完成并有证据 / `partial` 部分完成（列明剩余） / `pending` 未开始 / `n/a` 不适用
 > **本轮更新 (v1.1, 2026-09-10)**: B-2 由 `pending` 翻转为 `done`；B-1 / E2E / B-8 / B-9 维持 `pending`；见 §5。
+> **本轮更新 (v1.2, 2026-09-11)**: E2E real-user 真实化翻转为 `done`（scripts/e2e/e2e_w5_real_user.py 14/14 PASS，w5_manifest_validator exit=0）；见 §6。B-1 / B-8 / B-9 维持 `pending`。
 
 ## 1. 阻塞项总览
 
@@ -13,6 +14,7 @@
 |---|---|---|---|
 | B-1 | W4 baseline 缺失（不得伪造，由 W4 evaluator 真实运行产生） | pending | `docs/evidence/README.md` 已如实记录不可用事实 |
 | B-2 | Anti-ghost 校验真实化 | done | `scripts/quality/check_w5_antighost.py` 已升级为真实 runner；5/5 control point 真实激活；manifest 落盘 `docs/evidence/w5_antighost/manifest.json` 经 `w5_manifest_validator.py` 校验通过；详见 §5 |
+| B-E2E | W5 真实用户 E2E 真实化（覆盖 Test Plan §13 14 个场景） | done | `scripts/e2e/e2e_w5_real_user.py` 14/14 PASS（E-W5-01~14）；manifest 落盘 `docs/e2e_evidence/w5_e2e/manifest.json` 经 `w5_manifest_validator.py` 校验 exit=0；详见 §6 |
 | B-3 | candidate token 契约冻结（14 字段 / key_version 字符串 / resource 字段名统一） | done | `tests/w5/test_canonical_json_vectors.py` 25 项全绿；`W5_CANDIDATE_TOKEN_FIELDS` 单一来源（`src/promiselink/core/auth.py`） |
 | B-4 | token 签发（issue_candidate_token + hex nonce） | done | `tests/test_w5_candidate_token_api.py::test_candidates_issue_token_and_operation_row` |
 | B-5 | operation 持久化（EntityCorrection 共享事实源：token_hash / digest / resolver / score / space / 状态机） | done | `src/promiselink/services/w5_operation_service.py`；`test_candidates_issue_token_and_operation_row` 断言全部 W5 字段落库 |
@@ -129,3 +131,41 @@
 
 - ✅ Anti-ghost 路径打通 → manifest schema 路径打通 → E2E real-user 黑盒可复用同一 manifest schema。
 - ⏭️ 下一步：B-2 改动本地 commit（不 push）→ 真实化 `scripts/e2e/e2e_w5_real_user.py` → 产出 `docs/evidence/w5_e2e/manifest.json`（w5-e2e command allowlist 入口）→ B-1 W4 baseline 由 W4 evaluator 真实运行 → B-8 PG dual_db 矩阵 → B-9 四角色第三次复审 → Implementation Authorization。
+
+## 6. E2E real-user 真实化实施记录（2026-09-11，v1.2）
+
+### 6.1 目标
+
+消除 B-E2E "W5 真实用户 E2E 真实化"。覆盖 Test Plan §13 列出的 14 个真实用户黑盒场景（E-W5-01~14），每个场景独立 SQLite + `dependency_overrides` 注入 user_id + `httpx.ASGITransport` 真实黑盒，禁用 `process_event_background` 后台流水线，产出 `docs/e2e_evidence/w5_e2e/manifest.json` 并由 `w5_manifest_validator.py` 校验。
+
+### 6.2 交付物
+
+| 文件 | 内容 |
+|---|---|
+| `scripts/e2e/e2e_w5_real_user.py`（新） | 14 个 SCENARIOS 列表 + `--case` 单点冒烟；强制环境变量开启 W5（CROSS_LANGUAGE_ENABLED / TODO / EMBEDDING / ROLLOUT_PERCENT=100 / CANDIDATE_TOKEN_SECRET_V1 / SYNONYM_DICT_PATH）；每个场景独立 `create_async_engine("sqlite+aiosqlite:///{db_path}")` + `Base.metadata.create_all` + `PRAGMA foreign_keys=ON`；`dependency_overrides[get_current_user_id] = lambda: USER_ID` 黑盒；`httpx.ASGITransport(app=app)`；pre-create Entity/Todo（不依赖真实 pipeline 抽取）；`_build_manifest` 落盘 `docs/e2e_evidence/w5_e2e/manifest.json`（schema_version=w5-evidence-v1，command="w5-e2e"），单字符串 `migration_head` 来自 `alembic heads`，`metrics` 为 dict 结构；E-W5-04 用 `now=past` 触发 TTL 410；E-W5-08 直接解码 token envelope 取出服务端 `operation_key` |
+| `data/e2e_w5_synonyms.json`（新） | E2E 专用同义词覆盖：CJK↔Latin 人名/公司名映射，保证 synonym/difflib 路径命中（SYNONYM_MATCH_SCORE=0.95） |
+| `src/promiselink/services/w5_operation_service.py`（改） | `generate_entity_candidates` 调用 `load_synonyms(dict_path)` 接受 `synonym_dict_path` 参数（默认空 → 加载 seeds，保持原行为；E2E 通过 `SYNONYM_DICT_PATH` 注入覆盖） |
+| `docs/e2e_evidence/w5_e2e/manifest.json`（生成） | runner 真跑产物（schema_version=w5-evidence-v1 / validator_version=w5-manifest-validator-v1 / command="w5-e2e" / counts={pass:14,fail:0} / pii_scan_result=pass） |
+
+### 6.3 runner 退出码契约
+
+| 退出码 | 含义 |
+|---|---|
+| 0 | 14 个场景全 PASS + PII pass + validator 接受 |
+| 4 | PII 命中 或 validator reject |
+| 5 | 必需场景未全部通过 |
+
+### 6.4 真实证据（2026-09-11）
+
+| 维度 | 命令 / 产物 | 结果 |
+|---|---|---|
+| 14 场景全跑 | `.venv/bin/python scripts/e2e/e2e_w5_real_user.py` | `结果：PASS=14 FAIL=0 SKIP=0` |
+| Manifest 落盘 | runner `_build_manifest` 写 `docs/e2e_evidence/w5_e2e/manifest.json` | 已生成；schema_version=w5-evidence-v1，command="w5-e2e" |
+| Validator 校验 | runner 末尾 `subprocess.check_call(["python", "scripts/quality/w5_manifest_validator.py", manifest])` | `validator exit: 0` |
+| 单点冒烟 | `.venv/bin/python scripts/e2e/e2e_w5_real_user.py --case E-W5-01` | PASS |
+| Migration head 真实解析 | runner `_migration_head()` 调 `alembic heads` 取首行 revision id | 真实值（按 `alembic heads` 拓扑） |
+
+### 6.5 E2E 真实化 → 下游解锁
+
+- ✅ E2E 真实用户黑盒打通 → 14 场景全绿 → manifest 落盘并 validator 接受 → 可支撑 PRD "真实 API/UI E2E" 准入契约。
+- ⏭️ 下一步：B-1 W4 baseline 由 W4 evaluator 真实运行 → B-8 PG dual_db upgrade/downgrade/parity 矩阵 → B-9 四角色第三次复审邀请 → 全部 approved → Implementation Authorization。push / release / deployment 禁令在 B-9 完成前维持。
