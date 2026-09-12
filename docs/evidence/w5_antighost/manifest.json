@@ -1,10 +1,10 @@
 {
   "schema_version": "w5-evidence-v1",
   "validator_version": "w5-manifest-validator-v1",
-  "commit_sha": "9c2bddbe387a8abadb58ef126b9ebb6c0b0a43ad",
+  "commit_sha": "3b704b33bec910063296589875335daabe8aaaf3",
   "command": "w5-anti-ghost",
-  "started_at": "2026-09-10T09:40:45.734258Z",
-  "finished_at": "2026-09-10T09:40:47.451749Z",
+  "started_at": "2026-09-11T11:29:35.075047Z",
+  "finished_at": "2026-09-11T11:29:36.740005Z",
   "database_backend": "sqlite",
   "migration_head": "d4e5f6a7b8c9,f3a4b5c6d7e8,w5_entity_correction_double_scope,w5a_score_audit_logs",
   "config_digest": "26354799cc9fecf29116d88d40912156c1b76a97d0cc3c75d37e1a59a6120a83",
@@ -65,36 +65,36 @@
     "control_points": {
       "issue_candidate_token": {
         "count": 1,
-        "last_invocation_ts": 1789033246.6659222,
+        "last_invocation_ts": 1789126175.977965,
         "source_module": "promiselink.core.auth"
       },
       "verify_candidate_token": {
         "count": 1,
-        "last_invocation_ts": 1789033246.6660311,
+        "last_invocation_ts": 1789126175.978177,
         "source_module": "promiselink.core.auth"
       },
       "multilingual_resolver": {
         "count": 1,
-        "last_invocation_ts": 1789033247.451707,
+        "last_invocation_ts": 1789126176.739959,
         "source_module": "promiselink.services.entity_resolution"
       },
       "embedding_space_isolation": {
         "count": 1,
-        "last_invocation_ts": 1789033247.45173,
+        "last_invocation_ts": 1789126176.739985,
         "source_module": "promiselink.services.embedding_provider"
       },
       "operation_state_machine": {
         "count": 1,
-        "last_invocation_ts": 1789033247.451731,
+        "last_invocation_ts": 1789126176.739986,
         "source_module": "promiselink.services.w5_operation_service"
       },
       "__probe_started_at": {
-        "value": "2026-09-10T09:40:46.559268Z",
+        "value": "2026-09-11T11:29:35.870125Z",
         "threshold": "n/a",
         "comparator": "="
       },
       "__probe_finished_at": {
-        "value": "2026-09-10T09:40:47.451733Z",
+        "value": "2026-09-11T11:29:36.739987Z",
         "threshold": "n/a",
         "comparator": "="
       }

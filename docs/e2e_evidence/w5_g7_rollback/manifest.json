@@ -1,0 +1,29 @@
+{
+  "schema_version": "w5-rollback-drill-v1",
+  "drilled_at": "2026-09-11T11:47:59Z",
+  "scenarios": [
+    {
+      "scenario": "A_key_version_isolation",
+      "ok_normal": true,
+      "revoked_rejected": true,
+      "result": "pass"
+    },
+    {
+      "scenario": "B_alembic_downgrade_-1",
+      "upgrade_head_rc": 0,
+      "current_after_upgrade": "INFO  [alembic.runtime.migration] Will assume non-transactional DDL.",
+      "downgrade_-1_rc": 0,
+      "current_after_downgrade": "INFO  [alembic.runtime.migration] Will assume non-transactional DDL.",
+      "re_upgrade_rc": 0,
+      "result": "pass"
+    },
+    {
+      "scenario": "C_w4_baseline_after_rollback",
+      "exit": 0,
+      "tail": "2026-09-11 19:47:59 [warning  ] llm_api_key_empty              note='Set LLM_API_KEY env var'\n2026-09-11 19:47:59,663 [INFO] w4_evaluator W4 evaluator starting commit=3b704b33bec910063296589875335daabe8aaaf3\n2026-09-11 19:47:59,663 [INFO] w4_evaluator loaded 16 cases\n2026-09-11 19:47:59,778 [INFO] w4_evaluator baseline 落盘: /Users/lin/trae_projects/PromiseLink/docs/evidence/w4_baseline.json\n2026-09-11 19:47:59,778 [INFO] w4_evaluator overall recall@5=0.917 mrr@5=0.917 fpr=0.000 pii=pass",
+      "result": "pass"
+    }
+  ],
+  "elapsed_seconds": 10.28,
+  "overall": "pass"
+}

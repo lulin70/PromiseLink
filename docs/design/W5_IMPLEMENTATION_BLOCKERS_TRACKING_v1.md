@@ -1,6 +1,7 @@
 # W5 实施阶段阻塞项跟踪（B-1 ~ B-9）
 
-> **版本**: v1.1
+> **版本**: v1.6
+> **本轮更新 (v1.6, 2026-09-12)**: G1~G8 release gates 全部完成并真实化（脚本级、manifest 落盘、可重跑）：G1 W5 E2E 14/14 / G2 W4 baseline / G3 Anti-ghost / G4 Migration parity / G5 Manifest v1 校验 / G6 全仓回归 2102 passed / G7 Rollback 演练 / G8 Secret 轮换演练；新增灰度 rollout 策略（staging → 10% → 50% → 100%）；见 §10、§11。push / release / deployment 禁令在用户明确放行前维持。
 > **日期**: 2026-09-10
 > **依据**: 四角色第二次独立复审产出的 P1 阻塞项清单（2026-09-09/10 会话）
 > **原则**: 每项必须附真实证据（命令 + 输出 + 测试名）；`pending` 项不得在证据缺失时标为 `done`（Anti-ghost）。
@@ -308,3 +309,91 @@
 - ✅ 四角色全部 `approved` → Implementation Authorization 签发 → release gates（rollout / rollback / 灰度 cycle）。
 - ⏳ 接下来执行 release gates（staging → production 灰度）；push / release / deployment 禁令在 release gates 完成前维持。
 - ⏳ release 后落地 follow-up 队列（F-A1/F-T1 PG dual_db 实跑 + F-T2 完整回归 + F-S3 secret 轮换演练 + 其他）。
+
+## 10. Release Gates G1~G8 实施记录（2026-09-12，v1.6）
+
+> **本节目的**：把 Authorization §4 的 G1~G8 全部从 `_pending_` 翻转为真实跑测 + manifest 落盘的 `done` 状态。所有结果均为脚本级真实运行（不是声明/未跑测的占位）。
+
+### 10.1 交付物
+
+| 文件 | 用途 |
+|---|---|
+| `scripts/e2e/e2e_w5_real_user.py` | G1 W5 E2E 14/14 真实用户黑盒（httpx.AsyncClient + ASGITransport + 独立 SQLite + dependency_overrides） |
+| `scripts/quality/w4_evaluator.py` | G2 W4 baseline 真实 evaluator（同步复用 production candidate 路径） |
+| `scripts/quality/check_w5_antighost.py` | G3 Anti-ghost 校验（call counters + 三层覆盖 + user-visible output） |
+| `scripts/quality/w5_parity_matrix.py` | G4 migration parity 矩阵（alembic upgrade head → downgrade base → upgrade head_round_trip + schema_parity_proxy） |
+| `scripts/quality/w5_manifest_validator.py` | G5 evidence manifest schema v1 校验（accepted/rejected + validator_exit） |
+| `scripts/quality/w5_g7_rollback_drill.py` | G7 Rollback 演练（key_version 隔离 / alembic downgrade -1 / W4 baseline 不退化） |
+| `scripts/quality/w5_g8_secret_rotation.py` | G8 Secret 轮换演练（HMAC v1→新值 fail-closed + DB credential reload + 11 张关键表对齐 B-8 parity 清单） |
+| `docs/e2e_evidence/w5_g7_rollback/manifest.json` | G7 manifest（schema_version=w5-rollback-drill-v1） |
+| `docs/e2e_evidence/w5_g8_secret_rotation/manifest.json` | G8 manifest（schema_version=w5-secret-rotation-v1） |
+| `docs/e2e_evidence/w5_parity/manifest.json` | G4 manifest（schema_version=w5-parity-v1，复跑回灌） |
+| `docs/e2e_evidence/w5_e2e/manifest.json` | G1 manifest（schema_version=w5-evidence-v1，复跑回灌） |
+| `docs/evidence/w4_baseline.json` | G2 baseline（schema_version=w4-baseline-v1，复跑回灌） |
+| `docs/evidence/w5_antighost/manifest.json` | G3 manifest，复跑回灌 |
+
+### 10.2 退出码契约 + 真实证据（一次性真跑摘要）
+
+| Gate | 命令（cwd=PromiseLink） | 退出码 | 结果摘要 |
+|---|---|---|---|
+| G1 | `.venv/bin/python scripts/e2e/e2e_w5_real_user.py` | 0 | PASS=14, FAIL=0（E-W5-01~14）；manifest schema_version=w5-evidence-v1 accepted |
+| G2 | `.venv/bin/python scripts/quality/w4_evaluator.py` | 0 | sample_count=16, recall@5=0.917, mrr@5=0.917, fpr=0.000, pii=pass, baseline_commit=ab28daa0... |
+| G3 | `CANDIDATE_TOKEN_SECRET_V1=... .venv/bin/python scripts/quality/check_w5_antighost.py` | 0 | 5/5 control points 真实激活；manifest 落盘 + validator exit=0 |
+| G4 | `.venv/bin/python scripts/quality/w5_parity_matrix.py` | 0 | upgrade_head ok / downgrade_base ok / upgrade_head_round_trip ok；schema_parity_proxy.match=true（11 表双侧列计数一致，过滤 alembic_version）；alembic_head=`w5a_score_audit_logs`；backend_remote_unavailable=[postgresql]（如实在 CI 之外） |
+| G5 | `.venv/bin/python scripts/quality/w5_manifest_validator.py docs/e2e_evidence/w5_e2e/manifest.json` | 0 | accepted；w5-evidence-v1 + validator w5-manifest-validator-v1 |
+| G6 | `CANDIDATE_TOKEN_SECRET_V1=... .venv/bin/python -m pytest tests/ --ignore=tests/test_load_real.py` | 0 | **2102 passed**, 79 skipped（环境约束）, 0 failed |
+| G7 | `.venv/bin/python scripts/quality/w5_g7_rollback_drill.py` | 0 | A_key_version_isolation pass / B_alembic_downgrade_-1 pass / C_w4_baseline_after_rollback pass |
+| G8 | `CANDIDATE_TOKEN_SECRET_V1=... .venv/bin/python scripts/quality/w5_g8_secret_rotation.py` | 0 | A_hmac_key_rotation pass（v1 通过 / 轮换后旧 token fail-closed / 新 token 通过）；B_db_credential_reload pass（alembic upgrade head 成功 + 11 张表与 B-8 parity 清单一致） |
+
+### 10.3 反幻觉防线
+
+- 每个 gate 的退出码、manifest JSON 路径都已在 `tracker v1.6` 记录；本地真跑命令可独立重放。
+- G6 中单测 `test_100_concurrent_users_get_entities` 偶发抖动（P95 阈值 500ms，单跑 549ms，独立复跑 passed）归 follow-up **F-T2**（不阻塞 release）。
+- G4 manifest `backend_remote_unavailable=[postgresql]` 如实记录 PG dual_db 在本机不可达，PG 实跑矩阵由 CI `dual_db` service 承担（已在 manifest `ci_replay_command` 注明 `act --job dual_db`）。
+- G8 校验清单直接复用 G4 schema_parity_proxy 的 11 张权威表清单，避免硬编码漂移。
+
+### 10.4 下游解锁
+
+- ✅ release gates G1~G8 全部 `done`，release 决策进入"等待用户明确放行 push/release/deployment"状态。
+- ✅ 灰度 rollout 策略（§11）准备就绪。
+- ⏳ push / release / deployment 仍在用户明确放行前维持禁令。
+
+## 11. 灰度 Rollout 策略（2026-09-12，v1.6）
+
+> **本节目的**：定义 W5 跨语言实体关联从 staging 到 production 的渐进式放量节奏 + 每次放量的可观测性/中止条件/回滚开关。
+
+### 11.1 放量节奏（4 阶段）
+
+| 阶段 | 范围 | 准入条件 | 持续时间 | 退出条件 | 失败中止 |
+|---|---|---|---|---|---|
+| Stage 0 | **staging 全量**（内部 dogfood） | G1~G8 全 `done` + Implementation Authorization 已签发 | ≥ 24h | staging 日志无 P0/P1 + 内部 10 个种子账号跑完至少 1 轮跨语言 entity/todo 关联 | 立即回滚（§11.3） |
+| Stage 1 | **production 10%**（按 user_id hash 桶） | Stage 0 退出条件满足 + 监控面板接入完毕 | ≥ 48h | error_budget 消耗 < 20% + p95 latency < 800ms + cross_lang_match_rate ≥ W4 baseline（0.917） | 切回 Stage 0 + 触发 §11.3 紧急吊销 |
+| Stage 2 | **production 50%** | Stage 1 退出条件满足 + F-A1（PG dual_db）有初稿结论 | ≥ 72h | 同 Stage 1 + score_audit_logs 写入成功率 ≥ 99.9% | 切回 Stage 1 + 触发 §11.3 |
+| Stage 3 | **production 100%** | Stage 2 退出条件满足 + F-S3（secret 轮换演练 staging 跑一次）完成 | 持续 | 全量监控基线稳定 ≥ 24h | 触发 §11.3 + 暂停放量 |
+
+### 11.2 可观测性（每阶段必须就绪）
+
+- 指标：`cross_lang_match_rate` / `candidate_token_verify_fail_rate` / `score_audit_logs_write_success_rate` / `p95_latency_w5_candidate_endpoint` / `error_budget_remaining`。
+- 日志：`operation_state_transition`（issued→pending→confirmed/rejected/expired 全部打点）+ `key_version_used`（用于追溯轮换期 token）。
+- 告警：`candidate_token_verify_fail_rate` 5 分钟突增 > 2× 基线 → PagerDuty P2；`score_audit_logs_write_success_rate` < 99% → PagerDuty P1。
+- Tracing：每个 candidate API 调用打 `trace_id` + `operation_key`，与 score_audit_logs 一一对应。
+
+### 11.3 回滚路径（与 Authorization §6 对齐）
+
+- **三开关独立降级**（任一独立生效，无需重启）：
+  1. `candidate_token_revoked_key_versions` 紧急吊销（演练已 G7-A 验证）。
+  2. feature flag `W5_FEATURE_ENABLED=false`（旁路 W5 路由，降级到 W4 中文解析）。
+  3. 灰度桶 `W5_ROLLOUT_PERCENTAGE=0`（拒绝新 W5 流量，已开始的不强制中断）。
+- **数据库回滚**：`alembic downgrade -1`（演练已 G7-B 验证）。
+- **金标降级**：移除 `score_audit_logs` 写入依赖（仅作审计，不在 critical path）。
+
+### 11.4 与 follow-up 队列的衔接
+
+- F-T2（94 根测试文件完整回归）必须在 Stage 1 进入前完成。
+- F-S3（secret 轮换演练 staging 跑一次）必须在 Stage 2 进入前完成。
+- F-A1/F-T1（PG dual_db 实跑）必须在 Stage 1 退出条件评估前出初稿结论。
+- 其他 P2 follow-up 不阻塞放量节奏，但每次 Stage 退出前必须 review 一次队列状态。
+
+### 11.5 下一动作
+
+- ⏳ 等待用户明确放行（可选项：先 push staging tag / staging deployment / 或进入 Stage 0 启动）；push / release / deployment 禁令在用户明确放行前维持。

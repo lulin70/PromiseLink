@@ -1,6 +1,6 @@
 {
   "schema_version": "w4-baseline-v1",
-  "baseline_commit": "ab28daa07503cf254a4cfbdd6a7bec25388b4df2",
+  "baseline_commit": "3b704b33bec910063296589875335daabe8aaaf3",
   "dataset_version": "w4-golden-v1",
   "evaluator_version": "w5-evaluator-v1",
   "sample_count": 16,

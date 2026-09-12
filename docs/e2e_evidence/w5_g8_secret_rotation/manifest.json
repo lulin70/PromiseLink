@@ -1,0 +1,37 @@
+{
+  "schema_version": "w5-secret-rotation-v1",
+  "drilled_at": "2026-09-12T04:34:05Z",
+  "scenarios": [
+    {
+      "scenario": "A_hmac_key_rotation",
+      "v1_token_verify_under_v1": true,
+      "old_token_rejected_after_rotation": true,
+      "v2_token_verify_under_v2": true,
+      "result": "pass"
+    },
+    {
+      "scenario": "B_db_credential_reload",
+      "new_db_path": "/var/folders/ql/drfrfdjn2_z3507_5dth3j1w0000gn/T/tmplyji6oti.sqlite",
+      "alembic_rc": 0,
+      "tables_after_reload": 11,
+      "tables_actual": [
+        "associations",
+        "entities",
+        "entity_corrections",
+        "events",
+        "relationship_briefs",
+        "reminder_logs",
+        "reminder_preferences",
+        "scheduled_events",
+        "score_audit_logs",
+        "snooze_schedules",
+        "todos"
+      ],
+      "expected_match_b8_parity": true,
+      "expected_count": 11,
+      "result": "pass"
+    }
+  ],
+  "elapsed_seconds": 4.18,
+  "overall": "pass"
+}

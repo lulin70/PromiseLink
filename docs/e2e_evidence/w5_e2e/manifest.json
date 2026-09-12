@@ -1,10 +1,10 @@
 {
   "schema_version": "w5-evidence-v1",
   "validator_version": "w5-manifest-validator-v1",
-  "commit_sha": "a92a5f4e8ff9f78ad518e693e2f02a77ee2bb3c6",
+  "commit_sha": "3b704b33bec910063296589875335daabe8aaaf3",
   "command": "w5-e2e",
-  "started_at": "2026-09-11T02:39:51.128386+00:00",
-  "finished_at": "2026-09-11T02:39:52.214117+00:00",
+  "started_at": "2026-09-11T11:28:05.745969+00:00",
+  "finished_at": "2026-09-11T11:28:06.740977+00:00",
   "database_backend": "sqlite",
   "migration_head": "w5a_add_score_audit_logs_table",
   "config_digest": "20e633deb32fdfbd73875c27b8d755db2736ec6a313816fe7457d40ab1aa1245",
