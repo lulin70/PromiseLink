@@ -1,6 +1,7 @@
 # W5 实施阶段阻塞项跟踪（B-1 ~ B-9）
 
-> **版本**: v1.6
+> **版本**: v1.7
+> **本轮更新 (v1.7, 2026-09-12)**: 用户明确放行 push / release / Stage 0 staging deployment；执行 `git push origin main`（9 个 commit）+ 打 annotated tag `v1.0-rc1` + push tag（GitHub Release 公开可访问）；新增 `docs/deploy/W5_STAGE0_STAGING_DEPLOY_v1.md`（staging 主机部署剧本 6 步 + smoke test）+ `scripts/deploy/w5_stage0_evidence.py`（evidence 回灌脚本，待 staging 主机执行后回传 stdout）；tracker §12 记录 push / tag / Stage 0 启动事件 + §3 锁定契约未被修改。
 > **本轮更新 (v1.6, 2026-09-12)**: G1~G8 release gates 全部完成并真实化（脚本级、manifest 落盘、可重跑）：G1 W5 E2E 14/14 / G2 W4 baseline / G3 Anti-ghost / G4 Migration parity / G5 Manifest v1 校验 / G6 全仓回归 2102 passed / G7 Rollback 演练 / G8 Secret 轮换演练；新增灰度 rollout 策略（staging → 10% → 50% → 100%）；见 §10、§11。push / release / deployment 禁令在用户明确放行前维持。
 > **日期**: 2026-09-10
 > **依据**: 四角色第二次独立复审产出的 P1 阻塞项清单（2026-09-09/10 会话）
@@ -397,3 +398,59 @@
 ### 11.5 下一动作
 
 - ⏳ 等待用户明确放行（可选项：先 push staging tag / staging deployment / 或进入 Stage 0 启动）；push / release / deployment 禁令在用户明确放行前维持。
+
+## 12. Push / Release / Stage 0 启动事件（2026-09-12，v1.7）
+
+> **本节目的**：登记用户在 2026-09-12 明确放行的 push / release / Stage 0 staging deployment 三件事，附真实命令输出。
+
+### 12.1 Push 事件（origin/main）
+
+| 项 | 值 |
+|---|---|
+| 命令 | `git push origin main` |
+| 本地 HEAD | `bea0b1f`（本地 commit v1.6 起 commit） |
+| 远端 origin | `git@github.com:lulin70/PromiseLink.git` |
+| Push 结果 | `b37cc69..bea0b1f  main -> main`（9 commit 推送成功） |
+| Push exit code | 0 |
+| Push 后状态 | `Your branch is up to date with 'origin/main'. nothing to commit, working tree clean` |
+
+### 12.2 Release tag 事件（v1.0-rc1）
+
+| 项 | 值 |
+|---|---|
+| 命令 | `git tag -a v1.0-rc1 -m "..." && git push origin v1.0-rc1` |
+| Tag 类型 | annotated |
+| Tag 指向 commit | `bea0b1ff62ea230a9b05044727e9ac827ebc07fc` |
+| Tag 内容（节选） | 12 条锁定契约/manifest SHA 引用 + 4 角色 approved 引用 + 灰度 §11 |
+| Push 结果 | `* [new tag] v1.0-rc1 -> v1.0-rc1` |
+| Tag push exit code | 0 |
+| GitHub Release 可见性 | 公开（https://github.com/lulin70/PromiseLink/releases/tag/v1.0-rc1） |
+
+### 12.3 Stage 0 staging deployment 事件
+
+| 项 | 值 |
+|---|---|
+| 状态 | **待 staging 主机执行**（本机非部署机，无 docker/kubectl） |
+| 部署入口 | `docs/deploy/W5_STAGE0_STAGING_DEPLOY_v1.md` §2（6 步） |
+| Smoke test 入口 | 同文档 §3（E2E + Anti-ghost + Manifest validator） |
+| Evidence 回灌脚本 | `scripts/deploy/w5_stage0_evidence.py`（读 `scripts/deploy/stage0_inputs/*.txt`，输出 `docs/e2e_evidence/w5_stage0_staging/manifest.json` schema_version=w5-stage0-v1） |
+| Stage 0 退出条件 | §11.1 + 同文档 §4（≥ 24h + E2E 14/14 + 无 P0/P1 + cross_lang_match_rate ≥ 0.917 + p95 < 800ms） |
+| 回滚路径 | 同文档 §5（docker compose down / W5_FEATURE_ENABLED=false / alembic downgrade -1） |
+| 下一动作 | 用户/CI 在 staging 主机执行 §2 部署 → 执行 §3 smoke test → 把 stdout 贴入 `scripts/deploy/stage0_inputs/{e2e_w5_real_user,antighost,manifest_validator}.txt` → 跑 `python scripts/deploy/w5_stage0_evidence.py` 生成 manifest → 把 manifest 提交进 repo 并向用户请求放行进入 Stage 1（production 10%） |
+
+### 12.4 锁定契约保护
+
+- §3 锁定契约（PRD v1.2 / Tech Design v1.2 / Test Plan v1.2 / Manifest Schema v1 + 14 字段 / 状态机 / 阈值）在 push / tag / Stage 0 期间均**未被修改**。
+- §3 锁定契约 SHA 引用（来自 tag v1.0-rc1 annotation）：
+  - PRD: `137d0564cb482827f9d52a71dc1365ef354defc1`
+  - Tech: `294c4af42edd4190516dae20da0d88821f6743f6`
+  - Test: `140c3e5ad343aad06f6b95dee556b527be69af29`
+  - Auth: `a32d681a852888f5bb247f8e3d2c06a7e600fe4d`
+  - Manifest Schema: `364dfdbc7ddc2ef063374d7982ff75f108133f95`
+
+### 12.5 反幻觉防线
+
+- push / tag 输出均为本机真实命令捕获。
+- GitHub Release v1.0-rc1 已 WebFetch 公开验证。
+- Stage 0 deployment 不在本机伪造执行（开发机无 docker）；部署剧本 + smoke test + 回灌脚本均为可独立重放的入口，证据回传由 staging 主机产生。
+- 不假装本机已部署 staging —— 这是与"反幻觉"原则一致的处理方式。
