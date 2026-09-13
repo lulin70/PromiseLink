@@ -52,6 +52,20 @@ jobs:
           VERSION=$(cat VERSION)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "short_version=${VERSION#v}" >> $GITHUB_OUTPUT
+          # Fail-closed: release tag MUST match VERSION file (case-insensitive,
+          # allowing optional leading 'v' on the tag side). Prevents the
+          # "tag v1.0-rc1 + VERSION 1.1.0" class of mismatch that previously
+          # left download.html pointing at the wrong files for weeks.
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG_VERSION="${{ github.event.release.tag_name }}"
+            TAG_VERSION="${TAG_VERSION#v}"
+            TAG_LC=$(echo "$TAG_VERSION" | tr '[:upper:]' '[:lower:]')
+            VER_LC=$(echo "$VERSION" | tr '[:upper:]' '[:lower:]')
+            if [ "$TAG_LC" != "$VER_LC" ]; then
+              echo "::error::Release tag version ($TAG_VERSION) does not match VERSION file ($VERSION). Aborting deploy."
+              exit 1
+            fi
+          fi
 
       - name: Build with PyInstaller
         run: |
@@ -113,6 +127,17 @@ jobs:
           VERSION=$(cat VERSION)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "short_version=${VERSION#v}" >> $GITHUB_OUTPUT
+          # Fail-closed: release tag MUST match VERSION file
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG_VERSION="${{ github.event.release.tag_name }}"
+            TAG_VERSION="${TAG_VERSION#v}"
+            TAG_LC=$(echo "$TAG_VERSION" | tr '[:upper:]' '[:lower:]')
+            VER_LC=$(echo "$VERSION" | tr '[:upper:]' '[:lower:]')
+            if [ "$TAG_LC" != "$VER_LC" ]; then
+              echo "::error::Release tag version ($TAG_VERSION) does not match VERSION file ($VERSION). Aborting build."
+              exit 1
+            fi
+          fi
 
       - name: Build with PyInstaller
         shell: bash
@@ -156,6 +181,15 @@ jobs:
         run: |
           VERSION=$(cat VERSION)
           echo "short_version=${VERSION#v}" >> $GITHUB_OUTPUT
+          # Fail-closed: release tag MUST match VERSION file
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG_VERSION="${{ github.event.release.tag_name }}"
+            TAG_VERSION="${TAG_VERSION#v}"
+            if [ "$(echo "$TAG_VERSION" | tr '[:upper:]' '[:lower:]')" != "$(echo "$VERSION" | tr '[:upper:]' '[:lower:]')" ]; then
+              echo "::error::Release tag version ($TAG_VERSION) does not match VERSION file ($VERSION). Aborting deploy."
+              exit 1
+            fi
+          fi
 
       - name: Download macOS artifact
         uses: actions/download-artifact@v4
@@ -193,23 +227,57 @@ jobs:
           username: root
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: 22
-          timeout: 60s
+          timeout: 120s
           script: |
-            # Update download.html to point to local files (not GitHub CDN)
+            set -e
             WEBSITE=/opt/promiselink-pro/website
             VERSION=${{ steps.version.outputs.short_version }}
 
-            if [ -f "$WEBSITE/downloads/PromiseLink-${VERSION}-mac.dmg" ]; then
-              sed -i "s|https://github.com/lulin70/PromiseLink/releases/download/v${VERSION}/PromiseLink-${VERSION}-mac.dmg|downloads/PromiseLink-${VERSION}-mac.dmg|g" \
-                "$WEBSITE/download.html" 2>/dev/null || true
-              echo "macOS DMG link updated to local"
+            echo "=== Deploying version: $VERSION ==="
+
+            # Backup once per release (don't overwrite existing backup).
+            if [ ! -f "$WEBSITE/download.html.bak.$VERSION" ]; then
+              cp -p "$WEBSITE/download.html" "$WEBSITE/download.html.bak.$VERSION"
+              echo "Backed up download.html -> download.html.bak.$VERSION"
+            else
+              echo "Backup already exists: download.html.bak.$VERSION"
             fi
 
-            if [ -f "$WEBSITE/downloads/PromiseLink-${VERSION}-windows.exe" ]; then
-              sed -i "s|https://github.com/lulin70/PromiseLink/releases/download/v${VERSION}/PromiseLink-${VERSION}-windows.exe|downloads/PromiseLink-${VERSION}-windows.exe|g" \
-                "$WEBSITE/download.html" 2>/dev/null || true
-              echo "Windows EXE link updated to local"
+            # Regex-based rewrite: catches ANY stale version reference
+            # (PromiseLink-0.9.9-..., PromiseLink-1.0.5-..., etc.) and
+            # replaces it with the current VERSION. This is structurally
+            # immune to "the website still says v0.9.9" / "stale 1.0.5"
+            # classes of bug — the bug can never recur because the sed
+            # matches any digit/.-rc prefix, not one exact string.
+            cd "$WEBSITE"
+            sed -i -E \
+              -e "s|PromiseLink-[0-9][0-9a-zA-Z.\\-]*-mac\\.dmg|PromiseLink-${VERSION}-mac.dmg|g" \
+              -e "s|PromiseLink-[0-9][0-9a-zA-Z.\\-]*-windows\\.exe|PromiseLink-${VERSION}-windows.exe|g" \
+              -e "s|https://github\\.com/lulin70/PromiseLink/releases/download/v[0-9][0-9a-zA-Z.\\-]*/PromiseLink-[0-9][0-9a-zA-Z.\\-]*-mac\\.dmg|downloads/PromiseLink-${VERSION}-mac.dmg|g" \
+              -e "s|https://github\\.com/lulin70/PromiseLink/releases/download/v[0-9][0-9a-zA-Z.\\-]*/PromiseLink-[0-9][0-9a-zA-Z.\\-]*-windows\\.exe|downloads/PromiseLink-${VERSION}-windows.exe|g" \
+              -e "s|约 82 MB · v[0-9][0-9a-zA-Z.\\-]*|约 82 MB · v${VERSION}|g" \
+              -e "s|约 42 MB · v[0-9][0-9a-zA-Z.\\-]*|约 42 MB · v${VERSION}|g" \
+              download.html
+
+            # Self-check: the new links MUST now reference the current VERSION.
+            if ! grep -q "PromiseLink-${VERSION}-mac.dmg" download.html; then
+              echo "::error::download.html still does not reference PromiseLink-${VERSION}-mac.dmg after rewrite."
+              exit 1
+            fi
+            if ! grep -q "PromiseLink-${VERSION}-windows.exe" download.html; then
+              echo "::error::download.html still does not reference PromiseLink-${VERSION}-windows.exe after rewrite."
+              exit 1
+            fi
+
+            # Self-check: no stale version references should remain.
+            STALE=$(grep -oE 'PromiseLink-[0-9][0-9a-zA-Z.\\-]*-(mac\.dmg|windows\.exe)' download.html | grep -v "PromiseLink-${VERSION}-" || true)
+            if [ -n "$STALE" ]; then
+              echo "::error::Stale artifact references still present in download.html:"
+              echo "$STALE"
+              exit 1
             fi
 
             nginx -t && nginx -s reload || echo "nginx reload skipped"
             echo "=== Server downloads ===" && ls -lh "$WEBSITE/downloads/"
+            echo "=== Final references in download.html ==="
+            grep -nE 'PromiseLink-[0-9][0-9a-zA-Z.\\-]*-(mac\.dmg|windows\.exe)|v[0-9][0-9a-zA-Z.\\-]*' download.html | grep -v 'data-' | head -20

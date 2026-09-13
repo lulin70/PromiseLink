@@ -78,6 +78,7 @@ frontend/dist/
 
 # === Test coverage ===
 .coverage
+*.profraw
 htmlcov/
 .pytest_cache/
 .ruff_cache/
