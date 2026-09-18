@@ -42,7 +42,7 @@
 | `src/promiselink/api/v1/event_pipeline_api.py` | `GET /events/{id}/entities/{eid}/candidates`、`GET /events/{id}/entities/{eid}/todos/candidates?source_todo_id=`；`correct_event` 两阶段化：Phase 1 全量 preflight（token 验证 + 候选重算 + digest 比对 + operation 查询，任一失败零写入）→ Phase 2 per-user 锁内 claim→mutate→audit→complete→`commit_with_retry` |
 | `src/promiselink/models/entity_correction.py` | `operation_key` 逐行唯一默认（消除 legacy 行唯一索引冲突）；scope XOR 约束修正（entity/todo 严格互斥 + promise/association 豁免 + todo issued/rejected 允许 selected_todo_id 为空） |
 | `src/promiselink/services/entity_correction_service.py` | legacy 审计行补 operation_key / operation_status（ignore→rejected，其余→confirmed）/ completed_at |
-| `src/promiselink/alembic/versions/w5_entity_correction_double_scope.py` | action CHECK 增加 'issued'（PG drop+NOT VALID 重建；SQLite batch 重建）；scope_xor 同步修正 |
+| `src/promiselink/alembic/versions/w5_entity_correction_scope.py` | action CHECK 增加 'issued'（PG drop+NOT VALID 重建；SQLite batch 重建）；scope_xor 同步修正（2026-09-18 由 `w5_entity_correction_double_scope.py` 更名，原 id 33 字符超出 alembic `version_num` VARCHAR(32) 上限） |
 | `src/promiselink/alembic/versions/w5a_add_score_audit_logs_table.py` | 补齐 score_audit_logs 迁移缺口（此前仅靠 create_all，与准入契约矛盾） |
 
 ### 2.2 安全语义闭环

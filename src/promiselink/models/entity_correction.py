@@ -84,7 +84,7 @@ class EntityCorrection(Base):
     # ── W5 双 scope 字段 (cross-language entity/todo association) ──────────────
     # 共享 operation/audit 事实源, 不新增独立 token/cooldown 表.
     # 详见 docs/design/TECH_DESIGN_跨语言实体关联_W5_v1.md §3.1.2 + alembic
-    # migration w5_entity_correction_double_scope.
+    # migration w5_entity_correction_scope.
     scope_type: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default="entity", default="entity",
     )

@@ -1,7 +1,7 @@
 """w5_add_score_audit_logs_table
 
 Revision ID: w5a_score_audit_logs
-Revises: merge_w5_double_scope_7bb48953af15
+Revises: merge_w5_double_scope
 Create Date: 2026-09-10
 
 Closes the migration/ORM parity gap: ``score_audit_logs`` previously relied on
@@ -21,7 +21,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = 'w5a_score_audit_logs'
-down_revision: str | Sequence[str] | None = 'merge_w5_double_scope_7bb48953af15'
+down_revision: str | Sequence[str] | None = 'merge_w5_double_scope'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

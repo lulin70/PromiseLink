@@ -1,6 +1,6 @@
-"""w5_entity_correction_double_scope
+"""w5_entity_correction_scope
 
-Revision ID: w5_entity_correction_double_scope
+Revision ID: w5_entity_correction_scope
 Revises: w3w4_entity_corrections
 Create Date: 2026-09-09
 
@@ -40,7 +40,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'w5_entity_correction_double_scope'
+revision: str = 'w5_entity_correction_scope'
 down_revision: str | Sequence[str] | None = 'w3w4_entity_corrections'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None

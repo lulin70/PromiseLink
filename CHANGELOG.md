@@ -33,6 +33,13 @@ CI `test (3.11)` 作业自 2026-09-03 起在 mypy 阶段失败，导致 pytest �
 
 ## [Unreleased]
 
+### Fixed — alembic 修订 id 超长导致 CI e2e 长期失败（2026-09-18）
+
+- **根因**：`w5_entity_correction_double_scope`（33 字符）与 `merge_w5_double_scope_7bb48953af15`（34 字符）超出 alembic 建 `alembic_version.version_num` 时固定的 `VARCHAR(32)`。SQLite 不校验长度，故本地/单测全绿；PostgreSQL（CI `e2e`、staging、容器部署）在 `alembic upgrade head` 时报 `psycopg2.errors.StringDataRightTruncation: value too long for type character varying(32)`，导致 `e2e` 门禁自 W5 迁移合入后持续红灯。
+- **修复**：两个修订更名为 `w5_entity_correction_scope` / `merge_w5_double_scope`（含 `down_revision` 引用与文档指针同步）。`version_num` 只记录当前 head（`w5a_score_audit_logs`），故已迁移的 SQLite/PostgreSQL 数据库均不受影响——实测升级后落盘值仍为 `w5a_score_audit_logs`。
+- **防复发**：新增 `tests/test_alembic_revision_ids.py`（修订 id ≤32 字符 / 单 head / down_revision 可解析），并用超长 id 探针做反向验证（探针下必失败，移除后通过）。
+- **本地验证**：全新 SQLite `alembic upgrade head` 成功（12 表），`alembic heads` 单 head。
+
 ### Added — 解析语义契约 W1+W2（2026-09-05， Ontology 语义契约规划）
 
 - **语义契约显式化（W1）**：`promiselink/core/contract.py` 以五个代码事实（EntityProperties schema / ORM 模型 / 受控词表 / InputScope 枚举 / ExtractionResult 输出结构）计算内容哈希作为契约版本（单一事实源，运行时 <2ms）；`scripts/generate_semantic_contract.py` 从代码生成 [解析语义契约文档](docs/spec/PARSING_SEMANTIC_CONTRACT.md)（`--check` 供 CI 防漂移，人工语义说明段自动保留）

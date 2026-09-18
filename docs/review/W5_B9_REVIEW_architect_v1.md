@@ -19,7 +19,7 @@
 ## B. 架构决策判断
 
 1. **token 不可逆语义**：已完成 operation 的 replay 走 `allow_expired_for_replay` + `verify_candidate_token` 优先于 TTL，且服务端的 token_hash 是 SHA-256 不可逆。✅ 已闭环。
-2. **operation_key 唯一索引**：解决 legacy 行唯一索引冲突（`models/entity_correction.py` migration w5_entity_correction_double_scope）。✅ 与 PRD §验收 §10 一致。
+2. **operation_key 唯一索引**：解决 legacy 行唯一索引冲突（`models/entity_correction.py` migration w5_entity_correction_scope，2026-09-18 由 `w5_entity_correction_double_scope` 更名）。✅ 与 PRD §验收 §10 一致。
 3. **scope_xor 约束**：entity/todo 严格互斥；promise/association 豁免；todo issued/rejected 允许 selected_todo_id 为空。✅ 与 Tech Design §4.3 一致。
 4. **score_audit_logs 补迁移**：`w5a_score_audit_logs` 已补齐 create_all 与迁移路径的 parity 缺口。✅ 与 Test Plan §16.3 schema 强制一致。
 5. **B-8 迁移矩阵**：本地 SQLite 11 表双侧对齐；PG 留 CI dual_db（manifest 已诚实标注 `backend_remote_unavailable=[postgresql]`）。✅ 反幻觉防线已立。
