@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import os
 import uuid
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 import pytest
 import pytest_asyncio
@@ -29,7 +29,6 @@ from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from promiselink.database import Base
-
 
 # Allowed values for the ``db_backend`` fixture.
 DB_BACKENDS = ("sqlite", "postgresql")
@@ -163,8 +162,8 @@ def _run_alembic_upgrade(sync_url: str, config: pytest.Config) -> str:
 
     from unittest.mock import patch
 
-    from alembic.config import Config as AlembicConfig
     from alembic import command as alembic_command
+    from alembic.config import Config as AlembicConfig
 
     from promiselink import config as pl_config
     from promiselink.config import Settings
@@ -255,7 +254,9 @@ async def db_session(
         # ``cursor.execute("PRAGMA foreign_keys")`` does not always return
         # a row in that path). The independent sync connection shares the
         # underlying SQLite file, so PRAGMA is consistent.
-        from sqlalchemy import create_engine, event as sa_event, text as sa_text
+        from sqlalchemy import create_engine
+        from sqlalchemy import event as sa_event
+        from sqlalchemy import text as sa_text
 
         verify_engine = create_engine(sync_url, connect_args={"check_same_thread": False})
 

@@ -87,9 +87,9 @@ class EntityResolutionEngine:
         # In-memory index for O(1) candidate lookup (session-scoped)
         # W5 隔离: 索引按 user_id + session_id 隔离, 严禁跨用户/跨请求复用
         # (per PRD §6 红线 7 / Tech Design §2.1 / Test Plan §9)
-        self._name_index: dict[tuple[str, str], list[Entity]] = {}
-        self._surname_index: dict[tuple[str, str], list[Entity]] = {}
-        self._alias_index: dict[tuple[str, str], list[Entity]] = {}
+        self._name_index: dict[tuple[str, str], dict[str, list[Entity]]] = {}
+        self._surname_index: dict[tuple[str, str], dict[str, list[Entity]]] = {}
+        self._alias_index: dict[tuple[str, str], dict[str, list[Entity]]] = {}
         self._index_loaded: set[tuple[str, str]] = set()
         self._session_user_id: str | None = None
         # W4: controlled synonym dictionaries (loaded once per resolution session).

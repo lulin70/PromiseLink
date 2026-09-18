@@ -55,6 +55,37 @@ jobs:
       - name: Contract consistency (W1, zero-cost push gate)
         run: python scripts/generate_semantic_contract.py --check
 
+      # 版本号单一事实源 = VERSION 文件；其余位置必须一致
+      # （防 P1-2 类漂移复发：frontend/package.json 曾长期停留在 0.9.0）
+      - name: Version consistency gate
+        run: |
+          python3 - <<'PY'
+          import json
+          import pathlib
+          import re
+          import sys
+
+          root = pathlib.Path(".")
+          version = (root / "VERSION").read_text().strip()
+          checks = {
+              "pyproject.toml": re.search(
+                  r'^version = "([^"]+)"', (root / "pyproject.toml").read_text(), re.M
+              ).group(1),
+              "src/promiselink/__init__.py": re.search(
+                  r'__version__ = "([^"]+)"', (root / "src/promiselink/__init__.py").read_text()
+              ).group(1),
+              "frontend/package.json": json.loads((root / "frontend/package.json").read_text())["version"],
+              "frontend/package-lock.json": json.loads((root / "frontend/package-lock.json").read_text())["version"],
+          }
+          for k, v in checks.items():
+              print(f"  {k}: {v}")
+          bad = {k: v for k, v in checks.items() if v != version}
+          if bad:
+              print(f"::error::版本号不一致（VERSION={version}）: {bad}")
+              sys.exit(1)
+          print(f"  ✓ 版本号一致: {version}")
+          PY
+
       - name: Run type checking
         run: python3 -m mypy src/promiselink --ignore-missing-imports
 

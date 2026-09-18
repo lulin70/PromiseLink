@@ -20,9 +20,9 @@ import json
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
-from sqlalchemy import select, update
+from sqlalchemy import CursorResult, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.config import get_settings
@@ -343,7 +343,7 @@ async def claim_operation(session: AsyncSession, operation: EntityCorrection) ->
         .values(operation_status="pending")
         .execution_options(synchronize_session=False)
     )
-    if result.rowcount == 1:
+    if cast(CursorResult[Any], result).rowcount == 1:
         operation.operation_status = "pending"
         # W5 Anti-ghost hook: real CAS state machine reached via the
         # production issue→pending transition.
@@ -381,9 +381,9 @@ def complete_operation(
     }
     operation.completed_at = datetime.now(UTC)
     if selected_entity_id is not None:
-        operation.selected_entity_id = _uid(selected_entity_id)
+        operation.selected_entity_id = cast(uuid.UUID, _uid(selected_entity_id))
     if selected_todo_id is not None:
-        operation.selected_todo_id = _uid(selected_todo_id)
+        operation.selected_todo_id = cast(uuid.UUID, _uid(selected_todo_id))
     if original_canonical_name is not None:
         operation.original_canonical_name = original_canonical_name[:200]
     if original_extracted_text is not None:

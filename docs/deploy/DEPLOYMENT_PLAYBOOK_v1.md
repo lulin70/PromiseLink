@@ -122,27 +122,40 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50 项安全测试
 | promiselink-nginx | 80/443 | 官网静态文件 | Pro 部署 + 基础版 build.yml deploy-to-server |
 | promiselink-certbot | 80/443 | ACME 证书 | Pro 部署流水线 |
 
-### 2.2 官网静态文件结构（`/opt/promiselink-pro/website/`）
+### 2.2 官网路径事实源（2026-09-18 修正）
+
+**官网唯一 owner = PromiseLink-Pro**（页面源 + 部署 + 版本改写）。基础版**只**上传安装包本体，不改写官网页面内容。
+
+| 角色 | 路径 | 说明 |
+|---|---|---|
+| **nginx 实际服务目录**（对外唯一事实源） | 容器内 `/usr/share/nginx/website` = 宿主机 `/opt/promiselink/website` | 对外 `https://www.promiselink.cn/` 内容全部来自这里 |
+| **安装包规范源** | `/opt/promiselink-pro/website/downloads/` | 基础版 `build.yml` 的上传目标；Pro 部署时同步进服务根 |
+| 一键安装脚本规范源 | `/opt/promiselink-pro/deploy/install_pro.sh` | Pro 部署时同步进服务根 |
 
 ```
-/opt/promiselink-pro/website/
-├── index.html                  # 官网首页
-├── download.html               # 下载页（README badge + 直接下载链接）
+/opt/promiselink/website/            # ← 被 nginx 服务（对外可访问）
+├── index.html / download.html / ...
 ├── downloads/
 │   ├── PromiseLink-X.Y.Z-mac.dmg
-│   ├── PromiseLink-X.Y.Z-windows.exe
-│   └── artifacts/               # CI 上传保留
-└── ...（其他静态资产）
+│   └── PromiseLink-X.Y.Z-windows.exe
+└── install_pro.sh
+
+/opt/promiselink-pro/website/downloads/   # ← 安装包规范源（不被服务，仅供同步）
 ```
 
-### 2.3 download.html 维护
+> ⚠️ **`/opt/promiselink-pro/website` 不是被服务的目录。** 曾对它做 sed 改写并据此汇报「已更新」，而线上服务的其实是 `/opt/promiselink/website` → 用户看到旧版本、下载 404（2026-09-18 P0-0 生产事故）。详见 [PROJECT_REVIEW_20260918_FINDINGS.md](../../PromiseLink-Pro/docs/review/PROJECT_REVIEW_20260918_FINDINGS.md) §P0-0。
+
+### 2.3 download.html 维护（职责已移交 Pro）
 
 | 维护动作 | 由谁 | 何时 |
 |---|---|---|
-| 推新版本后 sed 替换（**正则化 + 自检**，任何旧版本字符串都会改） | build.yml deploy-to-server（自动） | release published 后 |
-| v0.9.9 / v1.0.5 这类历史错链兜底修复 | 人工 SSH + sed | 巡检发现 / 用户报修（**不应再发生**——见下方 v1.1 升级） |
+| `download.html` / `sw.js` 版本改写（**正则化 + 四重自检**） | **Pro** `deploy/deploy-website.sh`（自动） | push `website/**` / 每小时 cron 自愈 / 手动 dispatch |
+| 安装包构建与上传到规范源 | **基础版** `build.yml` deploy-to-server（自动） | release published 后 |
+| 历史错链兜底修复 | 人工 SSH + sed | 巡检发现 / 用户报修（**不应再发生**） |
 
-**v1.1 自动化 sed 模式（build.yml 内，2026-09-13 升级）**：
+**版本号语义**：下载页取 **`BASE_VERSION` = 基础版最新 release tag**（同时含 mac.dmg + windows.exe），**不是** Pro 的 `VERSION`。三仓版本对照与取源规则见 [WEBSITE_DEPLOYMENT.md](../../PromiseLink-Pro/docs/ops/WEBSITE_DEPLOYMENT.md) §4。
+
+**历史参考（已被 Pro 脚本取代，2026-09-13 版，原在 build.yml 内）**：
 
 ```bash
 # 1. 入口门禁：release tag 必须与 VERSION 文件一致
@@ -171,14 +184,31 @@ STALE=$(grep -oE 'PromiseLink-[0-9][0-9a-zA-Z.\\-]*-(mac\.dmg|windows\.exe)' dow
 
 ### 2.4 部署后强制校验（每次发布必跑）
 
-```bash
-SSH="ssh -i /Users/lin/trae_projects/PromiseLink-Pro/deploy/keys/promiselink.pem root@47.116.219.15"
-$SSH 'ls -lht /opt/promiselink-pro/website/downloads/ | head -3'
-# 期望：新版本 dmg/exe 在前两行
+**判据必须是「对外 URL 的实测 HTTP 响应」，不是服务器上某个目录的文件内容**——后者曾在 P0-0 中导致虚假通过。
 
-$SSH 'grep -oE "PromiseLink-[0-9][0-9.a-z-]*" /opt/promiselink-pro/website/download.html | sort -u'
-# 期望：仅含新版本文件名
+```bash
+VER=1.1.0   # = 基础版 release tag（去掉 v 前缀）
+
+# 1. 下载页文案/链接（对外）
+curl -sk https://www.promiselink.cn/download.html | grep -oE 'PromiseLink-[0-9][0-9.a-zA-Z-]*-(mac\.dmg|windows\.exe)' | sort -u
+# 期望：仅含 PromiseLink-<VER>-mac.dmg / -windows.exe，无任何旧版本残留
+
+# 2. 安装包真实可达（对外）——最关键的一条
+for f in PromiseLink-${VER}-mac.dmg PromiseLink-${VER}-windows.exe; do
+  curl -sk -o /dev/null -w "$f → %{http_code}\n" "https://www.promiselink.cn/downloads/$f"
+done
+# 期望：全部 200/206；出现 404 即为 P0 级故障（页面指向不存在的包）
+
+# 3. PWA 缓存版本（对外）
+curl -sk https://www.promiselink.cn/sw.js | grep -oE "CACHE_VERSION = 'v[0-9A-Za-z.-]*'"
+# 期望：CACHE_VERSION = 'v<VER>'
+
+# 4. 一键安装脚本
+curl -sk -o /dev/null -w "install_pro.sh → %{http_code}\n" https://www.promiselink.cn/install_pro.sh
+# 期望：200
 ```
+
+> 上述四类断言已内建于 Pro `deploy/deploy-website.sh` 的 `[5/6]` 与 `deploy-website.yml` 的 `External verification`，正常流程无需手工重复；手工执行用于**独立复核**（尤其怀疑 CI 汇报失真时）。
 
 ---
 
@@ -302,7 +332,8 @@ W5 是基础版本地功能（实体归一 + candidate token），**不依赖**�
 
 - [ ] `gh release create` 默认 published（非 draft）
 - [ ] `gh run watch <run-id>` ✅
-- [ ] SSH 校验 §2.4 两条命令
+- [ ] **对外 URL 实测** §2.4 四条命令（安装包 200 + 无旧版本残留 + sw.js + install_pro.sh）
+- [ ] 确认 Pro 的 `Deploy Website` workflow 已跑绿（官网唯一 owner，见 §2.2）
 
 ---
 

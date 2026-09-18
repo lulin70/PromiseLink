@@ -1,6 +1,7 @@
 """JWT authentication and authorization utilities."""
 
 import base64
+import binascii
 import hashlib
 import hmac
 import json
@@ -174,7 +175,7 @@ def verify_candidate_token(
         decoded = base64.b64decode(
             padded.encode("ascii"), altchars=b"-_", validate=True
         )
-    except (UnicodeEncodeError, ValueError, base64.binascii.Error) as exc:
+    except (UnicodeEncodeError, ValueError, binascii.Error) as exc:
         raise _candidate_token_error("candidate token encoding is invalid") from exc
 
     if decoded.count(b".") != 1:

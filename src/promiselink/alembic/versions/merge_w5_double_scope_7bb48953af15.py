@@ -11,9 +11,6 @@ alembic 约定: merge migration 必须显式声明多个 down_revision 父级 (t
 """
 from collections.abc import Sequence
 
-import sqlalchemy as sa
-from alembic import op
-
 # revision identifiers, used by Alembic.
 revision: str = 'merge_w5_double_scope_7bb48953af15'
 down_revision: tuple[str, ...] = ('7bb48953af15', 'w5_entity_correction_double_scope')
