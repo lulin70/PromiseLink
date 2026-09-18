@@ -3,9 +3,10 @@
 W5 admission baseline (see docs/design/W5_IMPLEMENTATION_READINESS_CHECKLIST_v1.md §3).
 
 Notes:
-- This module no longer unconditionally overrides ``DATABASE_URL`` to ``sqlite://``.
-  The backend is selected by the ``db_backend`` fixture (default ``sqlite``; opt-in
-  ``postgresql`` via the ``dual_db`` marker or ``--postgresql-url``).
+- ``DATABASE_URL`` is forced (before any ``promiselink`` import) to match the
+  ``db_backend`` fixture (default ``sqlite``; opt-in ``postgresql`` via
+  ``W5_PG_URL`` + the ``dual_db`` marker). See the alignment block below for why
+  this is mandatory rather than cosmetic.
 - ``Base.metadata.create_all`` is retained **only** as a temporary in-memory
   convenience for SQLite fixtures. The W4+ Test Plan requires ``alembic upgrade
   head`` on every fixture-backed backend before any test runs; the
@@ -28,7 +29,23 @@ import pytest_asyncio
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from promiselink.database import Base
+# ── Test-env / model-dialect alignment (MUST precede the promiselink import) ──
+# ``promiselink.database.IS_SQLITE`` is resolved **at import time** from
+# ``settings.database_url``, and every model picks its column types from it
+# (``JSONB if not IS_SQLITE else JSON``, ``UUID if not IS_SQLITE else String``).
+# The fixtures build SQLite engines, so the process env has to advertise SQLite
+# as well: otherwise ``Base.metadata`` is built with JSONB columns and any
+# fixture that renders DDL against SQLite dies with
+# ``CompileError: ... can't render element of type JSONB``.
+# This matters in CI, where the ``Run tests`` job exports
+# ``DATABASE_URL=postgresql+asyncpg://...`` (used by the e2e jobs) even though
+# the unit suite runs on the SQLite backend.
+# PostgreSQL opt-in goes through ``W5_PG_URL`` because the dialect is frozen
+# before pytest parses ``--postgresql-url``.
+os.environ["DATABASE_URL"] = os.environ.get("W5_PG_URL") or "sqlite://"
+os.environ["TEST_MODE"] = "true"
+
+from promiselink.database import Base  # noqa: E402
 
 # Allowed values for the ``db_backend`` fixture.
 DB_BACKENDS = ("sqlite", "postgresql")
@@ -103,8 +120,7 @@ def db_backend(request: pytest.FixtureRequest) -> str:
     """Return the backend selected for this test.
 
     Defaults to ``sqlite``. Tests marked with ``@pytest.mark.dual_db`` must
-    also select ``postgresql`` either via ``--postgresql-url <url>`` or by
-    setting ``W5_PG_URL`` in the environment.
+    also select ``postgresql`` via ``--postgresql-url <url>`` or ``W5_PG_URL``.
     """
     backend = request.config.getoption("--db-backend")
     if backend not in DB_BACKENDS:
@@ -116,6 +132,18 @@ def db_backend(request: pytest.FixtureRequest) -> str:
     if backend == "postgresql" and "dual_db" not in request.keywords:
         raise pytest.UsageError(
             "postgresql backend requires the ``dual_db`` marker on the test"
+        )
+    if backend == "postgresql" and os.environ.get("W5_PG_URL") != os.environ.get(
+        "DATABASE_URL"
+    ):
+        # Model column types are frozen at import time from DATABASE_URL (see the
+        # alignment block at the top of this module). A CLI-only --postgresql-url
+        # would leave the models on SQLite while the fixtures build PostgreSQL
+        # engines — fail closed instead of running a mismatched suite.
+        raise pytest.UsageError(
+            "postgresql backend must be exported via W5_PG_URL before pytest "
+            "starts (models resolve their dialect at import time); "
+            "--postgresql-url alone cannot switch the model layer"
         )
     return backend
 
