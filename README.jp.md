@@ -10,8 +10,8 @@
   <a href="https://promiselink.cn"><img src="https://img.shields.io/badge/🌐_官网-promiselink.cn-blue?style=for-the-badge" alt="Website"></a>
   <br/>
   <a href="https://github.com/lulin70/PromiseLink/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/lulin70/PromiseLink/ci.yml?branch=main&label=CI&logo=github" alt="CI"></a>
-  <img src="https://img.shields.io/badge/tests-2088%20passed-brightgreen" alt="Tests">
-  <img src="https://img.shields.io/badge/coverage-88%25-green" alt="Coverage">
+  <img src="https://img.shields.io/badge/tests-2087%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/coverage-87%25-green" alt="Coverage">
   <img src="https://img.shields.io/badge/mypy-0%20errors-brightgreen" alt="mypy">
   <img src="https://img.shields.io/badge/ruff-0%20errors-brightgreen" alt="ruff">
   <img src="https://img.shields.io/badge/security-50%20tests%20passed-blue" alt="Security">
@@ -44,7 +44,7 @@
 | 利点 | データによる証明 | 従来のCRMとの比較 |
 |------|---------|-------------|
 | 🔐 **データ主権 · SaaS非提供** | 100% ローカル SQLite ストレージ / データは家の外に出ない / オフライン利用可能 / PIPL & GDPR 準拠 | SaaS AI-CRM はデータをクラウドにアップロードし、関係資産を第三者に委託 |
-| 🏭 **産業グレードの品質** | 2088 テスト合格 / 88% カバレッジ / mypy 0 / ruff 0 / 50 セキュリティテスト / 17 パフォーマンステスト | 多くのオープンソースCRMはカバレッジ 30% 未満 |
+| 🏭 **産業グレードの品質** | 2088 テスト合格 / 87% カバレッジ / mypy 0 / ruff 0 / 50 セキュリティテスト / 17 パフォーマンステスト | 多くのオープンソースCRMはカバレッジ 30% 未満 |
 | 🧠 **コアアルゴリズム層のメインロジックは純粋アルゴリズム** | エンティティ正規化 / Todo状態機械 / 約束履行 / 関連発見 / 動的スコアリング — メインロジックは純粋なアルゴリズム実装（NetworkX + RapidFuzz + numpy）、オプションのLLM拡張次元あり（いずれも縮退メカニズム付き）、オフライン動作、監査可能 | 主要なAI-CRMは全工程でGPT APIに依存 |
 | 🚀 **ポータブル・ゼロデプロイ** | `pip install -e .` + `bash scripts/start.sh` ですぐ利用可能、Docker / K8s 不要 | 同種ツールは docker-compose が必要 |
 
@@ -101,13 +101,16 @@ git clone https://github.com/lulin70/PromiseLink
 cd PromiseLink
 pip install -e '.[dev]'
 pytest --co -q | tail -1   # 2170 tests collected と表示されるはず
-pytest tests/ -q --ignore=tests/test_load_real.py   # メインスイート: 2071 passed, 79 skipped, 3 deselected
-pytest tests/test_load_real.py -q --no-cov -o addopts=""   # 負荷テスト: 17 passed
+pytest tests/ -q --ignore=tests/test_load_real.py --ignore=tests/test_performance_baseline.py   # メインスイート: 2054 passed, 79 skipped, 3 deselected
+pytest tests/test_load_real.py tests/test_performance_baseline.py -q --no-cov -o addopts=""   # 負荷 + パフォーマンス（CI の perf job）: 34 passed
 pytest tests/test_security_comprehensive.py -q --no-cov   # 50件のセキュリティテスト
 ```
 
-> 負荷テストはカバレッジ計測なしで単独実行する必要があります（`--no-cov -o addopts=""`、CI と同一）：
-> カバレッジ計測は並行処理の P95 を約 10ms から約 1200ms に膨張させ、500ms のしきい値を誤って超過させます。
+> 負荷テストとパフォーマンステストはカバレッジ計測なしで別グループとして実行する必要があります（CI の `perf` job と同一口径）：
+> カバレッジ計測は並行処理の P95 を約 10ms から約 1200ms に膨張させ、500ms のしきい値を誤って超過させます ——
+> 同一の並行ケースでの実測：計測ありで単体 7.3 秒、計測なしで 17 件合計 2.8 秒。
+> これら 2 グループは以前メインスイート内で実行されており、その揺らぎが `e2e` / `Playwright UI E2E` / `e2e-nightly` の
+> 3 ジョブをまとめて `skipped` にしていました。
 
 ---
 
@@ -115,8 +118,8 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50件のセキュリ
 
 | 指標       | 値                                                               |
 | -------- | ---------------------------------------------------------------- |
-| テストケース     | **2088 passed**, 79 skipped, 3 deselected, 0 failed（メインスイート 2071 + 負荷テスト 17。50件の relay_client 堅牢性 + 12件の v5.6 修正 + 50セキュリティ + 17パフォーマンス + 6件のリアル LLM E2E を含む） |
-| コードカバレッジ    | **88%**                                                          |
+| テストケース     | **2088 passed**, 79 skipped, 3 deselected, 0 failed（メインスイート 2054 + 負荷・パフォーマンス 34。50件の relay_client 堅牢性 + 12件の v5.6 修正 + 50セキュリティ + 17パフォーマンス + 6件のリアル LLM E2E を含む） |
+| コードカバレッジ    | **87%**                                                          |
 | mypy 型チェック | **0 エラー**（127ソースファイルすべて合格）                                             |
 | ruff リント | **0 エラー**                                                          |
 | セキュリティテスト     | **50件すべて合格**（SQLインジェクション / XSS / パストラバーサル / JWT / 権限昇格 / 入力バリデーション / レートリミット）         |
@@ -129,7 +132,7 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50件のセキュリ
 | 製品階層     | 基本版（ローカル無料） / プロ版（ゲートウェイ中継） / ミニプログラム（モバイル縦画面） / カスタム版（チーム）                      |
 | 全体進捗     | **89%** (基本版 E2E 81/0/0 零 skip 達成)                              |
 
-> **階層別カバレッジに関する注記**: コアアルゴリズム層（entity_resolution / todo_state_machine / promise_fulfillment / association_discovery / priority_scorer）は、プロジェクト平均の88%より高いカバレッジを持ち、LLMに依存せず、決定論的で再現可能です。
+> **階層別カバレッジに関する注記**: コアアルゴリズム層（entity_resolution / todo_state_machine / promise_fulfillment / association_discovery / priority_scorer）は、プロジェクト平均の87%より高いカバレッジを持ち、LLMに依存せず、決定論的で再現可能です。
 
 ---
 
@@ -296,7 +299,7 @@ PromiseLink/
 - [x] DataSourceAdapter 抽象層（手動 / CSV；音声 / WeChat / メールはプロ版の機能）
 - [x] CarryMem プロトコル分離（NullMemoryProvider グレースフルデグラデーション）
 - [x] 暗号化体系（HMAC-SHA256 + フィールドレベル暗号化 + 行レベルセキュリティ）
-- [x] 99 テストファイル / **2170 テストケース**（50件の relay_client 堅牢性 + 12件の v5.6 修正 + 6件のリアル LLM E2E を含む）/ **88% カバレッジ**
+- [x] 99 テストファイル / **2170 テストケース**（50件の relay_client 堅牢性 + 12件の v5.6 修正 + 6件のリアル LLM E2E を含む）/ **87% カバレッジ**
 - [x] CI/CD + Alembic 対応完了
 - [x] PoC Demo 4/4 シナリオ合格
 - [x] ワンクリックインストール / 起動スクリプト（ローカルで直接実行、Docker不要）

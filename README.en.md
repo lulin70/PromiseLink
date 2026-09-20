@@ -10,8 +10,8 @@
   <a href="https://promiselink.cn"><img src="https://img.shields.io/badge/🌐_官网-promiselink.cn-blue?style=for-the-badge" alt="Website"></a>
   <br/>
   <a href="https://github.com/lulin70/PromiseLink/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/lulin70/PromiseLink/ci.yml?branch=main&label=CI&logo=github" alt="CI"></a>
-  <img src="https://img.shields.io/badge/tests-2088%20passed-brightgreen" alt="Tests">
-  <img src="https://img.shields.io/badge/coverage-88%25-green" alt="Coverage">
+  <img src="https://img.shields.io/badge/tests-2087%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/coverage-87%25-green" alt="Coverage">
   <img src="https://img.shields.io/badge/mypy-0%20errors-brightgreen" alt="mypy">
   <img src="https://img.shields.io/badge/ruff-0%20errors-brightgreen" alt="ruff">
   <img src="https://img.shields.io/badge/security-50%20tests%20passed-blue" alt="Security">
@@ -44,7 +44,7 @@
 | Advantage | Proof | vs. Traditional CRM |
 |------|---------|-------------|
 | 🔐 **Data Sovereignty · No SaaS** | 100% local SQLite storage / data never leaves your home / offline-capable / PIPL & GDPR compliant | SaaS AI-CRMs upload data to the cloud, entrusting relationship assets to a third party |
-| 🏭 **Industrial-grade quality** | 2088 tests passed / 88% coverage / mypy 0 / ruff 0 / 50 security tests / 17 performance tests | Most open-source CRMs have < 30% coverage |
+| 🏭 **Industrial-grade quality** | 2088 tests passed / 87% coverage / mypy 0 / ruff 0 / 50 security tests / 17 performance tests | Most open-source CRMs have < 30% coverage |
 | 🧠 **Core algorithm layer: main logic is pure algorithm** | Entity resolution / Todo state machine / promise fulfillment / association discovery / dynamic scoring — main logic is pure algorithm implementation (NetworkX + RapidFuzz + numpy), with optional LLM enhancement dimensions (all with degradation mechanisms), runs offline, auditable | Mainstream AI-CRMs depend on GPT API across the full chain |
 | 🚀 **Portable, zero deployment** | `pip install -e .` + `bash scripts/start.sh` ready to use, no Docker / K8s required | Similar tools require docker-compose |
 
@@ -101,13 +101,15 @@ git clone https://github.com/lulin70/PromiseLink
 cd PromiseLink
 pip install -e '.[dev]'
 pytest --co -q | tail -1   # Should show 2170 tests collected
-pytest tests/ -q --ignore=tests/test_load_real.py   # main suite: 2071 passed, 79 skipped, 3 deselected
-pytest tests/test_load_real.py -q --no-cov -o addopts=""   # load tests: 17 passed
+pytest tests/ -q --ignore=tests/test_load_real.py --ignore=tests/test_performance_baseline.py   # main suite: 2054 passed, 79 skipped, 3 deselected
+pytest tests/test_load_real.py tests/test_performance_baseline.py -q --no-cov -o addopts=""   # load + performance (CI perf job): 34 passed
 pytest tests/test_security_comprehensive.py -q --no-cov   # 50 security tests
 ```
 
-> Load tests must run separately without coverage instrumentation (`--no-cov -o addopts=""`, same as CI):
-> coverage instrumentation inflates concurrent P95 from ~10ms to ~1200ms and trips the 500ms threshold.
+> Load and performance tests must run separately without coverage instrumentation (same grouping as the CI `perf` job):
+> coverage instrumentation inflates concurrent P95 from ~10ms to ~1200ms and trips the 500ms threshold —
+> measured on one concurrent case: 7.3s alone with instrumentation vs 2.8s for all 17 tests without it.
+> These two groups used to run inside the main suite, and their flakiness flipped `e2e` / `Playwright UI E2E` / `e2e-nightly` to `skipped`.
 
 ---
 
@@ -115,8 +117,8 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50 security tests
 
 | Metric       | Value                                                               |
 | -------- | ---------------------------------------------------------------- |
-| Test cases     | **2088 passed**, 79 skipped, 3 deselected, 0 failed (main suite 2071 + load tests 17; incl. 50 relay_client robustness + 12 v5.6 corrections + 50 security + 17 performance + 6 real LLM E2E) |
-| Code coverage    | **88%**                                                          |
+| Test cases     | **2088 passed**, 79 skipped, 3 deselected, 0 failed (main suite 2054 + load & performance 34; incl. 50 relay_client robustness + 12 v5.6 corrections + 50 security + 17 performance + 6 real LLM E2E) |
+| Code coverage    | **87%**                                                          |
 | mypy type check | **0 errors** (127 source files all passed)                                             |
 | ruff code check | **0 errors**                                                          |
 | Security tests     | **50 all passed** (SQL injection / XSS / path traversal / JWT / privilege escalation / input validation / rate limiting)         |
@@ -129,7 +131,7 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50 security tests
 | Product tier     | Basic (local free) / Pro (gateway relay) / Mini-program (mobile) / Custom (team)                      |
 | Overall progress     | **89%** (Basic E2E 81/0/0 zero skip achieved)                              |
 
-> **Layered coverage note**: The core algorithm layer (entity_resolution / todo_state_machine / promise_fulfillment / association_discovery / priority_scorer) has coverage higher than the project average of 88%, and does not depend on LLM — deterministic and reproducible.
+> **Layered coverage note**: The core algorithm layer (entity_resolution / todo_state_machine / promise_fulfillment / association_discovery / priority_scorer) has coverage higher than the project average of 87%, and does not depend on LLM — deterministic and reproducible.
 
 ---
 
@@ -296,7 +298,7 @@ PromiseLink/
 - [x] DataSourceAdapter abstraction layer (manual / CSV; voice / WeChat / email are Pro edition features)
 - [x] CarryMem protocol decoupling (NullMemoryProvider graceful degradation)
 - [x] Encryption system (HMAC-SHA256 + field-level encryption + row-level security)
-- [x] 99 test files / **2170 test cases** (incl. 50 relay_client robustness + 12 v5.6 corrections + 6 real LLM E2E) / **88% coverage**
+- [x] 99 test files / **2170 test cases** (incl. 50 relay_client robustness + 12 v5.6 corrections + 6 real LLM E2E) / **87% coverage**
 - [x] CI/CD + Alembic ready
 - [x] PoC Demo 4/4 scenarios passed
 - [x] One-click install / start scripts (run locally directly, no Docker required)

@@ -2,6 +2,27 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [Unreleased]
+
+### Changed — CI：性能/负载用例拆出独立 job（修「门禁遮挡」，L-6）
+
+- **问题**：`tests/test_performance_baseline.py`（17 条）与 `tests/test_load_real.py`（17 条）此前都跑在带 coverage 的 `test` job 里。coverage 插桩使并发用例耗时长约 2 个数量级 —— 本机实测：`test_concurrent_get_entities` 带插桩单条 **7.3s**，同文件无插桩 17 条合计 **2.8s**；在 CI 共享 runner 上表现为 10 并发耗时**均匀挤在 650~655ms** → 越过 500ms 阈值 → `test (3.11)` 红。
+- **后果（真正的问题不是抖动，是遮挡）**：`e2e` / `Playwright UI E2E` / `e2e-nightly` 均为 `needs: [test]`，`test` 一红它们全部 `skipped`。v1.1.1 发布提交 `e58fff6`（run `35513437144`）正是如此：`failure test (3.11)` + 三个 e2e job 全 `skipped` → **发布未取得 e2e 门禁证据**。
+- **修复**：新增独立 job `perf`（`Performance & Load (no coverage)`），以 `--no-cov -o addopts=""` 运行这两组用例且**不设 `needs`**；`test` job 的覆盖率步骤加 `--ignore=tests/test_performance_baseline.py` 并移除原 `Run load tests` 步骤。性能失败仍会让 workflow 变红（门禁信号不丢），但不再连带把三个 e2e job 变成 `skipped`。
+- **阈值未放宽**：`tests/test_performance_baseline.py` 文件头明确「thresholds are based on local SQLite baselines — do NOT loosen to pass」，本次只改运行环境（去掉插桩），未改任何阈值。
+
+### Docs — 测试数字与覆盖率订正（2026-09-20）
+
+| 指标 | 旧值 | 新值（本轮实测） |
+|---|---|---|
+| 主套件 passed（覆盖率步骤） | 2071 | **2054**（加 `--ignore=tests/test_performance_baseline.py` 后） |
+| 负载 + 性能（`perf` job） | 17 | **34** |
+| 用例总数 passed | 2088 | **2088**（2054 + 34，未变） |
+| 测试收集数 | 2170 | **2170**（未变） |
+| 覆盖率 | 88% | **87%** |
+
+覆盖率 A/B 实测（同一命令，仅差是否含性能用例）：含 → `TOTAL 11773 1514 87%`（`Total coverage: 87.14%`）；不含 → `TOTAL 11773 1512 87%`（`87.16%`）。性能用例对语句覆盖的贡献仅 **2 行**，故**拆分不是覆盖率变化的原因**；旧文档的 88%（`TOTAL 11168 1314 88%`）语句总数与本次实测（11773）不一致，属过期数字，一并订正。
+
 ## [1.1.1] - 2026-09-20
 
 > **版本号语义说明（如实标注）**：本版按**补丁版**发布，但内容含一处 `Removed`（移除基础版 Docker 交付链 + PostgreSQL 后端支持）。

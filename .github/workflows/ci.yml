@@ -87,11 +87,37 @@ jobs:
           REDIS_ENABLED: "false"
           TZ: Asia/Shanghai
         run: |
-          # 排除负载测试:coverage 插桩会使性能测量失效 (100 并发 P95 从 10ms 膨胀到 1185ms)
-          # 负载测试在下方 "Run load tests" step 单独无 coverage 执行
-          pytest tests/ -v --cov=src/promiselink --cov-report=xml --cov-report=term-missing --cov-fail-under=80 --ignore=tests/test_load_real.py -k "not embedding_provider_local and not embedding_provider_similar and not full_embedding_to_similarity"
+          # 排除负载/性能测试:coverage 插桩会使性能测量失效 (100 并发 P95 从 10ms 膨胀到 1185ms)
+          # 二者在 perf job 中单独无 coverage 执行
+          pytest tests/ -v --cov=src/promiselink --cov-report=xml --cov-report=term-missing --cov-fail-under=80 --ignore=tests/test_load_real.py --ignore=tests/test_performance_baseline.py -k "not embedding_provider_local and not embedding_provider_similar and not full_embedding_to_similarity"
 
-      - name: Run load tests (no coverage — performance measurements require clean instrumentation)
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          fail_ci_if_error: false
+
+  # 性能/负载用例独立成 job，不放在 test job 里：coverage 插桩会使性能测量失效
+  # （同一并发用例：带插桩单条 7.3s，无插桩整个文件 17 条 2.8s），而 test job 的
+  # 红/绿会被 needs:[test] 的 e2e / Playwright UI E2E / e2e-nightly 继承 ——
+  # 性能抖动曾把这三个 job 一起变成 skipped，使发布提交拿不到 e2e 证据（L-6）。
+  # 拆出后：性能失败仍会让 workflow 变红（门禁信号不丢），但不再遮挡 e2e 证据。
+  perf:
+    name: Performance & Load (no coverage)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run load + performance baseline tests (no coverage — instrumentation invalidates timings)
         env:
           TEST_MODE: "true"
           LLM_PROVIDER: "mock"
@@ -101,12 +127,7 @@ jobs:
           REDIS_ENABLED: "false"
           TZ: Asia/Shanghai
         run: |
-          pytest tests/test_load_real.py -v --no-cov -o addopts="" --tb=short
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        with:
-          fail_ci_if_error: false
+          pytest tests/test_load_real.py tests/test_performance_baseline.py -v --no-cov -o addopts="" --tb=short
 
   e2e:
     needs: [test]

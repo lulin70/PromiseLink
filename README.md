@@ -9,8 +9,8 @@
   <a href="https://github.com/lulin70/PromiseLink/releases"><img src="https://img.shields.io/badge/version-v1.1.1-blue?style=flat-square" alt="Version"></a>
   <br/>
   <a href="https://github.com/lulin70/PromiseLink/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/lulin70/PromiseLink/ci.yml?branch=main&label=CI&logo=github" alt="CI"></a>
-  <img src="https://img.shields.io/badge/tests-2088%20passed-brightgreen" alt="Tests">
-  <img src="https://img.shields.io/badge/coverage-88%25-green" alt="Coverage">
+  <img src="https://img.shields.io/badge/tests-2087%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/coverage-87%25-green" alt="Coverage">
   <img src="https://img.shields.io/badge/mypy-0%20errors-brightgreen" alt="mypy">
   <img src="https://img.shields.io/badge/ruff-0%20errors-brightgreen" alt="ruff">
   <img src="https://img.shields.io/badge/security-50%20tests%20passed-blue" alt="Security">
@@ -43,7 +43,7 @@
 | 优势 | 数据证明 | 对比传统 CRM |
 |------|---------|-------------|
 | 🔐 **数据主权 · 不提供 SaaS** | 100% 本地 SQLite 存储 / 数据从不出家门 / 离线可用 / 符合 PIPL & GDPR | SaaS AI-CRM 数据上云，关系资产交给第三方托管 |
-| 🏭 **工业级质量** | 2088 测试通过 / 88% 覆盖率 / mypy 0 / ruff 0 / 50 安全测试 / 17 性能测试 | 多数开源 CRM < 30% 覆盖率 |
+| 🏭 **工业级质量** | 2088 测试通过 / 87% 覆盖率 / mypy 0 / ruff 0 / 50 安全测试 / 17 性能测试 | 多数开源 CRM < 30% 覆盖率 |
 | 🧠 **核心算法层主逻辑纯算法** | 实体归一 / Todo 状态机 / 承诺履行 / 关联发现 / 动态评分 — 主逻辑纯算法实现（NetworkX + RapidFuzz + numpy），含可选 LLM 增强维度（均具备降级机制），可离线运行、可审计 | 主流 AI-CRM 全链路依赖 GPT API |
 | 🚀 **便携零部署** | `pip install -e .` + `bash scripts/start.sh` 即用，无需 Docker / K8s | 同类工具需 docker-compose |
 
@@ -126,13 +126,15 @@ git clone https://github.com/lulin70/PromiseLink
 cd PromiseLink
 pip install -e '.[dev]'
 pytest --co -q | tail -1   # 应显示 2170 tests collected
-pytest tests/ -q --ignore=tests/test_load_real.py   # 主套件：2071 passed, 79 skipped, 3 deselected
-pytest tests/test_load_real.py -q --no-cov -o addopts=""   # 负载测试：17 passed
+pytest tests/ -q --ignore=tests/test_load_real.py --ignore=tests/test_performance_baseline.py   # 主套件：2054 passed, 79 skipped, 3 deselected
+pytest tests/test_load_real.py tests/test_performance_baseline.py -q --no-cov -o addopts=""   # 负载 + 性能（CI 的 perf job）：34 passed
 pytest tests/test_security_comprehensive.py -q --no-cov   # 50 项安全测试
 ```
 
-> 负载测试必须去掉覆盖率插桩单独运行（`--no-cov -o addopts=""`，与 CI 一致）：
-> coverage 插桩会让并发 P95 从 ~10ms 膨胀到 ~1200ms，导致 500ms 阈值误报。
+> 负载与性能用例必须去掉覆盖率插桩、单独成组运行（与 CI 的 `perf` job 同口径）：
+> coverage 插桩会让并发 P95 从 ~10ms 膨胀到 ~1200ms，导致 500ms 阈值误报 ——
+> 实测同一并发用例：带插桩单条 7.3s，无插桩 17 条合计 2.8s。这两组用例此前与主套件同跑，
+> 抖动会连带把 `e2e` / `Playwright UI E2E` / `e2e-nightly` 三个 job 一起变成 skipped。
 
 ---
 
@@ -140,8 +142,8 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50 项安全测试
 
 | 指标       | 数值                                                               |
 | -------- | ---------------------------------------------------------------- |
-| 测试用例     | **2088 passed**, 79 skipped, 3 deselected, 0 failed（主套件 2071 + 负载测试 17；含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏 + 50 安全 + 17 性能 + 6 真实 LLM E2E） |
-| 代码覆盖率    | **88%**                                                          |
+| 测试用例     | **2088 passed**, 79 skipped, 3 deselected, 0 failed（主套件 2054 + 负载与性能 34；含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏 + 50 安全 + 17 性能 + 6 真实 LLM E2E） |
+| 代码覆盖率    | **87%**                                                          |
 | mypy 类型检查 | **0 错误** (127 源文件全部通过)                                             |
 | ruff 代码检查 | **0 错误**                                                          |
 | 安全测试     | **50 项全通过** (SQL 注入 / XSS / 路径遍历 / JWT / 越权 / 输入验证 / 速率限制)         |
@@ -154,7 +156,7 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50 项安全测试
 | 产品层级     | 基础版(本地免费) / 专业版(网关中继) / 小程序(手机竖屏) / 定制版(团队)                      |
 | 总体进度     | **89%** (基础版 E2E 156/0/0 零 skip 达成)                              |
 
-> **分层覆盖率提示**：核心算法层（entity_resolution / todo_state_machine / promise_fulfillment / association_discovery / priority_scorer）覆盖率高于项目平均 88%，主逻辑纯算法实现（含可选 LLM 增强维度），确定性可复现。
+> **分层覆盖率提示**：核心算法层（entity_resolution / todo_state_machine / promise_fulfillment / association_discovery / priority_scorer）覆盖率高于项目平均 87%，主逻辑纯算法实现（含可选 LLM 增强维度），确定性可复现。
 
 ---
 
@@ -321,7 +323,7 @@ PromiseLink/
 - [x] DataSourceAdapter 抽象层（手动 / CSV；语音 / 微信 / 邮件为专业版功能）
 - [x] CarryMem 协议解耦（NullMemoryProvider 优雅降级）
 - [x] 加密体系（HMAC-SHA256 + 字段级加密 + 行级安全）
-- [x] 99 个测试文件 / **2170 测试用例**（含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏 + 6 真实 LLM E2E）/ **88% 覆盖率**
+- [x] 99 个测试文件 / **2170 测试用例**（含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏 + 6 真实 LLM E2E）/ **87% 覆盖率**
 - [x] CI/CD + Alembic 就绪
 - [x] PoC Demo 4/4 场景通过
 - [x] 一键安装 / 启动脚本（本地直接运行，无需 Docker）
