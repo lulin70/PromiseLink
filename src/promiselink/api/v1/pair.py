@@ -168,14 +168,24 @@ async def get_pair_status(code: str) -> PairStatusResponse:
 async def activate_pair(body: PairActivateRequest, request: Request) -> PairActivateResponse:
     """Activate Pro edition with the obtained license key.
 
-    Writes PRO_LICENSE_KEY to the .env file so it persists across restarts,
-    then dynamically starts the WSS relay connection — no restart required.
+    Writes PRO_LICENSE_KEY **and RELAY_GATEWAY_URL** to the .env file so they
+    persist across restarts, then dynamically starts the WSS relay connection —
+    no restart required.
 
     2026-07-29 fix: Previously this endpoint only wrote .env and returned
     "即将启动中继服务", but the WSS client was only started in the lifespan
     startup event, so users had to manually restart the basic edition.
     Now we clear the settings cache, reload settings with the new license
     key, and start the WSS client immediately.
+
+    2026-09-20 fix: The gateway URL used to be pre-seeded into .env by the
+    (now removed) one-click install scripts. Not every delivery path ran them —
+    the desktop package (PyInstaller `.dmg` / `.exe`) writes no .env at all —
+    so ``settings.relay_gateway_url`` stayed empty and the WSS gate in both
+    this endpoint and the lifespan startup was permanently false: pairing
+    reported success while the miniapp could never reach the desktop. The
+    gateway address that /pair/init actually used is now persisted here, which
+    makes the pairing flow self-sufficient for every delivery path.
     """
     license_key = body.license_key.strip()
     if not license_key:
@@ -189,18 +199,24 @@ async def activate_pair(body: PairActivateRequest, request: Request) -> PairActi
         logger.error("pair_activate_read_env_failed", path=str(env_path), error=str(exc))
         return PairActivateResponse(success=False, error=f"读取 .env 失败: {exc}")
 
-    lines = content.splitlines()
-    found = False
-    for i, line in enumerate(lines):
-        if line.startswith("PRO_LICENSE_KEY="):
-            lines[i] = f"PRO_LICENSE_KEY={license_key}"
-            found = True
-            break
+    # Persist the license key plus the gateway address this pairing actually
+    # used, so the WSS relay can start now and after a restart.
+    updates = {"PRO_LICENSE_KEY": license_key}
+    gateway_url = _get_gateway_url()
+    if gateway_url:
+        updates["RELAY_GATEWAY_URL"] = gateway_url
 
-    if not found:
-        if lines and lines[-1].strip():
-            lines.append("")
-        lines.append(f"PRO_LICENSE_KEY={license_key}")
+    lines = content.splitlines()
+    for key, value in updates.items():
+        prefix = f"{key}="
+        for i, line in enumerate(lines):
+            if line.startswith(prefix):
+                lines[i] = f"{prefix}{value}"
+                break
+        else:
+            if lines and lines[-1].strip():
+                lines.append("")
+            lines.append(f"{prefix}{value}")
 
     new_content = "\n".join(lines) + "\n"
 
