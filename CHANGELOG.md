@@ -2,7 +2,13 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
-## [Unreleased] - 2026-09-19
+## [1.1.1] - 2026-09-20
+
+> **版本号语义说明（如实标注）**：本版按**补丁版**发布，但内容含一处 `Removed`（移除基础版 Docker 交付链 + PostgreSQL 后端支持）。
+> 判定为补丁的依据：该移除影响的是**交付方式与 Pro/企业向后端选型**，**基础版用户的可感知能力没有减少** ——
+> 基础版唯一二进制交付路径本就是桌面安装包，数据库本就是 SQLite，且本版发布前后用户侧操作完全一致。
+> 若认为对"曾用 Docker/PG 跑基础版"的用户构成破坏性变更，则应改判为 `1.2.0`（仅需改 `VERSION` / `pyproject.toml` / `__init__.py` / `frontend/package.json` 与本节标题）。
+> 决策与影响面分析见 PromiseLink-Pro `docs/review/PROJECT_REVIEW_20260918_FINDINGS.md` §9。
 
 ### Removed — 基础版 Docker 交付链 + PostgreSQL 后端支持（方案 B）
 
