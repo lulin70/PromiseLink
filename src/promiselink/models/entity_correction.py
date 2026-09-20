@@ -31,10 +31,9 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from promiselink.database import IS_SQLITE, Base
+from promiselink.database import Base
 
 
 class EntityCorrection(Base):
@@ -43,34 +42,34 @@ class EntityCorrection(Base):
     __tablename__ = "entity_corrections"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         primary_key=True,
         default=uuid.uuid4,
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         nullable=False,
         index=True,
     )
     event_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         ForeignKey("events.id"),
         nullable=False,
     )
     correction_type: Mapped[str] = mapped_column(String(20), nullable=False)
     entity_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         ForeignKey("entities.id"),
         nullable=True,
     )
     original_extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     original_canonical_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     candidate_entity_ids: Mapped[list[str] | None] = mapped_column(
-        JSONB if not IS_SQLITE else JSON,
+        JSON,
         nullable=True,
     )
-    selected_entity_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+    selected_entity_id: Mapped[str | None] = mapped_column(
+        String(36),
         nullable=True,
     )
     action: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -89,17 +88,17 @@ class EntityCorrection(Base):
         String(16), nullable=False, server_default="entity", default="entity",
     )
     source_todo_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         ForeignKey("todos.id"),
         nullable=True,
     )
-    selected_todo_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+    selected_todo_id: Mapped[str | None] = mapped_column(
+        String(36),
         ForeignKey("todos.id"),
         nullable=True,
     )
     candidate_todo_ids: Mapped[list[str] | None] = mapped_column(
-        JSONB if not IS_SQLITE else JSON,
+        JSON,
         nullable=True,
     )
     candidate_digest: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -127,7 +126,7 @@ class EntityCorrection(Base):
         String(16), nullable=False, server_default="issued", default="issued",
     )
     result_summary: Mapped[dict[str, Any] | None] = mapped_column(
-        JSONB if not IS_SQLITE else JSON,
+        JSON,
         nullable=True,
     )
     completed_at: Mapped[datetime | None] = mapped_column(

@@ -4,10 +4,9 @@ import uuid
 from datetime import UTC, datetime, time
 
 from sqlalchemy import JSON, CheckConstraint, DateTime, Index, Integer, String, Time
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from promiselink.database import IS_SQLITE, Base, _uuid_default
+from promiselink.database import Base, _uuid_default
 
 
 class ReminderPreference(Base):
@@ -16,7 +15,7 @@ class ReminderPreference(Base):
     __tablename__ = "reminder_preferences"
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         primary_key=True,
     )
     preferred_times: Mapped[list[str] | None] = mapped_column(JSON, default=["09:00", "20:00"])
@@ -34,17 +33,17 @@ class ReminderLog(Base):
     __tablename__ = "reminder_logs"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         primary_key=True,
         default=_uuid_default,
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         nullable=False,
         index=True,
     )
     todo_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         nullable=False,
     )
     reminder_type: Mapped[str] = mapped_column(String(30), nullable=False)

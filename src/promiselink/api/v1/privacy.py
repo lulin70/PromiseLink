@@ -35,7 +35,7 @@ from promiselink.models.score_audit_log import ScoreAuditLog
 from promiselink.models.todo import Todo
 
 # Note: SnoozeSchedule lacks user_id; relies on todos FK ondelete=CASCADE.
-# PostgreSQL cascades automatically; SQLite orphans are metadata-only (no PII).
+# Orphaned rows left by SQLite (no cascade) are metadata-only (no PII).
 
 router = APIRouter(prefix="/privacy", dependencies=[Depends(rate_limit_dependency)])
 logger = get_logger("promiselink.api.privacy")

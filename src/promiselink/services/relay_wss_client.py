@@ -1,6 +1,6 @@
 """WebSocket long-connection client for the Pro edition gateway relay.
 
-Bridges the local basic-edition Docker to the cloud AI gateway via a
+Bridges the local basic-edition desktop app to the cloud AI gateway via a
 persistent WSS connection. The gateway uses this connection to route
 HTTP business requests from the mini-app (received via
 ``/api/v1/pro/relay/request``) back to the user's local FastAPI

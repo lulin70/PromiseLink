@@ -1,6 +1,6 @@
 # PromiseLink 基础版技术债跟踪文档
 
-> **文档版本** v2.4 / 2026-09-07 / TD-B17 登记并修复（CI 门禁恢复 + W3/W4 潜伏缺陷清零）
+> **文档版本** v2.5 / 2026-09-19 / TD-B18 登记并完成（基础版 Docker 交付链 + PostgreSQL 后端清除，方案 B）
 > **关联文档** [PROJECT_STATUS.md](PROJECT_STATUS.md) · [CHANGELOG.md](../CHANGELOG.md) · [ROADMAP.md](ROADMAP.md) · [PromiseLink-Pro TECH_DEBT.md](../PromiseLink-Pro/docs/TECH_DEBT.md)
 > **用途**：量化跟踪技术债，按优先级清理，防止技术债积累导致项目可维护性下降
 > **更新原则**：每次清理后更新状态（OPEN→RESOLVED），新增技术债及时登记
@@ -14,9 +14,10 @@
 | P0 关键 | 0 项 | 0 项 | 0 项 | 0 项 |
 | P1 重要 | 3 项 | 3 项 | 0 项 | 0 项 |
 | P2 一般 | 3 项 | 3 项 | 0 项 | 0 项 |
-| P3 低优先 | 6 项 | 6 项 | 0 项 | 0 项 |
-| **合计** | **12 项** | **12 项** | **0 项** | **0 项** |
+| P3 低优先 | 7 项 | 7 项 | 0 项 | 0 项 |
+| **合计** | **13 项** | **13 项** | **0 项** | **0 项** |
 
+> **变更说明**：v2.5（2026-09-19）TD-B18 登记并完成（基础版 Docker 交付链 + PostgreSQL 后端支持清除，方案 B）。
 > **变更说明**：v2.2（2026-08-09）LLM Provider 从 Moka AI/rsxermu666.cn 迁移至 DeepSeek，TD-B12 RESOLVED。
 
 ---
@@ -333,10 +334,22 @@
 
 ---
 
+### TD-B18: 基础版 Docker 交付链 + PostgreSQL 后端支持残留（方案 B）✅ RESOLVED
+
+- **状态**：RESOLVED (2026-09-19)
+- **描述**：基础版长期携带一套来自 2026-06-04「托管 PoC」批次的 Docker 交付链（`Dockerfile` / `docker-compose*.yml` / `install-docker.sh` / `scripts/install_basic.sh` / `nginx/conf.d/default.conf` 等）与 PostgreSQL 双后端适配（`asyncpg`/`psycopg2-binary` 依赖、`is_postgresql`/`JSONB`/`IS_SQLITE` 分支）。该设计前提（云端托管基础版）已被 2026-06-11「长期 SQLite」决策与 2026-07-12「基础版禁止云端部署」硬约束两次否决，且从未作为用户可见交付能力出现。
+- **影响**：交付路径与文档双轨（Docker 镜像 vs 桌面包）、种子用户安装地址 `install_basic.sh` 404（P1-23）、镜像 pin 陈旧（P1-24）、CI test job 的 PG service 死重（P2-7）、`scripts/` 存量 ruff 告警（P2-8，未顺手修，另行观察）。
+- **修复**：采纳方案 B 删除基础版 Docker 交付链（12 个文件）并从基础版清除 PostgreSQL 后端（依赖 + 代码分支 + 测试 + CI），SQLite 成为基础版唯一后端；交付收敛为**桌面安装包**（`.dmg`/`.exe`）与源码运行两条路径。
+- **关联**：PromiseLink-Pro [PROJECT_REVIEW_20260918_FINDINGS.md](../PromiseLink-Pro/docs/review/PROJECT_REVIEW_20260918_FINDINGS.md) §9（决策 / 证据 / 执行记录）
+- **教训**：L-DELIVERY-001：交付路径与其历史批次的"设计前提"要一起退役——只删脚本不删前提，会留下"文档承诺 Docker、现实只有桌面包"的双轨失真。
+
+---
+
 ## 4. 变更历史
 
 | 日期 | 版本 | 作者 | 变更 |
 |------|------|------|------|
+| 2026-09-19 | v2.5 | DevSquad | TD-B18 登记并完成：基础版 Docker 交付链（12 文件）+ PostgreSQL 后端支持（asyncpg/psycopg2 依赖、is_postgresql/JSONB/IS_SQLITE 分支、PG 测试与 CI service）随方案 B 清除，SQLite 为唯一后端，交付收敛为桌面包（.dmg/.exe）+ 源码运行；同步 P1-23/P1-24/P2-7。详见 TD-B18 与 PromiseLink-Pro `docs/review/PROJECT_REVIEW_20260918_FINDINGS.md` §9。 |
 | 2026-09-07 | v2.4 | DevSquad | TD-B17 登记并立即修复：CI mypy 红灯（2026-09-03 起）导致 pytest 在 CI 从未执行，掩盖 3 个潜伏缺陷（`_step_synonym` 缺失 / W4 高频联系人生产不可达 / EntityCorrection SQLite 绑定）+ 2 个测试诚实性缺陷（伪造反向边数据 / e2e 绕过 resolve() 直呼私有方法）。验证：mypy 125 文件 0 错误 + 关联回归 109 用例 0 failed + e2e 12/12 PASS（真实公开路径）。详见 TD-B17。 |
 | 2026-08-03 | v2.0 | DevSquad | TD-B14 修复（5个测试失败：test_api_integration + test_coverage_boost + test_security_comprehensive×3）：修改测试期望 `assert resp.status_code in (404, 405)`，接受405作为HTTP标准合法响应。基础版技术债 10/12 RESOLVED，2项OPEN（TD-B12 LLM间歇性503非产品BUG + TD-B13 e2e mock审计部分修复）。 |
 | 2026-08-01 | v1.9 | DevSquad | TD-B13 部分修复：重命名 `test_real_llm_e2e.py` → `test_pipeline_mock_e2e.py`（诚实命名），同步更新 `test_user_journey_e2e.py` L66 注释引用。TD-B13 剩余项（小程序全 mock + 缺失 e2e 路径）仍 OPEN，优先级 P3 v0.10.0 处理。基础版技术债 9/11 RESOLVED，2 项 OPEN（TD-B12 待 LLM 稳定 + TD-B13 部分修复）。 |

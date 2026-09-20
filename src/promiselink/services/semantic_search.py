@@ -98,7 +98,7 @@ class SemanticSearchEngine:
         settings = get_settings()
         url = settings.database_url
         # Strip async dialect — sqlite3.connect needs plain path, not +aiosqlite
-        url = url.replace("+aiosqlite", "").replace("+asyncpg", "")
+        url = url.replace("+aiosqlite", "")
         # sqlite:///./data/promiselink.db → ./data/promiselink.db
         # sqlite:///data/promiselink.db → data/promiselink.db
         # sqlite:////app/data/promiselink.db → /app/data/promiselink.db
@@ -106,7 +106,7 @@ class SemanticSearchEngine:
             return url[len("sqlite:///"):]
         if url.startswith("sqlite://"):
             return url[len("sqlite://"):]
-        # Fallback for non-sqlite (shouldn't happen in PoC)
+        # Fallback when the URL is not a sqlite file URL
         return "data/promiselink.db"
 
     def _init_db(self) -> None:

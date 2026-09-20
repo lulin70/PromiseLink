@@ -16,17 +16,16 @@
 
 前往 [promiselink.cn](https://promiselink.cn) 下载页面，根据你的操作系统下载：
 
-- **macOS**：下载 `PromiseLink-Setup-x.x.x.dmg`，双击打开并拖入 Applications 文件夹即可
-- **Windows**：下载 `PromiseLink-Setup-x.x.x.exe`，双击运行安装向导
+- **macOS**：下载 `PromiseLink-x.x.x-mac.dmg`，双击打开并拖入 Applications 文件夹即可
+- **Windows**：下载 `PromiseLink-x.x.x-windows.exe`，双击运行安装向导
 
-安装完成后，首次启动会自动打开配置向导，引导你：
+安装完成后双击启动，本地服务自动运行并**自动打开浏览器**到 http://localhost:8000 。接下来：
 
-1. **设置 PoC 密码**（本地管理员密码，请妥善保管）
-2. **配置 LLM API Key**（AI 功能必需）
-3. **获取配对码**（用于手机小程序配对）
-4. **打开小程序**（手机微信搜索"PromiseLink"或扫码）
+1. **登录电脑端**（默认本地密码 `promiselink2026`；可在 `~/.promiselink/.env` 中修改 `POC_SECRET`）
+2. **配置 LLM API Key**（可选，AI 解析功能需要；写入 `~/.promiselink/.env` 的 `LLM_API_KEY`）
+3. **配对手机小程序**（电脑端打开 http://localhost:8000/pair 显示二维码，用微信小程序扫码即可；配对结果持久化在 `~/.promiselink/.env`，重启无需重新配对）
 
-> **提示**：安装包方式已包含所有依赖，无需手动安装 Python/Node.js。
+> **提示**：安装包方式已包含所有依赖，无需手动安装 Python/Node.js，也无需 Docker。
 
 ### 方式 B：从源码运行（适合开发者/深度定制）
 
@@ -134,7 +133,7 @@ curl http://localhost:8000/api/v1/promises?view=my-promises \
 | `LLM_API_KEY` | 空 | LLM API 密钥 |
 | `LLM_BASE_URL` | 自动填充 | LLM API 地址（根据 LLM_PROVIDER 自动设置） |
 | `LLM_MODEL` | 自动填充 | LLM 模型名称（根据 LLM_PROVIDER 自动设置） |
-| `DATABASE_URL` | `sqlite:///./data/promiselink.db` | 数据库连接 |
+| `DATABASE_URL` | `sqlite:///{用户家目录}/.promiselink/data/promiselink.db` | 数据库连接 |
 | `LOG_LEVEL` | `INFO` | 日志级别 |
 
 ## FAQ
@@ -163,4 +162,4 @@ A: 非 development 环境必须设置 `SECRET_KEY`。生成方法：`python -c "
 A: 基础版（本仓库）不包含语音、邮件同步、OCR名片扫描等专业版功能。如需使用专业版功能，请访问 [promiselink.cn](https://promiselink.cn) 获取许可证密钥，并按专业版安装流程部署。专业版可独立运行（无需基础版），也可与本仓库基础版配对使用。
 
 **Q: 忘记 PoC 密码怎么办？**
-A: 在 `.env` 中修改 `POC_SECRET` 的值，重启服务生效。安装包版本可在配置界面重置。
+A: 在 `.env` 中修改 `POC_SECRET` 的值，重启服务生效。安装包版本的配置文件位于 `~/.promiselink/.env`（Windows：`%USERPROFILE%\.promiselink\.env`）。

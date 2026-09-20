@@ -15,7 +15,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.core.logging import get_logger
 from promiselink.core.text_utils import redact_pii_from_text
-from promiselink.database import IS_SQLITE
 from promiselink.models.entity_correction import EntityCorrection
 
 logger = get_logger("promiselink.entity_correction_service")
@@ -64,14 +63,12 @@ async def record_correction(
     # distinguish closed audit rows from live W5 operations.
     legacy_operation_status = "rejected" if action == "ignore" else "confirmed"
 
-    # SQLite uses String(36) columns for UUIDs, so bind plain str to avoid the
-    # DBAPI bind mismatch. PostgreSQL still accepts uuid.UUID instances.
-    def _uid(value: str | uuid.UUID | None) -> uuid.UUID | str | None:
+    # UUID columns are String(36), so bind plain str to avoid the DBAPI bind
+    # mismatch ("type 'UUID' is not supported").
+    def _uid(value: str | uuid.UUID | None) -> str | None:
         if value is None:
             return None
-        if IS_SQLITE:
-            return str(value if isinstance(value, uuid.UUID) else uuid.UUID(value))
-        return value if isinstance(value, uuid.UUID) else uuid.UUID(value)
+        return str(value)
 
     now = datetime.now(UTC)
     row = EntityCorrection(

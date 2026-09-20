@@ -5,10 +5,9 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import JSON, CheckConstraint, DateTime, Index, String, Text, func
-from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from promiselink.database import IS_SQLITE, Base, _uuid_default
+from promiselink.database import Base, _uuid_default
 
 
 class ScheduledEvent(Base):
@@ -31,14 +30,14 @@ class ScheduledEvent(Base):
 
     # Primary key
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         primary_key=True,
         default=_uuid_default,
     )
 
     # Core fields
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         nullable=False,
         index=True,
     )
@@ -49,7 +48,7 @@ class ScheduledEvent(Base):
     )
     topic: Mapped[str] = mapped_column(String(200), nullable=False)
     participants: Mapped[list[dict[str, Any]] | None] = mapped_column(
-        JSONB if not IS_SQLITE else JSON,
+        JSON,
         nullable=True,
         comment='[{"name":"张总","entity_id":"...","company":"..."}]',
     )
@@ -72,7 +71,7 @@ class ScheduledEvent(Base):
 
     # Link to Event after recording
     linked_event_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         nullable=True,
     )
 
@@ -85,7 +84,7 @@ class ScheduledEvent(Base):
     # Metadata
     metadata_: Mapped[dict[str, Any] | None] = mapped_column(
         "metadata",
-        JSONB if not IS_SQLITE else JSON,
+        JSON,
         nullable=True,
     )
 

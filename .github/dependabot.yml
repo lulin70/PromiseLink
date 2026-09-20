@@ -12,7 +12,6 @@
 # - Python production deps: weekly check, individual PRs (visibility into runtime changes)
 # - Python dev deps: weekly check, GROUPED PR, ignore patch/minor (reduce noise)
 # - GitHub Actions: weekly check, grouped (reduce workflow PR spam)
-# - Docker base images: weekly check (security-critical)
 # - Security updates: daily for ALL ecosystems (fastest response to CVEs)
 
 version: 2
@@ -124,22 +123,3 @@ updates:
       github-actions:
         patterns:
           - "actions/*"
-          - "docker/*"
-
-  # Docker base image (Dockerfile)
-  - package-ecosystem: "docker"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "Asia/Shanghai"
-    open-pull-requests-limit: 3
-    labels:
-      - "dependencies"
-      - "docker"
-    commit-message:
-      prefix: "docker"
-      include: "scope"
-    reviewers:
-      - "lulin70"

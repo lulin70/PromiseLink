@@ -25,7 +25,7 @@ from sqlalchemy import event as sa_event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-# Force IS_SQLITE=True BEFORE importing models
+# Pin the dialect to SQLite before importing models (SQLite is the only backend).
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 
 from promiselink.core.auth import get_current_user_id, get_optional_user_id  # noqa: E402

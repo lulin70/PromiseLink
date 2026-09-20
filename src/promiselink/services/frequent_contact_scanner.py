@@ -2,7 +2,7 @@
 
 Default threshold (3 hits, 90 days) is configurable via Settings
 (``co_occurrence_threshold`` / ``co_occurrence_window_days``). Marking is
-written into ``Entity.properties['frequent_contact']`` (JSONB) — zero schema
+written into ``Entity.properties['frequent_contact']`` (JSON) — zero schema
 change.
 
 Storage model (W4 amendment, 2026-09-07): associations keeps ONE canonical
@@ -10,8 +10,8 @@ co_occurrence row per unordered entity pair (enforced by
 ``uq_association_user_source_target_type`` + direction normalization in the
 discovery engine). Repeat encounters accumulate shared event ids on that row
 in ``properties.evidence.shared_event_ids``. The scanner therefore counts
-distinct shared events per pair in Python — portable across SQLite and
-PostgreSQL without dialect-specific JSON SQL.
+distinct shared events per pair in Python instead of relying on
+dialect-specific JSON SQL.
 
 Idempotency contract: each event id is counted at most once per pair (set
 dedup), so running the scanner multiple times after re-processing the same
@@ -21,7 +21,6 @@ event does not inflate the count.
 from __future__ import annotations
 
 import json
-import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -29,16 +28,15 @@ from sqlalchemy import bindparam, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from promiselink.core.logging import get_logger
-from promiselink.database import IS_SQLITE
 from promiselink.models.association import Association
 from promiselink.models.event import Event
 
 logger = get_logger("promiselink.frequent_contact_scanner")
 
 
-def _as_id(value: str) -> Any:
-    """Bind ids in the column's native type (str on SQLite, UUID on PostgreSQL)."""
-    return value if IS_SQLITE else uuid.UUID(value)
+def _as_id(value: Any) -> str:
+    """Bind ids as plain ``str`` (id columns are ``String(36)``)."""
+    return str(value)
 
 
 async def scan_frequent_contacts(
@@ -173,7 +171,7 @@ async def scan_frequent_contacts(
         }
         await session.execute(
             text("UPDATE entities SET properties = :props WHERE id = :id AND user_id = :uid"),
-            {"props": _serialize_jsonb(props), "id": str(eid), "uid": user_id},
+            {"props": _serialize_json(props), "id": str(eid), "uid": user_id},
         )
     await session.commit()
     logger.info(
@@ -188,7 +186,7 @@ async def scan_frequent_contacts(
 
 
 def _as_datetime(value: Any) -> datetime | None:
-    """Normalize SQLite strings / PostgreSQL datetimes to aware datetimes (UTC)."""
+    """Normalize stored values (ISO strings) to aware datetimes (UTC)."""
     if value is None:
         return None
     if isinstance(value, datetime):
@@ -207,7 +205,7 @@ def _as_datetime(value: Any) -> datetime | None:
 
 
 def _iso_or_none(value: Any) -> str | None:
-    """Normalize SQLite strings and PostgreSQL datetimes to ISO strings."""
+    """Normalize stored values to ISO strings."""
     if value is None:
         return None
     if isinstance(value, str):
@@ -216,6 +214,6 @@ def _iso_or_none(value: Any) -> str | None:
     return iso() if callable(iso) else str(value)
 
 
-def _serialize_jsonb(props: dict[str, Any]) -> Any:
-    """SQLite needs a JSON string; PostgreSQL JSONB also accepts JSON strings."""
+def _serialize_json(props: dict[str, Any]) -> str:
+    """Serialize a properties dict to the JSON text stored by SQLite."""
     return json.dumps(props, ensure_ascii=False, default=str)

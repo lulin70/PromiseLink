@@ -18,10 +18,9 @@ from sqlalchemy import (
     String,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from promiselink.database import IS_SQLITE, Base, _uuid_default
+from promiselink.database import Base, _uuid_default
 
 
 class RelationshipBrief(Base):
@@ -46,19 +45,19 @@ class RelationshipBrief(Base):
 
     # Primary key
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         primary_key=True,
         default=_uuid_default,
     )
 
     # Owner + Target person
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         nullable=False,
         index=True,
     )
     person_entity_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         ForeignKey("entities.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -74,8 +73,8 @@ class RelationshipBrief(Base):
         index=True,
     )
 
-    # Brief data as JSON(B) — contains all 12 modules
-    # Expected JSONB structure:
+    # Brief data as JSON — contains all 12 modules
+    # Expected JSON structure:
     #   {
     #       "basic_info": {"name": str, "company": str | None, "role": str | None},
     #       "relationship_stage": str,  # one of 7 stages
@@ -91,7 +90,7 @@ class RelationshipBrief(Base):
     #       "notes": str
     #   }
     brief_data: Mapped[dict[str, Any]] = mapped_column(
-        JSONB if not IS_SQLITE else JSON,
+        JSON,
         nullable=False,
         default=dict,
     )

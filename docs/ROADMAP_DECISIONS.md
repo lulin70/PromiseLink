@@ -33,7 +33,7 @@ v1.0.0 Pro（4-5周） 专业版深度感知（核心卖点）
 **范围**：
 - [x] E2E 链路修复（UUIDStr + datetime timezone + PromptInjection 硬约束）
 - [x] CI/CD 加固（timeout-minutes + 移除 continue-on-error）
-- [x] 文档对齐（三语 README + Dockerfile LABEL + requirements.lock 清理）
+- [x] 文档对齐（三语 README + Dockerfile LABEL + requirements.lock 清理）（注：`Dockerfile` 已于 2026-09-19 随基础版 Docker 交付链删除，此项为历史记录）
 - [ ] 配置 STAGING secrets → Staging 实部署
 - [ ] 内部灰度（许总 + 5-10 熟人）
 

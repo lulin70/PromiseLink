@@ -1,5 +1,9 @@
 # W5 Stage 0 — staging deployment 剧本
 
+> ⚠️ **已被取代（2026-09-19，方案 B）**：本剧本描述的是 **v1.0-rc1 时期的 Docker + PostgreSQL staging 路径**。基础版已于 2026-09-19 彻底删除 Docker 交付链（`docker-compose*.yml` / `Dockerfile` / `install_basic.sh` 等）与 PostgreSQL 后端支持，**下文所有 `docker compose --profile full` 与 `postgresql+asyncpg://` 命令均已不可执行**。
+>
+> 本文件作为**历史快照保留原样**（记录当时的事实），不再作为可执行剧本。当前基础版的验证/staging 路径为：本地 `.venv` 源码运行 + SQLite（`bash scripts/start.sh`，`DATABASE_URL=sqlite:///...`）；具体见 [DEPLOYMENT_PLAYBOOK_v1.md](DEPLOYMENT_PLAYBOOK_v1.md) §1 与决策记录 [PROJECT_REVIEW_20260918_FINDINGS.md](../../PromiseLink-Pro/docs/review/PROJECT_REVIEW_20260918_FINDINGS.md) §9。
+
 > **目的**：在 staging 主机上把 `v1.0-rc1` 启动起来，进入灰度 §11.1 Stage 0 阶段。
 > **范围**：本剧本不在本机执行；本机只产出可执行的 staging 部署脚本 + smoke test，由用户在 staging 主机或 CI 触发。
 > **退出条件（Stage 0 ≥ 24h）**：staging 日志无 P0/P1 + 内部 10 个种子账号跑完至少 1 轮跨语言 entity/todo 关联。

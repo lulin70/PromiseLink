@@ -282,7 +282,7 @@ async def take_reminder_action(
     log_entry = log_result.scalar_one_or_none()
     if log_entry:
         log_entry.action_taken = req.action
-        # sent_at 可能是 naive datetime（PostgreSQL timestamp without tz），
+        # sent_at 可能是 naive datetime（无 tz 的存储值），
         # 需补 tzinfo=UTC 才能与 datetime.now(UTC) 相减
         sent_at = (
             log_entry.sent_at.replace(tzinfo=UTC)

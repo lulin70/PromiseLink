@@ -5,10 +5,9 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import JSON, DateTime, Float, ForeignKey, Index, String, func
-from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from promiselink.database import IS_SQLITE, Base
+from promiselink.database import Base
 
 
 class ScoreAuditLog(Base):
@@ -23,19 +22,19 @@ class ScoreAuditLog(Base):
 
     __tablename__ = "score_audit_logs"
 
-    # Primary key (INTEGER autoincrement for SQLite/PG compatibility)
+    # Primary key (INTEGER autoincrement)
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
-    # Foreign key to Todo (UUID in PostgreSQL, String(36) in SQLite — matches todos.id type)
+    # Foreign key to Todo (String(36), matches todos.id type)
     todo_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         ForeignKey("todos.id", ondelete="CASCADE"),
         nullable=False,
     )
 
     # User who owns the scored todo
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         nullable=False,
     )
 
@@ -46,9 +45,9 @@ class ScoreAuditLog(Base):
     # Scoring model version (poc_v1 / phase1_v1)
     score_version: Mapped[str] = mapped_column(String(20), nullable=False)
 
-    # Detailed calculation factors snapshot (JSONB for PG, JSON for SQLite)
+    # Detailed calculation factors snapshot (JSON)
     calculation_factors: Mapped[dict[str, Any]] = mapped_column(
-        JSONB if not IS_SQLITE else JSON,
+        JSON,
         nullable=False,
     )
 

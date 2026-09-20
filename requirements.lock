@@ -7,6 +7,9 @@
 # 生成时间：2026-07-01 (Phase 4 文档硬约束修复)
 # 验证状态：1378 测试通过，基础版独立运行验证通过
 #
+# 2026-09-19：移除 asyncpg / psycopg2-binary（PostgreSQL 支持与 Docker 交付链
+# 一并收敛，SQLite 为唯一后端）。见 PROJECT_REVIEW_20260918_FINDINGS.md §9。
+#
 # 注意：
 # - 此文件包含项目核心依赖及传递依赖的版本快照
 # - 升级依赖后需重新生成：pip install -e . && pip freeze | sort > requirements.lock
@@ -33,7 +36,6 @@ annotated-doc==0.0.4
 annotated-types==0.7.0
 anthropic==0.105.2
 anyio==4.13.0
-asyncpg==0.31.0
 attrs==26.1.0
 bcrypt==5.0.0
 blinker==1.9.0
@@ -80,7 +82,6 @@ platformdirs==4.9.6
 prometheus_client==0.25.0
 propcache==0.5.2
 psutil==7.2.2
-psycopg2-binary==2.9.12
 pyasn1==0.6.3
 pycparser==3.0
 pydantic-settings==2.14.1

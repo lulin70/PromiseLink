@@ -199,7 +199,7 @@ cd /Users/lin/trae_projects/PromiseLink-Pro
 python3 -m pytest scripts/e2e/e2e_pro_user_operations.py -v --tb=short
 ```
 
-两个脚本均使用 in-memory SQLite + LLM mock，**无需启动外部服务、无需真实 LLM API Key**，可直接在 GitHub Actions ubuntu-latest + PostgreSQL 环境运行。
+两个脚本均使用 in-memory SQLite + LLM mock，**无需启动外部服务、无需真实 LLM API Key**，可直接在 GitHub Actions ubuntu-latest 环境运行。
 
 ---
 

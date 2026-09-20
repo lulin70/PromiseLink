@@ -6876,18 +6876,18 @@ PM初审 → 通过？ → 提交Arch复审
 
 ## 23. [v5.1新增] 三层产品模型E2E测试
 
-> **设计原则**: 验证基础版（Taro H5本地Docker）、专业版（网关中继+AI代理+计数限流）、定制版三层产品模型的核心E2E场景，包括版本升级路径和故障降级。
+> **设计原则**: 验证基础版（Taro H5本地桌面应用）、专业版（网关中继+AI代理+计数限流）、定制版三层产品模型的核心E2E场景，包括版本升级路径和故障降级。
 
 ---
 
-### TC-TIER-001: 基础版 Taro H5 E2E测试（浏览器访问本地Docker）
+### TC-TIER-001: 基础版 Taro H5 E2E测试（浏览器访问本地桌面应用）
 
-**目标**: 验证基础版用户通过浏览器访问本地Docker部署的Taro H5应用，完成核心业务流程
+**目标**: 验证基础版用户通过浏览器访问本地桌面应用提供的Taro H5应用，完成核心业务流程
 
 **前置条件**:
-- 本地Docker环境已启动（基础版镜像）
-- Taro H5前端已编译并部署在Docker容器内
-- SQLite数据库已初始化
+- 基础版桌面应用已启动（安装 `PromiseLink-<VERSION>-mac.dmg` / `PromiseLink-<VERSION>-windows.exe`，或源码运行 `bash scripts/start.sh`）
+- Taro H5前端已编译并由本地服务提供（`http://localhost:8000`）
+- SQLite数据库已初始化（`~/.promiselink/data/promiselink.db`，开发环境 `sqlite:///./data/promiselink.db`）
 
 **测试步骤**:
 1. 浏览器访问 `http://localhost:{port}` 打开Taro H5应用
@@ -6914,7 +6914,7 @@ PM初审 → 通过？ → 提交Arch复审
 **目标**: 验证专业版用户通过网关中继实现WebSocket连接、请求转发、AI代理调用和计数限流
 
 **前置条件**:
-- 专业版Docker环境已启动（含网关服务）
+- 专业版环境已启动（本地桌面应用 + 网关服务）
 - 用户PC已注册至网关中继
 - AI代理服务可用
 
@@ -6946,14 +6946,14 @@ PM初审 → 通过？ → 提交Arch复审
 **目标**: 验证基础版用户升级至专业版时，数据完整保留且网关功能正常启用
 
 **前置条件**:
-- 基础版Docker环境运行中，已有生产数据（Events/Entities/Todos）
+- 基础版桌面应用运行中，已有生产数据（Events/Entities/Todos）
 - SQLite数据库包含完整业务数据
 - 专业版网关服务已部署
 
 **测试步骤**:
 1. 记录基础版当前数据快照（Event/Entity/Todo/Association条数）
-2. 停止基础版Docker容器
-3. 启动专业版Docker容器，挂载同一SQLite数据卷
+2. 退出基础版桌面应用
+3. 启动同一个桌面安装包并以专业版模式激活（同一 SQLite 文件，配对后自动连网关）
 4. 验证专业版启动成功，无数据库迁移错误
 5. 验证所有历史数据完整（条数一致、字段一致）
 6. 建立网关WebSocket连接
@@ -6977,7 +6977,7 @@ PM初审 → 通过？ → 提交Arch复审
 **目标**: 验证专业版网关故障时，系统自动降级至基础版模式，核心功能不受影响
 
 **前置条件**:
-- 专业版Docker环境运行中，网关连接正常
+- 专业版环境运行中（本地桌面应用 + 网关连接正常）
 - 用户已通过网关中继进行业务操作
 
 **测试步骤**:
@@ -7003,36 +7003,40 @@ PM初审 → 通过？ → 提交Arch复审
 
 ---
 
-### TC-TIER-005: Docker一键安装测试（基础版+专业版）
+### TC-TIER-005: 桌面安装包一键安装测试（基础版+专业版）
 
-**目标**: 验证基础版和专业版的Docker一键安装流程，确保用户可快速部署
+**目标**: 验证基础版桌面安装包（`.dmg` / `.exe`）的开箱即用安装流程，以及专业版经由同一桌面安装包完成配对激活的流程
 
 **前置条件**:
-- 目标机器已安装Docker和Docker Compose
-- 无现有PromiseLink容器运行
+- 干净环境（目标机器无 PromiseLink 安装、无 `~/.promiselink/` 残留）
+- 已从官网下载页（https://www.promiselink.cn/download.html）或 GitHub Releases 取得 `PromiseLink-<VERSION>-mac.dmg` / `PromiseLink-<VERSION>-windows.exe`
+- 专业版：小程序可用 + 有效邀请码（用于扫码配对）
 
 **测试步骤**:
 
 **基础版安装**:
-1. 执行 `docker compose -f docker-compose.basic.yml up -d`
-2. 等待容器启动完成（< 60秒）
-3. 浏览器访问 `http://localhost:{port}` 验证页面加载
-4. 执行PoC登录验证
-5. 创建一条Event验证核心功能
-6. 执行 `docker compose -f docker-compose.basic.yml down`
+1. 双击 `.dmg`（macOS，拖入 Applications）或 `.exe`（Windows，按向导安装）
+2. 启动 PromiseLink，等待浏览器自动打开 `http://localhost:8000`（< 60秒）
+3. 浏览器访问 `http://localhost:8000` 验证页面加载
+4. 创建一条Event，验证数据落在本地 SQLite（默认 `~/.promiselink/data/promiselink.db`）
+5. 退出应用，验证进程已结束
 
-**专业版安装**:
-1. 执行 `docker compose -f docker-compose.pro.yml up -d`
-2. 等待所有容器启动完成（< 120秒，含网关服务）
-3. 浏览器访问验证页面加载
-4. 验证网关WebSocket连接可用
-5. 验证AI代理功能可用
-6. 执行 `docker compose -f docker-compose.pro.yml down`
+**专业版激活（同一桌面安装包）**:
+1. 保持 PromiseLink 运行，小程序扫码完成配对（`POST /api/v1/pair/activate`）
+2. 验证许可证/网关配置写入 `~/.promiselink/.env`，WSS 连接网关成功
+3. 重启 PromiseLink，验证许可证仍在（无需重新配对）
+4. 浏览器访问验证页面加载，网关中继可用
+
+**裸机卸载**:
+1. 退出 PromiseLink
+2. 执行平台标准卸载（macOS 删除 `.app`；Windows 运行卸载程序）
+3. 验证无残留进程与自启项
 
 **期望结果**:
-- 基础版一键安装 < 60秒，单容器运行
-- 专业版一键安装 < 120秒，多容器编排正常
-- 两个版本均无需手动配置即可使用
-- 数据持久化卷正确挂载
+- 基础版一键安装 < 60秒，双击即用、无需任何命令行操作
+- 浏览器自动打开 `http://localhost:8000`，页面正常加载
+- 数据落在本地 SQLite（`~/.promiselink/data/promiselink.db`）
+- 配对后许可证写入 `~/.promiselink/.env`，重启后依然有效
+- 卸载后无残留进程（用户数据目录按用户选择保留或删除）
 
-**验收标准**: 基础版+专业版Docker一键安装均成功 ✅
+**验收标准**: 基础版+专业版桌面安装包一键安装均成功 ✅

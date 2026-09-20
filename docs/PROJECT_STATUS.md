@@ -2,6 +2,8 @@
 
 > ⚠️ **废弃内容说明（2026-07-12 更新）**：本文档中"托管 PoC 部署"相关内容（`docker-compose.hosted-poc.yml`、`deploy-staging.sh`、`init-ssl.sh` 等）已废弃并删除。基础版禁止云端部署（硬约束），必须在用户本地运行（localhost:8000）。详见：PromiseLink-Pro `docs/postmortem/2026-07-12_基础版违规部署根因分析.md`
 
+> ⚠️ **基础版交付链收敛（2026-09-19 更新）**：已采纳方案 B，**删除基础版 Docker 交付链、并清除基础版的 PostgreSQL 后端支持**（SQLite 为基础版唯一后端）。本文档中"基础版 Docker 打包 / Docker 镜像分发 / 一键安装脚本 `install_basic.sh`"等表述均为**历史记录**，不再反映现状。基础版当前**唯一**二进制交付路径为桌面安装包 `PromiseLink-<VERSION>-mac.dmg` / `PromiseLink-<VERSION>-windows.exe`（下载：https://www.promiselink.cn/download.html 或 GitHub Releases，双击安装后浏览器自动打开 http://localhost:8000）；亦支持源码运行（`pip install -e '.[dev]'` + `cp .env.basic.example .env` + `bash scripts/start.sh`）。已删除文件：`Dockerfile`、`.dockerignore`、`docker-compose*.yml`、`install-docker.sh`、`deploy/quick_install.sh`、`scripts/install_basic.sh`、`nginx/conf.d/default.conf`、`.env.poc*.example`。决策与证据详见 PromiseLink-Pro `docs/review/PROJECT_REVIEW_20260918_FINDINGS.md` §9。PostgreSQL 仅保留为**定制版（团队版/多租户）**的选型。
+
 > **更新时间**: 2026-07-28 (基础版 v0.9.0，技术债 9/9 RESOLVED，ICP 备案已通过)
 > **当前阶段**: 基础版 v0.9.0 发布前准备就绪；技术债全部清理完成；1968 tests collected / 3 skipif (依赖运行中的服务器，合理保留)；专业版 v0.9.0 同步发布，gateway 855 + pro-tests 272 passed；ICP 备案已通过（网站备案号：沪ICP备2026035458号-1，2026-07-27，主办单位：麟研(上海)文化艺术传播有限公司），gateway.promiselink.cn ACME 证书待 ICP 同步完成后签发
 > **产品定位**: AI驱动的个人商务关系经营助手
@@ -28,7 +30,7 @@ P7  测试计划      ███████████████████�
 ───────────────────────────────────────────────
 P8  实施          ██████████████████████  100%  ✅ 基础版 v0.9.0 代码完成+技术债 9/9 RESOLVED
 P9  测试          ██████████████████████  100%  ✅ 1968 tests collected / 3 skipif (依赖运行中的服务器，合理保留) / ruff 0 / mypy 0
-P10 部署发布      ████████████████████░░  90%  🟡 Docker 镜像已发布 ghcr.io/lulin70/promiselink:0.9.0，ICP 备案已通过（2026-07-27），待 ACME 证书签发解锁外部 HTTPS
+P10 部署发布      ████████████████████░░  90%  🟡 基础版以桌面安装包（.dmg/.exe）交付，ICP 备案已通过（2026-07-27），待 ACME 证书签发解锁外部 HTTPS
 P11 运维保障      █████████████░░░░░░░░░  60%  🟡 Prometheus端点已实现，Grafana待配置+无实战运维
 
 ═══════════════════════════════════════════════════════════════
@@ -505,7 +507,7 @@ PromiseLink/
 |------|------|---------|------|
 | 核心数据结构已定义 | ✅ 完成 | `docs/design/Database_Design_v1.md` (**v2.8**) | Event/Entity/Association/Todo + 动态评分字段+审计表 |
 | 字段级加密策略 | ✅ 完成 | `docs/design/Security_Design_v1.md` (**v2.8**) | AES-256-GCM + PII检测正则 + Concern数据保护 |
-| JSONB使用策略 | ✅ 完成 | Database_Design v2.8 | PostgreSQL 15, metadata灵活扩展 |
+| JSONB使用策略 | ✅ 完成 | Database_Design v2.8 | 基础版 SQLite（JSON 以 TEXT 存储）/ 定制版 PostgreSQL 15（metadata 灵活扩展） |
 | 图数据存储方案 | ✅ 完成 | Database_Design v2.8 | NetworkX + igraph |
 | Alembic迁移就绪 | ✅ 完成 | `src/promiselink/alembic/` | 初始schema迁移脚本 |
 | **3NF或反范式化论证** | ✅ 完成 | Database_Design v2.8 | 实用主义优先 |
@@ -564,7 +566,7 @@ PromiseLink/
 
 | 检查项 | 状态 | 证据 | 备注 |
 |------|------|------|------|
-| 开发环境搭建 | ✅ 完成 | `pyproject.toml`, `requirements.txt`, `Dockerfile` | FastAPI项目脚手架 |
+| 开发环境搭建 | ✅ 完成 | `pyproject.toml`, `requirements.txt` | FastAPI项目脚手架 |
 | Event接入API | ✅ 完成 | `src/promiselink/api/v1/events.py` | POST/GET/DELETE /api/v1/events |
 | Entity API | ✅ 完成 | `src/promiselink/api/v1/entities.py` | GET /api/v1/entities |
 | Association API | ✅ 完成 | `src/promiselink/api/v1/associations.py` | GET /api/v1/associations |
@@ -572,7 +574,7 @@ PromiseLink/
 | Auth API (JWT) | ✅ 完成 | `src/promiselink/api/v1/auth.py` + `core/auth.py` | JWT认证端点 |
 | Health API | ✅ 完成 | `src/promiselink/api/v1/health.py` | 基础+数据库健康检查 |
 | 数据库模型 | ✅ 完成 | `src/promiselink/models/` 9个文件 | Event/Entity/Association/Todo/RelationshipBrief/VoiceSession/Reminder/ScoreAuditLog |
-| 数据库连接 | ✅ 完成 | `src/promiselink/database.py` | SQLite+PostgreSQL异步支持 |
+| 数据库连接 | ✅ 完成 | `src/promiselink/database.py` | SQLite（基础版唯一后端）异步支持 |
 | 实体抽取模块 | ✅ 完成 | `services/entity_extractor.py` + prompts | LLM NER pipeline |
 | 实体归一引擎 | ✅ 完成 | `services/entity_resolution.py` | 5步算法含人工确认 |
 | 关联发现引擎 | ✅ 完成 | `services/association_discovery.py` | 共现+类型推断+衰减过滤 |
@@ -586,7 +588,7 @@ PromiseLink/
 | Redis缓存 | ✅ 完成 | `core/redis.py` | Redis 7连接 |
 | Alembic迁移 | ✅ 完成 | `src/promiselink/alembic/` | 初始schema |
 | Pydantic Schema | ✅ 完成 | `api/v1/schemas.py` | 请求/响应模型 |
-| Docker配置 | ✅ 完成 | `docker-compose.yml` | SQLite/PostgreSQL/Redis三种配置 |
+| 源码/桌面包交付 | ✅ 完成 | `scripts/start.sh` + 桌面安装包（.dmg/.exe） | 基础版 SQLite 单文件，零外部依赖（原 Docker 编排已于 2026-09-19 删除，见文首说明） |
 | **F-44 input_scope分类器** | ✅ 完成 | `services/input_scope_classifier.py` + 规则缓存 | Algorithm_Design v2.0 |
 | **F-45 Promise双向动作** | ✅ 完成 | Todo model扩展 + action_type枚举 + LLM fallback | API_Design v2.0 + DB_Design v2.0 |
 | **F-46 Todo降噪** | ✅ 完成 | `services/todo_dedup.py` + DB级删除(pending_deletions) | Algorithm_Design v2.0 |
@@ -618,7 +620,7 @@ PromiseLink/
 - ✅ 0.3.x PoC代码完成 — F-44~F-69 + 1224测试
 - ✅ 0.4.x Phase A-D代码完成 — F-67/F-68/F-69代码+测试
 - ✅ 0.6.x 录入页五类纠偏完成 — 人脉/关系/待办/承诺确认/承诺添加(手动补录)+文本框50000字+时分选择+1364测试通过
-- 🟡 基础版 — Docker打包 + Taro H5 + 一键安装脚本（本地免费，SQLite长期方案）
+- ✅ 基础版 — 桌面安装包（.dmg/.exe）+ Taro H5（本地免费，SQLite 长期方案；Docker 交付链已于 2026-09-19 删除）
 - 🟡 专业版 — 网关中继设计完成，实现未开始（SQLite+relay gateway）
 - ❌ 定制版 — 销售团队版（PG+Redis+多租户，独立分支，按需启动）
 
@@ -643,11 +645,11 @@ PromiseLink/
 
 | 检查项 | 状态 | 证据 | 备注 |
 |------|------|------|------|
-| Docker容器化 | ✅ 完成 | `Dockerfile` + `docker-compose.yml` | 多阶段构建(builder→runtime非root) |
+| 桌面安装包交付 | ✅ 完成 | `PromiseLink-<VERSION>-mac.dmg` / `-windows.exe` | 双击安装，浏览器自动打开 http://localhost:8000（原 Docker 容器化交付已于 2026-09-19 删除） |
 | GitHub Actions CI/CD | ✅ 完成 | `Deployment_Guide` v0.4.8 | trigger/strategy/services/steps/lint/typecheck/test/coverage |
-| Alembic数据库迁移 | ✅ 完成 | `src/promiselink/alembic/` | 初始化+autogenerate+SQLite→PG升级路径 |
+| Alembic数据库迁移 | ✅ 完成 | `src/promiselink/alembic/` | 初始化+autogenerate（基础版 SQLite-only；定制版可迁移至 PG） |
 | Prometheus监控指标 | ✅ 完成 | `Deployment_Guide` v0.4.8 + `prometheus.yml` | 6项P0指标(input_scope延迟/Todo分布等)+Rate Limiting指标 |
-| **托管PoC部署** | ✅ 完成 | `docker-compose.hosted-poc.yml` + `nginx/` + `.env.poc.hosted` | nginx反向代理+HTTPS配置+certbot自动证书+部署脚本 |
+| **托管PoC部署** | ❌ 已废弃 | 相关文件（`docker-compose.hosted-poc.yml` + `nginx/` + `.env.poc.hosted`）已删除 | 违反"基础版本地运行"硬约束，见文首废弃说明 |
 | **部署脚本** | ✅ 完成 | `scripts/ops/deploy-staging.sh` | 一键部署脚本 |
 | **备份脚本** | ✅ 完成 | `scripts/backup.sh` | 数据库+Redis备份 |
 | Staging环境部署 | ❌ 未开始 | - | |
@@ -655,7 +657,7 @@ PromiseLink/
 | 发布检查清单 | ❌ 未开始 | - | |
 | 托管PoC部署检查清单 | 🟡 部分完成 | HTTPS配置就绪 | 实际HTTPS证书+域名绑定待完成 |
 
-**P10 Gate 判定**: **🟡 部署配置就绪，未实际部署** — Docker/CI/CD/nginx/部署脚本就绪，但无域名、无HTTPS证书、无生产Key、未执行过deploy.sh。配置就绪≠部署完成。
+**P10 Gate 判定**: **🟡 桌面安装包交付链就绪** — 基础版以 `.dmg`/`.exe` 桌面安装包为唯一二进制交付路径（Docker 交付链已于 2026-09-19 删除，见文首说明），CI/CD 就绪；但无域名/HTTPS 证书，种子用户 onboarding 待完成。配置就绪≠部署完成。
 
 ---
 
@@ -665,7 +667,7 @@ PromiseLink/
 |------|------|------|------|
 | 监控告警 | ✅ 完成 | `prometheus.yml` + Grafana待配置 | Prometheus metrics已定义+配置文件就绪 |
 | 日志聚合 | ❌ 未开始 | - | ELK/Loki |
-| 备份策略 | ✅ 完成 | `scripts/backup.sh` | PG dump + Redis AOF，自动备份脚本就绪 |
+| 备份策略 | ✅ 完成 | `scripts/backup.sh` | SQLite 数据库备份（基础版唯一后端），自动备份脚本就绪 |
 
 **P11 Gate 判定**: **✅ 部分完成（60%）** — Prometheus监控配置+备份脚本就绪，日志聚合待实施。
 
@@ -680,9 +682,9 @@ PromiseLink/
                    ├→ [P4 ✅] ──┘           └→ [P5 ✅] ────────────────┘
                    └→ [P5(depends P1+P3)]                         YOU ARE HERE
 
-关键路径: 本地E2E验证 → 基础版Docker打包 → 一键安装脚本 → 发布基础版 → 专业版网关开发
-当前节点: PoC代码完成+1224测试通过，基础版SQLite长期方案已确认，需Docker打包+安装脚本
-下一节点: 本地E2E验证 → 基础版Docker打包 → 发布基础版 → 专业版网关开发
+关键路径: 本地E2E验证 → 桌面安装包（.dmg/.exe）打包发布 → 种子用户 onboarding → 专业版网关开发
+当前节点: 基础版 v0.9.0 桌面安装包交付链就绪（Docker 交付链已于 2026-09-19 删除），SQLite 为唯一后端
+下一节点: 真实用户 e2e（安装→扫码配对→重启后许可证仍在）→ 发布基础版 → 专业版网关开发
 定制版: 销售团队需求时启动（独立分支，PG+Redis+多租户）
 ```
 
@@ -728,7 +730,7 @@ PromiseLink/
             │         F-59~F-66(Media+Privacy+Rate Limiting+安全修复+Pipeline重构)
             │         PRD v4.8 + 866测试通过, 0 skip, 覆盖率74%(目标≥70%)
             │
-2026-06-09  ├─ ★ M13: 前端集成+托管PoC部署就绪 ← 当前位置
+2026-06-09  ├─ ★ M13: 前端集成+托管PoC部署就绪 ← 当前位置（注：托管 PoC 部署已于 2026-07-12 废弃删除，见文首说明）
             │         Taro小程序前端联调完成 + 1224测试 + 73%覆盖率
             │         托管PoC部署(docker-compose.hosted-poc.yml+nginx+HTTPS+部署脚本+备份脚本)
             │         性能P95<500ms + 安全8/8通过 + PoC准备度82/100
@@ -738,14 +740,14 @@ PromiseLink/
 
 ## 8. 下一步行动计划
 
-### 📋 基础版打包发布，下一阶段: 发布基础版
+### 📋 基础版桌面安装包发布，下一阶段: 发布基础版
 
 | # | 行动项 | 负责方 | 产出 | 对应变更 |
 |---|--------|--------|------|---------|
-| 1 | **本地E2E验证** | CarryMem | 本地完整用户旅程验证通过 | P9验证完成 |
-| 2 | **基础版Docker打包** | CarryMem | Docker镜像+docker-compose基础版配置 | P10基础版部署 |
-| 3 | **Taro H5前端打包** | CarryMem | H5可访问版本 | P8前端完成 |
-| 4 | **一键安装脚本** | CarryMem | install.sh脚本 | P10安装体验 |
+| 1 | **真实用户 e2e** | CarryMem | 干净环境安装 .dmg/.exe → 扫码配对 → 重启后许可证仍在 | P9验证完成 |
+| 2 | **桌面安装包打包发布** | CarryMem | `PromiseLink-<VERSION>-mac.dmg` / `-windows.exe` | P10基础版部署 |
+| 3 | **Taro H5前端打包** | CarryMem | H5可访问版本（随桌面包内置） | P8前端完成 |
+| 4 | **官网下载页交付** | CarryMem | download.html 指向桌面包 | P10安装体验 |
 | 5 | **发布基础版** | CarryMem | 基础版可用 | P10里程碑 |
 
 ### ✅ 已完成Sprint回顾
@@ -759,7 +761,7 @@ PromiseLink/
 | Phase 1 扩展 | F-51~F-58 动态优先级+语义搜索+数据接入 | ✅ 完成 |
 | Phase 1 媒体 | F-59~F-66 Media+Privacy+Rate Limiting+安全修复 | ✅ 完成 |
 | 前端集成 | Taro小程序前端开发+后端联调 | ✅ 完成 |
-| 托管PoC部署 | docker-compose.hosted-poc.yml+nginx+HTTPS+部署脚本+备份脚本 | ✅ 完成 |
+| 托管PoC部署 | docker-compose.hosted-poc.yml+nginx+HTTPS+部署脚本+备份脚本 | ✅ 完成（2026-07-12 废弃删除） |
 
 ---
 
@@ -825,6 +827,8 @@ PromiseLink/
 > **评估日期**: 2026-06-11
 > **评估基准**: 基础版发布所需全部条件
 > **产品层级**: 基础版(本地免费) / 专业版(网关中继) / 定制版(团队)
+
+> ⚠️ **本节为 2026-06-11 时间点快照，保持原样**：其中"未 Docker 打包 / 需编写 Docker 基础版配置"等表述描述的是**当时**的交付设想。基础版 Docker 交付链已于 2026-09-19 删除，现以桌面安装包（.dmg/.exe）交付，详见文首说明与 PromiseLink-Pro `docs/review/PROJECT_REVIEW_20260918_FINDINGS.md` §9。
 
 ### 综合评分
 

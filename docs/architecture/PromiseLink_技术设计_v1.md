@@ -2,6 +2,8 @@
 
 > ⚠️ **废弃内容说明（2026-07-12 更新）**：本文档 §8.6.3a "托管 PoC 部署"相关内容（`docker-compose.hosted-poc.yml`、云端部署命令等）已废弃并删除。基础版禁止云端部署（硬约束），必须在用户本地运行（localhost:8000）。云端服务器仅部署专业版网关 + 官网静态文件。详见：PromiseLink-Pro `docs/deployment/DEPLOYMENT_COMPLIANCE_CHECKLIST.md`
 
+> ⚠️ **基础版交付链收敛（2026-09-19，方案 B）**：基础版 **Docker 交付链已删除**（`Dockerfile`、`docker-compose*.yml` 等已删除文件），**基础版 PostgreSQL 后端支持亦已移除，SQLite 为基础版唯一后端**。基础版当前交付：桌面安装包 `PromiseLink-<VERSION>-mac.dmg` / `-windows.exe`（双击安装，浏览器自动打开 http://localhost:8000）或源码运行（`pip install -e '.[dev]'` + `cp .env.basic.example .env` + `bash scripts/start.sh`）。本文档中 **Docker / docker-compose / PostgreSQL / JSONB 相关内容**：涉及基础版交付的为**历史记录**，涉及 **定制版（团队/多租户）**的选型仍然有效。详见 PromiseLink-Pro `docs/review/PROJECT_REVIEW_20260918_FINDINGS.md` §9。
+
 > **版本**: v3.2
 > **日期**: 2026-06-17
 > **对应PRD**: v5.2
@@ -2800,11 +2802,11 @@ POST /api/v1/events
 | 组件 | 选型 | 理由 |
 |------|------|------|
 | API框架 | FastAPI | 异步、自动文档、类型校验 |
-| 数据库 | PostgreSQL 15 | JSONB支持、GIN索引、成熟稳定 |
+| 数据库 | SQLite（基础版唯一后端，个人版长期方案） / PostgreSQL 15（定制版，JSONB/GIN） | 零依赖、单文件；PG 仅多用户并发场景 |
 | 缓存 | Redis 7 | 会话、限流、热数据缓存 |
 | LLM | DeepSeek (deepseek-v4-flash) | 中文理解能力强、成本可控 |
 | 配置 | YAML | 可读性好、支持行业定制 |
-| 部署 | Docker Compose | 开发阶段简单，生产可升级K8s |
+| 部署 | 桌面安装包（.dmg/.exe）+ 源码运行（基础版）；Docker Compose（定制版） | 基础版零外部依赖，双击安装即用 |
 | CarryMem集成 | Protocol接口 | 优雅降级、可测试、可替换 |
 | 认证 | JWT (RS256) | 非对称加密、临时授权码模式 |
 
@@ -3571,6 +3573,8 @@ LLM推理必须走云端，手机只是展示层。微信小程序已覆盖Promi
 
 ### 8.6.3 PoC部署方案（Docker单机）
 
+> ⚠️ **历史章节（2026-09-19）**：`docker-compose.poc.yml` 已随基础版 Docker 交付链删除，下方 YAML 与启动命令仅作历史记录。
+
 ```yaml
 # docker-compose.poc.yml
 version: "3.8"
@@ -3599,6 +3603,8 @@ docker compose -f docker-compose.poc.yml up -d
 **PoC数据位置**：`./data/promiselink_poc.db`（SQLite文件，用户完全控制）
 
 ### 8.6.3a 托管PoC部署模式（v2.9新增）
+
+> ⚠️ **本节已废弃（2026-07-12）**：托管 PoC 违反"基础版禁止云端部署"硬约束，`docker-compose.hosted-poc.yml` / `nginx/` 已删除，仅作历史记录。
 
 > **适用场景**：用户无本地Docker环境，或需要微信小程序直接访问，或希望零运维上手体验。
 
@@ -3865,9 +3871,9 @@ curl -f https://promiselink.example.com/health || echo "HEALTH CHECK FAILED"
 
 | 层级 | 名称 | 部署方式 | 前端 | AI调用 | 数据存储 |
 |------|------|----------|------|--------|----------|
-| L1 | 基础版 | 本地Docker | Taro H5 | 用户自带API Key | 本地SQLite |
-| L2 | 专业版 | 本地Docker + 网关中继 | 微信小程序 | 网关代理DeepSeek | 本地SQLite |
-| L3 | 定制版 | 云端部署 | 微信小程序+多端 | 云端AI服务 | PG + Redis + 多租户 |
+| L1 | 基础版 | 本地运行（桌面安装包 .dmg/.exe 或源码；**无 Docker**） | Taro H5 | 用户自带API Key | 本地SQLite（唯一后端） |
+| L2 | 专业版 | 本地运行 + 网关中继 | 微信小程序 | 网关代理DeepSeek | 本地SQLite |
+| L3 | 定制版 | 云端部署（Docker Compose/K8s） | 微信小程序+多端 | 云端AI服务 | PG + Redis + 多租户 |
 
 **架构图**：
 
@@ -3875,7 +3881,7 @@ curl -f https://promiselink.example.com/health || echo "HEALTH CHECK FAILED"
 ┌──────────────────┐     WebSocket(WSS)     ┌──────────────────┐     HTTPS      ┌──────────────────┐
 │  用户家用PC       │ ◄════════════════════► │  云VPS网关        │ ◄════════════► │  微信小程序        │
 │  ┌────────────┐  │     长连接(出站)        │  ┌────────────┐  │                │  ┌────────────┐  │
-│  │ 本地Docker  │  │                        │  │ 中继路由器  │  │                │  │ Taro H5    │  │
+│  │ 本地进程    │  │                        │  │ 中继路由器  │  │                │  │ Taro H5    │  │
 │  │ FastAPI    │  │                        │  │ AI代理      │  │                │  │ +原生组件   │  │
 │  │ SQLite     │  │                        │  │ 计数限流    │  │                │  └────────────┘  │
 │  │ relay_     │  │                        │  └────────────┘  │                └──────────────────┘
@@ -3891,9 +3897,11 @@ curl -f https://promiselink.example.com/health || echo "HEALTH CHECK FAILED"
 - 用户PC主动出站连接网关（无需公网IP、无需端口映射）
 - 网关是无状态中继，可随时替换/重启
 
-### 8.7.2 基础版 vs 专业版 Docker区别
+### 8.7.2 基础版 vs 专业版本地运行区别
 
-**基础版Docker组成**：
+> ⚠️ **2026-09-19（方案 B）**：基础版已不再以 Docker 交付（`Dockerfile`/`docker-compose*.yml` 已删除），改以桌面安装包（.dmg/.exe）或源码运行。下方"基础版Docker组成"为**历史记录**，实际组成（FastAPI + SQLite + 本地Embedding + Taro H5）不变，只是**打包/运行载体由容器改为原生进程**。
+
+**基础版组成（原 Docker 载体，现为原生进程）**：
 
 ```
 基础版 Docker

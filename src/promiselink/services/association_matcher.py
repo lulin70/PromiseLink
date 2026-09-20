@@ -58,14 +58,9 @@ class AssociationMatcherMixin:
         if company:
             or_conditions.append(Entity.name != "")  # Placeholder
 
-        # Fetch candidates that share city or company
-        # We need to filter by JSONB properties, which varies by DB
-        # For SQLite: properties is JSON text, use LIKE
-        # For PostgreSQL: properties is JSONB, use containment operator
-
-        # Simple approach: fetch entities with SQL pre-filtering where possible
-        # For SQLite: use LIKE on JSON text for city/company
-        # For PostgreSQL: use JSONB containment (Phase 2)
+        # Fetch candidates that share city or company.
+        # ``properties`` is stored as JSON text; candidate filtering is done in
+        # Python (below) rather than with dialect-specific JSON SQL.
         # Limit results to avoid O(N) memory load
         CANDIDATE_LIMIT = 200
 

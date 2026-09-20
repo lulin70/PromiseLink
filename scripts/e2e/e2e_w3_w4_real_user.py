@@ -592,7 +592,7 @@ async def run(selected: set[str] | None = None) -> int:
     # SQLite 通过 aiosqlite 驱动时，SQLAlchemy 把 String(36) 列原样绑定；
     # 但 ORM 模型在 generic UUID 路径下会传入 uuid.UUID 实例。注册 type
     # adapter 让原生 sqlite3 接受 uuid.UUID（输出统一为 36 位小写 hex 字符串）。
-    # 这一段仅在离线测试里启用，与生产 PostgreSQL 路径无任何关联。
+    # 这一段仅在离线测试里启用；SQLite 是基础版唯一后端。
     import sqlite3
     import uuid as _uuid
 

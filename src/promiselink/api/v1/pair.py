@@ -6,7 +6,8 @@ Endpoints:
 - POST /api/v1/pair/activate — Desktop activates with obtained license_key, writes to .env
 
 Flow (one-click install):
-1. User runs `curl -fsSL https://promiselink.cn/install.sh | bash`
+1. User installs the desktop package (macOS `.dmg` / Windows `.exe`) from the official
+   download page and launches it (no Docker required)
 2. Basic edition starts without PRO_LICENSE_KEY → enters pairing mode
 3. Desktop calls /pair/init → gets device_pair_code + QR content
 4. User scans QR with miniapp (already activated) → miniapp submits to gateway
@@ -25,7 +26,7 @@ import httpx
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from promiselink.config import get_settings
+from promiselink.config import get_settings, runtime_env_file
 from promiselink.core.logging import get_logger
 
 logger = get_logger("promiselink.pair")
@@ -69,8 +70,13 @@ def _get_gateway_url() -> str:
 
 
 def _get_env_path() -> pathlib.Path:
-    project_root = pathlib.Path(__file__).resolve().parents[4]
-    return project_root / ".env"
+    """运行时 .env 的位置 —— 与 ``Settings.env_file`` 同源，避免写入与读取错位。
+
+    2026-09-19 fix: 原先用 ``Path(__file__).resolve().parents[4]`` 推导，源码布局下
+    指向仓库根（正确），但 PyInstaller 冻结后 ``__file__`` 在 ``sys._MEIPASS`` 临时
+    解包目录内 → 写到系统临时目录，进程退出即丢失，表现为「每次启动都要重新配对」。
+    """
+    return runtime_env_file()
 
 
 @router.post("/init", response_model=PairInitResponse)
@@ -199,6 +205,8 @@ async def activate_pair(body: PairActivateRequest, request: Request) -> PairActi
     new_content = "\n".join(lines) + "\n"
 
     try:
+        # 打包后 .env 位于 ~/.promiselink/，首次配对时该目录可能尚不存在
+        env_path.parent.mkdir(parents=True, exist_ok=True)
         env_path.write_text(new_content, encoding="utf-8")
     except OSError as exc:
         logger.error("pair_activate_write_env_failed", path=str(env_path), error=str(exc))

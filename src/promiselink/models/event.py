@@ -5,10 +5,9 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import JSON, CheckConstraint, DateTime, Index, String, Text, func
-from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from promiselink.database import IS_SQLITE, Base, _uuid_default
+from promiselink.database import Base, _uuid_default
 
 
 class Event(Base):
@@ -24,14 +23,14 @@ class Event(Base):
 
     # Primary key
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         primary_key=True,
         default=_uuid_default,
     )
 
     # Core fields
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         nullable=False,
         index=True,
     )
@@ -49,10 +48,10 @@ class Event(Base):
     # Raw content (max 500KB as per Technical Design §3.1)
     raw_text: Mapped[str | None] = mapped_column(Text)
 
-    # Metadata as JSON (SQLite) or JSONB (PostgreSQL)
+    # Metadata as JSON
     metadata_: Mapped[dict[str, Any] | None] = mapped_column(
         "metadata",
-        JSONB if not IS_SQLITE else JSON,
+        JSON,
     )
 
     # Processing status
@@ -66,7 +65,7 @@ class Event(Base):
 
     # Pipeline failure tracking
     failed_steps: Mapped[list[str] | None] = mapped_column(
-        JSONB if not IS_SQLITE else JSON,
+        JSON,
         nullable=True,
     )
 

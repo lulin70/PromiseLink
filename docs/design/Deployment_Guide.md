@@ -6,6 +6,12 @@
 > **参考**: 技术设计 v2.5 §9（部署架构与数据主权）、§8.0.5（监控指标）、§8.0.6（数据库迁移策略）
 > **技术栈**: Python 3.11 / FastAPI / httpx async / Pydantic v2
 
+> ⚠️ **交付链重大变更（2026-09-19，方案 B）**：**基础版 Docker 交付链已删除**（`Dockerfile`、`docker-compose*.yml`、`install-docker.sh`、`scripts/install_basic.sh`、`nginx/conf.d/default.conf` 等均为已删除文件），**基础版 PostgreSQL 后端支持亦已移除**（SQLite 为唯一后端）。
+> - 基础版**唯一二进制交付路径**：桌面安装包 `PromiseLink-<VERSION>-mac.dmg` / `PromiseLink-<VERSION>-windows.exe`（https://www.promiselink.cn/download.html 或 GitHub Releases），双击安装后浏览器自动打开 http://localhost:8000。
+> - 基础版源码运行：`pip install -e '.[dev]'` + `cp .env.basic.example .env` + `bash scripts/start.sh`（或 `python -m uvicorn promiselink.main:app --host 0.0.0.0 --port 8000`）；`DATABASE_URL` 默认 `sqlite:///{用户家目录}/.promiselink/data/promiselink.db`。
+> - 本文档中所有 **`docker compose` 命令、`docker run` 命令、Docker Compose 编排说明均为历史记录**；`PostgreSQL` 相关内容仅适用于**定制版（团队/多租户）**与专业版网关侧。
+> - 决策与证据详见 PromiseLink-Pro `docs/review/PROJECT_REVIEW_20260918_FINDINGS.md` §9。
+
 ---
 
 ## 1. 部署概述
@@ -16,9 +22,9 @@ PromiseLink是个人产品，SQLite完全够用。采用功能递进式部署，
 
 | 阶段 | 基础设施 | 数据库 | 缓存 | 成本 | 用户规模 | 目标 |
 |------|----------|--------|------|------|----------|------|
-| **PoC（概念验证）** | 本地 Docker Desktop | SQLite | 无 | 零云成本 | 单用户 | 概念验证、核心流程跑通 |
-| **基础版（本地免费）** | 本地 Docker Desktop | SQLite | 无 | 零云成本 | 单用户 | 本地可用产品，Taro H5浏览器访问 |
-| **专业版（网关中继）** | 本地Docker + 云中继网关 | SQLite | 无(网关代理AI) | ~50元/月 | 单用户 | 随时随地微信小程序访问 |
+| **PoC（概念验证）**（历史，已废弃） | 本地 Docker Desktop | SQLite | 无 | 零云成本 | 单用户 | 概念验证、核心流程跑通 |
+| **基础版（本地免费）** | 本地桌面运行（桌面安装包 .dmg/.exe 或源码，**无需 Docker**） | SQLite | 无 | 零云成本 | 单用户 | 本地可用产品，Taro H5浏览器访问 |
+| **专业版（网关中继）** | 本地运行 + 云中继网关 | SQLite | 无(网关代理AI) | ~50元/月 | 单用户 | 随时随地微信小程序访问 |
 | **定制版** | 云端 Docker Compose | PostgreSQL 16 | Redis 7 | ~500元/月 | 销售团队 | 多用户协作（独立分支） |
 
 > **决策变更（2026-06-11）**：个人版长期使用SQLite，不做PG/Redis迁移。理由：单用户无并发场景，SQLite处理百万行无压力，PG/Redis增加成本和复杂度但无收益。
@@ -26,7 +32,7 @@ PromiseLink是个人产品，SQLite完全够用。采用功能递进式部署，
 **关键约束**：
 - 不做原生APP，微信小程序是主入口
 - LLM推理走云端API（DeepSeek/OpenAI/Anthropic），不部署本地模型
-- PoC阶段零云成本，所有服务运行在本地Docker内
+- PoC阶段零云成本，所有服务运行在本地Docker内（历史记录；PoC Docker 编排文件已于 2026-09-19 删除）
 - **数据主权**：数据属于用户，PromiseLink是processor不是owner（详见 §8.6.5）
 
 ### 1.2 环境要求表
@@ -34,9 +40,9 @@ PromiseLink是个人产品，SQLite完全够用。采用功能递进式部署，
 | 项目 | PoC（概念验证） | 基础版（本地免费） | 专业版（网关中继） | 定制版 |
 |------|-----|---------|--------|--------|
 | **操作系统** | macOS / Linux / Windows(WSL2) | macOS / Linux / Windows(WSL2) | macOS / Linux / Windows(WSL2) | Ubuntu 22.04+ |
-| **Docker** | Docker Desktop 24+ | Docker Desktop 24+ | Docker Desktop 24+ | Docker Engine 24+ |
-| **Docker Compose** | v2.20+ | v2.20+ | v2.20+ | v2.20+ |
-| **Python** | 3.11+（宿主机调试用） | 3.11+（宿主机调试用） | N/A（容器内） | N/A |
+| **Docker** | Docker Desktop 24+ | **不需要**（桌面安装包 / 源码运行） | 不需要（本地运行） | Docker Engine 24+ |
+| **Docker Compose** | v2.20+ | **不需要** | 不需要 | v2.20+ |
+| **Python** | 3.11+（宿主机调试用） | 3.11+（源码运行；桌面包内置） | 3.11+（本地运行） | N/A |
 | **内存** | ≥4GB 可用 | ≥4GB 可用 | ≥4GB 可用 | ≥8GB 可用 |
 | **磁盘** | ≥2GB 可用 | ≥2GB 可用 | ≥2GB 可用 | ≥50GB 可用 |
 | **CPU** | ≥2核 | ≥2核 | ≥2核 | ≥4核 |
@@ -46,6 +52,8 @@ PromiseLink是个人产品，SQLite完全够用。采用功能递进式部署，
 ---
 
 ## 2. PoC本地部署
+
+> ⚠️ **历史章节（2026-09-19）**：本节描述的是 **PoC 阶段的 Docker 本地部署**，其依赖的 `Dockerfile`、`docker-compose.poc.yml`、`.env.poc` 等文件已随方案 B 删除。本节仅作历史记录保留；基础版当前交付方式见文首说明。
 
 ### 2.1 前置条件
 
@@ -304,6 +312,8 @@ docker compose -f docker-compose.poc.yml logs --tail=50
 | 容器内存不足 | 数据量过大 | 增大 `deploy.resources.limits.memory` |
 
 ### 2.9 托管PoC部署模式 [0.4.8新增]
+
+> ⚠️ **本节已废弃（2026-07-12）**：托管 PoC 部署违反"基础版禁止云端部署"硬约束，相关文件（`docker-compose.hosted-poc.yml`、`nginx/`、`.env.poc.hosted`）已删除。仅作历史记录保留。
 
 [0.4.8新增] 本节面向**不具备服务器运维能力的非技术用户**，提供一种介于本地PoC和专业版之间的轻量云端部署方案。用户只需准备一台轻量云服务器，即可通过微信小程序访问PromiseLink，无需自行管理本地Docker环境。
 
@@ -611,6 +621,8 @@ python3 scripts/verify_migration.py --source sqlite --target postgresql
 
 ### 2.10 基础版 vs 专业版 Docker配置
 
+> ⚠️ **历史章节（2026-09-19）**：基础版 Docker 交付链已删除，本节"基础版 Docker"相关配置（`docker-compose*.yml`、`docker run` 命令）为**历史记录**；基础版现以桌面安装包（`.dmg`/`.exe`）或源码运行交付。`Docker Compose` 相关配置仅定制版仍适用。
+
 本节对比基础版（本地免费）与专业版（网关中继）的Docker部署差异，帮助用户根据需求选择合适的部署方案。
 
 #### 2.10.1 架构差异
@@ -738,7 +750,7 @@ cd PromiseLink/frontend && npm run build:h5
 |--------|-----|------|
 | Runner | `ubuntu-latest` | GitHub托管Linux runner |
 | Python版本 | `3.11`（矩阵单值） | 与生产环境一致 |
-| 服务容器 | `postgres:16-alpine` | 测试用PG实例（自动健康检查） |
+| 服务容器 | 无（基础版 SQLite-only；原 `postgres:16-alpine` service 已于 2026-09-19 移除） | 测试用数据库由 `DATABASE_URL` 指向本地 SQLite |
 
 ### 3.2 流水线步骤详解 [0.2.0新增]
 
@@ -766,7 +778,7 @@ cd PromiseLink/frontend && npm run build:h5
 │ Step 6: Run Tests (pytest)                                       │
 │   pytest tests/ -v --cov=src/promiselink                          │
 │   --cov-report=xml --cov-report=term-missing                     │
-│   环境变量：DATABASE_URL(PG) / TEST_MODE / LLM_API_KEY(测试key) │
+│   环境变量：DATABASE_URL(SQLite) / TEST_MODE / LLM_API_KEY(测试key) │
 │            SECRET_KEY(32位+) / REDIS_ENABLED=false               │
 ├─────────────────────────────────────────────────────────────────┤
 │ Step 7: Upload Coverage                                         │
@@ -779,7 +791,7 @@ cd PromiseLink/frontend && npm run build:h5
 
 | 变量 | CI中的值 | 说明 |
 |------|---------|------|
-| `DATABASE_URL` | `postgresql+asyncpg://promiselink:promiselink_test@localhost:5432/promiselink_test` | 异步PG连接串 |
+| `DATABASE_URL` | `sqlite://`（内存/文件） | 基础版唯一后端（原 `postgresql+asyncpg://...` 已于 2026-09-19 移除） |
 | `TEST_MODE` | `"true"` | 标记测试模式（跳过真实LLM调用） |
 | `LLM_API_KEY` | `"test-key-for-ci"` | 测试占位Key（不调用真实API） |
 | `SECRET_KEY` | `"ci-test-secret-key-min-32-chars-long"` | CI专用JWT密钥（≥32字符） |
@@ -800,7 +812,7 @@ cd PromiseLink/frontend && npm run build:h5
 
 | 能力 | 触发条件 | 计划内容 |
 |------|----------|----------|
-| Docker镜像构建 | PR合并到main | 自动构建multi-stage镜像并推送到Registry |
+| ~~Docker镜像构建~~ | ~~PR合并到main~~ | **已取消**：`build-and-push` job 随基础版 Docker 交付链于 2026-09-19 删除（基础版以桌面包交付） |
 | 自动部署(专业版) | main分支推送 | SSH到云服务器执行 `docker compose pull && up -d` |
 | 小程序自动化发布 | Taro构建就绪 | `miniprogram-ci` 自动上传+提审 |
 | 环境扩散部署 | 定制版启动前 | dev → staging → production 多环境流水线 |
@@ -1607,7 +1619,7 @@ docker compose exec promiselink-api env | grep -E "^TTS_|^VOICE_"
 | `PROMISELINK_LOG_LEVEL` | `INFO` | 否 | 全部 | 日志级别：DEBUG/INFO/WARNING/ERROR |
 | `PROMISELINK_CORS_ORIGINS` | `["http://localhost:3000"]` | 否 | 全部 | CORS允许来源，JSON数组格式 |
 | **数据库** | | | | |
-| `DATABASE_URL` | `sqlite:///./data/promiselink.db` | 否 | 全部 | 数据库连接串，专业版改为PG异步串 |
+| `DATABASE_URL` | `sqlite:///{用户家目录}/.promiselink/data/promiselink.db` | 否 | 全部 | 数据库连接串；定制版改为 PostgreSQL 异步串 |
 | **Redis** | | | | |
 | `REDIS_URL` | `redis://localhost:6379/0` | 否 | 专业版+ | Redis连接串 |
 | `REDIS_ENABLED` | `false` | 否 | 全部 | 是否启用Redis |

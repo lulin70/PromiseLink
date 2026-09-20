@@ -12,7 +12,7 @@
 
 - 综合成熟度：87/100（7 维度评估）
 - E2E 测试：34 个通过（基础版 19 + 专业版 15）
-- CI/CD：test/e2e/frontend/security/build-and-push 全部 success
+- CI/CD：test/e2e/frontend/security 全部 success（原 `build-and-push` job 已随基础版 Docker 交付链于 2026-09-19 删除）
 - 待办：用户配置 STAGING_SSH_KEY/STAGING_HOST secrets → Staging 实部署
 
 ---
@@ -93,10 +93,10 @@
 2. **确认边界**：所有跨语言路径严格 `CONFIRM-only`；服务端 opaque HMAC candidate token 绑定 scope、digest、operation 和版本，客户端候选字段不可信。
 3. **翻译边界**：不做实时翻译 API，保持原文与独立 `canonical_zh`；不把抽取阶段 `canonical_zh` 自动写入 aliases。
 4. **事实源**：主数据库承载 Entity/Todo/Association/EntityCorrection operation-audit 事实；向量索引是可重建派生数据，不新增向量数据库。
-5. **发布门禁**：Test Plan approval、SQLite/PostgreSQL 真实 migration、真实用户 E2E、Anti-ghost、黄金集、性能、指标、灰度和回滚全部通过前不得实现、push 或 deploy。
+5. **发布门禁**：Test Plan approval、SQLite 真实 migration、真实用户 E2E、Anti-ghost、黄金集、性能、指标、灰度和回滚全部通过前不得实现、push 或 deploy。（基础版 SQLite-only，原"SQLite/PostgreSQL 双数据库 migration"已随 2026-09-19 方案 B 收敛，见 [PROJECT_REVIEW_20260918_FINDINGS.md](../PromiseLink-Pro/docs/review/PROJECT_REVIEW_20260918_FINDINGS.md) §9）
 
 **决策点**：
-1. L4 的 embedding 是否满足黄金集和性能门槛；Test Plan approval、双数据库 migration、真实用户 E2E、Anti-ghost、灰度/回滚是否全部通过。
+1. L4 的 embedding 是否满足黄金集和性能门槛；Test Plan approval、SQLite 真实 migration、真实用户 E2E、Anti-ghost、灰度/回滚是否全部通过。
 2. 是否支持自动翻译录入文本？（当前设计不做自动翻译，保持原文 + 独立 `canonical_zh`）
 
 ---

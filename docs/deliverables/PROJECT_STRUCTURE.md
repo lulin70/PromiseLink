@@ -18,8 +18,7 @@ PromiseLink/
 ├── pyproject.toml                 # Python项目配置
 ├── requirements.txt               # 生产依赖
 ├── requirements-dev.txt           # 开发依赖
-├── Dockerfile                     # Docker镜像构建
-├── docker-compose.yml             # Docker编排配置
+│   （Dockerfile / docker-compose.yml 已于 2026-09-19（方案 B）删除，基础版不再以 Docker 交付）
 │
 ├── src/                           # 📦 源代码
 │   └── promiselink/                 # 主应用包
@@ -130,7 +129,7 @@ PromiseLink/
 #### Entity模型
 - 5种实体类型：`person`, `organization`, `topic`, `technology`, `project`
 - 支持实体归一：canonical_name + aliases
-- properties字段：JSONB/JSON存储实体属性
+- properties字段：JSON存储实体属性（基础版 SQLite 以 TEXT 存 JSON；定制版 PostgreSQL 用 JSONB）
 
 #### Association模型
 - 8种关联类型：`alumni`, `ex_colleague`, `same_city`, `competitor`, `tech_overlap`, `deal_link`, `risk_link`, `supply_chain`
@@ -198,17 +197,11 @@ python -m uvicorn promiselink.main:app --reload
 open http://localhost:8000/docs
 ```
 
-### 方式2：Docker
+### 方式2：桌面安装包（基础版推荐）
 
-```bash
-cd PromiseLink
+下载 `PromiseLink-<VERSION>-mac.dmg` / `PromiseLink-<VERSION>-windows.exe`（https://www.promiselink.cn/download.html 或 GitHub Releases），双击安装后浏览器会自动打开 http://localhost:8000。
 
-# 构建并启动
-docker-compose up --build
-
-# 访问
-curl http://localhost:8000/api/v1/health
-```
+> 说明：原「方式2：Docker」已于 2026-09-19（方案 B）随基础版 Docker 交付链一并删除，详见 PromiseLink-Pro `docs/review/PROJECT_REVIEW_20260918_FINDINGS.md` §9。
 
 ---
 
@@ -246,7 +239,7 @@ curl http://localhost:8000/api/v1/health
 - [x] 数据库模型（4张表完整实现）
 - [x] FastAPI应用框架
 - [x] 基础API（Health + Events）
-- [x] Docker配置
+- [x] 桌面安装包交付（.dmg/.exe；原 Docker 配置已于 2026-09-19 删除）
 - [x] 文档整理（按DevSquad规范）
 
 ### ⏳ 进行中

@@ -324,7 +324,7 @@ class RelationshipBriefService:
         # Apply changes with optimistic lock increment
         brief.brief_data = data
         brief.version += 1
-        # Force SQLAlchemy to detect JSON/JSONB mutation (critical for SQLite)
+        # Force SQLAlchemy to detect JSON mutation
         from sqlalchemy.orm.attributes import flag_modified
         flag_modified(brief, "brief_data")
 
@@ -394,7 +394,7 @@ class RelationshipBriefService:
 
         brief.brief_data = data
         brief.version += 1
-        # Force SQLAlchemy to detect JSON/JSONB mutation (critical for SQLite)
+        # Force SQLAlchemy to detect JSON mutation
         from sqlalchemy.orm.attributes import flag_modified as _flag_modified
         _flag_modified(brief, "brief_data")
 

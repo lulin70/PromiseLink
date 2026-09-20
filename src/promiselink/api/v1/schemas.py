@@ -6,10 +6,9 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict
 
 T = TypeVar("T")
 
-# Coerce uuid.UUID (returned by PostgreSQL UUID columns) to str for
-# Pydantic response models. SQLite returns str already; the BeforeValidator
-# is a no-op in that case. The union base type lets mypy accept both
-# str (SQLite) and uuid.UUID (PostgreSQL) inputs at construction sites.
+# Coerce uuid.UUID to str for Pydantic response models: UUID columns are
+# String(36) so stored values are already str, but construction sites may still
+# pass uuid.UUID objects. The union base type lets mypy accept both.
 UUIDStr = Annotated[str | uuid.UUID, BeforeValidator(lambda v: str(v) if isinstance(v, uuid.UUID) else v)]
 
 

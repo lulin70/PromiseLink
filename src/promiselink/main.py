@@ -598,11 +598,11 @@ app.get("/pair")(get_pair_page)
 
 # ── Static Files (H5 Frontend) ──
 # Mount AFTER API routes so /api/v1/* takes priority.
-# Docker: /app/static | PyInstaller: sys._MEIPASS/frontend/dist | Local: ./frontend/dist
+# PyInstaller: sys._MEIPASS/frontend/dist | Local: ./frontend/dist
 import sys
 
 STATIC_DIR = None
-_static_candidates = [Path("/app/static")]
+_static_candidates: list[Path] = []
 # PyInstaller frozen executable: bundled resources extracted to sys._MEIPASS
 if hasattr(sys, "_MEIPASS"):
     _static_candidates.append(Path(sys._MEIPASS) / "frontend" / "dist")

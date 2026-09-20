@@ -10,6 +10,8 @@
 
 本文档描述如何安全回滚Alembic数据库迁移，确保在生产环境遇到问题时能快速恢复。
 
+> **适用范围说明（2026-09-19 更新）**：**基础版仅使用 SQLite**（`DATABASE_URL` 默认 `sqlite:///{用户家目录}/.promiselink/data/promiselink.db`），基础版 PostgreSQL 后端支持已随方案 B 移除（详见 PromiseLink-Pro `docs/review/PROJECT_REVIEW_20260918_FINDINGS.md` §9）。本文档中所有 **PostgreSQL 相关步骤（`pg_dump`/`pg_restore`/`pg_stat_activity`/`psql` 等）仅适用于定制版（团队/多租户）**；基础版请只参考 SQLite 部分。
+
 ---
 
 ## 前置准备

@@ -309,11 +309,14 @@ async def get_todo(
     if todo.status == "snoozed":
         from promiselink.models.todo import SnoozeSchedule
         snooze_result = await session.execute(
-            select(SnoozeSchedule.recover_at).where(
+            select(SnoozeSchedule).where(
                 SnoozeSchedule.todo_id == str(todo.id),
             )
         )
-        snoozed_until = snooze_result.scalar_one_or_none()
+        snooze = snooze_result.scalar_one_or_none()
+        # recover_at is stored as an ISO string (String(50)); the model property
+        # normalises it to datetime for both string and datetime storage forms.
+        snoozed_until = snooze.recover_at_datetime if snooze else None
 
     return TodoDetailResponse(
         id=todo.id,

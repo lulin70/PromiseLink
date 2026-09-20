@@ -63,21 +63,15 @@ def _ensure_data_dir_exists() -> None:
 _ensure_data_dir_exists()
 
 
-# ── Dialect detection (used by models for SQLite/PG compatibility) ──
-
-def _is_sqlite() -> bool:
-    """Detect if current dialect is SQLite based on config URL."""
-    return settings.database_url.startswith("sqlite")
-
-
-IS_SQLITE = _is_sqlite()
+# ── Dialect (SQLite is the only backend for the basic edition) ──
+# PostgreSQL support was removed on 2026-09-19 together with the Docker delivery
+# chain (see PROJECT_REVIEW_20260918_FINDINGS.md §9). ``Database_Design_v1.md:30``
+# has always declared SQLite the long-term store for the local basic edition.
 
 
-def _uuid_default() -> str | uuid.UUID:
-    """Generate a default UUID value compatible with current dialect."""
-    if IS_SQLITE:
-        return str(uuid.uuid4())
-    return uuid.uuid4()
+def _uuid_default() -> str:
+    """Generate a default UUID value (string form, matches ``String(36)`` columns)."""
+    return str(uuid.uuid4())
 
 
 # Base class for all models
@@ -90,22 +84,18 @@ class Base(DeclarativeBase):
 # Sync engine for migrations
 def get_sync_engine() -> Any:
     """Get synchronous engine for Alembic migrations."""
-    url = settings.database_url
-    if url.startswith("sqlite"):
-        # Strip async dialect — sync engine needs plain sqlite:// URL
-        url = url.replace("+aiosqlite", "")
-        # SQLite-specific settings: WAL mode + busy_timeout for concurrency
-        engine = create_engine(url, connect_args={"check_same_thread": False}, echo=settings.debug)
+    # Strip async dialect — sync engine needs plain sqlite:// URL
+    url = settings.database_url.replace("+aiosqlite", "")
+    # SQLite-specific settings: WAL mode + busy_timeout for concurrency
+    engine = create_engine(url, connect_args={"check_same_thread": False}, echo=settings.debug)
 
-        @event.listens_for(engine, "connect")
-        def set_sqlite_pragma(dbapi_conn: Any, connection_record: Any) -> None:
-            cursor = dbapi_conn.cursor()
-            cursor.execute("PRAGMA foreign_keys=ON")
-            cursor.execute("PRAGMA journal_mode=WAL")
-            cursor.execute("PRAGMA busy_timeout=30000")
-            cursor.close()
-    else:
-        engine = create_engine(url, echo=settings.debug, pool_pre_ping=True)
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_conn: Any, connection_record: Any) -> None:
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=30000")
+        cursor.close()
 
     return engine
 
@@ -133,33 +123,26 @@ def get_async_engine() -> Any:
     """Get asynchronous engine for FastAPI."""
     url = settings.database_url
 
-    # Convert SQLite URL to async format
-    if url.startswith("sqlite"):
-        if "+aiosqlite" not in url:
-            url = url.replace("sqlite://", "sqlite+aiosqlite://")
-        # NullPool: each session creates a fresh connection and closes it when done.
-        # QueuePool exhausted under concurrent pipeline load (steps hold sessions
-        # during slow LLM calls, up to 300s each, consuming all 15 pooled connections).
-        # NullPool + WAL mode + busy_timeout=30s handles concurrency correctly.
-        engine = create_async_engine(
-            url,
-            echo=settings.debug,
-            connect_args={"check_same_thread": False, "timeout": 30},
-            poolclass=NullPool,
-        )
+    if "+aiosqlite" not in url:
+        url = url.replace("sqlite://", "sqlite+aiosqlite://")
+    # NullPool: each session creates a fresh connection and closes it when done.
+    # QueuePool exhausted under concurrent pipeline load (steps hold sessions
+    # during slow LLM calls, up to 300s each, consuming all 15 pooled connections).
+    # NullPool + WAL mode + busy_timeout=30s handles concurrency correctly.
+    engine = create_async_engine(
+        url,
+        echo=settings.debug,
+        connect_args={"check_same_thread": False, "timeout": 30},
+        poolclass=NullPool,
+    )
 
-        @event.listens_for(engine.sync_engine, "connect")
-        def set_sqlite_pragma(dbapi_conn: Any, connection_record: Any) -> None:
-            cursor = dbapi_conn.cursor()
-            cursor.execute("PRAGMA foreign_keys=ON")
-            cursor.execute("PRAGMA journal_mode=WAL")
-            cursor.execute("PRAGMA busy_timeout=30000")
-            cursor.close()
-    else:
-        # PostgreSQL async
-        if "+asyncpg" not in url:
-            url = url.replace("postgresql://", "postgresql+asyncpg://")
-        engine = create_async_engine(url, echo=settings.debug, pool_pre_ping=True)
+    @event.listens_for(engine.sync_engine, "connect")
+    def set_sqlite_pragma(dbapi_conn: Any, connection_record: Any) -> None:
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=30000")
+        cursor.close()
 
     return engine
 

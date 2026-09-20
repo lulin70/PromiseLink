@@ -12,6 +12,8 @@
 > **v2.8变更**: Event模型event_type约束新增'email'和'wechat_forward'，Todo模型properties JSONB新增resource_overuse类型
 > **v2.9变更**: todos表扩展fulfillment_status/fulfilled_at/overdue_notified_at字段(F-68)，新增reminder_preferences表(F-69)，新增reminder_logs表(F-69)
 
+> ⚠️ **基础版后端收敛（2026-09-19，方案 B）**：**基础版 PostgreSQL 后端支持已移除，SQLite 为基础版唯一后端**（`DATABASE_URL` 默认 `sqlite:///{用户家目录}/.promiselink/data/promiselink.db`）。本文档中的 PostgreSQL DDL 类型（`UUID` / `JSONB` / `INET` / `GIN` 等）**仅适用于定制版（团队/多租户）**；基础版按 §5 "SQLite 兼容说明"（JSONB→TEXT 等）落库，代码中不再存在 `is_postgresql`/`JSONB if not IS_SQLITE` 分支。SQLite→PostgreSQL 迁移路径仅定制版使用（见 §5.1）。详见 PromiseLink-Pro `docs/review/PROJECT_REVIEW_20260918_FINDINGS.md` §9。
+
 ---
 
 ## 1. 设计原则

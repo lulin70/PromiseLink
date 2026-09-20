@@ -23,21 +23,6 @@ jobs:
       matrix:
         python-version: ["3.11"]
 
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: promiselink
-          POSTGRES_PASSWORD: promiselink_test
-          POSTGRES_DB: promiselink_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
     steps:
       - uses: actions/checkout@v4
 
@@ -90,11 +75,10 @@ jobs:
         run: python3 -m mypy src/promiselink --ignore-missing-imports
 
       - name: Run security audit
-        run: pip-audit --desc --ignore-vuln PYSEC-2026-1325 --ignore-vuln PYSEC-2026-3447  # ecdsa Minerva timing attack (side-channel out of scope) + setuptools Unicode normalization (macOS sdist only, PromiseLink deploys via Docker not sdist)
+        run: pip-audit --desc --ignore-vuln PYSEC-2026-1325 --ignore-vuln PYSEC-2026-3447  # ecdsa Minerva timing attack (side-channel out of scope) + setuptools Unicode normalization (macOS sdist only, PromiseLink ships as a desktop package not sdist)
 
       - name: Run tests
         env:
-          DATABASE_URL: postgresql+asyncpg://promiselink:promiselink_test@localhost:5432/promiselink_test
           TEST_MODE: "true"
           LLM_PROVIDER: "mock"
           EMBEDDING_PROVIDER: "local"
@@ -109,7 +93,6 @@ jobs:
 
       - name: Run load tests (no coverage — performance measurements require clean instrumentation)
         env:
-          DATABASE_URL: postgresql+asyncpg://promiselink:promiselink_test@localhost:5432/promiselink_test
           TEST_MODE: "true"
           LLM_PROVIDER: "mock"
           EMBEDDING_PROVIDER: "local"
@@ -130,21 +113,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: promiselink
-          POSTGRES_PASSWORD: promiselink_test
-          POSTGRES_DB: promiselink_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
     steps:
       - uses: actions/checkout@v4
 
@@ -158,7 +126,6 @@ jobs:
 
       - name: Start PromiseLink server
         env:
-          DATABASE_URL: postgresql+asyncpg://promiselink:promiselink_test@localhost:5432/promiselink_test
           TEST_MODE: "true"
           LLM_PROVIDER: "mock"
           EMBEDDING_PROVIDER: "local"
@@ -280,26 +247,10 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # 仅夜间定时运行：e2e-nightly 需要真实 LLM API key，CI 环境无法通过，
-    # 且不阻塞镜像构建（build-and-push 不依赖本 job）。
+    # 仅夜间定时运行：e2e-nightly 需要真实 LLM API key，CI 环境无法通过。
     # 每次 push 都跑会浪费 30 分钟 CI 时间并可能导致 concurrency 取消。
     # 基本 E2E 由 e2e job 覆盖（push 时运行）。
     if: github.event_name == 'schedule'
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: promiselink
-          POSTGRES_PASSWORD: promiselink_test
-          POSTGRES_DB: promiselink_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
 
     steps:
       - uses: actions/checkout@v4
@@ -317,7 +268,6 @@ jobs:
 
       - name: Start PromiseLink server
         env:
-          DATABASE_URL: postgresql+asyncpg://promiselink:promiselink_test@localhost:5432/promiselink_test
           TEST_MODE: "true"
           LLM_PROVIDER: "mock"
           EMBEDDING_PROVIDER: "local"
@@ -399,7 +349,7 @@ jobs:
         run: bandit -r src/ -f json -o bandit-report.json -ll
 
       - name: Run pip-audit
-        run: pip-audit --desc --ignore-vuln PYSEC-2026-1325 --ignore-vuln PYSEC-2026-3447  # ecdsa Minerva timing attack (side-channel out of scope) + setuptools Unicode normalization (macOS sdist only, PromiseLink deploys via Docker not sdist)
+        run: pip-audit --desc --ignore-vuln PYSEC-2026-1325 --ignore-vuln PYSEC-2026-3447  # ecdsa Minerva timing attack (side-channel out of scope) + setuptools Unicode normalization (macOS sdist only, PromiseLink ships as a desktop package not sdist)
 
       - name: Upload bandit report
         uses: actions/upload-artifact@v4
@@ -407,59 +357,10 @@ jobs:
           name: bandit-report
           path: bandit-report.json
 
-  build-and-push:
-    # 批次3.4: 镜像构建门控 — test(单测+覆盖率) + frontend(tsc+build) + security(bandit+pip-audit)
-    # 注: e2e/e2e-nightly/playwright-ui 需要真实 LLM API key，CI 环境无法通过，不阻塞镜像构建
-    # 这些测试仍会运行（结果可见于 CI 日志），真实 LLM E2E 验证转移到 staging 环境执行 (Phase 5)
-    # TODO(tech-debt): Playwright/e2e 测试应 mock LLM 响应以支持 CI 环境运行
-    needs: [test, frontend, security]
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract version
-        id: version
-        run: |
-          VERSION=$(grep 'version = "' pyproject.toml | head -1 | sed 's/.*version = "\(.*\)".*/\1/')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Building version: $VERSION"
-          # Docker tags must be lowercase; github.repository may contain uppercase
-          echo "repo_lower=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/${{ steps.version.outputs.repo_lower }}:latest
-            ghcr.io/${{ steps.version.outputs.repo_lower }}:${{ steps.version.outputs.version }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Verify Docker image
-        run: |
-          docker pull ghcr.io/${{ steps.version.outputs.repo_lower }}:${{ steps.version.outputs.version }}
-          docker run --rm ghcr.io/${{ steps.version.outputs.repo_lower }}:${{ steps.version.outputs.version }} \
-            python -c "import promiselink; print(f'PromiseLink v{promiselink.__version__} OK')"
-
-# 注：deploy-staging job 已移除（2026-07-12）
-# 原因：基础版禁止云端部署（硬约束），staging 部署到云端服务器违反架构原则
-# 基础版在用户本地运行（localhost:8000），Docker 镜像通过 ghcr.io 分发
-# 详见 docs/postmortem/ 基础版违规部署根因分析
+# 注：build-and-push job 已移除（2026-09-19）
+# 原因：基础版交付链统一为 PyInstaller 桌面包（macOS .dmg / Windows .exe），
+#       Docker 镜像（ghcr.io）这一分发路径已无任何消费者（install_basic.sh 一并删除）。
+#       镜像 tag 曾长期停留在 0.9.0（陈旧 pin，滞后 6 周），并造成「CI 绿=用户可安装」的
+#       门禁遮挡假象；收敛后由 release 工作流的桌面包产物承担交付验证。
+# 关联：deploy-staging job 已移除（2026-07-12）——基础版禁止云端部署（硬约束）。
+# 决策记录：PromiseLink-Pro/docs/review/PROJECT_REVIEW_20260918_FINDINGS.md §9

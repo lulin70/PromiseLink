@@ -15,10 +15,9 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from promiselink.database import IS_SQLITE, Base, _uuid_default
+from promiselink.database import Base, _uuid_default
 
 
 class Association(Base):
@@ -33,26 +32,26 @@ class Association(Base):
 
     # Primary key
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         primary_key=True,
         default=_uuid_default,
     )
 
     # Core fields
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         nullable=False,
         index=True,
     )
 
     # Source and target entities
     source_entity_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         ForeignKey("entities.id", ondelete="CASCADE"),
         nullable=False,
     )
     target_entity_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         ForeignKey("entities.id", ondelete="CASCADE"),
         nullable=False,
     )
@@ -68,12 +67,12 @@ class Association(Base):
 
     # Properties specific to association type
     properties: Mapped[dict[str, Any] | None] = mapped_column(
-        JSONB if not IS_SQLITE else JSON,
+        JSON,
     )
 
     # Source tracking
-    source_event_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+    source_event_id: Mapped[str | None] = mapped_column(
+        String(36),
         ForeignKey("events.id", ondelete="SET NULL"),
         nullable=True,
     )

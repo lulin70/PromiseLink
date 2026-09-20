@@ -47,7 +47,7 @@
 | **缓存** | Redis 7 |
 | **图计算** | NetworkX + igraph |
 | **LLM** | DeepSeek + spaCy |
-| **容器化** | Docker + docker-compose |
+| **打包/交付** | PyInstaller 桌面安装包（`PromiseLink-<VERSION>-mac.dmg` / `-windows.exe`）；源码运行（`pip install -e '.[dev]'` + `bash scripts/start.sh`） |
 
 ---
 
@@ -117,7 +117,7 @@ pending ⇄ in_progress ⇄ done
 | 2026-05-31 | 排除公开信息爬取 | 法律风险 | 竞对判断依赖网页检索+用户标注 |
 | 2026-05-31 | 工商API第一期不做 | 成本控制 | 降低初期投入 |
 | 2026-06-01 | 实体归一必须人工确认 | 数据准确性 | Step 5 Human-in-the-Loop |
-| 2026-06-02 | SQLite用于开发环境 | 零依赖快速启动 | 生产环境切换PostgreSQL |
+| 2026-06-02 | SQLite用于开发环境 | 零依赖快速启动 | 生产环境切换PostgreSQL（后于 2026-06-11 决策反转为"长期 SQLite"；基础版 2026-09-19 起 SQLite-only，PostgreSQL 仅定制版选型） |
 
 ---
 

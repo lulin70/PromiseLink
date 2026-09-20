@@ -14,7 +14,7 @@ Uses tracemalloc for Python-level allocation tracking.
 
 import gc
 
-# Force IS_SQLITE=True BEFORE importing models
+# SQLite is the only supported backend; conftest pins DATABASE_URL before import.
 import os
 import tracemalloc
 import uuid

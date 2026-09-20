@@ -123,11 +123,11 @@ PromiseLink 已实施以下安全措施，覆盖数据保护、认证授权、�
 
 ### 6.1 部署建议
 
-- **基础版部署位置**：基础版必须在**用户本地设备**运行（localhost:8000），**禁止云端部署**（硬约束）。用户通过 `docker run` 或源码安装在本地运行。
-- **数据库**：PostgreSQL 单独部署，不与应用容器同网络，启用连接 TLS。
+- **基础版部署位置**：基础版必须在**用户本地设备**运行（localhost:8000），**禁止云端部署**（硬约束）。用户通过**桌面安装包**（`PromiseLink-<VERSION>-mac.dmg` / `-windows.exe`，双击安装）或源码运行（`pip install -e '.[dev]'` + `cp .env.basic.example .env` + `bash scripts/start.sh`）在本地运行。原 `docker run` 交付路径已于 2026-09-19（方案 B）删除，详见 PromiseLink-Pro `docs/review/PROJECT_REVIEW_20260918_FINDINGS.md` §9。
+- **数据库**：基础版仅使用本地 SQLite 单文件（`DATABASE_URL` 默认 `sqlite:///{用户家目录}/.promiselink/data/promiselink.db`），无独立数据库服务；PostgreSQL 仅用于**定制版（团队/多租户）**，需单独部署、不与应用同网络并启用连接 TLS。
 - **Redis**：启用密码认证，绑定内网 IP，禁止公网访问。
 - **反向代理**：Nginx 前置，启用 HSTS、CSP、X-Frame-Options 等安全头。
-- **最小化镜像**：使用多阶段构建，生产镜像不含编译工具与调试符号。
+- **最小化依赖**：桌面安装包仅打包运行时必需依赖，不含编译工具与调试符号。
 
 ### 6.2 密钥管理
 

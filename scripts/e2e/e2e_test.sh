@@ -40,9 +40,9 @@ info "检查PromiseLink服务状态..."
 if ! curl -sf "${API_URL}/health" > /dev/null 2>&1; then
     error "PromiseLink服务未运行，请先启动服务：
     cd $PROJECT_ROOT
-    ./install.sh
+    bash scripts/start.sh
     或
-    docker compose -f docker-compose.basic.yml up -d"
+    bash scripts/install.sh"
 fi
 
 success "PromiseLink服务运行中"

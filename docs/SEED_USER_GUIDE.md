@@ -8,52 +8,42 @@
 
 管理员会通过微信或邮件发送给您两样东西：
 
-1. **许可证密钥**：格式如 `PL-PRO-XXXX-XXXX-XXXX`（请妥善保管）
-2. **小程序体验版二维码**：用微信扫码即可打开小程序
+1. **小程序体验版二维码**：用微信扫码即可打开 PromiseLink 小程序
+2. **许可证密钥**：格式如 `PL-PRO-XXXX-XXXX-XXXX`（请妥善保管）
 
 ---
 
-## 第一步：电脑端安装（约 10 分钟）
+## 第一步：电脑端安装（约 5 分钟）
 
-### 1.1 安装 Docker Desktop
+### 1.1 下载安装包
 
-如果您的电脑还没有安装 Docker：
+打开浏览器访问 **https://www.promiselink.cn/download.html**，根据您的系统下载对应的安装包：
 
-| 系统 | 下载地址 |
+| 系统 | 下载文件 |
 |------|---------|
-| macOS | https://www.docker.com/products/docker-desktop |
-| Windows | https://www.docker.com/products/docker-desktop |
-| Linux | https://docs.docker.com/engine/install/ |
+| macOS | `PromiseLink-<版本号>-mac.dmg` |
+| Windows | `PromiseLink-<版本号>-windows.exe` |
 
-下载后双击安装，安装完成后**启动 Docker Desktop**（菜单栏/任务栏出现鲸鱼图标且状态为 running 即可）。
+> 安装包已内置 Python 运行时与全部依赖，**无需安装 Python、Node.js，也无需安装 Docker**。
 
-### 1.2 运行安装命令
+### 1.2 安装并启动
 
-打开终端（Mac: 应用程序→实用工具→终端；Windows: 开始菜单→PowerShell），复制粘贴以下命令并回车：
+- **macOS**：双击 `.dmg`，把 PromiseLink 图标拖入「应用程序」文件夹；再从「应用程序」中双击启动
+- **Windows**：双击 `.exe`，按安装向导完成安装；再从开始菜单双击启动
 
-```bash
-curl -fsSL https://promiselink.cn/install_basic.sh | bash
-```
+启动后本地服务会自动运行，**浏览器会自动打开** http://localhost:8000 ，看到 PromiseLink 界面即表示电脑端已就绪。
 
-### 1.3 按提示操作
+> 若浏览器没有自动打开，请手动打开浏览器并在地址栏输入 `http://localhost:8000`。
 
-安装脚本会引导您完成以下步骤：
+### 1.3 登录电脑端
 
-1. **自动检查 Docker** — 看到 `Docker 已就绪 ✓` 即可
-2. **输入许可证密钥** — 输入您收到的 `PL-PRO-XXXX-XXXX-XXXX`
-3. **确认网关地址** — 直接回车使用默认值即可
-4. **自动下载并启动** — 等待约 2-5 分钟（首次下载镜像约 200MB）
-5. **看到安装完成提示** — 记下屏幕上显示的 **PoC 登录密码**
+在浏览器页面使用本地管理员密码（PoC 密码）登录。默认密码为 `promiselink2026`，管理员可能会为您改成其他密码。
 
-### 1.4 验证电脑端运行
-
-浏览器打开 http://localhost:8000 ，能看到 PromiseLink 页面即表示电脑端已就绪。
-
-> **注意**：使用期间请保持电脑开机且 Docker 运行，否则小程序无法访问数据。
+> **注意**：使用期间请保持电脑开机、PromiseLink 保持运行，否则手机小程序无法访问数据。
 
 ---
 
-## 第二步：手机端激活（约 3 分钟）
+## 第二步：手机端配对（约 3 分钟）
 
 ### 2.1 打开小程序
 
@@ -63,19 +53,20 @@ curl -fsSL https://promiselink.cn/install_basic.sh | bash
 
 在小程序登录页，点击**"微信快捷登录"**，授权后自动登录。
 
-### 2.3 激活专业版
+### 2.3 扫码配对（把手机与您的电脑连起来）
 
-首次登录后，小程序会提示您激活专业版：
+1. 在电脑端浏览器中打开配对页面 **http://localhost:8000/pair**（也可在界面左下角「我的 → 配对小程序」进入）
+2. 页面会显示一个二维码
+3. 用手机微信**扫一扫**扫描该二维码
+4. 电脑端出现"激活成功"提示后即配对完成
 
-1. 在激活页面输入您收到的 **许可证密钥**（`PL-PRO-XXXX-XXXX-XXXX`）
-2. 点击"激活"
-3. 看到"激活成功"提示即表示手机端已就绪
+配对成功后，许可证会自动写入您电脑上的配置文件（`~/.promiselink/.env`），加密中继连接随即启动。**重启电脑端后无需重新配对。**
 
 ---
 
 ## 第三步：开始使用
 
-激活成功后，小程序会自动连接到您电脑上的基础版。您现在可以：
+配对成功后，小程序会自动连接到您电脑上的 PromiseLink。您现在可以：
 
 | 功能 | 说明 |
 |------|------|
@@ -93,30 +84,30 @@ curl -fsSL https://promiselink.cn/install_basic.sh | bash
 
 ### Q1：小程序提示"本地基础版未连接"
 
-**原因**：电脑关机、Docker 停止、或网络中断。
+**原因**：电脑关机、PromiseLink 未运行、或网络中断。
 
 **解决**：
 1. 确认电脑已开机
-2. 确认 Docker Desktop 正在运行（鲸鱼图标为 running）
-3. 确认基础版容器在运行：打开终端输入 `docker ps`，应看到 `promiselink-api` 容器
-4. 如果容器没运行：`cd ~/promiselink && docker compose up -d`
+2. 确认 PromiseLink 正在运行（菜单栏 / 任务栏有 PromiseLink 图标；浏览器能打开 http://localhost:8000）
+3. 确认已完成扫码配对（未配对时重新打开 http://localhost:8000/pair 扫码）
+4. 若仍不行：退出 PromiseLink 后重新启动
 
-### Q2：安装脚本提示"Docker 未运行"
+### Q2：浏览器没有自动打开
 
-**解决**：启动 Docker Desktop，等待鲸鱼图标变为稳定状态（约 10-30 秒），重新运行安装命令。
+**解决**：手动打开浏览器，地址栏输入 `http://localhost:8000`。
 
-### Q3：忘记 PoC 登录密码
+### Q3：忘记本地登录密码
 
-**解决**：打开终端，输入：
-```bash
-cat ~/promiselink/.env.basic | grep POC_SECRET
-```
+**解决**：打开配置文件修改 `POC_SECRET` 的值后重启 PromiseLink：
+
+- macOS / Linux：`~/.promiselink/.env`
+- Windows：`%USERPROFILE%\.promiselink\.env`
 
 ### Q4：换了一台电脑怎么迁移？
 
-1. 在新电脑上安装 Docker Desktop
-2. 运行安装命令，输入相同的许可证密钥
-3. 旧电脑的数据不会自动迁移（如需迁移请联系 support@promiselink.cn）
+1. 在新电脑上安装 PromiseLink 桌面版并启动
+2. 重新扫码配对（同一许可证可重复配对）
+3. 旧电脑上的业务数据不会自动迁移（如需迁移请联系 support@promiselink.cn）
 
 ### Q5：许可证密钥丢了怎么办？
 
@@ -133,16 +124,25 @@ cat ~/promiselink/.env.basic | grep POC_SECRET
 
 ---
 
+## 数据与本机文件位置
+
+| 内容 | 位置 |
+|------|------|
+| 业务数据（SQLite） | `~/.promiselink/data/promiselink.db`（Windows：`%USERPROFILE%\.promiselink\data\promiselink.db`） |
+| 本机配置（含许可证 / LLM Key / 登录密码） | `~/.promiselink/.env`（Windows：`%USERPROFILE%\.promiselink\.env`） |
+
+---
+
 ## 系统架构简图
 
 ```
-您的电脑（数据存储）          云端网关（中转）           手机小程序
-┌─────────────────┐       ┌──────────┐         ┌──────────┐
-│ 基础版 Docker    │ ─WSS→ │ 网关     │ ←HTTPS─ │ 微信小程序 │
-│ localhost:8000  │       │ gateway. │         │ 数据加密   │
-│ SQLite 数据库   │       │ promisel │         │ 传输       │
-└─────────────────┘       │ ink.cn   │         └──────────┘
-                          └──────────┘
+您的电脑（数据存储）            云端网关（中转）           手机小程序
+┌──────────────────┐        ┌──────────┐         ┌──────────┐
+│ PromiseLink 桌面版 │ ─WSS→  │ 网关     │ ←HTTPS─ │ 微信小程序 │
+│ localhost:8000    │        │ gateway. │         │ 数据加密   │
+│ SQLite 数据库     │        │ promisel │         │ 传输       │
+└──────────────────┘        │ ink.cn   │         └──────────┘
+                            └──────────┘
 ```
 
 **数据安全原则**：数据从不出家门，小程序通过加密通道访问本地数据。

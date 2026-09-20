@@ -1,13 +1,15 @@
 """Alembic 修订树契约守卫（fail-closed）。
 
-背景（2026-09-18）：CI ``e2e`` job 的 ``alembic upgrade head`` 在 PostgreSQL 上以
-``psycopg2.errors.StringDataRightTruncation: value too long for type character
-varying(32)`` 失败 —— 两个修订 id 分别长 33/34 字符，而 alembic 建
-``alembic_version`` 表时把 ``version_num`` 固定为 ``VARCHAR(32)``。
-SQLite 不校验长度，所以 unit/本地路径全部通过，只有 PostgreSQL 后端（CI e2e、
-staging、容器部署）暴露该问题，导致 e2e 门禁长期红灯却无人定位。
+历史成因（2026-09-18）：CI ``e2e`` job 的 ``alembic upgrade head`` 当时跑在
+PostgreSQL 上，以 ``psycopg2.errors.StringDataRightTruncation: value too long
+for type character varying(32)`` 失败 —— 两个修订 id 分别长 33/34 字符，而
+alembic 建 ``alembic_version`` 表时把 ``version_num`` 固定为 ``VARCHAR(32)``。
 
-这里把该约束固化为测试：任何超长修订 id 或双 head 都会在进入 PostgreSQL 环境前失败。
+守卫保留理由：32 字符上限来自 alembic 自身的 DDL，与后端无关。基础版自
+2026-09-19 起已收敛为 SQLite 单后端（PostgreSQL 支持随 Docker 交付链一并
+移除，见 ``PromiseLink-Pro/docs/review/PROJECT_REVIEW_20260918_FINDINGS.md``
+§9），而 SQLite 不校验 ``VARCHAR`` 长度——正因如此，这类超长 id 不会在本地
+暴露，只能靠本测试在提交前拦下。任何超长修订 id 或双 head 都在此失败。
 """
 
 from pathlib import Path
@@ -16,7 +18,7 @@ from alembic.config import Config
 from alembic.script import ScriptDirectory
 
 # alembic 在 ``alembic/runtime/migration.py`` 中固定使用 ``sa.String(32)``
-# 建 ``alembic_version.version_num``，PostgreSQL 会按该长度截断/报错。
+# 建 ``alembic_version.version_num``；超出即违反 alembic 的 DDL 契约。
 REVISION_ID_LIMIT = 32
 
 
@@ -46,8 +48,8 @@ def test_revision_ids_fit_alembic_version_column() -> None:
         if len(rev.revision) > REVISION_ID_LIMIT
     }
     assert not too_long, (
-        f"修订 id 超过 alembic_version.version_num 的 {REVISION_ID_LIMIT} 字符上限，"
-        f"在 PostgreSQL 上会报 StringDataRightTruncation: {too_long}"
+        f"修订 id 超过 alembic_version.version_num 的 {REVISION_ID_LIMIT} 字符上限"
+        f"（alembic 固定 VARCHAR(32)）：{too_long}"
     )
 
 

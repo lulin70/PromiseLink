@@ -3,10 +3,11 @@
 W5 admission baseline (see docs/design/W5_IMPLEMENTATION_READINESS_CHECKLIST_v1.md §3).
 
 Notes:
-- ``DATABASE_URL`` is forced (before any ``promiselink`` import) to match the
-  ``db_backend`` fixture (default ``sqlite``; opt-in ``postgresql`` via
-  ``W5_PG_URL`` + the ``dual_db`` marker). See the alignment block below for why
-  this is mandatory rather than cosmetic.
+- SQLite is the only supported backend (PostgreSQL support was removed on
+  2026-09-19 together with the Docker delivery chain — see
+  ``PromiseLink-Pro/docs/review/PROJECT_REVIEW_20260918_FINDINGS.md`` §9).
+  ``DATABASE_URL`` is forced to SQLite before any ``promiselink`` import. See the
+  alignment block below for why this is mandatory rather than cosmetic.
 - ``Base.metadata.create_all`` is retained **only** as a temporary in-memory
   convenience for SQLite fixtures. The W4+ Test Plan requires ``alembic upgrade
   head`` on every fixture-backed backend before any test runs; the
@@ -30,39 +31,25 @@ from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 # ── Test-env / model-dialect alignment (MUST precede the promiselink import) ──
-# ``promiselink.database.IS_SQLITE`` is resolved **at import time** from
-# ``settings.database_url``, and every model picks its column types from it
-# (``JSONB if not IS_SQLITE else JSON``, ``UUID if not IS_SQLITE else String``).
+# ``promiselink.database`` freezes the dialect at import time from
+# ``settings.database_url``, and every model picks its column types from it.
 # The fixtures build SQLite engines, so the process env has to advertise SQLite
-# as well: otherwise ``Base.metadata`` is built with JSONB columns and any
-# fixture that renders DDL against SQLite dies with
-# ``CompileError: ... can't render element of type JSONB``.
-# This matters in CI, where the ``Run tests`` job exports
-# ``DATABASE_URL=postgresql+asyncpg://...`` (used by the e2e jobs) even though
-# the unit suite runs on the SQLite backend.
-# PostgreSQL opt-in goes through ``W5_PG_URL`` because the dialect is frozen
-# before pytest parses ``--postgresql-url``.
-os.environ["DATABASE_URL"] = os.environ.get("W5_PG_URL") or "sqlite://"
+# as well — otherwise ``Base.metadata`` is built against a different backend and
+# any fixture that renders DDL dies with a ``CompileError``.
+# An outer ``DATABASE_URL`` (e.g. exported by a developer shell) must not leak in.
+os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["TEST_MODE"] = "true"
 
 from promiselink.database import Base  # noqa: E402
-
-# Allowed values for the ``db_backend`` fixture.
-DB_BACKENDS = ("sqlite", "postgresql")
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     """Register W5 admission CLI options.
 
     The conftest used to silently override ``DATABASE_URL``. We now expose
-    the choice to the test runner instead, matching Test Plan §16.1.
+    the skip-alembic escape hatch to the test runner instead, matching Test
+    Plan §16.1.
     """
-    parser.addoption(
-        "--postgresql-url",
-        action="store",
-        default=os.environ.get("W5_PG_URL", ""),
-        help="PostgreSQL URL used when the ``dual_db`` marker is selected.",
-    )
     parser.addoption(
         "--skip-alembic",
         action="store_true",
@@ -77,16 +64,6 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=False,
         help="Explicit opt-in flag for ``--skip-alembic``. Production-bound "
         "runs must never set this.",
-    )
-    parser.addoption(
-        "--db-backend",
-        action="store",
-        default="sqlite",
-        choices=list(DB_BACKENDS),
-        help="Select the database backend for the ``db_backend`` fixture. "
-        "``postgresql`` requires the ``dual_db`` marker and ``--postgresql-url``. "
-        "Default is ``sqlite``. The fixture no longer falls back silently to "
-        "sqlite when this option is missing — explicit declaration is enforced.",
     )
 
 
@@ -115,39 +92,6 @@ def _reset_rate_limits():
     reset_rate_limits()
 
 
-@pytest.fixture
-def db_backend(request: pytest.FixtureRequest) -> str:
-    """Return the backend selected for this test.
-
-    Defaults to ``sqlite``. Tests marked with ``@pytest.mark.dual_db`` must
-    also select ``postgresql`` via ``--postgresql-url <url>`` or ``W5_PG_URL``.
-    """
-    backend = request.config.getoption("--db-backend")
-    if backend not in DB_BACKENDS:
-        raise pytest.UsageError(f"--db-backend must be one of {DB_BACKENDS}")
-    if backend == "postgresql" and not request.config.getoption("--postgresql-url"):
-        raise pytest.UsageError(
-            "--postgresql-url (or W5_PG_URL) is required when --db-backend=postgresql"
-        )
-    if backend == "postgresql" and "dual_db" not in request.keywords:
-        raise pytest.UsageError(
-            "postgresql backend requires the ``dual_db`` marker on the test"
-        )
-    if backend == "postgresql" and os.environ.get("W5_PG_URL") != os.environ.get(
-        "DATABASE_URL"
-    ):
-        # Model column types are frozen at import time from DATABASE_URL (see the
-        # alignment block at the top of this module). A CLI-only --postgresql-url
-        # would leave the models on SQLite while the fixtures build PostgreSQL
-        # engines — fail closed instead of running a mismatched suite.
-        raise pytest.UsageError(
-            "postgresql backend must be exported via W5_PG_URL before pytest "
-            "starts (models resolve their dialect at import time); "
-            "--postgresql-url alone cannot switch the model layer"
-        )
-    return backend
-
-
 def _build_sqlite_url(tmp_path) -> str:
     """Build a per-test SQLite URL backed by a temp file (not in-memory).
 
@@ -156,15 +100,6 @@ def _build_sqlite_url(tmp_path) -> str:
     """
     db_file = tmp_path / "w5.sqlite"
     return f"sqlite+aiosqlite:///{db_file}"
-
-
-def _build_postgresql_url(config: pytest.Config) -> str:
-    url = config.getoption("--postgresql-url") or os.environ.get("W5_PG_URL", "")
-    if not url.startswith("postgresql"):
-        raise pytest.UsageError("PostgreSQL URL must use the postgresql:// scheme")
-    if "+asyncpg" not in url and "+psycopg2" not in url:
-        url = url.replace("postgresql://", "postgresql+asyncpg://")
-    return url
 
 
 def _run_alembic_upgrade(sync_url: str, config: pytest.Config) -> str:
@@ -216,7 +151,6 @@ def _run_alembic_upgrade(sync_url: str, config: pytest.Config) -> str:
 
         pl_database = _pl_database
         pl_database.settings = fixture_settings
-        pl_database.IS_SQLITE = fixture_settings.is_sqlite
     except Exception:
         # If the module is not importable yet, alembic env.py will trigger it.
         pass
@@ -235,7 +169,6 @@ def _run_alembic_upgrade(sync_url: str, config: pytest.Config) -> str:
             from promiselink import config as _pl_config
 
             pl_database.settings = _pl_config.get_settings()
-            pl_database.IS_SQLITE = pl_database.settings.is_sqlite
 
     from alembic.script import ScriptDirectory
 
@@ -248,61 +181,54 @@ async def db_session(
     request: pytest.FixtureRequest,
     tmp_path,
 ) -> AsyncIterator[AsyncSession]:
-    """Yield an async session for the selected backend.
+    """Yield an async session backed by a per-test SQLite file.
 
     Always runs ``alembic upgrade head`` (unless explicitly opted out).
     SQLite connections enable ``PRAGMA foreign_keys=ON``; ``PRAGMA foreign_keys``
     is queried post-connect and the fixture fails if pragma is not effective.
     """
-    backend = request.getfixturevalue("db_backend")
-    if backend == "sqlite":
-        url = _build_sqlite_url(tmp_path)
-        sync_url = url.replace("+aiosqlite", "")
-    else:
-        url = _build_postgresql_url(request.config)
-        sync_url = url.replace("+asyncpg", "").replace("+psycopg2", "")
+    url = _build_sqlite_url(tmp_path)
+    sync_url = url.replace("+aiosqlite", "")
 
     head = _run_alembic_upgrade(sync_url, request.config)
 
     engine = create_async_engine(url, connect_args={"check_same_thread": False})
 
-    if backend == "sqlite":
-
-        @event.listens_for(engine.sync_engine, "connect")
-        def _enable_sqlite_fks(dbapi_conn, _record):  # noqa: ANN001
-            cursor = dbapi_conn.cursor()
-            cursor.execute("PRAGMA foreign_keys=ON")
-            cursor.close()
+    @event.listens_for(engine.sync_engine, "connect")
+    def _enable_sqlite_fks(dbapi_conn, _record):  # noqa: ANN001
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
     async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    if backend == "sqlite":
-        # Verify PRAGMA foreign_keys took effect on the engine. We use a
-        # short-lived sync engine so that aiosqlite quirks do not mask the
-        # assertion (the SQLAlchemy async connection wraps pysqlite but
-        # ``cursor.execute("PRAGMA foreign_keys")`` does not always return
-        # a row in that path). The independent sync connection shares the
-        # underlying SQLite file, so PRAGMA is consistent.
-        from sqlalchemy import create_engine
-        from sqlalchemy import event as sa_event
-        from sqlalchemy import text as sa_text
 
-        verify_engine = create_engine(sync_url, connect_args={"check_same_thread": False})
+    # Verify PRAGMA foreign_keys took effect on the engine. We use a
+    # short-lived sync engine so that aiosqlite quirks do not mask the
+    # assertion (the SQLAlchemy async connection wraps pysqlite but
+    # ``cursor.execute("PRAGMA foreign_keys")`` does not always return
+    # a row in that path). The independent sync connection shares the
+    # underlying SQLite file, so PRAGMA is consistent.
+    from sqlalchemy import create_engine
+    from sqlalchemy import event as sa_event
+    from sqlalchemy import text as sa_text
 
-        @sa_event.listens_for(verify_engine, "connect")
-        def _enable_fks_on_verify(dbapi_conn, _record):  # noqa: ANN001
-            cursor = dbapi_conn.cursor()
-            cursor.execute("PRAGMA foreign_keys=ON")
-            cursor.close()
+    verify_engine = create_engine(sync_url, connect_args={"check_same_thread": False})
 
-        try:
-            with verify_engine.connect() as conn:
-                fk_value = conn.execute(sa_text("PRAGMA foreign_keys")).scalar()
-                if fk_value != 1:
-                    raise RuntimeError(
-                        f"SQLite PRAGMA foreign_keys did not enable (got {fk_value!r})"
-                    )
-        finally:
-            verify_engine.dispose()
+    @sa_event.listens_for(verify_engine, "connect")
+    def _enable_fks_on_verify(dbapi_conn, _record):  # noqa: ANN001
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+    try:
+        with verify_engine.connect() as conn:
+            fk_value = conn.execute(sa_text("PRAGMA foreign_keys")).scalar()
+            if fk_value != 1:
+                raise RuntimeError(
+                    f"SQLite PRAGMA foreign_keys did not enable (got {fk_value!r})"
+                )
+    finally:
+        verify_engine.dispose()
 
     async with async_session() as session:
         # Expose the migration head to tests that need to assert schema state.

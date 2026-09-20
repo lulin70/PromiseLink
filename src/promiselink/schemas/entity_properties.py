@@ -1,4 +1,4 @@
-"""Pydantic schema validation for Entity.properties JSONB field.
+"""Pydantic schema validation for Entity.properties JSON field.
 
 Validates the structure of the properties dict before writing to database.
 Provides graceful degradation: if validation fails, logs a warning and

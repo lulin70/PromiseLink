@@ -9,17 +9,23 @@
 
 ## §0 经验教训（先看这段）
 
-### 教训 1：基础版不需要 Docker，但容易误用 Docker
+### 教训 1：基础版交付链已收敛为「桌面包 + 源码运行」，Docker 编排已删除
 
-**误判**：看到 `docker-compose.yml` 里有 `promiselink` / `postgres` / `redis` 服务，就以为"基础版应该 docker compose up"。
+**误判**：曾看到 `docker-compose.yml` 里有 `promiselink` / `postgres` / `redis` 服务，就以为"基础版应该 docker compose up"，把基础版当成需要容器编排的服务——这正是 2026-07-12"基础版违规云端部署"事故的诱因之一。
 
-**真相**：基础版的核心交付物是 `pip install -e . + bash scripts/start.sh`（localhost:8000 源码运行）。
-`docker-compose.yml` 的 `promiselink` 服务**仅用于生产部署 / 自托管 PoC**；PostgreSQL / Redis / Nginx 都在 `profiles: ["full"|"production"]` 后，默认 `docker compose up`（无 profile）只会启动 SQLite 模式。
+**现状（2026-09-19，方案 B）**：基础版**彻底删除**了 Docker 交付链（`Dockerfile`、`.dockerignore`、`docker-compose*.yml`、`install-docker.sh`、`deploy/quick_install.sh`、`scripts/install_basic.sh`、`nginx/`、`.env.poc*.example`），并**从基础版代码中清除了 PostgreSQL 后端支持**。基础版现在只有两条交付路径：
+
+| 路径 | 面向 | 方式 |
+|---|---|---|
+| **桌面包** | 非技术用户 | 下载 `PromiseLink-<VER>-mac.dmg` / `PromiseLink-<VER>-windows.exe` → 双击安装 → 启动（浏览器自动打开 http://localhost:8000） |
+| **源码运行** | 开发者 | `pip install -e '.[dev]'` + `cp .env.basic.example .env` + `bash scripts/start.sh`（或 `uvicorn promiselink.main:app --host 0.0.0.0 --port 8000`） |
+
+数据库：**SQLite 唯一**（默认 `~/.promiselink/data/promiselink.db`）。决策、溯源与验证记录见 [PROJECT_REVIEW_20260918_FINDINGS.md](../../PromiseLink-Pro/docs/review/PROJECT_REVIEW_20260918_FINDINGS.md) §9。
 
 **行动铁律**：
 - 基础版所有 E2E / smoke test / 验证 → 本地 `.venv` 源码运行（`bash scripts/start.sh` 或 `uvicorn ...`）
 - 基础版**禁止**部署到云端服务器（违反"数据从不出家门"数据主权承诺）
-- 只有"全栈自托管场景"才用 `docker compose --profile full up`
+- 不得再为本仓库引入 Docker / docker-compose 交付配置（容器化若需要，属其他产品版本的独立设计）
 
 ### 教训 2：push tag ≠ 发布 release；deploy 链路只在 published release 上触发
 
@@ -79,16 +85,14 @@
 
 ### 1.1 安装
 
+- **桌面包**（推荐非技术用户）：从 https://www.promiselink.cn/download.html 下载 `PromiseLink-<VER>-mac.dmg` / `-windows.exe` → 双击安装 → 启动（服务运行在 127.0.0.1:8000，浏览器自动打开）
+- **源码运行**（开发者）：
+
 ```bash
 git clone https://github.com/lulin70/PromiseLink && cd PromiseLink
 git checkout vX.Y.Z          # 或 main
 pip install -e '.[dev]'
 cp .env.basic.example .env   # 编辑 .env 填 LLM_API_KEY（可选）
-```
-
-### 1.2 启动
-
-```bash
 bash scripts/start.sh        # 一键启动（推荐）
 # 或：
 python -m uvicorn promiselink.main:app --host 0.0.0.0 --port 8000
@@ -97,16 +101,19 @@ python -m uvicorn promiselink.main:app --host 0.0.0.0 --port 8000
 ### 1.3 验证（无需 LLM）
 
 ```bash
-pytest --co -q | tail -1     # 应显示 ~2035 tests collected
+pytest --co -q | tail -1     # 应显示 2167 tests collected
 pytest tests/test_security_comprehensive.py -q --no-cov   # 50 项安全测试
 ```
 
-### 1.4 何时**不**用 Docker
+### 1.4 基础版没有 Docker 路径
 
-- ✅ E2E 真实用户测试 → 本地 .venv 源码运行（`httpx.AsyncClient` + `ASGITransport`）
-- ✅ 全量回归测试 → 本地 .venv 源码运行
-- ✅ release gates G1~G8 → 本地 .venv 源码运行
-- ❌ "我以为是 staging"→基础版禁止云端 staging；只有"自托管 PoC"才允许 docker compose --profile full up 到本地服务器
+基础版已无任何 Docker 交付配置（见 §0 教训 1）。所有验证一律走本地 `.venv` 源码运行：
+
+- ✅ E2E 真实用户测试 → 本地 `.venv` 源码运行（`httpx.AsyncClient` + `ASGITransport`）
+- ✅ 全量回归测试 → 本地 `.venv` 源码运行
+- ✅ release gates G1~G8 → 本地 `.venv` 源码运行
+- ✅ 真实用户 e2e（用户规则 3）→ 用 release 桌面包（`.dmg` / `.exe`）走完整链路：启动 → 小程序扫码配对 → 写 `.env` → WSS 连上 → 重启后许可证仍在
+- ❌ "我以为是 staging" → 基础版禁止云端 staging，也不再有自托管容器编排
 
 ---
 
@@ -344,7 +351,7 @@ W5 是基础版本地功能（实体归一 + candidate token），**不依赖**�
 | 服务器 download.html 仍指 v0.9.9 | push tag 不触发 deploy | 手工 SSH + sed §2.3 兜底；下次用 `gh release create`（非 `git push tag`） |
 | Release published 但服务器 downloads/ 无新文件 | build.yml deploy job 失败 | `gh run watch` 看 logs；检查 `secrets.SERVER_SSH_KEY` / `secrets.SERVER_HOST` 是否仍有效 |
 | 本机 E2E 通过但服务器 502 | 数据迁移未跑 | SSH 进容器 `alembic upgrade head` |
-| `docker compose --profile full up` 报端口冲突 | 5432/6379/8000 被占 | 改用本地 `.venv` 源码运行（基础版主路径） |
+| 桌面包启动后浏览器打不开 localhost:8000 | 本地服务未起或端口被占 | 确认菜单栏/任务栏有 PromiseLink 图标；关闭占用 8000 端口的程序后重启；仍不行则重新下载安装桌面包 |
 | `pip install -e .` 报依赖缺失 | venv 未激活 | `source .venv/bin/activate` 后重试 |
 
 ---

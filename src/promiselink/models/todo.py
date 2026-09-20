@@ -5,10 +5,9 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Index, String, Text, func
-from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from promiselink.database import IS_SQLITE, Base, _uuid_default
+from promiselink.database import Base, _uuid_default
 
 
 class Todo(Base):
@@ -23,14 +22,14 @@ class Todo(Base):
 
     # Primary key
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         primary_key=True,
         default=_uuid_default,
     )
 
     # Core fields
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         nullable=False,
         index=True,
     )
@@ -44,11 +43,11 @@ class Todo(Base):
 
     # Related entities
     related_entity_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         ForeignKey("entities.id", ondelete="SET NULL"),
     )
     related_association_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         ForeignKey("associations.id", ondelete="SET NULL"),
     )
 
@@ -62,12 +61,12 @@ class Todo(Base):
 
     # Additional metadata
     properties: Mapped[dict[str, Any] | None] = mapped_column(
-        JSONB if not IS_SQLITE else JSON,
+        JSON,
     )
 
     # Source tracking
     source_event_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         ForeignKey("events.id", ondelete="SET NULL"),
         nullable=True,
     )
@@ -79,17 +78,17 @@ class Todo(Base):
         index=True,
     )
     promisor_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         ForeignKey("entities.id", ondelete="SET NULL"),
     )
     beneficiary_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         ForeignKey("entities.id", ondelete="SET NULL"),
     )
     confirmation_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
     evidence_quote: Mapped[str | None] = mapped_column(Text, nullable=True)
     evidence_event_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         ForeignKey("events.id", ondelete="SET NULL"),
         nullable=True,
     )
@@ -193,7 +192,7 @@ class SnoozeSchedule(Base):
 
     # Primary key (same as todo_id)
     todo_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         ForeignKey("todos.id", ondelete="CASCADE"),
         primary_key=True,
     )
@@ -202,18 +201,11 @@ class SnoozeSchedule(Base):
     original_status: Mapped[str] = mapped_column(String(15), nullable=False)
 
     # When to recover
-    if not IS_SQLITE:
-        recover_at: Mapped[datetime] = mapped_column(
-            TIMESTAMP(timezone=True),
-            nullable=False,
-            index=True,
-        )
-    else:
-        recover_at: Mapped[str] = mapped_column(  # type: ignore[no-redef]
-            String(50),  # ISO format string for SQLite
-            nullable=False,
-            index=True,
-        )
+    recover_at: Mapped[str] = mapped_column(
+        String(50),  # ISO format string for SQLite
+        nullable=False,
+        index=True,
+    )
 
     @property
     def recover_at_datetime(self) -> datetime | None:

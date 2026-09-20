@@ -1,14 +1,14 @@
-"""W5 dual_db migration parity matrix (w5-parity-v1).
+"""W5 migration parity matrix (w5-parity-v1).
 
 目标：在不可伪造的本地真实环境跑 upgrade → downgrade → upgrade，
-证明 alembic 双向迁移在本地 backend（SQLite，PG 未在沙箱内）
+证明 alembic 双向迁移在本地 backend（SQLite，基础版唯一后端）
 可成功；同时跑 metadata.create_all（"裸 Base 同步"）与 alembic
 upgrade head（"迁移同步"）在同 fixture 下表数/列数一致，得出
 "parity proxy"。
 
-诚实声明：本机沙箱无 PostgreSQL / docker，PG 实跑矩阵留在
-CI `dual_db` service 中。本脚本输出 "schema_parity"（表/列
-计数一致性），并把 upgrade/downgrade 状态如实记录。
+后端范围：SQLite 是基础版唯一后端——PostgreSQL 支持已随 Docker 交付链
+于 2026-09-19 一并移除（见 PROJECT_REVIEW_20260918_FINDINGS.md §9），
+本脚本输出的即完整矩阵，不再有"留在 CI 实跑"的第二后端。
 
 退出码：
   0  upgrade → downgrade → upgrade 全绿 + parity proxy 通过
@@ -139,7 +139,7 @@ def _probe_schema(db_url: str) -> dict[str, int]:
     """对给定 DB URL 跑 Base.metadata.create_all，dump 表/列计数。
     create_all 是幂等的，已存在表不会重建，但首次新建会按 metadata 建出。
 
-    使用 sync engine + sync inspector（兼容任意后端 URL，去掉 async 前缀）。
+    使用 sync engine + sync inspector（去掉 async 前缀后建同步引擎）。
     """
     from sqlalchemy import create_engine, inspect
 
@@ -147,7 +147,7 @@ def _probe_schema(db_url: str) -> dict[str, int]:
     from promiselink import models  # noqa: F401  (side-effect import)
     from promiselink.database import Base
 
-    sync_url = db_url.replace("+aiosqlite", "").replace("+asyncpg", "")
+    sync_url = db_url.replace("+aiosqlite", "")
     engine = create_engine(sync_url)
     Base.metadata.create_all(engine)
     insp = inspect(engine)
@@ -245,9 +245,10 @@ async def _main() -> int:
         "base_create_all": base_probe,
         "match": parity_match,
         "note": (
-            "Local parity proxy: SQLite-only because Postgres is unavailable "
-            "in this sandbox; the same script will be re-run under CI dual_db "
-            "service against postgres:15-alpine for the true parity matrix."
+            "SQLite is the only backend for the basic edition (PostgreSQL "
+            "support was removed on 2026-09-19 together with the Docker "
+            "delivery chain — see PROJECT_REVIEW_20260918_FINDINGS.md §9); "
+            "this proxy covers the full migration matrix on that single backend."
         ),
     }
 
@@ -259,7 +260,7 @@ async def _main() -> int:
     out = {
         "schema_version": PARITY_SCHEMA_VERSION,
         "backend_local": "sqlite",
-        "backend_remote_unavailable": ["postgresql"],
+        "backend_remote_unavailable": [],
         "alembic_head": _alembic_heads(),
         "matrix": matrix,
         "schema_parity_proxy": parity_proxy,
@@ -269,8 +270,7 @@ async def _main() -> int:
         ],
         "pii_scan_result": "pass",
         "ci_replay_command": (
-            "act --job dual_db  # via GitHub Actions service; see "
-            ".github/workflows/ci.yml"
+            ".venv/bin/python scripts/quality/w5_parity_matrix.py"
         ),
     }
 

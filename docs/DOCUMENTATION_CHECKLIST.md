@@ -7,8 +7,10 @@
 > - `docs/STAGING_DEPLOYMENT_CHECKLIST.md` — staging 部署清单（已删除）
 > - `.env.prod.example` — 生产环境配置模板（已删除）
 >
-> 基础版部署方式：用户本地运行（localhost:8000），通过 Docker 镜像 `ghcr.io/lulin70/promiselink` 分发。
+> 基础版部署方式：用户本地运行（localhost:8000），**桌面安装包**（`PromiseLink-<VERSION>-mac.dmg` / `PromiseLink-<VERSION>-windows.exe`，双击安装）或源码运行（`pip install -e '.[dev]'` + `cp .env.basic.example .env` + `bash scripts/start.sh`）分发；SQLite 为基础版唯一后端。
 > 详见：部署目标合规性检查制度（PromiseLink-Pro `docs/deployment/DEPLOYMENT_COMPLIANCE_CHECKLIST.md`）
+
+> ⚠️ **基础版交付链收敛（2026-09-19 更新）**：已采纳方案 B，删除基础版 Docker 交付链并从基础版清除 PostgreSQL 支持（SQLite 为唯一后端）。本文档中 `Dockerfile`、`docker-compose*.yml`、`nginx/`、`scripts/install_basic.sh`、`.env.poc*.example` 等引用均为**历史记录**（文件已删除）；详见 PromiseLink-Pro `docs/review/PROJECT_REVIEW_20260918_FINDINGS.md` §9。
 
 > **更新时间**: 2026-07-09
 > **阶段**: v0.8.0 基础版许可证迁移至 MPL 2.0 — 三仓库独立（PromiseLink + PromiseLink-Pro + PromiseLink-miniapp）
@@ -32,10 +34,10 @@
 | 10 | **UI/UX设计** | `design/UI_UX_Design_v1.md` | **v3.1** | 2026-06-14 | ✅ 生效 |
 | 11 | **规格说明README** | `spec/README.md` | **v5.8** | 2026-07-05 | ✅ 同步 |
 | 12 | **项目状态** | `PROJECT_STATUS.md` | **已同步** | 2026-07-05 | ✅ 最新 |
-| 13 | **托管PoC Docker Compose** | `docker-compose.hosted-poc.yml` | **v1.0** | 2026-06-09 | ✅ 已验证 |
-| 14 | **nginx配置** | `nginx/` | **v1.0** | 2026-06-09 | ✅ 已验证 |
-| 15 | **PoC环境变量** | `.env.poc.hosted` | **v1.0** | 2026-06-09 | ✅ 已验证 |
-| 16 | **部署脚本** | `scripts/ops/deploy-staging.sh` | **v1.0** | 2026-06-09 | ✅ 已验证 |
+| 13 | **托管PoC Docker Compose** | `docker-compose.hosted-poc.yml` | **v1.0** | 2026-06-09 | ❌ 已删除（2026-07-12） |
+| 14 | **nginx配置** | `nginx/` | **v1.0** | 2026-06-09 | ❌ 已删除（2026-07-12） |
+| 15 | **PoC环境变量** | `.env.poc.hosted` | **v1.0** | 2026-06-09 | ❌ 已删除（2026-07-12） |
+| 16 | **部署脚本** | `scripts/ops/deploy-staging.sh` | **v1.0** | 2026-06-09 | ❌ 已删除（2026-07-12） |
 | 17 | **备份脚本** | `scripts/backup.sh` | **v1.0** | 2026-06-09 | ✅ 已验证 |
 | 18 | **Prometheus配置** | `prometheus.yml` | **v1.0** | 2026-06-09 | ✅ 已验证 |
 
@@ -45,7 +47,7 @@
 
 - **需求层 (P1)**: PRD v5.8 ←→ 技术设计 v3.2（双主文档对齐）
 - **设计层 (P3-P7)**: 集成设计 v2.9 / API设计 v3.1 / 测试计划 v5.1 / 算法设计 v2.8（安全设计系列已迁Pro）
-- **部署层**: 部署指南 v0.5.0 / docker-compose.hosted-poc.yml v1.0 / nginx v1.0 / deploy-staging.sh v1.0 / backup.sh v1.0
+- **部署层**: 部署指南 v0.5.0 / 桌面安装包（.dmg/.exe，基础版唯一二进制交付路径）/ backup.sh v1.0（原 docker-compose.hosted-poc.yml / nginx / deploy-staging.sh 已于 2026-07-12 删除）
 - **运维层**: Prometheus配置 v1.0 / 备份脚本 v1.0
 - **UI层**: UI/UX设计 v3.1（基础版宽屏H5；小程序UI独立仓库 PromiseLink-miniapp）
 - **软件版本**: v0.8.0（VERSION/pyproject.toml/__init__.py/config.py/package.json/三语README 8处一致）
@@ -130,13 +132,14 @@ ACTION_TYPES = ["follow_up", "introduce", "collaborate", "provide_help",
 
 | 检查项 | 涉及文件 | 预期结果 | 状态 |
 |--------|----------|----------|------|
-| Dockerfile与部署指南步骤一致 | 项目根目录 `Dockerfile` ↔ Deployment Guide §3 | 基础镜像/依赖安装/启动命令匹配 | ⬜ 待确认 |
-| docker-compose.poc.yml服务定义完整 | `docker-compose.poc.yml` ↔ Deployment Guide §3.2 | web/db/redis三个服务配置齐全 | ⬜ 待确认 |
-| docker-compose.hosted-poc.yml服务定义完整 | `docker-compose.hosted-poc.yml` ↔ 技术设计 §8.6.3a | api/nginx/certbot三个服务配置齐全 | ✅ 已确认 |
-| 环境变量模板与代码config.py一致 | `.env.poc.hosted` ↔ `src/promiselink/config.py` | 必需环境变量全覆盖 | ✅ 已确认 |
-| nginx配置与部署指南一致 | `nginx/` ↔ Deployment Guide §3 | 反向代理+HTTPS+certbot配置匹配 | ✅ 已确认 |
-| 部署脚本可执行 | `scripts/ops/deploy-staging.sh` ↔ Deployment Guide | 一键部署流程完整 | ✅ 已确认 |
-| 备份脚本可执行 | `scripts/backup.sh` ↔ Deployment Guide | PG dump+Redis AOF备份完整 | ✅ 已确认 |
+| 桌面安装包与下载页一致 | `PromiseLink-<VERSION>-mac.dmg`/`-windows.exe` ↔ `download.html`（三语 README） | 同一交付物：双击安装 → 浏览器自动打开 localhost:8000 | ⬜ 待确认 |
+| 源码运行方式与 .env.basic.example 一致 | `scripts/start.sh` ↔ `.env.basic.example` | 数据库段仅 SQLite，`DATABASE_URL` 默认 `sqlite:///{用户家目录}/.promiselink/data/promiselink.db` | ⬜ 待确认 |
+| ~~docker-compose.poc.yml服务定义完整~~ | ~~`docker-compose.poc.yml` ↔ Deployment Guide §3.2~~ | **文件已删除（2026-09-19 方案 B）**，见文首说明 | ❌ 不适用 |
+| ~~docker-compose.hosted-poc.yml服务定义完整~~ | ~~`docker-compose.hosted-poc.yml` ↔ 技术设计 §8.6.3a~~ | **文件已删除（2026-07-12）** | ❌ 不适用 |
+| 环境变量模板与代码config.py一致 | `.env.basic.example` ↔ `src/promiselink/config.py` | 必需环境变量全覆盖；基础版已无 PG 段 | ✅ 已确认 |
+| ~~nginx配置与部署指南一致~~ | ~~`nginx/` ↔ Deployment Guide §3~~ | **已删除（2026-07-12）** | ❌ 不适用 |
+| ~~部署脚本可执行~~ | ~~`scripts/ops/deploy-staging.sh` ↔ Deployment Guide~~ | **已删除（2026-07-12）** | ❌ 不适用 |
+| 备份脚本可执行 | `scripts/backup.sh` ↔ Deployment Guide | 基础版 SQLite 数据库备份完整 | ✅ 已确认 |
 
 ---
 
@@ -155,7 +158,7 @@ ACTION_TYPES = ["follow_up", "introduce", "collaborate", "provide_help",
 
 | 债务项 | 说明 | 建议 |
 |--------|------|------|
-| PoC使用SQLite，Phase 1 需迁移至PostgreSQL | 数据库设计已包含双平台DDL | 提前准备Alembic迁移脚本 |
+| 基础版仅使用 SQLite | 基础版为单文件 SQLite，无需迁移至 PostgreSQL | PostgreSQL 仅作为定制版（团队/多租户）选型 |
 | PoC无Redis缓存，Phase 1 需引入 | 缓存策略已在Deployment Guide中定义 | 缓存层接口先行抽象 |
 | 单用户模式，无RBAC | 安全设计已明确排除多租户 | 保持简单，避免过度设计 |
 
@@ -202,7 +205,7 @@ ACTION_TYPES = ["follow_up", "introduce", "collaborate", "provide_help",
 - [ ] **M3**: 数据库设计的核心表(events/entities/associations/todos/voice_sessions)与API设计的CRUD端点一一对应 [F-50新增]
 - [ ] **M4**: 安全设计的PII规则已在API设计的响应脱敏中体现
 - [ ] **M5**: 测试计划包含12项P0功能的测试用例（至少每个P0功能1个正向用例，含F-50）[F-50新增]
-- [ ] **M6**: Deployment_Guide中的Docker命令可在本地成功执行(`docker-compose -f docker-compose.poc.yml up`)
+- [ ] **M6**: 基础版桌面安装包（.dmg/.exe）可在干净环境双击安装并自动打开 http://localhost:8000（原 `docker-compose -f docker-compose.poc.yml up` 已随方案 B 删除）
 - [ ] **M7**: LLM_Prompt_Templates中的模板可在LLM客户端中成功调用（mock即可）
 
 ### 建议完成 (Should)

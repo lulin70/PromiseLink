@@ -19,7 +19,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-# Force IS_SQLITE=True BEFORE importing models
+# Pin the dialect to SQLite before importing models (SQLite is the only backend).
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 
 from sqlalchemy.ext.asyncio import AsyncSession

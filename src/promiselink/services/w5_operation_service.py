@@ -28,7 +28,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from promiselink.config import get_settings
 from promiselink.core.logging import get_logger
 from promiselink.core.text_utils import redact_pii_from_text
-from promiselink.database import IS_SQLITE
 from promiselink.models.entity import Entity
 from promiselink.models.entity_correction import EntityCorrection
 from promiselink.models.todo import Todo
@@ -228,10 +227,9 @@ async def generate_todo_candidates(
     return candidates
 
 
-def _uid(value: str | uuid.UUID) -> uuid.UUID | str:
-    if IS_SQLITE:
-        return str(value)
-    return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
+def _uid(value: str | uuid.UUID) -> str:
+    """Bind ids as plain ``str`` (id columns are ``String(36)``)."""
+    return str(value)
 
 
 def build_result_summary(candidate: W5Candidate | None) -> dict[str, Any]:
@@ -381,9 +379,9 @@ def complete_operation(
     }
     operation.completed_at = datetime.now(UTC)
     if selected_entity_id is not None:
-        operation.selected_entity_id = cast(uuid.UUID, _uid(selected_entity_id))
+        operation.selected_entity_id = _uid(selected_entity_id)
     if selected_todo_id is not None:
-        operation.selected_todo_id = cast(uuid.UUID, _uid(selected_todo_id))
+        operation.selected_todo_id = _uid(selected_todo_id)
     if original_canonical_name is not None:
         operation.original_canonical_name = original_canonical_name[:200]
     if original_extracted_text is not None:

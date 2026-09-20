@@ -1,5 +1,6 @@
 """Application configuration management."""
 
+import sys
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, cast
@@ -15,6 +16,23 @@ from promiselink import __version__
 #   file" at startup.
 # - Home directory is writable on all platforms (macOS/Linux/Windows).
 _DEFAULT_DATA_DIR = str(Path.home() / ".promiselink" / "data")
+_PROMISELINK_HOME = Path.home() / ".promiselink"
+
+
+def runtime_env_file() -> Path:
+    """运行时 ``.env`` 的唯一事实源（配对激活写入与 Settings 读取必须同一处）。
+
+    - 源码运行：项目根目录的 ``.env``（与 ``cp .env.basic.example .env`` 习惯一致）
+    - PyInstaller 打包：``~/.promiselink/.env``
+
+    打包后 ``__file__`` 位于临时解包目录（``sys._MEIPASS``），用 ``__file__`` 推导
+    会落到系统临时目录 —— 进程退出即消失；而 ``env_file`` 是相对 CWD 解析，
+    双击启动时两者并不一致，会造成「配对激活后重启又要重新配对」。
+    """
+    if getattr(sys, "frozen", False):
+        return _PROMISELINK_HOME / ".env"
+    return Path(__file__).resolve().parents[2] / ".env"
+
 
 LLM_PRESETS: dict[str, dict[str, str]] = {
     "deepseek": {"base_url": "https://api.deepseek.com/v1", "model": "deepseek-v4-flash"},
@@ -27,7 +45,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(runtime_env_file()),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -53,7 +71,7 @@ class Settings(BaseSettings):
     co_occurrence_window_days: int = 90
 
     # API
-    api_host: str = "0.0.0.0"  # nosec B104 — container must bind all interfaces; port mapping controls exposure
+    api_host: str = "0.0.0.0"  # nosec B104 — overridden to 127.0.0.1 by launcher.py; exposed only if the operator opts in
     api_port: int = 8000
     api_prefix: str = "/api/v1"
     cors_origins: list[str] = Field(
@@ -225,16 +243,6 @@ class Settings(BaseSettings):
     # Performance
     max_workers: int = 4
     request_timeout: int = 30
-
-    @property
-    def is_sqlite(self) -> bool:
-        """Check if using SQLite database."""
-        return self.database_url.startswith("sqlite")
-
-    @property
-    def is_postgresql(self) -> bool:
-        """Check if using PostgreSQL database."""
-        return self.database_url.startswith("postgresql")
 
     @model_validator(mode="after")
     def apply_llm_preset(self) -> "Settings":

@@ -1,9 +1,7 @@
 {
   "schema_version": "w5-parity-v1",
   "backend_local": "sqlite",
-  "backend_remote_unavailable": [
-    "postgresql"
-  ],
+  "backend_remote_unavailable": [],
   "alembic_head": "w5a_score_audit_logs",
   "matrix": [
     {
@@ -88,12 +86,12 @@
       }
     },
     "match": true,
-    "note": "Local parity proxy: SQLite-only because Postgres is unavailable in this sandbox; the same script will be re-run under CI dual_db service against postgres:15-alpine for the true parity matrix."
+    "note": "SQLite is the only backend for the basic edition (PostgreSQL support was removed on 2026-09-19 together with the Docker delivery chain — see PROJECT_REVIEW_20260918_FINDINGS.md §9); this proxy covers the full migration matrix on that single backend."
   },
   "migration_history_ok": true,
   "artifacts": [
     "docs/e2e_evidence/w5_parity/manifest.json"
   ],
   "pii_scan_result": "pass",
-  "ci_replay_command": "act --job dual_db  # via GitHub Actions service; see .github/workflows/ci.yml"
+  "ci_replay_command": ".venv/bin/python scripts/quality/w5_parity_matrix.py"
 }

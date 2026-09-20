@@ -27,7 +27,7 @@
     "command": { "type": "string", "minLength": 1 },
     "started_at": { "type": "string", "format": "date-time" },
     "finished_at": { "type": "string", "format": "date-time" },
-    "database_backend": { "enum": ["sqlite", "postgresql"] },
+    "database_backend": { "enum": ["sqlite"] },
     "migration_head": { "type": "string", "minLength": 1 },
     "config_digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "embedding_profile": {
@@ -82,7 +82,6 @@
         "enum": [
           "w5-contract-unit",
           "w5-integration-sqlite",
-          "w5-integration-postgresql",
           "w5-golden",
           "w5-e2e",
           "w5-performance",

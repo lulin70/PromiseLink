@@ -2,6 +2,17 @@
 
 All notable changes to PromiseLink will be documented in this file.
 
+## [Unreleased] - 2026-09-19
+
+### Removed — 基础版 Docker 交付链 + PostgreSQL 后端支持（方案 B）
+
+- **删除基础版 Docker 交付链**：移除 `Dockerfile`、`.dockerignore`、`docker-compose.yml`、`docker-compose.basic.yml`、`docker-compose.prod.yml`、`docker-compose.poc.yml`、`install-docker.sh`、`deploy/quick_install.sh`、`scripts/install_basic.sh`、`nginx/conf.d/default.conf`、`.env.poc.example`、`.env.poc.hosted.example`。基础版不再以 Docker 交付。
+- **清除基础版 PostgreSQL 后端支持**：移除 `asyncpg` / `psycopg2-binary` 依赖与 `is_postgresql` / `JSONB if not IS_SQLITE` 等双后端分支；**SQLite 成为基础版唯一后端**（`DATABASE_URL` 默认 `sqlite:///{用户家目录}/.promiselink/data/promiselink.db`）。PostgreSQL 仅保留为**定制版（团队/多租户）**选型。
+- **交付路径收敛**：基础版**唯一**二进制交付路径为**桌面安装包** `PromiseLink-<VERSION>-mac.dmg` / `PromiseLink-<VERSION>-windows.exe`（https://www.promiselink.cn/download.html 或 GitHub Releases，双击安装后浏览器自动打开 http://localhost:8000）；源码运行方式为 `pip install -e '.[dev]'` + `cp .env.basic.example .env` + `bash scripts/start.sh`。
+- **关联清理**：CI 移除 Docker 镜像构建 job 与 PostgreSQL service；`.github/dependabot.yml` 移除 docker 生态；删除 `tests/test_install_basic_flow.py`（被测对象已移除）。
+- **文档同步**：三语 README、`docs/PROJECT_STATUS.md`、`docs/DOCUMENTATION_CHECKLIST.md`、`docs/TECH_DEBT.md`、`docs/ROADMAP*.md`、`docs/architecture/PromiseLink_技术设计_v1.md`、`docs/design/Deployment_Guide.md`、`docs/design/Database_Design_v1.md`、`SECURITY.md`、`docs/deliverables/*` 等已同步。
+- 决策、溯源与执行记录详见 PromiseLink-Pro `docs/review/PROJECT_REVIEW_20260918_FINDINGS.md` §9。
+
 ## [1.1.0] - 2026-09-07
 
 ### Added — 服务端离线模式（CI e2e 门禁恢复）

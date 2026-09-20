@@ -2,7 +2,7 @@
 
 > **写给谁看**：从未用过命令行的目标用户、一般用户
 > **你需要什么**：一台电脑（Mac 或 Windows）、一个许可证密钥（PL-PRO-xxxx-xxxx-xxxx 格式）
-> **预计耗时**：15-20 分钟
+> **预计耗时**：15 分钟
 
 ---
 
@@ -19,88 +19,67 @@ PromiseLink 是一款 AI 驱动的个人商务关系管理助手。它会帮你�
 
 ## 安装步骤
 
-### 第 1 步：安装 Docker Desktop（5 分钟）
+### 第 1 步：下载安装包（2 分钟）
 
-Docker 是一个免费的软件，用来在电脑上运行 PromiseLink。
+1. 打开浏览器，访问：https://www.promiselink.cn/download.html
+2. 根据你的电脑系统下载对应的安装包：
 
-1. 打开浏览器，访问：https://www.docker.com/products/docker-desktop
-2. 点击 **Download for Mac** 或 **Download for Windows**（根据你的电脑系统）
-3. 下载完成后，双击安装包，按提示完成安装
-4. 安装完成后，**启动 Docker Desktop**（Mac：在"应用程序"里找到 Docker 图标双击；Windows：桌面找到 Docker 图标双击）
-5. 等待 Docker 鲸鱼图标出现在菜单栏/任务栏，且显示 **"Docker is running"**
+   | 系统 | 下载文件 |
+   |------|---------|
+   | macOS（Apple Silicon / Intel） | `PromiseLink-<版本号>-mac.dmg` |
+   | Windows 10/11 64 位 | `PromiseLink-<版本号>-windows.exe` |
 
-> **如何确认 Docker 已就绪**？
-> 打开"终端"（Mac：Command+空格 搜索"终端"；Windows：开始菜单搜索"cmd"），输入：
-> ```
-> docker info
-> ```
-> 如果显示一堆信息（而不是报错），说明 Docker 已就绪。
+> 安装包已内置 Python 运行时和全部依赖，**不需要安装 Python、Node.js，也不需要安装 Docker**。
 
 ---
 
-### 第 2 步：下载安装脚本（1 分钟）
+### 第 2 步：安装并启动（2 分钟）
 
-1. 打开浏览器，访问：https://github.com/lulin70/PromiseLink
-2. 找到 `scripts/install_basic.sh` 文件，点击 **Raw** 按钮
-3. 右键 → 另存为，保存到桌面，文件名为 `install_basic.sh`
+**macOS**：
+1. 双击下载好的 `.dmg` 文件
+2. 在弹出的窗口中，把 PromiseLink 图标拖到「应用程序」文件夹
+3. 打开「应用程序」，双击 PromiseLink 启动
 
-> **不会下载？** 也可以直接在终端运行：
-> ```
-> curl -o install_basic.sh https://raw.githubusercontent.com/lulin70/PromiseLink/main/scripts/install_basic.sh
-> ```
+**Windows**：
+1. 双击下载好的 `.exe` 文件
+2. 按安装向导的提示点击「下一步」直到完成
+3. 在开始菜单中找到 PromiseLink，双击启动
 
----
+启动后本地服务会自动运行，**浏览器会自动打开** http://localhost:8000 ，能看到 PromiseLink 页面即表示启动成功。
 
-### 第 3 步：运行安装脚本（5-10 分钟）
-
-1. 打开"终端"
-2. 切换到脚本所在目录（如果保存在桌面）：
-   ```
-   cd ~/Desktop
-   ```
-3. 运行安装脚本：
-   ```
-   bash install_basic.sh
-   ```
-4. 脚本会依次询问你：
-   - **许可证密钥**：输入你收到的 `PL-PRO-xxxx-xxxx-xxxx` 格式密钥
-   - **网关地址**：直接按回车使用默认值即可
-5. 脚本会自动：
-   - 生成配置文件
-   - 下载 Docker 镜像（约 200MB，首次需要耐心等待）
-   - 启动 PromiseLink 服务
-   - 等待健康检查通过
-
-6. 看到下面的提示说明安装成功：
-   ```
-   ✓ PromiseLink 基础版安装完成！
-   ```
-
-> **重要**：脚本会显示你的 **PoC 登录密码**，请记下来！首次登录后可以在设置里修改。
+> 若浏览器没有自动打开，请手动打开浏览器（Chrome / Safari / Edge 均可），在地址栏输入 `http://localhost:8000`。
 
 ---
 
-### 第 4 步：在电脑上使用（1 分钟）
+### 第 3 步：登录电脑端（1 分钟）
 
-1. 打开浏览器（Chrome / Safari / Edge 均可）
-2. 地址栏输入：`http://localhost:8000`
-3. 用刚才记下的 **PoC 登录密码** 登录
-4. 进入 PromiseLink 主界面，可以开始：
-   - 录入互动记录（会议、通话、见面）
-   - 查看待办事项
-   - 查看人脉关系
-   - 查看承诺追踪
+在浏览器页面使用本地管理员密码登录。默认密码为 `promiselink2026`（管理员可能会为你改成其他密码）。
+
+进入 PromiseLink 主界面后，可以开始：
+- 录入互动记录（会议、通话、见面）
+- 查看待办事项
+- 查看人脉关系
+- 查看承诺追踪
 
 ---
 
-### 第 5 步：在手机上使用（3 分钟）
+### 第 4 步：在手机上使用（3 分钟）
 
 想在手机上也能访问？需要用微信小程序：
 
 - **小程序正式发布后**：打开手机微信，在搜索框输入"PromiseLink"，点击搜索结果中的小程序即可使用
 - **发布前内测阶段**：请联系 support@promiselink.cn 获取内测二维码，用微信扫一扫打开
 
-> **前提**：你的电脑必须保持开机且 PromiseLink 服务正在运行（第 3 步启动的服务）。手机小程序通过云端网关中继访问你电脑上的数据，关闭电脑则手机无法访问。
+**把手机和电脑配对**：
+
+1. 在电脑端浏览器打开配对页面：http://localhost:8000/pair
+2. 页面会显示一个二维码
+3. 用手机微信扫一扫扫描该二维码
+4. 电脑端提示"激活成功"后，即可用手机访问电脑上的数据
+
+> **前提**：你的电脑必须保持开机且 PromiseLink 正在运行（第 2 步启动的程序）。手机小程序通过云端网关中继访问你电脑上的数据，关闭电脑则手机无法访问。
+>
+> 配对成功后，许可证会写入你电脑上的配置文件，**重启电脑后无需重新配对**。
 
 > **详细的小程序使用说明**：请参阅 [小程序用户指南](https://promiselink.cn/docs/miniapp-user-guide)
 
@@ -110,62 +89,40 @@ Docker 是一个免费的软件，用来在电脑上运行 PromiseLink。
 
 | 问题 | 原因 | 解决方法 |
 |------|------|----------|
-| 启动报错 "未检测到 Docker" | Docker Desktop 未安装或未运行 | 安装 Docker Desktop 并启动，确认菜单栏有鲸鱼图标 |
-| 启动报错 "许可证密钥格式不正确" | 密钥输入错误 | 检查密钥格式应为 `PL-PRO-xxxx-xxxx-xxxx`，联系 support@promiselink.cn 获取 |
-| 浏览器打不开 localhost:8000 | 服务未启动成功 | 终端运行 `docker compose ps` 查看状态；运行 `docker compose logs --tail=50` 查看日志 |
-| 页面显示 "secret_key must be changed" | 配置文件未正确生成 | 重新运行 `bash install_basic.sh` |
-| 小程序无法访问本地数据 | WSS 连接未建立 | 终端运行 `docker compose logs \| grep relay_wss` 查看 WSS 状态 |
-| 端口 8000 被占用 | 其他程序占用了该端口 | 编辑 `docker-compose.yml`，把 `8000:8000` 改成 `8001:8000`，然后访问 `localhost:8001` |
+| 浏览器打不开 localhost:8000 | 程序未启动成功 | 确认菜单栏 / 任务栏有 PromiseLink 图标；退出后重新双击启动 |
+| 页面提示需要登录但不知道密码 | 未拿到本地登录密码 | 默认密码为 `promiselink2026`；如管理员已修改，请联系 support@promiselink.cn |
+| 小程序提示"本地基础版未连接" | 电脑关机、程序未运行或未完成配对 | 确认电脑开机 + PromiseLink 运行中；重新打开 http://localhost:8000/pair 扫码配对 |
+| 想修改登录密码 | 需要修改本地配置 | 编辑配置文件后重启程序（见下方「配置文件位置」） |
+| 端口 8000 被占用 | 其他程序占用了该端口 | 关闭占用 8000 端口的程序后重启 PromiseLink |
 
 ---
 
-## 常用命令速查
+## 数据与配置文件位置
 
-打开终端，进入安装目录（默认 `~/promiselink`）：
+| 内容 | 位置 |
+|------|------|
+| 业务数据（SQLite 数据库） | `~/.promiselink/data/promiselink.db` |
+| 本机配置（许可证 / LLM Key / 登录密码） | `~/.promiselink/.env` |
 
-```bash
-cd ~/promiselink
-
-# 查看服务状态
-docker compose ps
-
-# 查看实时日志
-docker compose logs -f
-
-# 停止服务
-docker compose down
-
-# 启动服务（停止后重新启动）
-docker compose up -d
-
-# 重启服务
-docker compose restart
-```
+> Windows 用户：`~` 即 `%USERPROFILE%`（例如 `C:\Users\你的用户名`）。
 
 ---
 
 ## 数据备份
 
-你的所有数据存储在 Docker 卷中，对应宿主机路径：`~/promiselink/data/promiselink.db`
-
-> **重要**：PromiseLink 运行在 Docker 容器内，直接 `cp` 宿主机文件可能在容器写入时获取到不一致的快照。请使用下面的 Docker 原生方式备份。
-
-建议每周备份一次（在终端运行）：
+建议每周备份一次。**先退出 PromiseLink**（避免写入冲突），然后复制数据库文件：
 
 ```bash
-cd ~/promiselink
-
-# 方法 1（推荐）：通过 Docker 执行 SQLite 在线备份，保证数据一致性
-docker compose exec -T promiselink sqlite3 /data/promiselink.db ".backup /data/promiselink-backup-$(date +%Y%m%d).db"
-docker compose cp promiselink:/data/promiselink-backup-$(date +%Y%m%d).db ~/promiselink-backup-$(date +%Y%m%d).db
-
-# 方法 2（简单）：先停止服务再复制文件，避免写入冲突
-docker compose down
-cp ~/promiselink/data/promiselink.db ~/promiselink-backup-$(date +%Y%m%d).db
-docker compose up -d
+# macOS / Linux
+cp ~/.promiselink/data/promiselink.db ~/promiselink-backup-$(date +%Y%m%d).db
 ```
 
-> **恢复方法**：如需从备份恢复，先 `docker compose down`，然后用 `cp ~/promiselink-backup-YYYYMMDD.db ~/promiselink/data/promiselink.db` 覆盖，再 `docker compose up -d`。
+```powershell
+# Windows PowerShell
+Copy-Item "$env:USERPROFILE\.promiselink\data\promiselink.db" "$env:USERPROFILE\promiselink-backup-$(Get-Date -Format yyyyMMdd).db"
+```
+
+> **恢复方法**：先退出 PromiseLink，再用备份文件覆盖上面的数据库文件，最后重新启动 PromiseLink。
 
 ---
 

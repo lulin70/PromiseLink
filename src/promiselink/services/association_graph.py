@@ -8,14 +8,12 @@ fetch existing edge sets for deduplication. These methods are mixed into
 
 from __future__ import annotations
 
-import uuid
 from datetime import UTC, datetime
 from typing import Any, cast
 
 from sqlalchemy import and_, or_, select
 
 from promiselink.core.logging import get_logger
-from promiselink.database import IS_SQLITE
 from promiselink.models.association import Association
 from promiselink.models.entity import Entity
 
@@ -24,9 +22,9 @@ logger = get_logger("promiselink.association_discovery")
 __all__ = ["AssociationGraphMixin"]
 
 
-def _as_assoc_id(value: str) -> Any:
-    """Bind entity/event ids in the column's native type (str on SQLite, UUID on PG)."""
-    return value if IS_SQLITE else uuid.UUID(value)
+def _as_assoc_id(value: Any) -> str:
+    """Bind entity/event ids as plain ``str`` (id columns are ``String(36)``)."""
+    return str(value)
 
 
 def _append_shared_event(assoc: Association, ev_id: str) -> None:
@@ -70,8 +68,6 @@ class AssociationGraphMixin:
         Queries entities from DB and groups by city/company in Python.
         Only creates associations within each group — O(G²) per group
         instead of O(P²) globally.
-
-        For PostgreSQL Phase 1: can be replaced with native JSONB queries.
         """
         results: list[Association] = []
 

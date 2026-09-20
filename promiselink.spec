@@ -33,12 +33,9 @@ hiddenimports = (
         'uvicorn.protocols.http.auto',
         'uvicorn.protocols.websockets.auto',
         'sqlalchemy.dialects.sqlite',
-        'sqlalchemy.dialects.postgresql',
         # SQLAlchemy imports DBAPI drivers dynamically via import_dbapi(),
         # so PyInstaller cannot detect them. List them explicitly.
         'aiosqlite',
-        'asyncpg',
-        'psycopg2',
         # certifi CA bundle — required for SSL verification in PyInstaller bundle
         # (launcher.py sets SSL_CERT_FILE=certifi.where() at startup)
         'certifi',

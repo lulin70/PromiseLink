@@ -17,7 +17,7 @@ from tests.conftest import create_test_event, make_entity_data, make_user_id
 async def _create_entity(session: AsyncSession, user_id: str, data: dict, event_id: str | None = None) -> Entity:
     """Helper to create an Entity object (not yet committed).
 
-    Uses string IDs for SQLite compatibility (IS_SQLITE=True in tests).
+    Uses string IDs (id columns are ``String(36)``).
     If event_id is not provided, creates a test Event first for the FK constraint.
     """
     if event_id is None:

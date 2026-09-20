@@ -5,10 +5,9 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Index, String, func
-from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from promiselink.database import IS_SQLITE, Base, _uuid_default
+from promiselink.database import Base, _uuid_default
 
 
 class Entity(Base):
@@ -23,14 +22,14 @@ class Entity(Base):
 
     # Primary key
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         primary_key=True,
         default=_uuid_default,
     )
 
     # Core fields
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         nullable=False,
         index=True,
     )
@@ -40,10 +39,10 @@ class Entity(Base):
     # Entity resolution fields
     canonical_name: Mapped[str] = mapped_column(String(200), nullable=False)
     aliases: Mapped[list[str] | None] = mapped_column(
-        JSONB if not IS_SQLITE else JSON,
+        JSON,
     )
 
-    # Properties (JSONB for PostgreSQL, JSON for SQLite)
+    # Properties (JSON; SQLite is the only supported backend for the basic edition)
     # Contains entity-specific attributes, e.g., for person:
     # {
     #   "basic": {"company": "...", "title": "...", "phone": "..."},
@@ -53,12 +52,12 @@ class Entity(Base):
     #   "relationship": {"strength": 0.8, "last_contact": "..."}
     # }
     properties: Mapped[dict[str, Any] | None] = mapped_column(
-        JSONB if not IS_SQLITE else JSON,
+        JSON,
     )
 
     # Source tracking
     source_event_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True) if not IS_SQLITE else String(36),
+        String(36),
         ForeignKey("events.id"),
         nullable=False,
     )

@@ -20,7 +20,7 @@ from tests.conftest import make_user_id
 def _create_todo(session: AsyncSession, user_id: str, status: str = "pending") -> Todo:
     """Helper to create a Todo object.
 
-    Uses string IDs for SQLite compatibility (IS_SQLITE=True in tests).
+    Uses string IDs (id columns are ``String(36)``).
     Creates a parent Event first to satisfy the FK constraint.
     """
     event_id = str(uuid.uuid4())

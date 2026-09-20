@@ -30,7 +30,6 @@ EXIT_MANIFEST_REJECTED = 4
 COMMAND_ALLOWLIST = frozenset({
     "w5-contract-unit",
     "w5-integration-sqlite",
-    "w5-integration-postgresql",
     "w5-golden",
     "w5-e2e",
     "w5-performance",
@@ -117,8 +116,8 @@ def validate_manifest(manifest: dict[str, object]) -> ManifestError:
         errors.add("command", "must be non-empty string")
 
     # 6. database_backend
-    if manifest.get("database_backend") not in ("sqlite", "postgresql"):
-        errors.add("database_backend", "must be 'sqlite' or 'postgresql'")
+    if manifest.get("database_backend") != "sqlite":
+        errors.add("database_backend", "must be 'sqlite'")
 
     # 7. migration_head
     mh = manifest.get("migration_head")
