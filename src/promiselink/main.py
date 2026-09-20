@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, NoReturn
 
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,7 +32,7 @@ from promiselink.api.v1 import (
     scheduled_events,
     todos,
 )
-from promiselink.config import get_settings
+from promiselink.config import get_settings, runtime_pair_code_file
 from promiselink.core.exceptions import BusinessError, LLMError, PromiseLinkError
 from promiselink.core.metrics import init_app_metrics
 from promiselink.core.metrics import metrics_middleware as _metrics_middleware
@@ -43,6 +44,12 @@ settings = get_settings()
 # Graceful shutdown state
 _shutdown_event = asyncio.Event()
 _pending_tasks: set[asyncio.Task] = set()
+
+# Auto-pair polling cadence. Module-level so tests can compress them.
+_PAIR_POLL_INITIAL_DELAY = 2  # 等待应用完全启动（秒）
+_PAIR_POLL_INTERVAL = 3  # 两次轮询之间的间隔（秒）
+_PAIR_POLL_MAX_RUNTIME = 600  # 单次轮询总时长上限（秒）= 配对码 5 分钟有效期 + 缓冲
+_pair_poll_task: asyncio.Task | None = None
 
 
 async def _scheduled_event_maintenance() -> None:
@@ -130,69 +137,89 @@ async def _pair_auto_poll() -> None:
     Runs only when PRO_LICENSE_KEY is not set (pairing mode).
     Periodically polls GET /pair/device/{code} until status is 'matched',
     then calls POST /pair/activate to write license_key to .env.
+
+    2026-09-20 fix: this task used to be created **once** at startup and, on
+    timeout, returned for good — so once a 5-minute pair code expired, the
+    desktop could never be paired again without restarting the whole app.
+    It is now (re)created by ``start_pair_auto_poll``, which the lifespan and
+    ``POST /pair/init`` both call.
     """
     import os
 
     import structlog
 
     logger = structlog.get_logger()
-    import httpx
 
-    await asyncio.sleep(2)  # Wait for app to fully start
+    await asyncio.sleep(_PAIR_POLL_INITIAL_DELAY)  # Wait for app to fully start
 
     gateway_url = os.environ.get("RELAY_GATEWAY_URL", "https://gateway.promiselink.cn").rstrip("/")
-    pair_code_file = Path(__file__).resolve().parents[2] / ".pair_code"
+    pair_code_file = runtime_pair_code_file()
 
-    poll_interval = 3  # seconds between polls
-    max_runtime = 600  # stop after 10 minutes (5-min pair code expiry + buffer)
     elapsed = 0
 
-    while not _shutdown_event.is_set() and elapsed < max_runtime:
+    while not _shutdown_event.is_set() and elapsed < _PAIR_POLL_MAX_RUNTIME:
         # Load pair code from file (written by POST /pair/init endpoint)
-        if not pair_code_file.exists():
-            await asyncio.sleep(poll_interval)
-            elapsed += poll_interval
-            continue
+        code = pair_code_file.read_text().strip() if pair_code_file.exists() else ""
 
-        code = pair_code_file.read_text().strip()
-        if not code:
-            await asyncio.sleep(poll_interval)
-            elapsed += poll_interval
-            continue
+        if code:
+            # Check if already activated (another instance or previous run)
+            settings = get_settings()
+            if settings.pro_license_key:
+                logger.info("pair_auto_poll_exiting", reason="license_already_set")
+                return
 
-        # Check if already activated (another instance or previous run)
-        settings = get_settings()
-        if settings.pro_license_key:
-            logger.info("pair_auto_poll_exiting", reason="license_already_set")
-            return
-
-        try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
-                resp = await client.get(f"{gateway_url}/api/v1/pair/device/{code}")
-                if resp.status_code == 200:
-                    data = resp.json()
-                    status = data.get("data", {}).get("status", "pending")
-                    if status == "matched":
-                        license_key = data.get("data", {}).get("license_key")
+            try:
+                async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
+                    resp = await client.get(f"{gateway_url}/api/v1/pair/device/{code}")
+                    if resp.status_code == 200:
+                        data = resp.json().get("data", {})
+                        license_key = data.get("license_key") if data.get("status") == "matched" else None
                         if license_key:
-                            logger.info("pair_auto_poll_matched", code=code, license_key=license_key)
-                            # Activate
+                            logger.info("pair_auto_poll_matched", code=code, license_key=_mask_key(license_key))
+                            # Activate — 端口取 settings.api_port（此前硬编码 8000，
+                            # 改端口后会自动轮询永远打不中本地接口）
                             act_resp = await client.post(
-                                "http://127.0.0.1:8000/api/v1/pair/activate",
+                                f"http://127.0.0.1:{settings.api_port}/api/v1/pair/activate",
                                 json={"license_key": license_key},
                             )
                             if act_resp.status_code == 200:
-                                logger.info("pair_auto_activate_success", license_key=license_key)
+                                logger.info("pair_auto_activate_success", license_key=_mask_key(license_key))
                                 # Clean up pair code file
                                 pair_code_file.unlink(missing_ok=True)
                                 return
-        except Exception as e:
-            logger.warning("pair_auto_poll_error", error=str(e)[:100])
+            except Exception as e:
+                logger.warning("pair_auto_poll_error", error=str(e)[:100])
 
-        await asyncio.sleep(poll_interval)
-        elapsed += poll_interval
+        await asyncio.sleep(_PAIR_POLL_INTERVAL)
+        elapsed += _PAIR_POLL_INTERVAL
 
     logger.info("pair_auto_poll_exiting", reason="timeout")
+
+
+def start_pair_auto_poll() -> asyncio.Task:
+    """(Re)start the auto-pair polling task and return the new task.
+
+    Must be called from within a running event loop. Any still-running previous
+    poller is cancelled first: ``POST /pair/init`` means "start a new pairing
+    attempt", so a fresh 10-minute window must begin — otherwise a poller that
+    is a few seconds from its own timeout would swallow the new pair code.
+    """
+    global _pair_poll_task
+
+    previous = _pair_poll_task
+    if previous is not None and not previous.done():
+        previous.cancel()
+
+    task = asyncio.create_task(_pair_auto_poll())
+    _pair_poll_task = task
+    _pending_tasks.add(task)
+    task.add_done_callback(_pending_tasks.discard)
+    return task
+
+
+def _mask_key(license_key: str) -> str:
+    """Mask a license key for logs — 与 pair.py 的日志口径一致，不落明文。"""
+    return license_key[:10] + "****"
 
 
 def _signal_handler(signum: int, frame: Any) -> None:
@@ -254,11 +281,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Start auto-pair polling task if in pairing mode (no PRO_LICENSE_KEY).
     # This background task polls the gateway's pair status and auto-activates
-    # when the miniapp completes the pairing scan.
+    # when the miniapp completes the pairing scan. POST /pair/init re-creates it
+    # for every new pair code (see start_pair_auto_poll).
     if not settings.pro_license_key:
-        _pair_task = asyncio.create_task(_pair_auto_poll())
-        _pending_tasks.add(_pair_task)
-        _pair_task.add_done_callback(_pending_tasks.discard)
+        start_pair_auto_poll()
 
     # Start Pro edition WSS long-connection to cloud gateway (if configured).
     # The WSS connection allows the mini-app to relay HTTP business

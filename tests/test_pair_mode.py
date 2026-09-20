@@ -12,6 +12,8 @@ the global httpx used by TestClient's ASGI transport.
 
 from __future__ import annotations
 
+import asyncio
+import json
 import types
 
 import httpx
@@ -349,3 +351,108 @@ def test_full_pair_flow_init_to_activate(monkeypatch, tmp_path):
 
     content = fake_env.read_text(encoding="utf-8")
     assert f"PRO_LICENSE_KEY={license_key}" in content
+
+
+# ── auto-pair 轮询任务可重建（2026-09-20 回归） ──
+#
+# 缺陷：``_pair_auto_poll`` 只在 App 启动时被创建一次，到达 10 分钟上限就
+# ``return`` 且不再重建。配对码只有 5 分钟有效期，因此用户第一次配对超时后
+# 再点「配对」，不重启 App 就再也配不上（现场只能靠临时脚本复刻轮询绕过）。
+
+
+async def test_auto_poll_recovers_after_timeout_when_pairing_retried(monkeypatch, tmp_path):
+    """回归：第一轮轮询超时退出后，重新发起配对仍能完成激活。
+
+    完整时序：无配对码 → 第一轮轮询到上限退出（复现「配对码已过期」）→
+    ``POST /pair/init`` 落盘新配对码并重启轮询 → 网关 matched →
+    本地 ``/pair/activate`` 被调用 → 配对码文件清理。
+    """
+    from promiselink import main as main_module
+
+    pair_code_file = tmp_path / ".pair_code"
+    gateway_state = {"status": "pending"}
+    activated: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if request.method == "GET" and path.startswith("/api/v1/pair/device/"):
+            if gateway_state["status"] == "matched":
+                return httpx.Response(200, json=_gateway_status_matched())
+            return httpx.Response(200, json=_gateway_status_pending())
+        if request.method == "POST" and path == "/api/v1/pair/activate":
+            activated.append(json.loads(request.content)["license_key"])
+            return httpx.Response(200, json={"success": True, "message": "ok"})
+        raise AssertionError(f"unexpected request: {request.method} {path}")
+
+    monkeypatch.setattr(main_module, "httpx", _mock_httpx_module(handler))
+    monkeypatch.setattr(main_module, "runtime_pair_code_file", lambda: pair_code_file)
+    monkeypatch.setattr(main_module, "get_settings", lambda: types.SimpleNamespace(pro_license_key="", api_port=8000))
+    monkeypatch.setattr(main_module, "_PAIR_POLL_INITIAL_DELAY", 0)
+    monkeypatch.setattr(main_module, "_PAIR_POLL_INTERVAL", 0.01)
+    monkeypatch.setattr(main_module, "_pair_poll_task", None)
+
+    # 第一轮：没有配对码，轮询到达上限即退出（复现「配对码已过期」）
+    monkeypatch.setattr(main_module, "_PAIR_POLL_MAX_RUNTIME", 0.02)
+    await asyncio.wait_for(main_module._pair_auto_poll(), timeout=5)
+    assert not pair_code_file.exists()
+
+    # 第二轮：用户重新发起配对 —— 新配对码落盘 + 轮询任务重建
+    monkeypatch.setattr(main_module, "_PAIR_POLL_MAX_RUNTIME", 10)
+    pair_code_file.write_text("384721")
+    gateway_state["status"] = "matched"
+
+    task = main_module.start_pair_auto_poll()
+    await asyncio.wait_for(task, timeout=5)
+
+    assert activated == ["PL-PRO-TEST-ABCD-EFGH"]
+    assert not pair_code_file.exists(), "激活成功后应清理配对码文件"
+
+
+async def test_start_pair_auto_poll_replaces_running_poller(monkeypatch):
+    """重新发起配对必须取消仍在跑的旧轮询，让新配对码拿到完整的轮询窗口。
+
+    否则旧任务可能只剩几秒就到期，用户刚拿到的新配对码会被它一起带走。
+    """
+    from promiselink import main as main_module
+
+    async def _never_ending() -> None:
+        await asyncio.sleep(3600)
+
+    monkeypatch.setattr(main_module, "_pair_auto_poll", _never_ending)
+    monkeypatch.setattr(main_module, "_pair_poll_task", None)
+
+    first = main_module.start_pair_auto_poll()
+    await asyncio.sleep(0)
+    second = main_module.start_pair_auto_poll()
+    await asyncio.gather(first, return_exceptions=True)
+
+    assert first.cancelled() is True
+    assert second is not first
+    assert main_module._pair_poll_task is second
+
+    second.cancel()
+    await asyncio.gather(second, return_exceptions=True)
+
+
+async def test_pair_init_starts_the_auto_poll_task(monkeypatch, tmp_path):
+    """回归：``POST /pair/init`` 必须自己拉起轮询任务。
+
+    修复前 init 只写文件、从不碰轮询 —— 这正是「超时后必须重启 App」的根因。
+    """
+    from promiselink import main as main_module
+
+    pair_code_file = tmp_path / ".pair_code"
+    restarts: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_gateway_init_response())
+
+    monkeypatch.setattr(pair_module, "httpx", _mock_httpx_module(handler))
+    monkeypatch.setattr(pair_module, "runtime_pair_code_file", lambda: pair_code_file)
+    monkeypatch.setattr(main_module, "start_pair_auto_poll", lambda: restarts.append(1))
+
+    resp = await pair_module.init_pair()
+
+    assert resp.success is True
+    assert pair_code_file.read_text(encoding="utf-8") == "384721"
+    assert restarts == [1]

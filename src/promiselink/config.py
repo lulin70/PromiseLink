@@ -34,6 +34,22 @@ def runtime_env_file() -> Path:
     return Path(__file__).resolve().parents[2] / ".env"
 
 
+def runtime_pair_code_file() -> Path:
+    """配对码文件的唯一事实源（``POST /pair/init`` 写入、自动轮询任务读取）。
+
+    与 ``runtime_env_file`` 同源、理由相同：打包后 ``__file__`` 落在临时解包
+    目录，一旦写入方与读取方各自用 ``__file__`` 推导，就可能错位到随时消失的
+    位置，表现为「用户扫了码但电脑端永远配不上」。
+
+    2026-09-20：此前 ``main.py`` 用 ``parents[2]``、``api/v1/pair.py`` 用
+    ``parents[4]`` 各推一遍（源码布局下恰好都指向仓库根，属侥幸一致），现收敛
+    到此处，避免后续目录层级调整时静默漂移。
+    """
+    if getattr(sys, "frozen", False):
+        return _PROMISELINK_HOME / ".pair_code"
+    return Path(__file__).resolve().parents[2] / ".pair_code"
+
+
 LLM_PRESETS: dict[str, dict[str, str]] = {
     "deepseek": {"base_url": "https://api.deepseek.com/v1", "model": "deepseek-v4-flash"},
     "openai": {"base_url": "https://api.openai.com/v1", "model": "gpt-5.5"},

@@ -262,7 +262,11 @@ async def screen3_collision_discovery(
         # Try associations endpoint (may not exist yet)
         resp = await client.get(f"{BASE_URL}/associations", params={"limit": 20}, headers=_auth_headers(), timeout=TIMEOUT)
         if resp.status_code == 200:
-            associations = resp.json()
+            # 该端点返回 PaginatedResponse（{"items": [...], "total", "limit", "offset"}）。
+            # 2026-09-20 fix: 此前直接把响应体当列表用，dict 迭代出来是**键名（str）**，
+            # 下一行的 a.get(...) 必抛 AttributeError —— e2e-nightly 因此长期红。
+            payload = resp.json()
+            associations = payload.get("items", []) if isinstance(payload, dict) else payload
         else:
             associations = []
     except Exception:

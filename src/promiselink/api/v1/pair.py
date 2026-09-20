@@ -26,7 +26,7 @@ import httpx
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from promiselink.config import get_settings, runtime_env_file
+from promiselink.config import get_settings, runtime_env_file, runtime_pair_code_file
 from promiselink.core.logging import get_logger
 
 logger = get_logger("promiselink.pair")
@@ -116,10 +116,18 @@ async def init_pair() -> PairInitResponse:
     data = response.json().get("data", response.json())
     code = data.get("device_pair_code", "")
 
-    # Write pair code to file for background auto-poll task
+    # Write pair code to file for background auto-poll task, then make sure the
+    # poller for it is actually running.
     if code:
-        pair_code_file = pathlib.Path(__file__).resolve().parents[4] / ".pair_code"
-        pair_code_file.write_text(code)
+        runtime_pair_code_file().write_text(code)
+
+        # 2026-09-20 fix: the poller was created only once at startup and gave up
+        # for good after its 10-minute cap, so a retry with a fresh code (the
+        # 5-minute code had expired) could never be picked up without restarting
+        # the app. Lazy import: ``promiselink.main`` imports this module.
+        from promiselink.main import start_pair_auto_poll
+
+        start_pair_auto_poll()
 
     return PairInitResponse(
         success=True,

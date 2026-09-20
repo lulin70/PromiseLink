@@ -101,7 +101,7 @@ python -m uvicorn promiselink.main:app --host 0.0.0.0 --port 8000
 ### 1.3 验证（无需 LLM）
 
 ```bash
-pytest --co -q | tail -1     # 应显示 2167 tests collected
+pytest --co -q | tail -1     # 应显示 2170 tests collected
 pytest tests/test_security_comprehensive.py -q --no-cov   # 50 项安全测试
 ```
 

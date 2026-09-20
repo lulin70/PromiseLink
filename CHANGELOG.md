@@ -13,6 +13,36 @@ All notable changes to PromiseLink will be documented in this file.
 - **文档同步**：三语 README、`docs/PROJECT_STATUS.md`、`docs/DOCUMENTATION_CHECKLIST.md`、`docs/TECH_DEBT.md`、`docs/ROADMAP*.md`、`docs/architecture/PromiseLink_技术设计_v1.md`、`docs/design/Deployment_Guide.md`、`docs/design/Database_Design_v1.md`、`SECURITY.md`、`docs/deliverables/*` 等已同步。
 - 决策、溯源与执行记录详见 PromiseLink-Pro `docs/review/PROJECT_REVIEW_20260918_FINDINGS.md` §9。
 
+### Fixed — 配对轮询任务超时后无法再次配对（2026-09-20）
+
+- **`_pair_auto_poll` 是一次性任务（P0，用户实测阻塞配对）**：轮询任务仅在 App **启动时创建一次**，`max_runtime=600` 超时后即 `return` 且永不重建（`_shutdown_event` 未置位也不会重建）。配对码只有 **5 分钟**有效期，因此用户第一次配对未完成（或超时）后再点「配对」，**不重启 App 就再也配不上**；现场只能靠临时脚本复刻轮询绕过。
+- **修复**：轮询任务的创建抽出为 `start_pair_auto_poll()`，由 **lifespan 启动** 与 **`POST /pair/init`** 共同调用；init 时若旧任务仍在运行则先取消再新建，保证新配对码拿到完整的轮询窗口。轮询节奏（初始延迟/间隔/上限）提升为模块级常量，便于测试压缩。
+- **回归测试**：`tests/test_pair_mode.py` 新增 3 条 —— ① 复现完整时序（第一轮超时退出 → init 落盘新码并重启轮询 → 网关 matched → 本地 activate 被调用 → 配对码清理）；② `start_pair_auto_poll()` 会取消仍在运行的旧轮询；③ `POST /pair/init` 自己拉起轮询任务。已对修复前代码实测 3 条**全部失败**（其中 ③ 为行为级失败：`assert [] == [1]`）。
+- **连带修复（同路径，避免同类"配不上"再次静默发生）**：
+  - 配对码文件路径收敛为 `config.runtime_pair_code_file()` 唯一事实源（源码布局 → 仓库根 `.pair_code`；PyInstaller 冻结 → `~/.promiselink/.pair_code`）。此前 `main.py` 用 `parents[2]`、`pair.py` 用 `parents[4]` 各推一遍，**源码布局下恰好都指向仓库根，属侥幸一致**。
+  - 自动激活的本地地址由硬编码 `127.0.0.1:8000` 改为 `settings.api_port`（改端口后原写法会永远打不中本地接口）。
+  - `pair_auto_poll_matched` / `pair_auto_activate_success` 日志不再落许可证密钥明文，与 `pair.py` 的口径一致（掩码 `前10位 + ****`）。
+  - `.pair_code` 取消 git 跟踪并加入 `.gitignore`（运行时机器本地状态；此前会被测试运行写入仓库根并被误提交）。
+
+### Fixed — 真实用户 e2e 脚本解析 `/associations` 响应体错误（2026-09-20）
+
+- **`scripts/e2e/e2e_user_journey.py:265`**：`GET /associations` 返回 `PaginatedResponse`（`{"items": [...], "total", "limit", "offset"}`），脚本却把响应体直接当列表迭代 —— 迭代 dict 得到的是**键名（str）**，下一行 `a.get(...)` 必抛 `AttributeError: 'str' object has no attribute 'get'`，`e2e-nightly` 因此红灯。
+- **修复**：按仓库既有写法取 `items`（`payload.get("items", []) if isinstance(payload, dict) else payload`）；非 200 仍降级为空列表。
+- **验证**：本机以 `httpx.MockTransport` 注入分页响应直接调用 `screen3_collision_discovery()` —— 根因（直接迭代响应体）复现 `AttributeError`，修复后返回 1 条无异常，HTTP 500 分支降级为空列表。
+
+### Docs — 测试数字同步（2026-09-20）
+
+新增 3 条配对回归测试后，按「数字单一 owner」重测并同步了下游文档（**未沿用旧数字、未估算**）：
+
+| 指标 | 旧值 | 新值（本轮实测） |
+|---|---|---|
+| 测试收集数 | 2167 | **2170** |
+| 主套件 passed | 2068 | **2071** |
+| 用例总数（主套件 + 负载） | 2085 | **2088** |
+| 覆盖率 | 88% | 88%（`TOTAL 11168 1314 88%`） |
+
+同步文件：`README.md` / `README.en.md` / `README.jp.md`（badge、质量指标表、快速开始命令、目录树、完成清单）、`docs/deploy/DEPLOYMENT_PLAYBOOK_v1.md`（§1.3 校验命令）。
+
 ## [1.1.0] - 2026-09-07
 
 ### Added — 服务端离线模式（CI e2e 门禁恢复）

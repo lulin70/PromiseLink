@@ -10,7 +10,7 @@
   <a href="https://promiselink.cn"><img src="https://img.shields.io/badge/🌐_官网-promiselink.cn-blue?style=for-the-badge" alt="Website"></a>
   <br/>
   <a href="https://github.com/lulin70/PromiseLink/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/lulin70/PromiseLink/ci.yml?branch=main&label=CI&logo=github" alt="CI"></a>
-  <img src="https://img.shields.io/badge/tests-2085%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-2088%20passed-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/coverage-88%25-green" alt="Coverage">
   <img src="https://img.shields.io/badge/mypy-0%20errors-brightgreen" alt="mypy">
   <img src="https://img.shields.io/badge/ruff-0%20errors-brightgreen" alt="ruff">
@@ -44,7 +44,7 @@
 | Advantage | Proof | vs. Traditional CRM |
 |------|---------|-------------|
 | 🔐 **Data Sovereignty · No SaaS** | 100% local SQLite storage / data never leaves your home / offline-capable / PIPL & GDPR compliant | SaaS AI-CRMs upload data to the cloud, entrusting relationship assets to a third party |
-| 🏭 **Industrial-grade quality** | 2085 tests passed / 88% coverage / mypy 0 / ruff 0 / 50 security tests / 17 performance tests | Most open-source CRMs have < 30% coverage |
+| 🏭 **Industrial-grade quality** | 2088 tests passed / 88% coverage / mypy 0 / ruff 0 / 50 security tests / 17 performance tests | Most open-source CRMs have < 30% coverage |
 | 🧠 **Core algorithm layer: main logic is pure algorithm** | Entity resolution / Todo state machine / promise fulfillment / association discovery / dynamic scoring — main logic is pure algorithm implementation (NetworkX + RapidFuzz + numpy), with optional LLM enhancement dimensions (all with degradation mechanisms), runs offline, auditable | Mainstream AI-CRMs depend on GPT API across the full chain |
 | 🚀 **Portable, zero deployment** | `pip install -e .` + `bash scripts/start.sh` ready to use, no Docker / K8s required | Similar tools require docker-compose |
 
@@ -100,8 +100,8 @@ bash scripts/start.sh
 git clone https://github.com/lulin70/PromiseLink
 cd PromiseLink
 pip install -e '.[dev]'
-pytest --co -q | tail -1   # Should show 2167 tests collected
-pytest tests/ -q --ignore=tests/test_load_real.py   # main suite: 2068 passed, 79 skipped, 3 deselected
+pytest --co -q | tail -1   # Should show 2170 tests collected
+pytest tests/ -q --ignore=tests/test_load_real.py   # main suite: 2071 passed, 79 skipped, 3 deselected
 pytest tests/test_load_real.py -q --no-cov -o addopts=""   # load tests: 17 passed
 pytest tests/test_security_comprehensive.py -q --no-cov   # 50 security tests
 ```
@@ -115,7 +115,7 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50 security tests
 
 | Metric       | Value                                                               |
 | -------- | ---------------------------------------------------------------- |
-| Test cases     | **2085 passed**, 79 skipped, 3 deselected, 0 failed (main suite 2068 + load tests 17; incl. 50 relay_client robustness + 12 v5.6 corrections + 50 security + 17 performance + 6 real LLM E2E) |
+| Test cases     | **2088 passed**, 79 skipped, 3 deselected, 0 failed (main suite 2071 + load tests 17; incl. 50 relay_client robustness + 12 v5.6 corrections + 50 security + 17 performance + 6 real LLM E2E) |
 | Code coverage    | **88%**                                                          |
 | mypy type check | **0 errors** (127 source files all passed)                                             |
 | ruff code check | **0 errors**                                                          |
@@ -250,7 +250,7 @@ PromiseLink/
 │   ├── prompts/                # LLM Prompt templates
 │   └── main.py                 # FastAPI entry
 ├── docs/                       # Documentation
-├── tests/                      # Tests (99 files / 2167 cases)
+├── tests/                      # Tests (99 files / 2170 cases)
 ├── data/                       # SQLite data storage
 ├── scripts/                    # One-click install/start scripts + E2E tests
 └── frontend/                   # Taro H5 frontend
@@ -296,7 +296,7 @@ PromiseLink/
 - [x] DataSourceAdapter abstraction layer (manual / CSV; voice / WeChat / email are Pro edition features)
 - [x] CarryMem protocol decoupling (NullMemoryProvider graceful degradation)
 - [x] Encryption system (HMAC-SHA256 + field-level encryption + row-level security)
-- [x] 99 test files / **2167 test cases** (incl. 50 relay_client robustness + 12 v5.6 corrections + 6 real LLM E2E) / **88% coverage**
+- [x] 99 test files / **2170 test cases** (incl. 50 relay_client robustness + 12 v5.6 corrections + 6 real LLM E2E) / **88% coverage**
 - [x] CI/CD + Alembic ready
 - [x] PoC Demo 4/4 scenarios passed
 - [x] One-click install / start scripts (run locally directly, no Docker required)

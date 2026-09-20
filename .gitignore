@@ -11,6 +11,9 @@
 credentials.json
 secrets.yaml
 
+# 设备配对码（运行时由 POST /pair/init 写入，机器本地状态，禁止入库）
+.pair_code
+
 # === API Keys (any file containing keys) ===
 **/api_keys*
 **/config.local*

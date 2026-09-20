@@ -9,7 +9,7 @@
   <a href="https://github.com/lulin70/PromiseLink/releases"><img src="https://img.shields.io/badge/version-v1.1.0-blue?style=flat-square" alt="Version"></a>
   <br/>
   <a href="https://github.com/lulin70/PromiseLink/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/lulin70/PromiseLink/ci.yml?branch=main&label=CI&logo=github" alt="CI"></a>
-  <img src="https://img.shields.io/badge/tests-2085%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-2088%20passed-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/coverage-88%25-green" alt="Coverage">
   <img src="https://img.shields.io/badge/mypy-0%20errors-brightgreen" alt="mypy">
   <img src="https://img.shields.io/badge/ruff-0%20errors-brightgreen" alt="ruff">
@@ -43,7 +43,7 @@
 | 优势 | 数据证明 | 对比传统 CRM |
 |------|---------|-------------|
 | 🔐 **数据主权 · 不提供 SaaS** | 100% 本地 SQLite 存储 / 数据从不出家门 / 离线可用 / 符合 PIPL & GDPR | SaaS AI-CRM 数据上云，关系资产交给第三方托管 |
-| 🏭 **工业级质量** | 2085 测试通过 / 88% 覆盖率 / mypy 0 / ruff 0 / 50 安全测试 / 17 性能测试 | 多数开源 CRM < 30% 覆盖率 |
+| 🏭 **工业级质量** | 2088 测试通过 / 88% 覆盖率 / mypy 0 / ruff 0 / 50 安全测试 / 17 性能测试 | 多数开源 CRM < 30% 覆盖率 |
 | 🧠 **核心算法层主逻辑纯算法** | 实体归一 / Todo 状态机 / 承诺履行 / 关联发现 / 动态评分 — 主逻辑纯算法实现（NetworkX + RapidFuzz + numpy），含可选 LLM 增强维度（均具备降级机制），可离线运行、可审计 | 主流 AI-CRM 全链路依赖 GPT API |
 | 🚀 **便携零部署** | `pip install -e .` + `bash scripts/start.sh` 即用，无需 Docker / K8s | 同类工具需 docker-compose |
 
@@ -125,8 +125,8 @@ bash scripts/start.sh
 git clone https://github.com/lulin70/PromiseLink
 cd PromiseLink
 pip install -e '.[dev]'
-pytest --co -q | tail -1   # 应显示 2167 tests collected
-pytest tests/ -q --ignore=tests/test_load_real.py   # 主套件：2068 passed, 79 skipped, 3 deselected
+pytest --co -q | tail -1   # 应显示 2170 tests collected
+pytest tests/ -q --ignore=tests/test_load_real.py   # 主套件：2071 passed, 79 skipped, 3 deselected
 pytest tests/test_load_real.py -q --no-cov -o addopts=""   # 负载测试：17 passed
 pytest tests/test_security_comprehensive.py -q --no-cov   # 50 项安全测试
 ```
@@ -140,7 +140,7 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50 项安全测试
 
 | 指标       | 数值                                                               |
 | -------- | ---------------------------------------------------------------- |
-| 测试用例     | **2085 passed**, 79 skipped, 3 deselected, 0 failed（主套件 2068 + 负载测试 17；含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏 + 50 安全 + 17 性能 + 6 真实 LLM E2E） |
+| 测试用例     | **2088 passed**, 79 skipped, 3 deselected, 0 failed（主套件 2071 + 负载测试 17；含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏 + 50 安全 + 17 性能 + 6 真实 LLM E2E） |
 | 代码覆盖率    | **88%**                                                          |
 | mypy 类型检查 | **0 错误** (127 源文件全部通过)                                             |
 | ruff 代码检查 | **0 错误**                                                          |
@@ -275,7 +275,7 @@ PromiseLink/
 │   ├── prompts/                # LLM Prompt 模板
 │   └── main.py                 # FastAPI 入口
 ├── docs/                       # 文档体系
-├── tests/                      # 测试（99 个文件 / 2167 用例）
+├── tests/                      # 测试（99 个文件 / 2170 用例）
 ├── data/                       # SQLite 数据存储
 ├── scripts/                    # 一键安装/启动脚本 + E2E 测试
 └── frontend/                   # Taro H5 前端
@@ -321,7 +321,7 @@ PromiseLink/
 - [x] DataSourceAdapter 抽象层（手动 / CSV；语音 / 微信 / 邮件为专业版功能）
 - [x] CarryMem 协议解耦（NullMemoryProvider 优雅降级）
 - [x] 加密体系（HMAC-SHA256 + 字段级加密 + 行级安全）
-- [x] 99 个测试文件 / **2167 测试用例**（含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏 + 6 真实 LLM E2E）/ **88% 覆盖率**
+- [x] 99 个测试文件 / **2170 测试用例**（含 50 个 relay_client 健壮性 + 12 个 v5.6 纠偏 + 6 真实 LLM E2E）/ **88% 覆盖率**
 - [x] CI/CD + Alembic 就绪
 - [x] PoC Demo 4/4 场景通过
 - [x] 一键安装 / 启动脚本（本地直接运行，无需 Docker）
