@@ -73,7 +73,58 @@ __all__ = [
     "_DEFAULT_OCR_MODEL",
     "_TOKEN_REFRESH_MARGIN",
     "_TokenState",
+    "_PERMANENT_LICENSE_CODES",
 ]
+
+# Gateway error codes that mean "this credential will never work" — retrying
+# cannot help, so the caller must stop and tell the user instead of looping.
+# Source of truth: PromiseLink-Pro `gateway/core/error_codes.py`.
+#
+# Why a code set and not just the HTTP status: the license is refused with
+# different statuses depending on *why* it is unusable — 401/403 for
+# invalid/expired/revoked/suspended/device-mismatch, and **404** for a key
+# that does not exist at all (`LICENSE_NOT_FOUND`). L-1 (2026-09-21) only
+# treated 401/403 as terminal, so a mistyped or deleted license key still
+# retried forever at `reconnect_max` (30s) intervals even with the cap in
+# place. Reproduced on the v1.1.1 release package, see L-14.
+_PERMANENT_LICENSE_CODES = frozenset(
+    {
+        "JWT_INVALID",
+        "JWT_EXPIRED",
+        "JWT_REVOKED",
+        "JWT_MISSING",
+        "API_KEY_INVALID",
+        "LICENSE_INACTIVE",
+        "LICENSE_EXPIRED",
+        "LICENSE_CANCELLED",
+        "LICENSE_SUSPENDED",
+        "DEVICE_FINGERPRINT_MISMATCH",
+        "DEVICE_LIMIT_EXCEEDED",
+        "PERMISSION_DENIED",
+        "LICENSE_NOT_FOUND",
+        "INVALID_LICENSE_KEY_FORMAT",
+        "INVALID_DEVICE_FINGERPRINT",
+    }
+)
+
+
+def _is_permanent_license_rejection(response: httpx.Response) -> bool:
+    """Whether the gateway's answer means the license/credential is unusable.
+
+    Deliberately excludes 429 (rate limit), 402 (quota) and 5xx — those are
+    transient and must keep retrying.
+    """
+    if response.status_code in (401, 403):
+        return True
+    try:
+        body = response.json()
+    except Exception:
+        return False
+    if not isinstance(body, dict):
+        return False
+    error = body.get("error")
+    code = error.get("code") if isinstance(error, dict) else None
+    return code in _PERMANENT_LICENSE_CODES
 
 
 class RelayClient(RelayEndpointsMixin):
@@ -249,7 +300,7 @@ class RelayClient(RelayEndpointsMixin):
                 details={"gateway_url": self.gateway_url, "error": str(exc)[:200]},
             ) from exc
 
-        if response.status_code in (401, 403):
+        if _is_permanent_license_rejection(response):
             detail = safe_error_detail(response)
             logger.warning("relay_refresh_auth_failed", status=response.status_code, detail=detail)
             raise RelayAuthError(
@@ -315,7 +366,7 @@ class RelayClient(RelayEndpointsMixin):
                 details={"gateway_url": self.gateway_url, "error": str(exc)[:200]},
             ) from exc
 
-        if response.status_code in (401, 403):
+        if _is_permanent_license_rejection(response):
             detail = safe_error_detail(response)
             logger.error("relay_token_refresh_auth_failed", status=response.status_code, detail=detail)
             raise RelayAuthError(

@@ -96,10 +96,13 @@ async def init_pair() -> PairInitResponse:
             )
     except httpx.HTTPError as exc:
         logger.error("pair_init_network_error", gateway=gateway_url, error=str(exc)[:200])
+        # L-15: httpx 的若干异常 `str(exc)` 为空串（干净环境 e2e 实测 4 次中出现
+        # 1 次），原先只拼 `{exc}` → 界面显示「无法连接网关: 」光秃秃一句，
+        # 用户与售后都无法判断是 DNS、TLS、超时还是被拒。带上异常类型。
         return PairInitResponse(
             success=False,
             gateway_url=gateway_url,
-            error=f"无法连接网关: {exc}",
+            error=f"无法连接网关({type(exc).__name__}): {exc}",
         )
 
     if response.status_code != 200:
@@ -154,7 +157,10 @@ async def get_pair_status(code: str) -> PairStatusResponse:
             )
     except httpx.HTTPError as exc:
         logger.error("pair_status_network_error", error=str(exc)[:200])
-        return PairStatusResponse(success=False, error=f"无法连接网关: {exc}")
+        # L-15: 同上，带上异常类型以免出现「无法连接网关: 」的空提示。
+        return PairStatusResponse(
+            success=False, error=f"无法连接网关({type(exc).__name__}): {exc}"
+        )
 
     if response.status_code != 200:
         return PairStatusResponse(

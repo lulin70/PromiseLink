@@ -141,6 +141,30 @@ def test_pair_init_gateway_error_status(monkeypatch):
     assert "500" in data["error"]
 
 
+def test_pair_init_empty_exception_message_still_names_the_failure(monkeypatch):
+    """L-15: 异常信息为空串时，错误提示仍须带上异常类型。
+
+    干净环境 e2e 在真实网关上实测到一次 `str(exc) == ""`
+    （4 次调用中出现 1 次），此时旧提示是「无法连接网关: 」，用户拿不到
+    任何可用于排查的线索。
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("")
+
+    monkeypatch.setattr(pair_module, "httpx", _mock_httpx_module(handler))
+
+    from promiselink.main import app
+
+    with TestClient(app) as client:
+        resp = client.post("/api/v1/pair/init")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is False
+    assert "ConnectError" in data["error"]
+
+
 # ── /pair/status tests ──
 
 

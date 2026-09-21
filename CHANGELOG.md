@@ -33,6 +33,34 @@ All notable changes to PromiseLink will be documented in this file.
 
 覆盖率 A/B 实测（同一命令，仅差是否含性能用例）：含 → `TOTAL 11773 1514 87%`（`Total coverage: 87.14%`）；不含 → `TOTAL 11773 1512 87%`（`87.16%`）。性能用例对语句覆盖的贡献仅 **2 行**，故**拆分不是覆盖率变化的原因**；旧文档的 88%（`TOTAL 11168 1314 88%`）语句总数与本次实测（11773）不一致，属过期数字，一并订正。
 
+### Fixed — 许可证「不存在」时的重试风暴：L-1 修复的漏网状态码（L-14，2026-09-21）
+
+- **怎么发现的**：为闭环 §9.7 第 5 条，新增 `scripts/e2e/e2e_release_package_clean_env.sh`（干净 HOME + release 包走真实用户链路）。用**无效许可证**跑该脚本时，v1.1.1 包日志稳定出现：
+  ```
+  relay_token_refresh_failed  detail="{'code': 'LICENSE_NOT_FOUND', 'message': 'License not found'}" status=404
+  relay_wss_session_ended     backoff_seconds=30 error="RelayError: License activation failed (HTTP 404)"
+  ```
+- **问题**：L-1 只把 **401/403**（`RelayAuthError`）判为终态。「许可证不存在」在网关侧是 **404 `LICENSE_NOT_FOUND`**，落进通用 `RelayError` 分支 → 仍被当作瞬时错误 → 退避饱和后**每 30 秒重试一次、永不停止**。即 L-1 修好了 403 风暴，却漏掉了同一故障模式下更常见的触发方式（许可证输错/被删除），用户仍会对网关持续施压。
+- **反向验证（不是推理，是实测）**：上面这段日志即**修复前**的真实行为 —— v1.1.1 包没有本修复，它输出的就是 `RelayError`（非 `RelayAuthError`），证明旧代码对 404 判为可重试。
+- **修复**：新增 `_is_permanent_license_rejection()`，终态判据从「状态码 401/403」升级为「状态码 401/403 **或** 响应体 `error.code` 属于网关的永久性拒绝码集合」（来源 `PromiseLink-Pro/gateway/core/error_codes.py`，15 个码：`JWT_*` / `API_KEY_INVALID` / `LICENSE_INACTIVE|EXPIRED|CANCELLED|SUSPENDED|NOT_FOUND` / `DEVICE_FINGERPRINT_MISMATCH` / `DEVICE_LIMIT_EXCEEDED` / `PERMISSION_DENIED` / `INVALID_LICENSE_KEY_FORMAT` / `INVALID_DEVICE_FINGERPRINT`）。`/license/refresh` 与 `/license/activate` 两处判定同步。
+- **刻意不判终态**：429 限流、402 配额、5xx 与网络错误**必须**保持可重试；`404 ROUTE_NOT_FOUND`（网关误部署/路由缺失）也不得误判为许可证问题 —— 否则会永久停掉中继且误导用户去换许可证。三者均有反向测试锁死。
+- **回归测试（新增 5 条）**：`tests/test_relay_client_robustness.py` —— 404 `LICENSE_NOT_FOUND` / 403 `LICENSE_EXPIRED` / 400 `INVALID_LICENSE_KEY_FORMAT` 判终态，404 `ROUTE_NOT_FOUND` 与 429 `RATE_LIMIT_EXCEEDED` 判可重试。
+
+### Fixed — 网关不可达时提示为空串（L-15，2026-09-21）
+
+- **现象**：同一 e2e 在 4 次运行中有 1 次 `/pair/init` 失败，界面/接口拿到的是 `"无法连接网关: "` —— 冒号后**什么都没有**（httpx 的若干异常 `str(exc)` 为空串）。
+- **影响**：用户与售后无法区分 DNS / TLS / 超时 / 被拒，只能盲猜。
+- **修复**：`pair.py` 的 `init` 与 `status` 两处错误提示改为 `无法连接网关({异常类型}): {异常信息}`。既有断言（子串 `无法连接网关`）不受影响，并新增 1 条空消息用例锁死。
+
+### Added — 干净环境 · release 包 · 真实用户链路 e2e（§9.7 第 5 条 / P0-2，2026-09-21）
+
+- **为什么需要**：此前所有 e2e 都在源码树内跑（`.venv` + 仓库内 `.env`），覆盖不到"从官网下载 dmg → 双击 → 配对 → 重启"这条**唯一交付路径**；2026-09-19「每次启动都要重新配对」与 2026-09-20「桌面包 WSS 永不启动」两个 P0 都只可能在这条路径上被发现。
+- **做法**：`scripts/e2e/e2e_release_package_clean_env.sh <PromiseLink.app> [工作目录]` —— 把 `HOME` 指向全新空目录后启动包内二进制，等价新机器，且不污染开发者真实 `~/.promiselink/`。8 个步骤 14 项断言：启动 / 未配对不连网关 / 取配对码 / 激活写 `.env` / WSS 起连 / 优雅退出 / 重启 / **重启后许可证仍在**。
+- **实测结果（v1.1.1 dmg，最终版脚本）**：`14 passed, 0 failed`。**两个历史 P0 均已进包**：`.env` 落在干净 HOME 且含 `PRO_LICENSE_KEY` + `RELAY_GATEWAY_URL`；重启后无需再配对即 `relay_wss_start_scheduled`，`PRO_LICENSE_KEY` 跨重启保持。
+- **未覆盖（脚本内已显式标注，不假装通过）**：小程序**真人扫码**那一步无法自动化；脚本走的是扫码完成后桌面轮询任务所调用的同一个 `POST /api/v1/pair/activate`。
+- **顺带记录的两项体验问题**：① 优雅停机实测 **31~32s**（在等"事件维护"后台任务收尾），用户点关闭后会以为卡死；② 上面 L-15 的空提示。脚本会对停机 >10s 主动打警告。
+- **断言取数说明（踩过的坑，留给后来的维护者）**：包的 `/api/v1/health` 是**未认证短响应**（只有 status/version），带 components 的 `/api/v1/health/full` 需认证 —— 故脚本一律以**包自身日志**为事实来源。另外"进程是否真的退出"既不能只看 PID（PyInstaller bootloader 先退、子进程还在跑），也不能只等端口释放（uvicorn 先关监听 socket、lifespan 停机还在继续），两者都会造成假红/假绿，最终判据取"包内二进制进程全部消失"。
+
 ## [1.1.1] - 2026-09-20
 
 > **版本号语义说明（如实标注）**：本版按**补丁版**发布，但内容含一处 `Removed`（移除基础版 Docker 交付链 + PostgreSQL 后端支持）。

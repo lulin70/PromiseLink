@@ -303,6 +303,102 @@ class TestRefreshToken:
             await relay_client.refresh_token()
         assert exc_info.value.code == "RELAY_LICENSE_ERROR"
 
+    async def test_refresh_token_l14_404_license_not_found_is_terminal(self, relay_client):
+        """L-14: 404 + LICENSE_NOT_FOUND → RelayAuthError（终态，不再无限重试）.
+
+        复现自 v1.1.1 release 包：无效/不存在的许可证在网关侧返回
+        ``404 {'code': 'LICENSE_NOT_FOUND'}``，旧逻辑把它当瞬时错误，
+        在 ``reconnect_max``(30s) 处饱和后每 30 秒重试一次、永不停止。
+        """
+        mock_client = _make_mock_http_client(
+            post_return=_make_httpx_response(
+                404,
+                json_data={
+                    "success": False,
+                    "error": {"code": "LICENSE_NOT_FOUND", "message": "License not found"},
+                },
+            )
+        )
+        relay_client._get_client = AsyncMock(return_value=mock_client)
+
+        with pytest.raises(RelayAuthError) as exc_info:
+            await relay_client.refresh_token()
+        assert exc_info.value.details["status_code"] == 404
+
+    async def test_refresh_token_l14_403_license_expired_is_terminal(self, relay_client):
+        """L-14: 403 + LICENSE_EXPIRED → RelayAuthError（许可证已过期，重试无用）."""
+        mock_client = _make_mock_http_client(
+            post_return=_make_httpx_response(
+                403,
+                json_data={
+                    "success": False,
+                    "error": {"code": "LICENSE_EXPIRED", "message": "License expired"},
+                },
+            )
+        )
+        relay_client._get_client = AsyncMock(return_value=mock_client)
+
+        with pytest.raises(RelayAuthError):
+            await relay_client.refresh_token()
+
+    async def test_refresh_token_l14_400_invalid_key_format_is_terminal(self, relay_client):
+        """L-14: 400 + INVALID_LICENSE_KEY_FORMAT → RelayAuthError（密钥格式错，重试无用）."""
+        mock_client = _make_mock_http_client(
+            post_return=_make_httpx_response(
+                400,
+                json_data={
+                    "success": False,
+                    "error": {
+                        "code": "INVALID_LICENSE_KEY_FORMAT",
+                        "message": "Bad format",
+                    },
+                },
+            )
+        )
+        relay_client._get_client = AsyncMock(return_value=mock_client)
+
+        with pytest.raises(RelayAuthError):
+            await relay_client.refresh_token()
+
+    async def test_refresh_token_l14_404_route_not_found_stays_transient(self, relay_client):
+        """L-14 反向：404 + ROUTE_NOT_FOUND 不得被判终态.
+
+        网关误部署/路由缺失是运维问题，恢复后重试即可；若把它当许可证
+        问题处理，会永久停掉 WSS 且误导用户去换许可证。
+        """
+        mock_client = _make_mock_http_client(
+            post_return=_make_httpx_response(
+                404,
+                json_data={
+                    "success": False,
+                    "error": {"code": "ROUTE_NOT_FOUND", "message": "No such route"},
+                },
+            )
+        )
+        relay_client._get_client = AsyncMock(return_value=mock_client)
+
+        with pytest.raises(RelayError) as exc_info:
+            await relay_client.refresh_token()
+        assert not isinstance(exc_info.value, RelayAuthError)
+        assert exc_info.value.code == "RELAY_LICENSE_ERROR"
+
+    async def test_refresh_token_l14_429_rate_limit_stays_transient(self, relay_client):
+        """L-14 反向：429 限流必须保持可重试，不得判终态."""
+        mock_client = _make_mock_http_client(
+            post_return=_make_httpx_response(
+                429,
+                json_data={
+                    "success": False,
+                    "error": {"code": "RATE_LIMIT_EXCEEDED", "message": "slow down"},
+                },
+            )
+        )
+        relay_client._get_client = AsyncMock(return_value=mock_client)
+
+        with pytest.raises(RelayError) as exc_info:
+            await relay_client.refresh_token()
+        assert not isinstance(exc_info.value, RelayAuthError)
+
     async def test_refresh_token_json_parse_error_raises_relay_error(self, relay_client):
         """JSON parse failure → RelayError with code RELAY_PARSE_ERROR."""
         mock_client = _make_mock_http_client(
