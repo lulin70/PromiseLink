@@ -127,8 +127,29 @@ exe = EXE(
 )
 
 # macOS app bundle
+#
+# L-12（2026-09-21）：此前 BUNDLE 未传 version= / bundle_identifier=，
+# PyInstaller 便用默认值 —— CFBundleShortVersionString="0.0.0"、
+# CFBundleIdentifier=appname（"PromiseLink"）。实测 v1.1.1 的 dmg：
+#     plutil -p PromiseLink.app/Contents/Info.plist
+#     "CFBundleShortVersionString" => "0.0.0"
+#     "CFBundleIdentifier" => "PromiseLink"
+# 用户「显示简介」看到的就是 0.0.0，无法判断装的是哪一版；售后排查与"该升级了"
+# 的引导都失去依据（应用内版本号正常，来自 src/promiselink/__init__.py）。
+#
+# 版本号单一事实源 = 仓库根 VERSION 文件（与本仓 CI 的 Version consistency gate
+# 同源），在 spec 内直接读取，因此不会与代码漂移；读不到就让构建失败，
+# 而不是又静默退回 0.0.0。
+_version_file = os.path.join(SPECPATH, 'VERSION')
+with open(_version_file, encoding='utf-8') as _fh:
+    _version = _fh.read().strip()
+if not _version:
+    raise SystemExit(f'VERSION file is empty: {_version_file}')
+
 app = BUNDLE(
     exe,
     name='PromiseLink.app',
     icon=None,  # TODO: Add .icns icon
+    version=_version,
+    bundle_identifier='com.carrymem.promiselink',
 )

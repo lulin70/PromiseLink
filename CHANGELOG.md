@@ -61,6 +61,35 @@ All notable changes to PromiseLink will be documented in this file.
 - **顺带记录的两项体验问题**：① 优雅停机实测 **31~32s**（在等"事件维护"后台任务收尾），用户点关闭后会以为卡死；② 上面 L-15 的空提示。脚本会对停机 >10s 主动打警告。
 - **断言取数说明（踩过的坑，留给后来的维护者）**：包的 `/api/v1/health` 是**未认证短响应**（只有 status/version），带 components 的 `/api/v1/health/full` 需认证 —— 故脚本一律以**包自身日志**为事实来源。另外"进程是否真的退出"既不能只看 PID（PyInstaller bootloader 先退、子进程还在跑），也不能只等端口释放（uvicorn 先关监听 socket、lifespan 停机还在继续），两者都会造成假红/假绿，最终判据取"包内二进制进程全部消失"。
 
+### Fixed — 打包后 App 自报版本号恒为 `0.0.0`（L-12，2026-09-21）
+
+- **现象（实测，非推断）**：`promiselink.spec` 的 `BUNDLE(exe, name='PromiseLink.app', icon=None)` 未传 `version=` / `bundle_identifier=`，PyInstaller 便使用默认值。实测已发布的 v1.1.1 dmg：
+  ```
+  plutil -p PromiseLink.app/Contents/Info.plist
+  "CFBundleIdentifier" => "PromiseLink"
+  "CFBundleShortVersionString" => "0.0.0"
+  ```
+  用户在访达「显示简介」看到的就是 `0.0.0`，无法据此判断装的是哪一版；售后排查与「该升级了」的引导都失去依据。（**应用内**版本号一直正常：`/api/v1/health` 返回 `1.1.1`，来自 `src/promiselink/__init__.py`。）
+- **修复**：spec 内读取仓库根 `VERSION`（与本仓 CI 的 Version consistency gate 同一事实源）后传 `version=`，并显式指定 `bundle_identifier='com.carrymem.promiselink'`；`VERSION` 为空则让构建直接失败，而不是又静默退回 `0.0.0`。
+- **修复后实测（本机重新打包一次）**：
+  ```
+  plutil -p /tmp/pl_spec_build/dist/PromiseLink.app/Contents/Info.plist
+  "CFBundleIdentifier" => "com.carrymem.promiselink"
+  "CFBundleShortVersionString" => "1.1.1"
+  ```
+- **回归测试（新增 3 条）**：`tests/test_packaging_spec.py` 以 AST 静态断言 —— ① `BUNDLE` 必须显式传 `version=` 与 `bundle_identifier=`；② `version=` 必须是变量且其值**确实**从 `VERSION` 文件读出（而非硬编码）；③ `VERSION` 内容必须等于 `promiselink.__version__`。**反向验证**：把 spec 回退成修复前形态（探针 A）、把版本号硬编码为 `'0.0.0'`（探针 B）、把 `VERSION` 篡改为 `9.9.9`（探针 C），三条探针**全部变红**。
+- **注**：本项**需下次发版才生效**（已发布的 dmg 已锁定，改不了）。
+- **顺带记录（未处理，已登记为 L-16）**：PyInstaller 在 `EXE(console=True)` 时会同时写入 `LSBackgroundOnly=true`（两者是同一处取舍，spec 内原注释即「Set to False for windowed mode」）。当前效果是用户会看到一个终端窗口、且应用不进 Dock。属产品取舍，留待共识，本轮不改。
+
+### Docs — CHANGELOG 补记 1.0.2 / 1.0.3 / 1.0.4 段并收敛游离的 `[Unreleased]`（L-7，2026-09-21）
+
+- **缺口**：`git tag` 有 `v1.0.2`（`249d2e0`）/ `v1.0.3`（`377b54c`）/ `v1.0.4`（`1595c97`），三个 tag 均落在 2026-09-06，但 CHANGELOG 自 `1.0.5` 向下**直接跳到 `1.0.1`**，三个版本无对应小节。
+- **补记依据（不编造）**：逐条按 `git log` / `git show --stat` 还原 —— `[1.0.2]` 收入 `v1.0.1..v1.0.2` 的 10 个提交（W1+W2、W3+W4、两处 stability 修复、两处 docs 订正）；`[1.0.3]` / `[1.0.4]` 各只有 1 个提交、均为纯发布链修复（实测只改 `.github/workflows/build.yml` + 三处版本号文件），段内已明写「不含产品代码变更」。
+- **收敛游离标题**：`grep -c "^## \[Unreleased\]"` 此前为 **4**（L5 正确的那一处 + 三处游离），现为 **1**：
+  - 中部游离块中的 W1+W2 / W3+W4 内容归位到 `[1.0.2]`；
+  - 中部游离块中的 alembic 修订 id 修复，按 `git tag --contains 76aba28` → `v1.1.1` **归位到 `[1.1.1]`**（此前挂在错误位置，会让读者以为它未发布）；
+  - 2026-07-05 / 2026-07-06 两个历史块标题改为 `[v0.8.0-rc2 与 v0.8.1 之间 · 未打 tag]`（该区间确实无 tag，不臆造版本号）。
+
 ## [1.1.1] - 2026-09-20
 
 > **版本号语义说明（如实标注）**：本版按**补丁版**发布，但内容含一处 `Removed`（移除基础版 Docker 交付链 + PostgreSQL 后端支持）。
@@ -68,6 +97,14 @@ All notable changes to PromiseLink will be documented in this file.
 > 基础版唯一二进制交付路径本就是桌面安装包，数据库本就是 SQLite，且本版发布前后用户侧操作完全一致。
 > 若认为对"曾用 Docker/PG 跑基础版"的用户构成破坏性变更，则应改判为 `1.2.0`（仅需改 `VERSION` / `pyproject.toml` / `__init__.py` / `frontend/package.json` 与本节标题）。
 > 决策与影响面分析见 PromiseLink-Pro `docs/review/PROJECT_REVIEW_20260918_FINDINGS.md` §9。
+
+### Fixed — alembic 修订 id 超长导致 CI e2e 长期失败（2026-09-18）
+
+- **根因**：`w5_entity_correction_double_scope`（33 字符）与 `merge_w5_double_scope_7bb48953af15`（34 字符）超出 alembic 建 `alembic_version.version_num` 时固定的 `VARCHAR(32)`。SQLite 不校验长度，故本地/单测全绿；PostgreSQL（CI `e2e`、staging、容器部署）在 `alembic upgrade head` 时报 `psycopg2.errors.StringDataRightTruncation: value too long for type character varying(32)`，导致 `e2e` 门禁自 W5 迁移合入后持续红灯。
+- **修复**：两个修订更名为 `w5_entity_correction_scope` / `merge_w5_double_scope`（含 `down_revision` 引用与文档指针同步）。`version_num` 只记录当前 head（`w5a_score_audit_logs`），故已迁移的 SQLite/PostgreSQL 数据库均不受影响——实测升级后落盘值仍为 `w5a_score_audit_logs`。
+- **防复发**：新增 `tests/test_alembic_revision_ids.py`（修订 id ≤32 字符 / 单 head / down_revision 可解析），并用超长 id 探针做反向验证（探针下必失败，移除后通过）。
+- **本地验证**：全新 SQLite `alembic upgrade head` 成功（12 表），`alembic heads` 单 head。
+- **归属溯源（L-7，2026-09-21 补记）**：本项此前挂在文件中部一个游离的 `## [Unreleased]` 标题下。`git tag --contains 76aba28`（修订更名提交）实测输出 `v1.1.1`，即**本项随 v1.1.1 发布**，故归位于此。
 
 ### Removed — 基础版 Docker 交付链 + PostgreSQL 后端支持（方案 B）
 
@@ -137,14 +174,23 @@ CI `test (3.11)` 作业自 2026-09-03 起在 mypy 阶段失败，导致 pytest �
 - 发布验证：GitHub Actions run [34033889946](https://github.com/lulin70/PromiseLink/actions/runs/34033889946) 中 macOS 构建、Windows 构建、GitHub Release 资产上传、SCP 上传和 SSH 下载页更新全部成功；服务器已确认存在 `PromiseLink-1.0.5-mac.dmg` 与 `PromiseLink-1.0.5-windows.exe`。
 - 服务器当前未安装 nginx，工作流按预期输出 `nginx reload skipped`；这不影响静态文件上传和下载页链接更新。
 
-## [Unreleased]
+## [1.0.4] - 2026-09-06
 
-### Fixed — alembic 修订 id 超长导致 CI e2e 长期失败（2026-09-18）
+### Fixed — 服务器更新脚本实际未执行（发布链）
 
-- **根因**：`w5_entity_correction_double_scope`（33 字符）与 `merge_w5_double_scope_7bb48953af15`（34 字符）超出 alembic 建 `alembic_version.version_num` 时固定的 `VARCHAR(32)`。SQLite 不校验长度，故本地/单测全绿；PostgreSQL（CI `e2e`、staging、容器部署）在 `alembic upgrade head` 时报 `psycopg2.errors.StringDataRightTruncation: value too long for type character varying(32)`，导致 `e2e` 门禁自 W5 迁移合入后持续红灯。
-- **修复**：两个修订更名为 `w5_entity_correction_scope` / `merge_w5_double_scope`（含 `down_revision` 引用与文档指针同步）。`version_num` 只记录当前 head（`w5a_score_audit_logs`），故已迁移的 SQLite/PostgreSQL 数据库均不受影响——实测升级后落盘值仍为 `w5a_score_audit_logs`。
-- **防复发**：新增 `tests/test_alembic_revision_ids.py`（修订 id ≤32 字符 / 单 head / down_revision 可解析），并用超长 id 探针做反向验证（探针下必失败，移除后通过）。
-- **本地验证**：全新 SQLite `alembic upgrade head` 成功（12 表），`alembic heads` 单 head。
+- **现象**：服务器部署步骤用错了 appleboy/ssh-action 的输入 —— 使用了**不受支持的 SCP 命令输入**，导致「执行服务器更新脚本」这一步并未按预期执行；同时部署等待时长参数不正确。
+- **修复**（`1595c97`）：改用受支持的 SSH `script` 输入、移除不受支持的 SCP 命令输入，并按要求修正部署超时；版本号 `1.0.3 → 1.0.4`。
+- **范围**：`git show --stat 1595c97` 实测仅 4 个文件 —— `.github/workflows/build.yml`（-16/+10）与 `VERSION` / `pyproject.toml` / `src/promiselink/__init__.py` 三处版本号。**本版为发布链修复，不含产品代码变更。**
+
+## [1.0.3] - 2026-09-06
+
+### Fixed — 部署工作流超时参数写法（"use duration values"）
+
+- **现象**：appleboy/ssh-action 的超时参数此前传的是不带单位的裸数字，参数解析不正确。
+- **修复**（`377b54c`）：改为带单位的 duration 写法；版本号 `1.0.2 → 1.0.3`。
+- **范围**：`git show --stat 377b54c` 实测仅 4 个文件 —— `.github/workflows/build.yml`（4 行）与三处版本号文件。**本版为发布链修复，不含产品代码变更。**
+
+## [1.0.2] - 2026-09-06
 
 ### Added — 解析语义契约 W1+W2（2026-09-05， Ontology 语义契约规划）
 
@@ -166,6 +212,19 @@ CI `test (3.11)` 作业自 2026-09-03 起在 mypy 阶段失败，导致 pytest �
 - **G3 真实用户 e2e**：[scripts/e2e/e2e_w3_w4_real_user.py](scripts/e2e/e2e_w3_w4_real_user.py) 12 场景（事件录入 / 同名选择已有 / 创建新 / 忽略误识别 / 复合纠偏 / PII 脱敏 / 聚合隐私 / 同义词 / difflib / 2 次共现 / 91 天窗口 / 跨用户隔离）2026-09-06 跑通 12/12 PASS；每个场景使用独立文件 SQLite 实例，避免状态污染
 - 文档：[PRD](docs/spec/PRD_解析语义契约_W3W4_v1.md) / [技术设计](docs/design/TECH_DESIGN_解析语义契约_W3W4_v1.md) / [测试计划](docs/design/TEST_PLAN_解析语义契约_W3W4_v1.md)
 
+### Fixed — 10 项 P0-P2 用户体验补缺（2026-08-25）
+
+- `355b6d5`（`git show --stat` 实测 7 文件 / +234 / -61）：仪表盘新增根摘要接口（`src/promiselink/api/v1/dashboard.py`，+46）并补 `tests/test_dashboard_root_summary.py`（+63）；事件流水线补齐失败步骤可观测性（`services/event_pipeline.py`，+8）并补 `tests/test_pipeline_failed_steps.py`（+26）；关联打分校准（`services/association_scoring.py`）；三仓 WSS 联调 e2e 脚本修正（`scripts/e2e/e2e_three_repos_wss.py`，+19）；流水线可靠性设计文档同步（`docs/design/Pipeline_Reliability_2026-08-16.md`）。
+
+### Fixed — Wave 3 回归测试基础设施修复（2026-08-26）
+
+- `590f2b3`（`git show --stat` 实测 10 文件 / +102 / -58）：`services/embedding_provider.py` 重构（57 行改动）、`api/v1/dashboard.py` 修正（4 行），并修复/补充 5 个测试文件（`tests/test_auth_auto_identity.py` 新增 24 行、`tests/test_performance_supplement.py` 49 行改动等）。属**回归测试基础设施**，不含新功能。
+
+### Docs — 测试用例数与安装包体积订正（2026-09-02）
+
+- `a604ce3` / `c0e1cb4`：README 安装包体积改为与实际一致（macOS 35 MB / Windows 43 MB），测试用例数同步为 2035 passed（与实际一致）。
+
+> **溯源说明（L-7，2026-09-21 补记）**：本节内容此前挂在文件中部一个游离的 `## [Unreleased]` 标题下 —— 该标题既不指向任何待发布版本，也早于 `v1.0.2` / `v1.0.5` 的 tag。按 `git log v1.0.1..v1.0.2` 归位：W1+W2、W3+W4、两处 stability 修复与两处 docs 订正，全部随 **v1.0.2（`249d2e0`，2026-09-06）** 发布。1.0.3 / 1.0.4 两版为纯发布链修复，各只有 1 个提交，已单列于上。
 
 ## [1.0.1] - 2026-08-17
 
@@ -420,7 +479,7 @@ DevSquad 7-Role 评估发现基础版版本号落后专业版 2 个版本（v0.8
 - 版本策略：PATCH 递增（无新功能，仅 bug 修复 + 工程化改进 + 重构）
 - 文档先行：活文档 `PromiseLink-Pro/docs/planning/P0_P2_OPTIMIZATION_PLAN_2026-07-17.md` 实时更新
 
-## [Unreleased] - 2026-07-06
+## [v0.8.0-rc2 与 v0.8.1 之间 · 未打 tag] - 2026-07-06
 
 ### Removed — 违规部署配置清理 (2026-07-12)
 
@@ -513,7 +572,7 @@ DevSquad 7-Role 评估发现基础版版本号落后专业版 2 个版本（v0.8
 - **6/6 真实 LLM E2E 测试通过**（test_real_pipeline_e2e.py，91s）— 含 Happy Path、边界条件、4 zone 数据一致性
 - **293 单元测试通过**（association/promise/database 相关模块，17s）— 验证源码修改无回归
 
-## [Unreleased] - 2026-07-05
+## [v0.8.0-rc2 与 v0.8.1 之间 · 未打 tag] - 2026-07-05
 
 ### Fixed — 基础版 E2E 全量零 skip 达成
 
