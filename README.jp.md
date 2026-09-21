@@ -127,7 +127,7 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50件のセキュリ
 | APIルート    | **24ルートファイル / 63 APIエンドポイント / 53 paths**                              |
 | サービスモジュール     | **38個**                                                          |
 | データモデル     | **8ファイル、10モデルクラス**                                                  |
-| ドキュメントバージョン     | PRD v5.8 / Tech v3.2                                             |
+| ドキュメントバージョン     | PRD v5.9 / Tech v3.2                                             |
 | ソフトウェアバージョン     | v1.1.1                                                           |
 | 製品階層     | 基本版（ローカル無料） / プロ版（ゲートウェイ中継） / ミニプログラム（モバイル縦画面） / カスタム版（チーム）                      |
 | 全体進捗     | **89%** (基本版 E2E 81/0/0 零 skip 達成)                              |
@@ -267,7 +267,7 @@ PromiseLink/
 
 ### コアドキュメント
 
-- [PRD v5.8](docs/spec/PRD_v1.md) - 製品要件定義書
+- [PRD v5.9](docs/spec/PRD_v1.md) - 製品要件定義書
 - [技術設計 v3.2](docs/architecture/PromiseLink_技术设计_v1.md) - 完全な技術ソリューション
 - [プロジェクトステータス](docs/PROJECT_STATUS.md) - 11段階ライフサイクル追跡
 - [QUICKSTART](QUICKSTART.md) - クイックスタートガイド（設定リファレンスとFAQを含む）

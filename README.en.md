@@ -126,7 +126,7 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50 security tests
 | API routes    | **24 route files / 63 API endpoints / 53 paths**                              |
 | Service modules     | **38**                                                          |
 | Data models     | **8 files, 10 model classes**                                                  |
-| Documentation version     | PRD v5.8 / Tech v3.2                                             |
+| Documentation version     | PRD v5.9 / Tech v3.2                                             |
 | Software version     | v1.1.1                                                           |
 | Product tier     | Basic (local free) / Pro (gateway relay) / Mini-program (mobile) / Custom (team)                      |
 | Overall progress     | **89%** (Basic E2E 81/0/0 zero skip achieved)                              |
@@ -266,7 +266,7 @@ PromiseLink/
 
 ### Core Documents
 
-- [PRD v5.8](docs/spec/PRD_v1.md) - Product Requirements Document
+- [PRD v5.9](docs/spec/PRD_v1.md) - Product Requirements Document
 - [Technical Design v3.2](docs/architecture/PromiseLink_技术设计_v1.md) - Complete technical solution
 - [Project Status](docs/PROJECT_STATUS.md) - 11-stage lifecycle tracking
 - [QUICKSTART](QUICKSTART.md) - Quick start guide (incl. config reference and FAQ)

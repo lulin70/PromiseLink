@@ -151,7 +151,7 @@ pytest tests/test_security_comprehensive.py -q --no-cov   # 50 项安全测试
 | API 路由    | **24 个路由文件 / 63 个 API 端点 / 53 paths**                              |
 | 服务模块     | **38 个**                                                          |
 | 数据模型     | **8 个文件，10 个模型类**                                                  |
-| 文档版本     | PRD v5.8 / Tech v3.2                                             |
+| 文档版本     | PRD v5.9 / Tech v3.2                                             |
 | 软件版本     | v1.1.1                                                           |
 | 产品层级     | 基础版(本地免费) / 专业版(网关中继) / 小程序(手机竖屏) / 定制版(团队)                      |
 | 总体进度     | **89%** (基础版 E2E 156/0/0 零 skip 达成)                              |
@@ -291,7 +291,7 @@ PromiseLink/
 
 ### 核心文档
 
-- [PRD v5.8](docs/spec/PRD_v1.md) - 产品需求文档
+- [PRD v5.9](docs/spec/PRD_v1.md) - 产品需求文档
 - [技术设计 v3.2](docs/architecture/PromiseLink_技术设计_v1.md) - 完整技术方案
 - [项目状态](docs/PROJECT_STATUS.md) - 11 阶段生命周期跟踪
 - [QUICKSTART](QUICKSTART.md) - 快速开始指南（含配置参考和 FAQ）

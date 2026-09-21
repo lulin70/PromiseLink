@@ -71,6 +71,9 @@ jobs:
           print(f"  ✓ 版本号一致: {version}")
           PY
 
+      - name: Doc version consistency gate (③)
+        run: python3 scripts/quality/check_doc_versions.py
+
       - name: Run type checking
         run: python3 -m mypy src/promiselink --ignore-missing-imports
 
