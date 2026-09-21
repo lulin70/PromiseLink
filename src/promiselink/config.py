@@ -50,6 +50,20 @@ def runtime_pair_code_file() -> Path:
     return Path(__file__).resolve().parents[2] / ".pair_code"
 
 
+def runtime_log_dir() -> Path:
+    """运行时文件日志目录的唯一事实源（``~/.promiselink/logs``）。
+
+    与 ``runtime_env_file`` / ``runtime_pair_code_file`` 同源、理由相同：打包后
+    ``__file__`` 落在临时解包目录，日志写在那里进程一退就消失 —— 而售后排查
+    恰恰发生在进程退出之后。
+
+    ⑥（2026-09-21）：桌面端此前**只有 stdout 一个日志出口**（见
+    ``core/logging.py``），终端窗口一关日志即永久丢失；这是 ``console=False``
+    （窗口化）必须先补的前置条件。
+    """
+    return _PROMISELINK_HOME / "logs"
+
+
 LLM_PRESETS: dict[str, dict[str, str]] = {
     "deepseek": {"base_url": "https://api.deepseek.com/v1", "model": "deepseek-v4-flash"},
     "openai": {"base_url": "https://api.openai.com/v1", "model": "gpt-5.5"},

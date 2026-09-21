@@ -1,7 +1,7 @@
 # PromiseLink 数据库迁移回滚指南
 
-> **版本**: v1.0  
-> **更新日期**: 2026年6月29日  
+> **版本**: v1.1  
+> **更新日期**: 2026年9月21日  
 > **适用场景**: 生产环境迁移失败回滚、版本降级
 
 ---
@@ -184,6 +184,62 @@ alembic downgrade -1
 # 修改迁移脚本：op.create_index(..., postgresql_concurrently=True)
 ```
 
+### 场景4：修订 id 改名导致 `Can't locate revision`（L-11）
+
+**问题**：`alembic upgrade head` 报
+
+```
+ERROR [alembic.util.messaging] Can't locate revision identified by 'merge_w5_double_scope_7bb48953af15'
+FAILED: Can't locate revision identified by 'merge_w5_double_scope_7bb48953af15'
+```
+
+**背景**：该修订 id 曾在提交 `76aba28`（2026-09-18）中**改名**，由 `merge_w5_double_scope_7bb48953af15`（34 字符）改为 `merge_w5_double_scope` —— 目的是修 `alembic_version.version_num` 的 `VARCHAR(32)` 截断（详见 CHANGELOG 1.1.x 条目）。改名让**历史链里的旧 id 不再存在**，但已经落库的 `version_num` 仍写着旧 id，于是 alembic 无法定位起点。
+
+**影响面（已核实，不要夸大）**：
+
+- **已发布版本的用户不受影响** —— v1.1.0 起的 head 一直是 `w5a_score_audit_logs`，该 id 至今未变。
+- 受影响的**只有**在 2026-09-10 ~ 09-13 之间迁移过、且 `version_num` 停在**中间 head**（即 `merge_w5_double_scope_7bb48953af15`）的开发库 / 预发库。
+
+**处置办法（在 SQLite 上实测三种路径，结论见下）**：
+
+```bash
+# 前置：先看库停在哪
+alembic current          # 若同样报 Can't locate revision，改用 SQL 直查：
+sqlite3 <db> "SELECT version_num FROM alembic_version;"
+
+# 路径 1（推荐）：--purge 直接改写版本标记，再做一次 upgrade
+alembic stamp --purge merge_w5_double_scope
+alembic upgrade head
+
+# 路径 2（等价）：直接改表，绕过 alembic 的起点解析
+sqlite3 <db> "UPDATE alembic_version SET version_num='merge_w5_double_scope';"
+alembic upgrade head
+
+# 路径 3（开发库最省事）：该库只用于本地开发时，直接删库重建
+rm <db> && alembic upgrade head
+```
+
+**❌ 不要这样做**（两条都是"看起来最自然"的做法，实测均失败）：
+
+```bash
+alembic upgrade head                              # 仍然报 Can't locate revision
+alembic stamp merge_w5_double_scope               # 同样报 Can't locate revision
+```
+
+原因：`alembic stamp` **不带 `--purge`** 时会先解析当前版本以计算迁移路径，起点解析失败即中止；只有 `--purge` 会跳过这一步、直接覆写 `alembic_version`。
+
+**❌ 也不要在历史链里补一个同名的假修订**：那会在 alembic 迁移链中永久留下一个非真实节点，把一次性便利变成长期负担。
+
+**验证与反向探针（2026-09-21 实测，可复现）**：
+
+| 探针 | 动作 | 实测结果 |
+|---|---|---|
+| 基线 | 全新库 `alembic upgrade head` | ✅ 落盘 `w5a_score_audit_logs`，`score_audit_logs` 表建成 |
+| 反向 | 把 `version_num` 改为旧 id 后直接 `upgrade head` | ❌ `Can't locate revision` ×2（与本节症状一致） |
+| 反向 | 旧 id + `alembic stamp <新id>`（无 `--purge`） | ❌ `Can't locate revision` ×2（印证"路径 1 必须带 `--purge`"） |
+| 修复 | 旧 id + `stamp --purge` + `upgrade head` | ✅ 落盘 `w5a_score_audit_logs` |
+| 修复 | 旧 id + SQL `UPDATE` + `upgrade head` | ✅ 落盘 `w5a_score_audit_logs` |
+
 ---
 
 ## 回滚失败的应急处理
@@ -340,5 +396,5 @@ echo "=== 回滚完成 ==="
 
 ---
 
-**最后更新**: 2026年6月29日  
+**最后更新**: 2026年9月21日  
 **维护者**: PromiseLink团队

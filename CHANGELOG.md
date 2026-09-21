@@ -4,6 +4,30 @@ All notable changes to PromiseLink will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed — macOS 包窗口化后日志无处可看：新增文件日志 + `console` 改 `False`（⑥ / L-16 / L-18，2026-09-21）
+
+- **前置事实（L-18，写方案时为核实 L-16 而查）**：桌面端此前**只有 stdout 一个日志出口** —— `core/logging.py` 的 `logger_factory=structlog.PrintLoggerFactory()`，`configure_logging()` 只设 root level、**未挂任何 `FileHandler`**（全仓 grep `FileHandler|RotatingFile|WriteLoggerFactory` 无命中）。终端窗口一关（或用户从不看它）日志即**永久丢失**，而最需要日志的**非技术用户恰恰不读终端** → 售后拿不到任何证据。
+- **形态问题（L-16）**：PyInstaller 6.21.0 源码 `if self.console: info_plist_dict['LSBackgroundOnly'] = True` —— `EXE(console=True)` 的**附带效果**是 `LSBackgroundOnly=true`（与 `version=` 无关），实测**已发布的 v1.1.1 dmg 同样带此键**。于是状态是「黑底终端窗口可见 + Dock 无图标 / 不参与 Cmd-Tab」，**恰好取了两者的缺点**。
+- **修复①文件日志**：新增 `config.runtime_log_dir()`（`~/.promiselink/logs`，与 `runtime_env_file` / `runtime_pair_code_file` 同源同理由：打包后 `__file__` 落在临时解包目录，日志写在那里进程一退就消失）；`core/logging.py` 新增 `_LogFileSink`（`RotatingFileHandler` 子类，5MB × 3 份轮转）—— **一个 handler 兼作 structlog 的行式落点**，避免两个 handler 抢轮转；`_TeeFile` 把 structlog 同时写给 stdout 与文件，**stdout 格式零变更**；打包运行（`sys.frozen`）默认启用，**源码运行不建目录**（开发机与 CI runner 的 HOME 不被静默写入）；日志目录不可写时 **fail-soft**（记 stderr，不阻止启动）。
+- **修复②放开 uvicorn**：`uvicorn` / `uvicorn.error` 默认 `propagate=False`（自己写 stderr），显式置 `True`（`uvicorn.access` 刻意不放行）—— 否则窗口化后**启动失败的栈无处可看**。
+- **修复③窗口化**：`promiselink.spec` 的 `EXE(console=False)`。**顺序不可颠倒**：先有文件日志，再窗口化，否则排障能力归零（spec 内已写注释说明）。
+- **实测（真实命令输出见 `PromiseLink-Pro/docs/planning/P2_PLAN_20260921.md` §9）**：
+  - `plutil -p dist/PromiseLink.app/Contents/Info.plist | grep -c LSBackgroundOnly` → **0**（同次实测 `CFBundleShortVersionString => 1.1.1`、`CFBundleIdentifier => com.carrymem.promiselink`）
+  - 干净环境 e2e → **19 passed, 0 failed**（新增 2 条硬断言：文件日志已落盘且含启动行 / 文件日志未落许可证明文）
+  - 崩溃探针（把 `data/promiselink.db` 写成非 SQLite 内容后启动包）→ 文件日志含 **2 处 `Traceback`** 与 `sqlalchemy.exc.DatabaseError: file is not a database`（终端侧另有一份，窗口化后**文件侧这一份才是用户拿得到的**）
+  - 脱敏：`grep -c "PL-PRO-E2E0-0000-0001" promiselink.log` → **0**；许可证仅以 `PL-PRO-E2E****` 掩码出现（沿用 L-2 口径）
+- **回归测试（新增 10 条 + 3 条）**：`tests/test_file_logging.py` 10 条（含 3 条反向探针：源码运行不得建目录挂 handler / `propagate=False` 时栈必须丢 / 日志目录不可写不得阻止启动）＋ `tests/test_packaging_spec.py` 3 条（`exe_console_value()` AST 断言 + 反向探针：spec 改回 `console=True` 必须变红）。
+- **生效时点**：需**下次发版**才作用于用户（已发布的 dmg 已锁定，改 spec 不改已发布包）。
+- **未覆盖（需人工）**：应用出现在 Dock、`Cmd-Tab` 可切换 —— 需用户双击实际包确认（打包产物无法脚本化验证 Dock 行为）。
+
+### Docs — alembic 修订 id 改名的处置办法入运维文档（⑧，2026-09-21）
+
+- **问题**：`76aba28`（2026-09-18）把修订 id `merge_w5_double_scope_7bb48953af15` 改名为 `merge_w5_double_scope`（修 `version_num` 的 `VARCHAR(32)` 截断）。改名后历史链里不再有旧 id，而**已经落库**的 `version_num` 仍写着旧 id → `alembic upgrade head` 报 `Can't locate revision identified by 'merge_w5_double_scope_7bb48953af15'`。此前只在 CHANGELOG 记了"改名"，**没有写"踩到了怎么办"**。
+- **影响面（已核实，不夸大）**：已发布版本的用户**不受影响**（v1.1.0 起的 head `w5a_score_audit_logs` 至今未变）；受影响的只有在 2026-09-10 ~ 09-13 之间迁移过、停在**中间 head** 的开发库 / 预发库。
+- **处置办法写入** `docs/database_migration_rollback.md` 新增「场景4」（关键词 `merge_w5_double_scope_7bb48953af15` 可直接检索）：推荐 `alembic stamp --purge merge_w5_double_scope` → `alembic upgrade head`；等价路径为直接 `UPDATE alembic_version`；纯开发库可直接删库重建。**代码不改**（P2 §2.8 共识：不在历史链里补假修订）。
+- **反直觉发现（先探针后写文档，避免写出一条错的处置办法）**：`alembic stamp merge_w5_double_scope`（**不带** `--purge`）与 `alembic upgrade head` **一样报错** —— 因为 `stamp` 不带 `--purge` 时会先解析当前版本来算路径，起点解析失败即中止。若不做探针，文档里"最自然"的那条命令就是错的。
+- **探针证据（SQLite，2026-09-21 实测 5 条）**：基线（全新库 `upgrade head`）✅ 落盘 `w5a_score_audit_logs`；反向（旧 id 直接 `upgrade head`）❌ 报错 ×2；反向（旧 id + 无 `--purge` 的 `stamp`）❌ 报错 ×2；修复 A（`stamp --purge` + `upgrade head`）✅；修复 B（SQL `UPDATE` + `upgrade head`）✅。文档中的对照表即这 5 条实测结果。
+
 ### Docs — 三语 README 的文档版本口径对齐（③，2026-09-21）
 
 - **问题（实测）**：README 三语的「文档版本」行与文档链接都写 `PRD v5.8`，而 `docs/spec/PRD_v1.md` 头部已是 **v5.9**。README 是用户与外部评审的**第一印象**，声称的版本与实际文档不一致属对外口径错误（三语共 6 处）。
@@ -30,7 +54,7 @@ All notable changes to PromiseLink will be documented in this file.
 - **实测（同一探针，修复后）**：退出耗时 **31s → 1s**，日志为 `promiselink_shutting_down(pending_tasks=1)` → `waiting_for_pending_tasks(timeout=5.0)` → 任务**协作退出**（未触发取消）→ `shutdown_complete`，该段共 0.12s。
 - **回归测试（新增 5 条）**：`tests/test_coverage_boost.py` —— 停机上限必须有界（≤5s，防回退到 30s）、无任务时零成本、永不结束的任务须在上限内被取消且被指名（并断言日志含未完成项清单与本次等待上限）、响应信号的任务须正常收尾不被误杀、首次延迟须可被停机打断。
 - **反向探针（防假绿，各注入一次后复原）**：① 上限改回 `30.0` → "必须有界"断言红；② 去掉 `_shutdown_event.set()` → 协作任务未被唤醒、被误列为未完成（红）；③ 日志去掉 `unfinished=` → 日志断言红。
-- **e2e 断言升级（实测 `17 passed, 0 failed`）**：`e2e_release_package_clean_env.sh` 把原先"停机 >10s 打警告"改为**硬断言 `< 5s`**（实机测得 **1s**），并新增 ② 的 `/pair/status` 必须报 `rejected` + 非空 `rejected_kind`（且不回显许可证明文）两条断言，共 **17** 项（旧包因无终态能力跳 3 条 → 14）。
+- **e2e 断言升级（当时实测 `17 passed, 0 failed`）**：`e2e_release_package_clean_env.sh` 把原先"停机 >10s 打警告"改为**硬断言 `< 5s`**（实机测得 **1s**），并新增 ② 的 `/pair/status` 必须报 `rejected` + 非空 `rejected_kind`（且不回显许可证明文）两条断言，当时共 **17** 项（旧包因无终态能力跳 3 条 → 14）。**⑥ 落地后再加 2 条硬断言 → 19**（见上文 ⑥ 段，`17` 为本条落笔时点的历史实测值，不回填）。
 
 ### Fixed — 桌面版对无效许可证的 403 风暴（L-1，2026-09-21）
 
@@ -83,8 +107,8 @@ All notable changes to PromiseLink will be documented in this file.
 ### Added — 干净环境 · release 包 · 真实用户链路 e2e（§9.7 第 5 条 / P0-2，2026-09-21）
 
 - **为什么需要**：此前所有 e2e 都在源码树内跑（`.venv` + 仓库内 `.env`），覆盖不到"从官网下载 dmg → 双击 → 配对 → 重启"这条**唯一交付路径**；2026-09-19「每次启动都要重新配对」与 2026-09-20「桌面包 WSS 永不启动」两个 P0 都只可能在这条路径上被发现。
-- **做法**：`scripts/e2e/e2e_release_package_clean_env.sh <PromiseLink.app> [工作目录]` —— 把 `HOME` 指向全新空目录后启动包内二进制，等价新机器，且不污染开发者真实 `~/.promiselink/`。8 个步骤 ~~14~~ **17** 项断言（⑦/② 落地后升级，见上文）：启动 / 未配对不连网关 / 取配对码 / 激活写 `.env` / WSS 起连 + 终态可见 / 优雅退出（<5s）/ 重启 / **重启后许可证仍在**。
-- **实测结果（v1.1.1 dmg，最终版脚本）**：`14 passed, 0 failed`。**两个历史 P0 均已进包**：`.env` 落在干净 HOME 且含 `PRO_LICENSE_KEY` + `RELAY_GATEWAY_URL`；重启后无需再配对即 `relay_wss_start_scheduled`，`PRO_LICENSE_KEY` 跨重启保持。
+- **做法**：`scripts/e2e/e2e_release_package_clean_env.sh <PromiseLink.app> [工作目录]` —— 把 `HOME` 指向全新空目录后启动包内二进制，等价新机器，且不污染开发者真实 `~/.promiselink/`。8 个步骤 ~~14~~ ~~17~~ **19** 项断言（⑦/②/⑥ 逐次升级，见上文 ⑥ 段）：启动 + 文件日志落盘 / 未配对不连网关 / 取配对码 / 激活写 `.env` + 日志脱敏 / WSS 起连 + 终态可见 / 优雅退出（<5s）/ 重启 / **重启后许可证仍在**。
+- **实测结果（v1.1.1 dmg，本条落笔时点的脚本版本）**：`14 passed, 0 failed`（该数字为历史实测值，不回填；⑦/②/⑥ 之后为 **19 passed**）。**两个历史 P0 均已进包**：`.env` 落在干净 HOME 且含 `PRO_LICENSE_KEY` + `RELAY_GATEWAY_URL`；重启后无需再配对即 `relay_wss_start_scheduled`，`PRO_LICENSE_KEY` 跨重启保持。
 - **未覆盖（脚本内已显式标注，不假装通过）**：小程序**真人扫码**那一步无法自动化；脚本走的是扫码完成后桌面轮询任务所调用的同一个 `POST /api/v1/pair/activate`。
 - **顺带记录的两项体验问题**：① 优雅停机实测 **31~32s**（在等"事件维护"后台任务收尾），用户点关闭后会以为卡死；② 上面 L-15 的空提示。② 已在本轮修复；① 当时只打警告，现已升级为硬断言 `< 5s`（见上文 ⑦）。
 - **断言取数说明（踩过的坑，留给后来的维护者）**：包的 `/api/v1/health` 是**未认证短响应**（只有 status/version），带 components 的 `/api/v1/health/full` 需认证 —— 故脚本一律以**包自身日志**为事实来源。另外"进程是否真的退出"既不能只看 PID（PyInstaller bootloader 先退、子进程还在跑），也不能只等端口释放（uvicorn 先关监听 socket、lifespan 停机还在继续），两者都会造成假红/假绿，最终判据取"包内二进制进程全部消失"。

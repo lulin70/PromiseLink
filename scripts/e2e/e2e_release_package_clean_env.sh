@@ -13,8 +13,12 @@
 # 覆盖：启动 → 取配对码（网关可达）→ 激活写 .env → WSS 起连 → 终态对用户可见
 #       （② /pair/status 报 rejected + 归因）→ 杀进程（⑦ 优雅停机 < 5s）→
 #       重启后许可证仍在（不再要求重新配对）→ 无效证书不会造成重试风暴
+#       → ⑥ 文件日志已落盘且不含许可证明文
 #
-# 断言数：17（若包早于 L-1/L-14，⑤ 与 ② 会显式标注"该包无此能力"并跳过 3 条 → 14）
+# 断言数：19（若包早于 L-1/L-14，⑤ 与 ② 会显式标注"该包无此能力"并跳过 3 条 → 16）
+# 注：⑥ 的两条是**硬断言**。它验证的是"窗口化（console=False）之后日志仍然拿得到"，
+#     早于 ⑥ 的包（console=True，无文件日志）必然为红 —— 属预期，那些包不满足 ⑥
+#     之后的发布条件，不应再作为发布候选重跑本脚本。
 #
 # 不覆盖（必须人工，脚本会显式标注）：小程序真人扫码那一步。脚本走的是扫码
 # 完成后桌面轮询任务所调用的同一个 `POST /api/v1/pair/activate`。
@@ -113,6 +117,15 @@ else
   kill "$PID1" 2>/dev/null
   exit 1
 fi
+
+# ⑥（2026-09-21）：包已改 console=False（窗口化），不再有终端窗口 —— 文件日志
+# 是用户/售后唯一还能拿到的证据。这里断言的是"窗口化之后日志没有丢"。
+APP_LOG="$APP_HOME/.promiselink/logs/promiselink.log"
+if [[ -f "$APP_LOG" ]] && grep -q "promiselink_starting" "$APP_LOG"; then
+  ok "⑥ 文件日志已落盘且含启动行：${APP_LOG#*/}"
+else
+  bad "⑥ 未生成文件日志或其中无启动行（窗口化后终端没了，日志不能再丢）"
+fi
 VERSION=$(curl -s -m 5 "$BASE/api/v1/health" | python3 -c "import json,sys;print(json.load(sys.stdin).get('version',''))" 2>/dev/null)
 if [[ -n "$VERSION" ]]; then
   ok "应用内自报版本 = ${VERSION}（应与发布的 tag 一致）"
@@ -158,6 +171,18 @@ if grep -q "^RELAY_GATEWAY_URL=" "$ENV_FILE" 2>/dev/null; then
   ok ".env 含 RELAY_GATEWAY_URL（2026-09-20「WSS 永不启动」回归点）"
 else
   bad ".env 缺 RELAY_GATEWAY_URL"
+fi
+
+# ⑥（2026-09-21）：文件日志是会被用户"复制诊断信息"发给支持的那份东西，
+# 许可证必须沿用 L-2 的掩码口径（前 10 位 + ****），不得落明文。
+if [[ -f "$APP_LOG" ]]; then
+  if grep -q "$E2E_LICENSE_KEY" "$APP_LOG"; then
+    bad "⑥ 文件日志落了许可证明文（应从 pair 激活起就掩码）"
+  else
+    ok "⑥ 文件日志未落许可证明文（沿用 L-2 掩码口径）"
+  fi
+else
+  bad "⑥ 文件日志不存在，脱敏无从验证"
 fi
 
 step "5/8 激活后 WSS 应真正起连，且无效证书不得造成重试风暴"

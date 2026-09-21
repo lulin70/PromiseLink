@@ -119,7 +119,14 @@ exe = EXE(
     strip=False,
     upx=True,
     runtime_tmpdir=None,
-    console=True,  # Set to False for windowed mode (no terminal)
+    # console=False（窗口化，⑥ / L-16，2026-09-21）：PyInstaller 在
+    # console=True 时会顺带写 LSBackgroundOnly=true（源码：if self.console:
+    # info_plist_dict['LSBackgroundOnly'] = True），结果是"黑底终端窗口可见
+    # + Dock 无图标 / 不参与 Cmd-Tab"——恰好取了两者的缺点。
+    # 改窗口化后终端窗口消失，故**必须先有文件日志**（core/logging.py 写
+    # ~/.promiselink/logs/，轮转保留 3 份）作为非技术用户唯一可交付的诊断证据；
+    # 顺序不可颠倒，否则排障能力归零。
+    console=False,
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,

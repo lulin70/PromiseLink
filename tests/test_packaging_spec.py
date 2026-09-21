@@ -114,3 +114,42 @@ def test_bundle_version_comes_from_the_version_file():
 def test_version_file_value_matches_package_version():
     """即将写入 Info.plist 的值（VERSION 文件内容）必须与包自报版本一致。"""
     assert (ROOT / "VERSION").read_text(encoding="utf-8").strip() == promiselink.__version__
+
+
+def exe_console_value(source: str) -> bool:
+    """Return the ``console=`` literal from the spec's ``EXE(...)`` call."""
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "EXE"
+        ):
+            for kw in node.keywords:
+                if kw.arg == "console":
+                    assert isinstance(kw.value, ast.Constant)
+                    return bool(kw.value.value)
+            raise AssertionError("EXE(...) 未传 console= → 退回 PyInstaller 默认值")
+    raise AssertionError("promiselink.spec 中找不到 EXE(...) 调用")
+
+
+def test_exe_is_windowed_and_keeps_traceback_flag():
+    """⑥ / L-16：必须是 ``console=False``（否则 Info.plist 带 ``LSBackgroundOnly=true``）。
+
+    PyInstaller 6.21.0 源码：``if self.console: info_plist_dict['LSBackgroundOnly'] = True``
+    —— 即 ``console=True`` 会顺带把应用扔进"后台进程"，Dock 无图标、不参与
+    Cmd-Tab；而它同时又保留黑底终端窗口，等于"两者的缺点都要"。
+
+    本项的前提是**已有文件日志**（见 ``tests/test_file_logging.py``）：窗口化会
+    让终端窗口消失，没有文件日志就等于把排障能力归零。
+    """
+    assert exe_console_value(SPEC.read_text(encoding="utf-8")) is False, (
+        "EXE(console=True) 会写入 LSBackgroundOnly=true：应用不进 Dock、无法 Cmd-Tab"
+    )
+
+
+def test_probe_console_true_is_flagged():
+    """反向探针：把 spec 改回 ``console=True``，上面的门禁必须变红。"""
+    regressed = SPEC.read_text(encoding="utf-8").replace("console=False,", "console=True,")
+    assert regressed != SPEC.read_text(encoding="utf-8"), "探针未生效：spec 中找不到 console=False,"
+    assert exe_console_value(regressed) is True
