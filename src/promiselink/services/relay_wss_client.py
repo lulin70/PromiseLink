@@ -72,6 +72,10 @@ class RelayWSSState:
         self.auth_failures: int = 0
         # Non-empty when the loop gave up for a non-transient reason.
         self.terminal_reason: str = ""
+        # ②（2026-09-21）：网关给出的原因码（如 LICENSE_NOT_FOUND /
+        # DEVICE_LIMIT_EXCEEDED）。terminal_reason 只说"被拒"，配对页需要
+        # 据此区分「许可证无效 / 已被占用 / 不存在」。
+        self.terminal_code: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -83,6 +87,7 @@ class RelayWSSState:
             "last_error": self.last_error,
             "auth_failures": self.auth_failures,
             "terminal_reason": self.terminal_reason,
+            "terminal_code": self.terminal_code,
         }
 
 
@@ -161,6 +166,7 @@ class RelayWSSClient:
         # L-1: a (re)start means a fresh license attempt — clear the terminal
         # state so the previous rejection cannot latch forever.
         self.state.terminal_reason = ""
+        self.state.terminal_code = ""
         self.state.auth_failures = 0
         self.state.last_error = ""
         self._task = asyncio.create_task(self._run_forever(), name="relay_wss")
@@ -221,6 +227,7 @@ class RelayWSSClient:
                 # disconnect and reconnect with backoff.
                 backoff = self.reconnect_interval
                 self.state.auth_failures = 0
+                self.state.terminal_code = ""
             except asyncio.CancelledError:
                 raise
             except RelayAuthError as exc:
@@ -228,6 +235,10 @@ class RelayWSSClient:
                 self.state.auth_failures += 1
                 if self.state.auth_failures >= self.max_auth_failures:
                     self.state.terminal_reason = "license_rejected"
+                    # ②（2026-09-21）：保留网关原因码，供配对页给出可执行文案；
+                    # details 缺失时为 ""，配对页按"许可证无效"兜底。
+                    details = getattr(exc, "details", None) or {}
+                    self.state.terminal_code = str(details.get("gateway_code", ""))
                     logger.error(
                         "relay_wss_auth_terminal",
                         attempts=self.state.auth_failures,

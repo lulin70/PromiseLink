@@ -23,6 +23,7 @@ from promiselink.services.relay_client import (
     RelayClient,
     RelayError,
     RelayUnavailableError,
+    _gateway_error_code,
     close_relay_client,
     create_relay_client_from_settings,
     get_shared_relay_client,
@@ -360,6 +361,59 @@ class TestRefreshToken:
         with pytest.raises(RelayAuthError):
             await relay_client.refresh_token()
 
+    async def test_refresh_token_l19_409_already_activated_is_terminal(self, relay_client):
+        """L-19 反向探针：409 + LICENSE_ALREADY_ACTIVATED 必须判终态并带出原因码.
+
+        网关用 **409 Conflict** 表达"该许可证已绑定其他用户"
+        （`gateway/core/error_codes.py`: 409 → LICENSE_ALREADY_ACTIVATED）。
+        旧逻辑只看 401/403，409 落到下面的 `>= 400` 分支变成 RelayError
+        （瞬时错误）→ 在 `reconnect_max`(30s) 处饱和后每 30 秒重试一次、
+        永不停止，与 L-14（404 LICENSE_NOT_FOUND 未纳入集合）是同一类缺陷。
+
+        反向探针：若有人把 `LICENSE_ALREADY_ACTIVATED` 从
+        `_PERMANENT_LICENSE_CODES` 中移除，本用例必然变红。
+        """
+        mock_client = _make_mock_http_client(
+            post_return=_make_httpx_response(
+                409,
+                json_data={
+                    "success": False,
+                    "error": {
+                        "code": "LICENSE_ALREADY_ACTIVATED",
+                        "message": "License already bound to another user",
+                    },
+                },
+            )
+        )
+        relay_client._get_client = AsyncMock(return_value=mock_client)
+
+        with pytest.raises(RelayAuthError) as exc_info:
+            await relay_client.refresh_token()
+        assert exc_info.value.details["status_code"] == 409
+        assert exc_info.value.details["gateway_code"] == "LICENSE_ALREADY_ACTIVATED"
+
+    async def test_refresh_token_l19_409_unknown_code_stays_transient(self, relay_client):
+        """L-19 反向：409 + 未登记的码不得被判终态（不能把整个 409 一起打死）.
+
+        409 在网关词汇表里目前只有 LICENSE_ALREADY_ACTIVATED 一个语义，
+        但把"状态码"整体当终态会让未来任何 409 新语义都无声地停掉中继。
+        本用例锁定"按码不按状态码"的判定方式。
+        """
+        mock_client = _make_mock_http_client(
+            post_return=_make_httpx_response(
+                409,
+                json_data={
+                    "success": False,
+                    "error": {"code": "SOME_FUTURE_CONFLICT", "message": "conflict"},
+                },
+            )
+        )
+        relay_client._get_client = AsyncMock(return_value=mock_client)
+
+        with pytest.raises(RelayError) as exc_info:
+            await relay_client.refresh_token()
+        assert not isinstance(exc_info.value, RelayAuthError)
+
     async def test_refresh_token_l14_404_route_not_found_stays_transient(self, relay_client):
         """L-14 反向：404 + ROUTE_NOT_FOUND 不得被判终态.
 
@@ -508,6 +562,54 @@ class TestExtractTokenData:
         with pytest.raises(RelayError) as exc_info:
             RelayClient._extract_token_data({"status": "ok"})
         assert exc_info.value.code == "RELAY_PARSE_ERROR"
+
+
+# ── _gateway_error_code tests（② 2026-09-21）──
+
+
+class TestGatewayErrorCode:
+    """Test _gateway_error_code — 从 UnifiedResponse envelope 里取 error.code.
+
+    配对页要按原因码给三类不同文案（许可证无效 / 已被占用 / 不存在），
+    所以这里必须能把码取出来，且在取不到时给空串（不能抛异常、不能给
+    字符串 "None"）。
+    """
+
+    def test_extracts_code_from_unified_envelope(self):
+        """标准 envelope：error.code 被取出。"""
+        resp = _make_httpx_response(
+            409,
+            json_data={
+                "success": False,
+                "error": {"code": "LICENSE_ALREADY_ACTIVATED", "message": "bound"},
+            },
+        )
+        assert _gateway_error_code(resp) == "LICENSE_ALREADY_ACTIVATED"
+
+    def test_returns_empty_when_body_is_not_json(self):
+        """非 JSON 正文（nginx HTML 错误页）→ 空串，不抛异常。"""
+        resp = _make_httpx_response(502, text="<html>502 Bad Gateway</html>")
+        assert _gateway_error_code(resp) == ""
+
+    def test_returns_empty_when_error_key_missing(self):
+        """FastAPI 默认的 {"detail": ...} → 空串。"""
+        resp = _make_httpx_response(404, json_data={"detail": "Not Found"})
+        assert _gateway_error_code(resp) == ""
+
+    def test_returns_empty_when_error_is_not_an_object(self):
+        """error 是字符串而不是对象 → 空串（不得 AttributeError）。"""
+        resp = _make_httpx_response(422, json_data={"error": "boom"})
+        assert _gateway_error_code(resp) == ""
+
+    def test_returns_empty_when_code_is_not_a_string(self):
+        """code 是数字 → 空串（不得把 12345 变成 "12345"）。"""
+        resp = _make_httpx_response(422, json_data={"error": {"code": 12345}})
+        assert _gateway_error_code(resp) == ""
+
+    def test_returns_empty_when_body_is_a_list(self):
+        """正文是数组（老网关的裸错误格式）→ 空串。"""
+        resp = _make_httpx_response(400, json_data=[{"error": {"code": "X"}}])
+        assert _gateway_error_code(resp) == ""
 
 
 # ── _ensure_token tests ──

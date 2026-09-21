@@ -11,7 +11,9 @@ Targets modules with lowest coverage to push overall from 77% to 80%+:
 - database.py (62%)
 """
 
+import asyncio
 import os
+import re
 import time
 import uuid
 from datetime import UTC, datetime
@@ -2579,6 +2581,124 @@ class TestMainAppAdditional:
         _signal_handler(15, None)
         assert _shutdown_event.is_set()
         _shutdown_event.clear()
+
+    def test_shutdown_drain_timeout_is_bounded(self):
+        """⑦ 回归护栏：停机排空上限必须是有界的小值。
+
+        用户可见契约是「点退出后很快真的退出」。历史上这里是
+        `asyncio.wait(_pending_tasks, timeout=30.0)`，而集合里唯一的后台任务
+        是永不结束的循环 → 每次都等满 30s（实机 31~32s）。若有人把它改回
+        30s 量级，这条断言变红。
+        """
+        from promiselink.main import _SHUTDOWN_DRAIN_TIMEOUT
+
+        assert 0 < _SHUTDOWN_DRAIN_TIMEOUT <= 5.0
+
+    @pytest.mark.asyncio
+    async def test_drain_returns_immediately_when_no_pending_tasks(self, monkeypatch):
+        """没有后台任务时排空是零成本的（不睡觉、不空等）。"""
+        import promiselink.main as main_mod
+
+        monkeypatch.setattr(main_mod, "_pending_tasks", set())
+        main_mod._shutdown_event.clear()
+        try:
+            t0 = time.monotonic()
+            unfinished = await main_mod._drain_pending_tasks()
+            elapsed = time.monotonic() - t0
+            signal_set = main_mod._shutdown_event.is_set()
+        finally:
+            main_mod._shutdown_event.clear()
+
+        assert unfinished == []
+        assert elapsed < 0.5, f"空任务的排空不该耗时 {elapsed:.2f}s"
+        # 协作退出信号仍必须先发出：否则后续后台循环不知道自己该结束
+        assert signal_set is True
+
+    @pytest.mark.asyncio
+    async def test_drain_bounds_wait_and_reports_unfinished_task(self, monkeypatch, capsys):
+        """永不结束的任务：排空必须在上限内返回，并**指名**未完成者是哪一个。
+
+        这是 ⑦ 的核心行为 —— 旧代码会老老实实等满超时上限（且不记名）。
+        运维侧的事实来源是日志，故同时断言日志里真的带了未完成项清单。
+        """
+        import promiselink.main as main_mod
+
+        async def _never_ending() -> None:
+            while True:
+                await asyncio.sleep(3600)
+
+        pending: set[asyncio.Task] = set()
+        monkeypatch.setattr(main_mod, "_pending_tasks", pending)
+        monkeypatch.setattr(main_mod, "_SHUTDOWN_DRAIN_TIMEOUT", 0.3)
+        main_mod._shutdown_event.clear()
+
+        task = asyncio.create_task(_never_ending())
+        pending.add(task)
+        task.add_done_callback(pending.discard)
+
+        try:
+            t0 = time.monotonic()
+            unfinished = await main_mod._drain_pending_tasks()
+            elapsed = time.monotonic() - t0
+        finally:
+            main_mod._shutdown_event.clear()
+
+        assert elapsed < 2.0, f"排空应受 _SHUTDOWN_DRAIN_TIMEOUT 约束，实测 {elapsed:.2f}s"
+        assert len(unfinished) == 1, f"应恰好指名一个未完成项，实际 {unfinished}"
+        assert unfinished[0].endswith("_never_ending"), f"未完成项应被指名，实际 {unfinished}"
+        assert task.cancelled() is True, "超时任务必须被取消，否则会拖住解释器退出"
+
+        # §2.7 校验第 3 条：超时日志必须含明确的未完成项清单
+        # 先剥 ANSI 颜色码 —— 单独跑本文件时 structlog 上色，整文件一起跑时是 JSON，
+        # 不剥码会出现"同一断言单跑绿、连跑红"的伪失败。
+        out = re.sub(r"\x1b\[[0-9;]*m", "", capsys.readouterr().out)
+        assert "cancelling_pending_tasks" in out, f"缺少取消告警日志：{out}"
+        assert "unfinished" in out and "_never_ending" in out, f"日志未指名未完成项：{out}"
+        assert "timeout=0.3" in out, f"日志应暴露本次等待上限，便于定位阈值：{out}"
+
+    @pytest.mark.asyncio
+    async def test_drain_lets_shutdown_aware_task_finish_without_cancelling(self, monkeypatch):
+        """响应协作退出信号的任务应**正常收尾**，不被误杀也不进未完成清单。"""
+        import promiselink.main as main_mod
+
+        finished = asyncio.Event()
+
+        async def _cooperative() -> None:
+            await main_mod._shutdown_event.wait()
+            finished.set()
+
+        pending: set[asyncio.Task] = set()
+        monkeypatch.setattr(main_mod, "_pending_tasks", pending)
+        monkeypatch.setattr(main_mod, "_SHUTDOWN_DRAIN_TIMEOUT", 2.0)
+        main_mod._shutdown_event.clear()
+
+        task = asyncio.create_task(_cooperative())
+        pending.add(task)
+        task.add_done_callback(pending.discard)
+
+        try:
+            unfinished = await main_mod._drain_pending_tasks()
+        finally:
+            main_mod._shutdown_event.clear()
+
+        assert finished.is_set(), "任务应收到停机信号并完成收尾"
+        assert unfinished == [], "正常收尾的任务不得被列为未完成"
+        assert task.cancelled() is False
+
+    @pytest.mark.asyncio
+    async def test_sleep_or_shutdown_wakes_early_on_shutdown(self, monkeypatch):
+        """首次延迟（30s/60s）必须能被停机打断 —— 否则退出被延迟拖住。"""
+        import promiselink.main as main_mod
+
+        main_mod._shutdown_event.set()
+        try:
+            t0 = time.monotonic()
+            await main_mod._sleep_or_shutdown(30)
+            elapsed = time.monotonic() - t0
+        finally:
+            main_mod._shutdown_event.clear()
+
+        assert elapsed < 0.5, f"停机信号已置位时不该真的睡 30s，实测 {elapsed:.2f}s"
 
 
 # ══════════════════════════════════════════════════════════════════

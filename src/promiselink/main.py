@@ -45,6 +45,71 @@ settings = get_settings()
 _shutdown_event = asyncio.Event()
 _pending_tasks: set[asyncio.Task] = set()
 
+# ⑦（2026-09-21）：停机时等待后台任务收尾的上限。
+# 探针实测（P2 §2.7）：这里唯一的后台任务 _scheduled_event_maintenance 是设计上
+# 永不结束的循环，旧代码把 asyncio.wait 的 30s 上限等满（done=[]），实机表现为
+# "点了退出要等 31~32 秒"。改为先发协作退出信号、再限时等待，超时即记录未完成项。
+_SHUTDOWN_DRAIN_TIMEOUT = 5.0
+
+
+def _task_label(task: asyncio.Task) -> str:
+    """停机日志里的任务名 —— 让"超时未完成"能直接指认是哪一个任务。"""
+    coro = task.get_coro()
+    return getattr(coro, "__qualname__", None) or repr(coro)
+
+
+async def _sleep_or_shutdown(seconds: float) -> None:
+    """睡 ``seconds`` 秒，但停机请求到来时提前醒。
+
+    ``asyncio.sleep`` 不可打断：后台任务的**首次延迟**（30s / 60s）若正好赶上
+    退出，用户就要多等整个延迟。改成"睡或醒"后，停机不再被首次延迟拖住。
+    """
+    try:
+        await asyncio.wait_for(_shutdown_event.wait(), timeout=seconds)
+    except TimeoutError:
+        pass
+
+
+async def _drain_pending_tasks() -> list[str]:
+    """停机收尾：先请求协作退出，再限时等待；超时的任务取消并记名。
+
+    返回**未按时完成**的任务名清单（P2 §2.7 校验第 3 条：超时必须能指认是谁）。
+    """
+    import structlog
+
+    logger = structlog.get_logger()
+    _shutdown_event.set()
+
+    if not _pending_tasks:
+        return []
+
+    logger.info(
+        "waiting_for_pending_tasks",
+        count=len(_pending_tasks),
+        timeout=_SHUTDOWN_DRAIN_TIMEOUT,
+    )
+    try:
+        _, pending = await asyncio.wait(_pending_tasks, timeout=_SHUTDOWN_DRAIN_TIMEOUT)
+    except Exception as e:  # Startup/shutdown — keep broad catch for resilience
+        logger.error("shutdown_task_error", error=str(e))
+        return []
+
+    if not pending:
+        return []
+
+    unfinished = sorted(_task_label(t) for t in pending)
+    logger.warning(
+        "cancelling_pending_tasks",
+        cancelled_count=len(pending),
+        unfinished=unfinished,
+    )
+    for task in pending:
+        task.cancel()
+    # Wait for cancellation to propagate
+    await asyncio.gather(*pending, return_exceptions=True)
+    return unfinished
+
+
 # Auto-pair polling cadence. Module-level so tests can compress them.
 _PAIR_POLL_INITIAL_DELAY = 2  # 等待应用完全启动（秒）
 _PAIR_POLL_INTERVAL = 3  # 两次轮询之间的间隔（秒）
@@ -62,7 +127,7 @@ async def _scheduled_event_maintenance() -> None:
     logger = structlog.get_logger()
 
     # Initial delay to let app fully start
-    await asyncio.sleep(30)
+    await _sleep_or_shutdown(30)
 
     while not _shutdown_event.is_set():
         try:
@@ -104,7 +169,7 @@ async def _entity_correction_retention_maintenance() -> None:
     import structlog
 
     logger = structlog.get_logger()
-    await asyncio.sleep(60)  # let app fully start
+    await _sleep_or_shutdown(60)  # let app fully start
 
     # Reload settings each loop so test overrides (retention_days=0) take effect.
     while not _shutdown_event.is_set():
@@ -245,6 +310,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging(log_level=settings.log_level, json_output=settings.app_env != "development")
     import structlog
 
+    # ⑦：_shutdown_event 是模块级事件，上一次停机（含 TestClient 反复进出 lifespan）
+    # 会把它置位；不清零的话，本次 lifespan 起的后台任务会立刻以为自己该退出。
+    _shutdown_event.clear()
+
     logger = structlog.get_logger()
     logger.info("promiselink_starting")
     logger.info(
@@ -322,22 +391,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Shutdown — drain pending tasks
     logger.info("promiselink_shutting_down", pending_tasks=len(_pending_tasks))
 
-    if _pending_tasks:
-        logger.info("waiting_for_pending_tasks", count=len(_pending_tasks))
-        # Wait up to 30 seconds for pending tasks to complete
-        try:
-            done, pending = await asyncio.wait(_pending_tasks, timeout=30.0)
-            if pending:
-                logger.warning(
-                    "cancelling_pending_tasks",
-                    cancelled_count=len(pending),
-                )
-                for task in pending:
-                    task.cancel()
-                # Wait for cancellation to propagate
-                await asyncio.gather(*pending, return_exceptions=True)
-        except Exception as e:  # Startup/shutdown — keep broad catch for resilience
-            logger.error("shutdown_task_error", error=str(e))
+    await _drain_pending_tasks()
 
     from promiselink.core.redis import close_redis
 

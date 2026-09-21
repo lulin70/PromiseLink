@@ -49,6 +49,9 @@ class PairInitResponse(BaseModel):
 class PairStatusResponse(BaseModel):
     success: bool
     status: str = "pending"
+    # ②（2026-09-21）：status == "rejected" 时的归因，取值 invalid / occupied /
+    # not_found（其余值为兜底 invalid）。前端据此选择文案与下一步动作。
+    rejected_kind: str = ""
     license_key: str = ""
     user_id: str = ""
     error: str = ""
@@ -78,6 +81,37 @@ def _get_env_path() -> pathlib.Path:
     解包目录内 → 写到系统临时目录，进程退出即丢失，表现为「每次启动都要重新配对」。
     """
     return runtime_env_file()
+
+
+# ②（2026-09-21）：把网关的原因码归成三类用户能听懂的话。
+# 取值来源：PromiseLink-Pro ``gateway/core/error_codes.py``（唯一事实来源）。
+_OCCUPIED_CODES = frozenset(
+    {
+        "LICENSE_ALREADY_ACTIVATED",
+        "DEVICE_LIMIT_EXCEEDED",
+        "DEVICE_FINGERPRINT_MISMATCH",
+        "INVALID_DEVICE_FINGERPRINT",
+    }
+)
+_NOT_FOUND_CODES = frozenset(
+    {
+        "LICENSE_NOT_FOUND",
+        "INVALID_LICENSE_KEY_FORMAT",
+    }
+)
+
+
+def _rejected_kind(gateway_code: str) -> str:
+    """Map a gateway error code to one of three user-facing buckets.
+
+    Unknown / empty codes fall back to ``invalid`` — never to ``expired``:
+    "凭据被拒" and "配对码到期" 是两件事，混在一起会把用户引向错误的下一步。
+    """
+    if gateway_code in _NOT_FOUND_CODES:
+        return "not_found"
+    if gateway_code in _OCCUPIED_CODES:
+        return "occupied"
+    return "invalid"
 
 
 @router.post("/init", response_model=PairInitResponse)
@@ -143,11 +177,33 @@ async def init_pair() -> PairInitResponse:
 
 
 @router.get("/status", response_model=PairStatusResponse)
-async def get_pair_status(code: str) -> PairStatusResponse:
-    """Poll the device pairing status from the gateway.
+async def get_pair_status(code: str, request: Request) -> PairStatusResponse:
+    """Poll the device pairing status.
 
     Query parameter: code — the device_pair_code from /pair/init.
+
+    ②（2026-09-21）：网关只会回 ``pending`` / ``matched`` / ``expired`` ——
+    **``activated`` 从来不会从网关来**（``set_device_pair_result`` 只写
+    ``matched``），而 L-1/L-14 的许可证终态只落在中继日志与 ``/health``。
+    两者叠加的结果是：配对页永远停在「正在激活...」，凭据被拒时也照样如此，
+    用户表现为「配不上，且不知道原因」。本端点因此在网关答案之外**叠加本地
+    中继状态**，使 ``activated`` / ``rejected`` 真正可达：
+
+    * 中继已给出终态 → ``rejected``（附 ``rejected_kind`` 归因）
+    * 中继已连上     → ``activated``
+    * 其余           → 原样透传网关答案
     """
+    # 本地中继状态优先：它是"本机到底激活成功没有"的唯一事实来源。
+    relay_state = getattr(getattr(request.app.state, "relay_wss_client", None), "state", None)
+    if getattr(relay_state, "terminal_reason", ""):
+        return PairStatusResponse(
+            success=True,
+            status="rejected",
+            rejected_kind=_rejected_kind(str(getattr(relay_state, "terminal_code", ""))),
+        )
+    if getattr(relay_state, "connected", False):
+        return PairStatusResponse(success=True, status="activated")
+
     gateway_url = _get_gateway_url()
 
     try:

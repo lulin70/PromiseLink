@@ -50,18 +50,30 @@ class _FakeRelayClient:
 
 
 class _RejectingRelayClient(_FakeRelayClient):
-    """Relay client whose license is rejected by the gateway (HTTP 403)."""
+    """Relay client whose license is rejected by the gateway (HTTP 403).
 
-    def __init__(self, attempts: list[int] | None = None) -> None:
+    ``gateway_code`` mirrors the real ``RelayAuthError.details["gateway_code"]``
+    that :mod:`relay_client` now attaches (② 2026-09-21). Left as ``None`` the
+    exception carries no code at all — the fallback path the WSS client must
+    survive.
+    """
+
+    def __init__(
+        self, attempts: list[int] | None = None, gateway_code: str | None = None
+    ) -> None:
         super().__init__(token="")
         self.attempts = attempts if attempts is not None else []
         self._token.expires_at = 0.0  # force needs_refresh
+        self._gateway_code = gateway_code
 
     async def _ensure_token(self) -> str:  # noqa: SLF001
         self.attempts.append(len(self.attempts) + 1)
+        details: dict[str, Any] = {"status_code": 403}
+        if self._gateway_code is not None:
+            details["gateway_code"] = self._gateway_code
         raise RelayAuthError(
             message="License activation rejected (HTTP 403): LicenseExpired",
-            details={"status_code": 403},
+            details=details,
         )
 
 
@@ -478,3 +490,99 @@ async def test_restart_clears_terminal_state_and_resumes_attempts():
 
     assert len(rejecting.attempts) > first_round, "restart did not resume the loop"
     assert client.state.auth_failures == 2
+
+
+# ── ②（2026-09-21）: 网关原因码必须随终态一起暴露给配对页 ──
+#
+# 背景：配对页要区分「许可证无效 / 已被占用 / 不存在」三类文案，而
+# RelayAuthError 里唯一的机器可读线索是 details["gateway_code"]。
+# 若 WSS 客户端不把它取出来，配对页只能一律回退到"许可证无效"。
+#
+# 反向探针：下面第一条用例给的 gateway_code 是 LICENSE_NOT_FOUND。若有人把
+# 传播逻辑删掉（terminal_code 恒为 ""），用例必然变红 —— 不可能静默通过。
+
+
+def test_state_as_dict_exposes_terminal_code():
+    """terminal_code 必须进入可观测快照（/health 与配对页都读它）。"""
+    state = RelayWSSState()
+    assert state.terminal_code == ""
+    state.terminal_reason = "license_rejected"
+    state.terminal_code = "DEVICE_LIMIT_EXCEEDED"
+    d = state.as_dict()
+    assert d["terminal_code"] == "DEVICE_LIMIT_EXCEEDED"
+    assert d["terminal_reason"] == "license_rejected"
+
+
+@pytest.mark.asyncio
+async def test_terminal_code_is_propagated_from_gateway_code():
+    """终态被拒时必须把网关原因码取出，而不是只留一句 "被拒"。"""
+    rejecting = _RejectingRelayClient(gateway_code="LICENSE_NOT_FOUND")
+    client = RelayWSSClient(
+        gateway_url="http://gateway.example",
+        license_key="PL-PRO-aaaa-bbbb-cccc",
+        reconnect_interval=0.01,
+        reconnect_max=0.02,
+        max_auth_failures=2,
+        relay_client=rejecting,  # type: ignore[arg-type]
+    )
+
+    await client.start()
+    await asyncio.sleep(0.15)
+    await _drain(client)
+
+    assert client.state.terminal_reason == "license_rejected"
+    assert client.state.terminal_code == "LICENSE_NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_terminal_code_is_empty_when_gateway_omits_it():
+    """兜底：details 里没有 gateway_code 时必须是空串（不是 "None"）。
+
+    旧版网关、或者异常在更早的层被包装时都可能没有这个键；此时配对页按
+    "许可证无效"兜底，但绝不能拿到字符串 "None" —— 那会命中不了任何映射
+    而静默显示错文案。
+    """
+    rejecting = _RejectingRelayClient()  # 不带 gateway_code
+    client = RelayWSSClient(
+        gateway_url="http://gateway.example",
+        license_key="PL-PRO-aaaa-bbbb-cccc",
+        reconnect_interval=0.01,
+        reconnect_max=0.02,
+        max_auth_failures=2,
+        relay_client=rejecting,  # type: ignore[arg-type]
+    )
+
+    await client.start()
+    await asyncio.sleep(0.15)
+    await _drain(client)
+
+    assert client.state.terminal_reason == "license_rejected"
+    assert client.state.terminal_code == ""
+
+
+@pytest.mark.asyncio
+async def test_restart_clears_terminal_code():
+    """重新激活后原因码必须清空，否则新一次配对会读到上一次的旧原因。"""
+    rejecting = _RejectingRelayClient(gateway_code="LICENSE_EXPIRED")
+    client = RelayWSSClient(
+        gateway_url="http://gateway.example",
+        license_key="PL-PRO-aaaa-bbbb-cccc",
+        reconnect_interval=0.005,
+        reconnect_max=0.01,
+        max_auth_failures=1,
+        relay_client=rejecting,  # type: ignore[arg-type]
+    )
+
+    await client.start()
+    await asyncio.sleep(0.1)
+    await _drain(client)
+    assert client.state.terminal_code == "LICENSE_EXPIRED"
+
+    # Second start: the stale code must not survive into the new session.
+    # `_connect_and_serve` is stubbed so the assertion stays offline and
+    # deterministic (no DNS/WS attempt against gateway.example).
+    with patch.object(client, "_connect_and_serve", new=AsyncMock()):
+        await client.start()
+        assert client.state.terminal_code == ""
+        assert client.state.terminal_reason == ""
+        await _drain(client)

@@ -226,6 +226,128 @@ def test_pair_status_gateway_error(monkeypatch):
     assert "无法连接网关" in data["error"]
 
 
+# ── /pair/status 终态合成（② 2026-09-21）──
+#
+# 背景：网关只会回 pending / matched / expired，`activated` 从来不是网关给的；
+# L-1/L-14 的许可证终态又只落在中继日志与 /health。两者叠加 → 配对页永远停在
+# 「正在激活...」。以下用例锁定"以本地中继状态为准"这一行为。
+#
+# 反向探针：用例里的网关答案固定为 pending。若有人把该逻辑退回纯透传，
+# 这些用例必然变红（不会静默通过）。
+
+
+class _FakeRelayState:
+    """中继状态替身（只含本功能读取的字段）。"""
+
+    def __init__(self, *, terminal_reason: str = "", terminal_code: str = "", connected: bool = False) -> None:
+        self.terminal_reason = terminal_reason
+        self.terminal_code = terminal_code
+        self.connected = connected
+
+
+class _FakeRelayClient:
+    def __init__(self, state: _FakeRelayState) -> None:
+        self.state = state
+
+
+def _gateway_pending_handler(request: httpx.Request) -> httpx.Response:
+    return httpx.Response(200, json=_gateway_status_pending())
+
+
+def test_pair_status_rejected_overrides_gateway_pending(monkeypatch):
+    """中继给出终态 → 页面必须看到 rejected，而不是继续 pending。"""
+
+    monkeypatch.setattr(pair_module, "httpx", _mock_httpx_module(_gateway_pending_handler))
+
+    from promiselink.main import app
+
+    with TestClient(app) as client:
+        app.state.relay_wss_client = _FakeRelayClient(
+            _FakeRelayState(terminal_reason="license_rejected", terminal_code="LICENSE_NOT_FOUND")
+        )
+        resp = client.get("/api/v1/pair/status", params={"code": "384721"})
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is True
+    assert data["status"] == "rejected"
+    assert data["rejected_kind"] == "not_found"
+
+
+def test_pair_status_activated_when_relay_connected(monkeypatch):
+    """中继已连上 → 页面必须看到 activated（网关侧永远给不出这个值）。"""
+
+    monkeypatch.setattr(pair_module, "httpx", _mock_httpx_module(_gateway_pending_handler))
+
+    from promiselink.main import app
+
+    with TestClient(app) as client:
+        app.state.relay_wss_client = _FakeRelayClient(_FakeRelayState(connected=True))
+        resp = client.get("/api/v1/pair/status", params={"code": "384721"})
+
+    data = resp.json()
+    assert data["success"] is True
+    assert data["status"] == "activated"
+
+
+@pytest.mark.parametrize(
+    ("gateway_code", "expected_kind"),
+    [
+        ("LICENSE_NOT_FOUND", "not_found"),
+        ("INVALID_LICENSE_KEY_FORMAT", "not_found"),
+        ("LICENSE_ALREADY_ACTIVATED", "occupied"),
+        ("DEVICE_LIMIT_EXCEEDED", "occupied"),
+        ("DEVICE_FINGERPRINT_MISMATCH", "occupied"),
+        ("LICENSE_EXPIRED", "invalid"),
+        ("LICENSE_SUSPENDED", "invalid"),
+        # 无原因码 / 未知原因码 → 兜底 invalid。
+        # 关键：绝不能兜底成 expired —— 那会把用户引向"重新生成配对码"这条
+        # 无效路径（问题在许可证，不在配对码）。
+        ("", "invalid"),
+        ("SOME_FUTURE_CODE", "invalid"),
+    ],
+)
+def test_pair_status_rejected_kind_mapping(monkeypatch, gateway_code, expected_kind):
+    """三类归因必须按网关原因码正确落桶。"""
+
+    monkeypatch.setattr(pair_module, "httpx", _mock_httpx_module(_gateway_pending_handler))
+
+    from promiselink.main import app
+
+    with TestClient(app) as client:
+        app.state.relay_wss_client = _FakeRelayClient(
+            _FakeRelayState(terminal_reason="license_rejected", terminal_code=gateway_code)
+        )
+        resp = client.get("/api/v1/pair/status", params={"code": "384721"})
+
+    data = resp.json()
+    assert data["status"] == "rejected"
+    assert data["rejected_kind"] == expected_kind
+    assert data["rejected_kind"] != "expired"
+
+
+def test_pair_status_rejected_kind_is_distinct_from_expired(monkeypatch):
+    """②的 ui-designer 条件：rejected 与 expired 不得混为一谈。
+
+    网关明确回 expired（配对码到点）时，不得被本地终态逻辑改成 rejected；
+    反之（上一条用例）网关回 pending 而中继被拒时必须 rejected。
+    """
+
+    def expired_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": {"status": "expired"}})
+
+    monkeypatch.setattr(pair_module, "httpx", _mock_httpx_module(expired_handler))
+
+    from promiselink.main import app
+
+    with TestClient(app) as client:
+        resp = client.get("/api/v1/pair/status", params={"code": "384721"})
+
+    data = resp.json()
+    assert data["status"] == "expired"
+    assert data["rejected_kind"] == ""
+
+
 # ── /pair/activate tests ──
 
 
@@ -392,6 +514,12 @@ async def test_auto_poll_recovers_after_timeout_when_pairing_retried(monkeypatch
     本地 ``/pair/activate`` 被调用 → 配对码文件清理。
     """
     from promiselink import main as main_module
+
+    # ⑦（2026-09-21）：停机排空会置位 _shutdown_event（协作退出信号），真实启动路径
+    # 由 lifespan 清零。本用例绕过 lifespan 直接驱动轮询协程，故显式建立与启动一致的
+    # 前置状态 —— 否则前一个 TestClient 用例停机时置位的信号会泄漏进来，轮询循环
+    # 第一圈就退出（这是本用例要测的"超时后能否重启轮询"的另一回事）。
+    main_module._shutdown_event.clear()
 
     pair_code_file = tmp_path / ".pair_code"
     gateway_state = {"status": "pending"}

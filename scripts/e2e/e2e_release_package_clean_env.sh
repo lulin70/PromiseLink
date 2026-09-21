@@ -10,8 +10,11 @@
 #   - `~/.promiselink/.env` / `~/.promiselink/data` 都是干净的（等价于新机器）
 #   - 不需要动本机真实 `~/.promiselink/`，不污染开发者环境
 #
-# 覆盖：启动 → 取配对码（网关可达）→ 激活写 .env → WSS 起连 → 杀进程 →
+# 覆盖：启动 → 取配对码（网关可达）→ 激活写 .env → WSS 起连 → 终态对用户可见
+#       （② /pair/status 报 rejected + 归因）→ 杀进程（⑦ 优雅停机 < 5s）→
 #       重启后许可证仍在（不再要求重新配对）→ 无效证书不会造成重试风暴
+#
+# 断言数：17（若包早于 L-1/L-14，⑤ 与 ② 会显式标注"该包无此能力"并跳过 3 条 → 14）
 #
 # 不覆盖（必须人工，脚本会显式标注）：小程序真人扫码那一步。脚本走的是扫码
 # 完成后桌面轮询任务所调用的同一个 `POST /api/v1/pair/activate`。
@@ -177,11 +180,36 @@ else
   fi
 fi
 
+# ②（2026-09-21）：终态必须对用户可见 —— 配对页轮询的就是这个端点。
+# 旧行为：网关只回 pending/matched，本地中继终态不进这个接口 → 配对页永远停在
+# 「正在激活...」，凭据被拒也照旧。此断言即"页面能不能告诉用户为什么配不上"。
+STATUS_JSON=$(curl -s -m 10 "$BASE/api/v1/pair/status?code=$CODE")
+STATUS=$(echo "$STATUS_JSON" | python3 -c "import json,sys;print(json.load(sys.stdin).get('status',''))" 2>/dev/null)
+KIND=$(echo "$STATUS_JSON" | python3 -c "import json,sys;print(json.load(sys.stdin).get('rejected_kind',''))" 2>/dev/null)
+if grep -q "relay_wss_auth_terminal" "$LOG_FIRST"; then
+  if [[ "$STATUS" == "rejected" && -n "$KIND" ]]; then
+    ok "/pair/status 报出用户可见终态：status=rejected, rejected_kind=${KIND}（②）"
+  else
+    bad "/pair/status 未暴露终态：status='${STATUS}' rejected_kind='${KIND}'（期望 rejected + 非空归因）"
+  fi
+  if echo "$STATUS_JSON" | grep -q "PL-PRO"; then
+    bad "/pair/status 回显了许可证明文"
+  else
+    ok "/pair/status 未回显许可证明文（沿用 L-2 掩码口径）"
+  fi
+else
+  echo "  ⚠️  该包无中继终态能力（早于 L-1/L-14），跳过 ② 断言"
+fi
+
 step "6/8 结束进程（模拟用户退出程序）"
 if stop_pid "$PID1"; then
-  ok "进程已退出，优雅停机耗时 ${STOP_ELAPSED}s"
-  if [[ "$STOP_ELAPSED" -gt 10 ]]; then
-    echo "  ⚠️  退出耗时超过 10s —— 用户点关闭后会等待较久，记为体验问题"
+  # ⑦（2026-09-21）：用户可见契约是「点退出后很快真的退出」。
+  # 旧代码在停机里 `asyncio.wait(_pending_tasks, timeout=30.0)`，而被等的
+  # 唯一任务设计上永不结束 → 每次都等满 30s（实机实测 31~32s）。修好后实测 1s。
+  if [[ "$STOP_ELAPSED" -lt 5 ]]; then
+    ok "进程已退出，优雅停机耗时 ${STOP_ELAPSED}s（⑦：< 5s）"
+  else
+    bad "优雅停机耗时 ${STOP_ELAPSED}s —— 用户点退出要干等这么久（⑦ 回归）"
   fi
 else
   bad "90s 内进程未退出，后续重启验证不可信"

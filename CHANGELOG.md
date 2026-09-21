@@ -4,6 +4,26 @@ All notable changes to PromiseLink will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed — 许可证终态对用户完全不可见（②，2026-09-21）
+
+- **现象**：配对页轮询 `/api/v1/pair/status`，而该接口**只透传网关答案**（`pending` / `matched` / `expired`）—— 网关侧 `set_device_pair_result` 只写 `matched`，**`activated` 从来不来自网关**；L-1/L-14 修出的许可证终态只落在中继日志与 `/health/full`。两者叠加：凭据被拒时页面永远停在「正在激活...」，用户表现为「配不上，且不知道原因」——与 L-15（提示是空串）同一类**可诊断性**缺陷。
+- **修复**：`GET /api/v1/pair/status` 在网关答案之外**叠加本机中继状态**（`app.state.relay_wss_client.state`），使 `activated` / `rejected` 真正可达：中继已给出终态 → `rejected` 并附 `rejected_kind` 归因；中继已连上 → `activated`；其余仍透传网关答案。
+- **归因分三类**（取值来源 `PromiseLink-Pro/gateway/core/error_codes.py`）：`not_found`（`LICENSE_NOT_FOUND` / `INVALID_LICENSE_KEY_FORMAT`）、`occupied`（`LICENSE_ALREADY_ACTIVATED` / `DEVICE_LIMIT_EXCEEDED` / `DEVICE_FINGERPRINT_MISMATCH` / `INVALID_DEVICE_FINGERPRINT`）、其余未知码归 `invalid`。**未知码刻意不归 `expired`**：「凭据被拒」与「配对码过期」是两件事，混在一起会把用户引向错误的下一步。
+- **连带修复（同一条用户路径上的真缺陷）**：`_PERMANENT_LICENSE_CODES` 补入 `LICENSE_ALREADY_ACTIVATED` —— 该码是网关 409 的"已被占用"语义，此前不在集合内，会被当作瞬时错误无限重试。
+- **前端**：`/pair` 页新增第五态 `rejected`（与 `expired` 在视觉与语义上区分：前者=凭据被拒用红、后者=有效期到用灰），并按 `rejected_kind` 给出下一步动作；`matched` 不再是终态，改为继续轮询直到 `activated`/`rejected`/`expired`。同一改动同时覆盖 H5（`frontend/src/pages/pair/`）与包内静态页（`web/pair_page.py`）。
+- **回归测试（新增 15 条）**：`tests/test_pair_mode.py` 4 条（rejected 覆盖 pending、connected→activated、`rejected_kind` 9 组参数化、expired 与 rejected 可区分）＋ `tests/test_relay_wss_client.py` 4 条（`terminal_code` 暴露/透传/缺省为空/重启清零）＋ `tests/test_relay_client_robustness.py` 8 条（409 已占用判终态、未知 409 仍可重试、`_gateway_error_code` 6 种畸形响应）＋ 前端 e2e `frontend/tests/e2e/pair_status.spec.ts` 7 条。
+- **反向探针（防假绿，各注入一次后复原）**：① 从 `_PERMANENT_LICENSE_CODES` 移除 `LICENSE_ALREADY_ACTIVATED` → 该用例由 `RelayAuthError` 变 `RelayError`（红）；② 把 `terminal_code` 写死 `""` → `assert '' == 'LICENSE_NOT_FOUND'`（红）。前端 e2e 用例 3 的 `[matched, rejected]` 序列即"`matched` 不得视为终态"的反向探针。
+
+### Fixed — 退出程序要等 31 秒（⑦，2026-09-21）
+
+- **现象（e2e 实测）**：点关闭后进程实测 **31s** 才真正退出；用户会以为卡死而强杀。
+- **定位（先探针后定阈值，两个独立探针，证据见 P2 §2.7）**：进程内包装 `asyncio.wait` 的探针给出 `asyncio.wait timeout=30.0 n=1 elapsed=30.00s / done=[] / pending=['_scheduled_event_maintenance']`；真实 uvicorn + SIGTERM 探针给出 `waiting_for_pending_tasks`→`cancelling_pending_tasks` 间隔**恰好 30.00s**。即耗时**完全**由停机里 `asyncio.wait(_pending_tasks, timeout=30.0)` 构成，而被等的唯一任务（事件维护）是**设计上永不结束的循环** —— 旧的协作退出事件在停机路径上压根没被置位（信号处理器在流程末尾才被调用）。
+- **修复（三处，均为最小改动）**：① 停机排空前先 `_shutdown_event.set()` 请求协作退出，再以 `_SHUTDOWN_DRAIN_TIMEOUT`（**5s**）限时等待，超时则取消并**在日志里指名未完成项**（`cancelling_pending_tasks ... unfinished=[...]`）；② 后台任务的**首次延迟**（30s / 60s）改用可被停机打断的 `_sleep_or_shutdown()`（`asyncio.sleep` 不可打断，正是"退出被延迟拖住"的另一半原因）；③ lifespan 启动时 `_shutdown_event.clear()`，防止上一次停机（尤其是测试里反复进出 lifespan）把信号泄漏到下一次启动、使新起的后台任务立刻自杀。
+- **实测（同一探针，修复后）**：退出耗时 **31s → 1s**，日志为 `promiselink_shutting_down(pending_tasks=1)` → `waiting_for_pending_tasks(timeout=5.0)` → 任务**协作退出**（未触发取消）→ `shutdown_complete`，该段共 0.12s。
+- **回归测试（新增 5 条）**：`tests/test_coverage_boost.py` —— 停机上限必须有界（≤5s，防回退到 30s）、无任务时零成本、永不结束的任务须在上限内被取消且被指名（并断言日志含未完成项清单与本次等待上限）、响应信号的任务须正常收尾不被误杀、首次延迟须可被停机打断。
+- **反向探针（防假绿，各注入一次后复原）**：① 上限改回 `30.0` → "必须有界"断言红；② 去掉 `_shutdown_event.set()` → 协作任务未被唤醒、被误列为未完成（红）；③ 日志去掉 `unfinished=` → 日志断言红。
+- **e2e 断言升级（实测 `17 passed, 0 failed`）**：`e2e_release_package_clean_env.sh` 把原先"停机 >10s 打警告"改为**硬断言 `< 5s`**（实机测得 **1s**），并新增 ② 的 `/pair/status` 必须报 `rejected` + 非空 `rejected_kind`（且不回显许可证明文）两条断言，共 **17** 项（旧包因无终态能力跳 3 条 → 14）。
+
 ### Fixed — 桌面版对无效许可证的 403 风暴（L-1，2026-09-21）
 
 - **现象（生产实测）**：nginx 日志中 `POST /api/v1/pro/license/activate` 累计 **6124 次 403**，UA `python-httpx/0.28.1`、无 referer、**约 30 秒一次**持续不断。
@@ -55,10 +75,10 @@ All notable changes to PromiseLink will be documented in this file.
 ### Added — 干净环境 · release 包 · 真实用户链路 e2e（§9.7 第 5 条 / P0-2，2026-09-21）
 
 - **为什么需要**：此前所有 e2e 都在源码树内跑（`.venv` + 仓库内 `.env`），覆盖不到"从官网下载 dmg → 双击 → 配对 → 重启"这条**唯一交付路径**；2026-09-19「每次启动都要重新配对」与 2026-09-20「桌面包 WSS 永不启动」两个 P0 都只可能在这条路径上被发现。
-- **做法**：`scripts/e2e/e2e_release_package_clean_env.sh <PromiseLink.app> [工作目录]` —— 把 `HOME` 指向全新空目录后启动包内二进制，等价新机器，且不污染开发者真实 `~/.promiselink/`。8 个步骤 14 项断言：启动 / 未配对不连网关 / 取配对码 / 激活写 `.env` / WSS 起连 / 优雅退出 / 重启 / **重启后许可证仍在**。
+- **做法**：`scripts/e2e/e2e_release_package_clean_env.sh <PromiseLink.app> [工作目录]` —— 把 `HOME` 指向全新空目录后启动包内二进制，等价新机器，且不污染开发者真实 `~/.promiselink/`。8 个步骤 ~~14~~ **17** 项断言（⑦/② 落地后升级，见上文）：启动 / 未配对不连网关 / 取配对码 / 激活写 `.env` / WSS 起连 + 终态可见 / 优雅退出（<5s）/ 重启 / **重启后许可证仍在**。
 - **实测结果（v1.1.1 dmg，最终版脚本）**：`14 passed, 0 failed`。**两个历史 P0 均已进包**：`.env` 落在干净 HOME 且含 `PRO_LICENSE_KEY` + `RELAY_GATEWAY_URL`；重启后无需再配对即 `relay_wss_start_scheduled`，`PRO_LICENSE_KEY` 跨重启保持。
 - **未覆盖（脚本内已显式标注，不假装通过）**：小程序**真人扫码**那一步无法自动化；脚本走的是扫码完成后桌面轮询任务所调用的同一个 `POST /api/v1/pair/activate`。
-- **顺带记录的两项体验问题**：① 优雅停机实测 **31~32s**（在等"事件维护"后台任务收尾），用户点关闭后会以为卡死；② 上面 L-15 的空提示。脚本会对停机 >10s 主动打警告。
+- **顺带记录的两项体验问题**：① 优雅停机实测 **31~32s**（在等"事件维护"后台任务收尾），用户点关闭后会以为卡死；② 上面 L-15 的空提示。② 已在本轮修复；① 当时只打警告，现已升级为硬断言 `< 5s`（见上文 ⑦）。
 - **断言取数说明（踩过的坑，留给后来的维护者）**：包的 `/api/v1/health` 是**未认证短响应**（只有 status/version），带 components 的 `/api/v1/health/full` 需认证 —— 故脚本一律以**包自身日志**为事实来源。另外"进程是否真的退出"既不能只看 PID（PyInstaller bootloader 先退、子进程还在跑），也不能只等端口释放（uvicorn 先关监听 socket、lifespan 停机还在继续），两者都会造成假红/假绿，最终判据取"包内二进制进程全部消失"。
 
 ### Fixed — 打包后 App 自报版本号恒为 `0.0.0`（L-12，2026-09-21）

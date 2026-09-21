@@ -140,9 +140,33 @@
   color: #52c41a;
 }
 
-.status-error {
+/* ②（2026-09-21）：凭据被拒（rejected）与配对码到期（expired）必须视觉可分。
+   expired 只是"时效到、重新生成即可"，改用中性灰；粉色/红色留给更严重的
+   rejected（凭据被拒，需要用户改状态或找客服），语义与视觉才对得上。 */
+.status-expired {
+  background: #f5f5f5;
+  color: #8a8a8a;
+}
+
+.status-rejected {
   background: #fff1f0;
   color: #e54d42;
+}
+
+.pair-rejected-guide {
+  width: 100%;
+  background: #fffaf3;
+  border: 1px solid #f2e2c9;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.pair-rejected-hint {
+  display: block;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #8a6d3b;
 }
 
 .pair-success-hint {

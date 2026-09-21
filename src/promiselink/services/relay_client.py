@@ -104,8 +104,33 @@ _PERMANENT_LICENSE_CODES = frozenset(
         "LICENSE_NOT_FOUND",
         "INVALID_LICENSE_KEY_FORMAT",
         "INVALID_DEVICE_FINGERPRINT",
+        # ②（2026-09-21）：409 Conflict —— 许可证已绑定其他用户。原先不在集合里，
+        # 而网关以 409 返回（非 401/403），于是被当成瞬时错误 → 每 30s 重试一次
+        # 永不停止，与 L-14（404 未纳入）是同一类缺陷。同属"该凭据不会自己变好"。
+        "LICENSE_ALREADY_ACTIVATED",
     }
 )
+
+
+def _gateway_error_code(response: httpx.Response) -> str:
+    """Extract ``error.code`` from the gateway's UnifiedResponse envelope.
+
+    Returns ``""`` when the body is not JSON, is not an object, or carries no
+    error code. Kept separate from :func:`_is_permanent_license_rejection`
+    because the caller needs the *reason* (to tell the user whether the
+    license is invalid / already bound / missing), not just a yes/no.
+    """
+    try:
+        body = response.json()
+    except Exception:
+        return ""
+    if not isinstance(body, dict):
+        return ""
+    error = body.get("error")
+    if not isinstance(error, dict):
+        return ""
+    code = error.get("code")
+    return code if isinstance(code, str) else ""
 
 
 def _is_permanent_license_rejection(response: httpx.Response) -> bool:
@@ -116,15 +141,7 @@ def _is_permanent_license_rejection(response: httpx.Response) -> bool:
     """
     if response.status_code in (401, 403):
         return True
-    try:
-        body = response.json()
-    except Exception:
-        return False
-    if not isinstance(body, dict):
-        return False
-    error = body.get("error")
-    code = error.get("code") if isinstance(error, dict) else None
-    return code in _PERMANENT_LICENSE_CODES
+    return _gateway_error_code(response) in _PERMANENT_LICENSE_CODES
 
 
 class RelayClient(RelayEndpointsMixin):
@@ -305,7 +322,13 @@ class RelayClient(RelayEndpointsMixin):
             logger.warning("relay_refresh_auth_failed", status=response.status_code, detail=detail)
             raise RelayAuthError(
                 message=f"Token refresh rejected (HTTP {response.status_code}): {detail}",
-                details={"status_code": response.status_code, "detail": detail},
+                details={
+                    "status_code": response.status_code,
+                    "detail": detail,
+                    # ②（2026-09-21）：保留网关原因码，供配对页区分
+                    # 「许可证无效 / 已被占用 / 不存在」三类文案。
+                    "gateway_code": _gateway_error_code(response),
+                },
             )
         if response.status_code >= 400:
             detail = safe_error_detail(response)
@@ -371,7 +394,12 @@ class RelayClient(RelayEndpointsMixin):
             logger.error("relay_token_refresh_auth_failed", status=response.status_code, detail=detail)
             raise RelayAuthError(
                 message=f"License activation rejected (HTTP {response.status_code}): {detail}",
-                details={"status_code": response.status_code, "detail": detail},
+                details={
+                    "status_code": response.status_code,
+                    "detail": detail,
+                    # ②（2026-09-21）：同 refresh 路径，保留网关原因码。
+                    "gateway_code": _gateway_error_code(response),
+                },
             )
         if response.status_code >= 400:
             detail = safe_error_detail(response)
