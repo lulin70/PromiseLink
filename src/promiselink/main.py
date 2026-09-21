@@ -302,6 +302,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 heartbeat_interval=settings.relay_heartbeat_interval,
                 reconnect_interval=settings.relay_reconnect_interval,
                 reconnect_max=settings.relay_reconnect_max,
+                max_auth_failures=settings.relay_max_auth_failures,
                 http_request_timeout=settings.relay_http_request_timeout,
             )
             await relay_wss.start()

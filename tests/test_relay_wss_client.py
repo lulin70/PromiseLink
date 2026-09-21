@@ -25,7 +25,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from promiselink.services.relay_models import _TokenState
+from promiselink.services.relay_models import (
+    RelayAuthError,
+    RelayUnavailableError,
+    _TokenState,
+)
 from promiselink.services.relay_wss_client import RelayWSSClient, RelayWSSState
 
 
@@ -43,6 +47,35 @@ class _FakeRelayClient:
 
     async def close(self) -> None:
         self.closed = True
+
+
+class _RejectingRelayClient(_FakeRelayClient):
+    """Relay client whose license is rejected by the gateway (HTTP 403)."""
+
+    def __init__(self, attempts: list[int] | None = None) -> None:
+        super().__init__(token="")
+        self.attempts = attempts if attempts is not None else []
+        self._token.expires_at = 0.0  # force needs_refresh
+
+    async def _ensure_token(self) -> str:  # noqa: SLF001
+        self.attempts.append(len(self.attempts) + 1)
+        raise RelayAuthError(
+            message="License activation rejected (HTTP 403): LicenseExpired",
+            details={"status_code": 403},
+        )
+
+
+class _UnavailableRelayClient(_FakeRelayClient):
+    """Relay client whose gateway is unreachable (transient failure)."""
+
+    def __init__(self) -> None:
+        super().__init__(token="")
+        self.attempts: list[int] = []
+        self._token.expires_at = 0.0
+
+    async def _ensure_token(self) -> str:  # noqa: SLF001
+        self.attempts.append(len(self.attempts) + 1)
+        raise RelayUnavailableError(message="Cannot reach gateway to refresh token")
 
 
 class _FakeWebSocket:
@@ -312,9 +345,136 @@ def test_state_as_dict_returns_observability_fields():
     state.reconnect_count = 3
     state.requests_handled = 42
     state.last_error = "test error"
+    state.auth_failures = 2
+    state.terminal_reason = "license_rejected"
 
     d = state.as_dict()
     assert d["connected"] is True
     assert d["reconnect_count"] == 3
     assert d["requests_handled"] == 42
     assert d["last_error"] == "test error"
+    assert d["auth_failures"] == 2
+    assert d["terminal_reason"] == "license_rejected"
+
+
+# ── L-1: license rejection must NOT become an unbounded 403 storm ──
+#
+# Production symptom (nginx log, reviewed 2026-09-18): 6124 hits of
+# POST /api/v1/pro/license/activate -> 403, roughly one every 30 seconds,
+# from a single desktop process (UA python-httpx). Root cause: the WSS
+# reconnect backoff saturates at reconnect_max (30s) while
+# _ensure_token() -> refresh_token() -> _activate_license() re-POSTs
+# /activate on every single reconnect, forever.
+
+
+async def _drain(client: RelayWSSClient) -> None:
+    """Stop the client's background task and wait for it to finish."""
+    client._stop_event.set()  # noqa: SLF001
+    task = client._task  # noqa: SLF001
+    if task is not None:
+        await asyncio.wait_for(task, timeout=5.0)
+
+
+@pytest.mark.asyncio
+async def test_auth_rejection_becomes_terminal_after_max_attempts():
+    """403 activation rejection stops the loop after max_auth_failures attempts."""
+    rejecting = _RejectingRelayClient()
+    client = RelayWSSClient(
+        gateway_url="http://gateway.example",
+        license_key="PL-PRO-aaaa-bbbb-cccc",
+        reconnect_interval=0.01,
+        reconnect_max=0.02,
+        max_auth_failures=3,
+        relay_client=rejecting,  # type: ignore[arg-type]
+    )
+
+    await client.start()
+    await asyncio.sleep(0.2)  # old code would keep firing here
+    await _drain(client)
+
+    assert len(rejecting.attempts) == 3
+    assert client.state.auth_failures == 3
+    assert client.state.terminal_reason == "license_rejected"
+    assert client.state.connected is False
+    assert "RelayAuthError" in client.state.last_error
+
+
+@pytest.mark.asyncio
+async def test_auth_rejection_attempt_count_is_capped_not_time_bounded():
+    """Repeated 403s stop at the cap: attempts must not grow with wall time.
+
+    This is the actual L-1 regression: with an 18ms cap the old loop produced
+    ~55 attempts/second; the fix pins the total to max_auth_failures no matter
+    how long the process stays alive.
+    """
+    rejecting = _RejectingRelayClient()
+    client = RelayWSSClient(
+        gateway_url="http://gateway.example",
+        license_key="PL-PRO-aaaa-bbbb-cccc",
+        reconnect_interval=0.005,
+        reconnect_max=0.01,
+        max_auth_failures=4,
+        relay_client=rejecting,  # type: ignore[arg-type]
+    )
+
+    await client.start()
+    await asyncio.sleep(0.1)
+    first_window = len(rejecting.attempts)
+    await asyncio.sleep(0.3)  # ten more windows' worth of idling
+    second_window = len(rejecting.attempts)
+    await _drain(client)
+
+    assert first_window == 4
+    assert second_window == 4, "403 attempts kept growing after the cap was reached"
+    assert client.state.terminal_reason == "license_rejected"
+
+
+@pytest.mark.asyncio
+async def test_transient_gateway_errors_still_retry_beyond_the_auth_cap():
+    """Network/5xx failures are NOT terminal — they keep retrying with backoff."""
+    unavailable = _UnavailableRelayClient()
+    client = RelayWSSClient(
+        gateway_url="http://gateway.example",
+        license_key="PL-PRO-aaaa-bbbb-cccc",
+        reconnect_interval=0.005,
+        reconnect_max=0.01,
+        max_auth_failures=3,
+        relay_client=unavailable,  # type: ignore[arg-type]
+    )
+
+    await client.start()
+    await asyncio.sleep(0.15)
+    attempts = len(unavailable.attempts)
+    await _drain(client)
+
+    assert attempts > 3, "transient failures must keep retrying, not go terminal"
+    assert client.state.terminal_reason == ""
+    assert client.state.auth_failures == 0
+    assert "RelayUnavailableError" in client.state.last_error
+
+
+@pytest.mark.asyncio
+async def test_restart_clears_terminal_state_and_resumes_attempts():
+    """Re-activation path: start() must clear a latched terminal state."""
+    rejecting = _RejectingRelayClient()
+    client = RelayWSSClient(
+        gateway_url="http://gateway.example",
+        license_key="PL-PRO-aaaa-bbbb-cccc",
+        reconnect_interval=0.005,
+        reconnect_max=0.01,
+        max_auth_failures=2,
+        relay_client=rejecting,  # type: ignore[arg-type]
+    )
+
+    await client.start()
+    await asyncio.sleep(0.1)
+    await _drain(client)
+    assert client.state.terminal_reason == "license_rejected"
+    first_round = len(rejecting.attempts)
+
+    await client.start()
+    await asyncio.sleep(0.1)
+    await _drain(client)
+
+    assert len(rejecting.attempts) > first_round, "restart did not resume the loop"
+    assert client.state.auth_failures == 2

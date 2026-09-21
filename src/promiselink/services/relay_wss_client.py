@@ -43,7 +43,10 @@ from websockets.exceptions import ConnectionClosed
 from promiselink.core.auth import create_access_token
 from promiselink.core.logging import get_logger
 from promiselink.services.relay_client import RelayClient
-from promiselink.services.relay_models import _RELAY_PREFIX
+from promiselink.services.relay_models import (
+    _RELAY_PREFIX,
+    RelayAuthError,
+)
 
 logger = get_logger("promiselink.relay_wss")
 
@@ -63,6 +66,12 @@ class RelayWSSState:
         self.reconnect_count: int = 0
         self.requests_handled: int = 0
         self.last_error: str = ""
+        # L-1 (2026-09-21): consecutive license/credential (401/403) failures.
+        # When this reaches the configured cap the reconnect loop stops
+        # entirely — retrying an invalid license only burns the gateway.
+        self.auth_failures: int = 0
+        # Non-empty when the loop gave up for a non-transient reason.
+        self.terminal_reason: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -72,6 +81,8 @@ class RelayWSSState:
             "reconnect_count": self.reconnect_count,
             "requests_handled": self.requests_handled,
             "last_error": self.last_error,
+            "auth_failures": self.auth_failures,
+            "terminal_reason": self.terminal_reason,
         }
 
 
@@ -88,6 +99,10 @@ class RelayWSSClient:
         heartbeat_interval: Seconds between ping messages (default 30).
         reconnect_interval: Initial reconnect backoff in seconds (default 1).
         reconnect_max: Max reconnect backoff in seconds (default 30).
+        max_auth_failures: Consecutive 401/403 activation/refresh failures
+            tolerated before the reconnect loop stops for good (default 3).
+            L-1 (2026-09-21): prevents an invalid license from producing an
+            endless one-request-per-30s 403 storm against the gateway.
         http_request_timeout: Timeout for forwarding a single HTTP
             request to the local FastAPI (default 30).
         relay_client: Optional pre-configured :class:`RelayClient` for
@@ -103,6 +118,7 @@ class RelayWSSClient:
         heartbeat_interval: int = 30,
         reconnect_interval: int = 1,
         reconnect_max: int = 30,
+        max_auth_failures: int = 3,
         http_request_timeout: int = 30,
         relay_client: RelayClient | None = None,
     ) -> None:
@@ -112,6 +128,7 @@ class RelayWSSClient:
         self.heartbeat_interval = heartbeat_interval
         self.reconnect_interval = reconnect_interval
         self.reconnect_max = reconnect_max
+        self.max_auth_failures = max_auth_failures
         self.http_request_timeout = http_request_timeout
 
         self._relay_client = relay_client or RelayClient(
@@ -141,6 +158,11 @@ class RelayWSSClient:
         if self._task is not None and not self._task.done():
             return
         self._stop_event.clear()
+        # L-1: a (re)start means a fresh license attempt — clear the terminal
+        # state so the previous rejection cannot latch forever.
+        self.state.terminal_reason = ""
+        self.state.auth_failures = 0
+        self.state.last_error = ""
         self._task = asyncio.create_task(self._run_forever(), name="relay_wss")
         logger.info(
             "relay_wss_start_scheduled",
@@ -178,7 +200,19 @@ class RelayWSSClient:
     # ── Main loop ──────────────────────────────────────────────────
 
     async def _run_forever(self) -> None:
-        """Outer reconnect loop with exponential backoff."""
+        """Outer reconnect loop with exponential backoff.
+
+        L-1 (2026-09-21): credential/license rejections (401/403) are
+        terminal, not transient. Before this fix a rejected license made
+        ``_ensure_token`` hit ``POST /api/v1/pro/license/activate`` on every
+        reconnect; the backoff saturates at ``reconnect_max`` (30s), so the
+        gateway received exactly one 403 every 30 seconds, forever (observed
+        as a 6124-hit 403 storm in the production nginx log). We now stop the
+        loop after ``max_auth_failures`` consecutive rejections and record a
+        terminal reason, so the caller can surface "license invalid" to the
+        user instead of hammering the gateway. Network/transient errors keep
+        the previous retry-with-backoff behaviour.
+        """
         backoff = self.reconnect_interval
         while not self._stop_event.is_set():
             try:
@@ -186,8 +220,30 @@ class RelayWSSClient:
                 # If we exited cleanly without stop signal, treat as
                 # disconnect and reconnect with backoff.
                 backoff = self.reconnect_interval
+                self.state.auth_failures = 0
             except asyncio.CancelledError:
                 raise
+            except RelayAuthError as exc:
+                self.state.last_error = f"{type(exc).__name__}: {exc}"[:200]
+                self.state.auth_failures += 1
+                if self.state.auth_failures >= self.max_auth_failures:
+                    self.state.terminal_reason = "license_rejected"
+                    logger.error(
+                        "relay_wss_auth_terminal",
+                        attempts=self.state.auth_failures,
+                        error=self.state.last_error,
+                        note=(
+                            "License/credential rejected by the gateway; "
+                            "relay retries stopped. Re-activate to resume."
+                        ),
+                    )
+                else:
+                    logger.warning(
+                        "relay_wss_auth_failed_retrying",
+                        attempts=self.state.auth_failures,
+                        max_attempts=self.max_auth_failures,
+                        error=self.state.last_error,
+                    )
             except Exception as exc:
                 self.state.last_error = f"{type(exc).__name__}: {exc}"[:200]
                 logger.warning(
@@ -199,7 +255,7 @@ class RelayWSSClient:
             self.state.connected = False
             self.state.last_disconnect_at = time.time()
 
-            if self._stop_event.is_set():
+            if self._stop_event.is_set() or self.state.terminal_reason:
                 break
 
             self.state.reconnect_count += 1

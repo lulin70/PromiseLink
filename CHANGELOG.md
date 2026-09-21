@@ -4,6 +4,16 @@ All notable changes to PromiseLink will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed — 桌面版对无效许可证的 403 风暴（L-1，2026-09-21）
+
+- **现象（生产实测）**：nginx 日志中 `POST /api/v1/pro/license/activate` 累计 **6124 次 403**，UA `python-httpx/0.28.1`、无 referer、**约 30 秒一次**持续不断。
+- **根因（本机复现确认）**：`RelayWSSClient._run_forever` 的重连退避在 `reconnect_max`（默认 30s）饱和，而**每次重连**都会先走 `_ensure_token()` → `refresh_token()` → `_activate_license()` 重新 `POST /activate`。许可证被拒（403）属**终态**而非可重试的瞬时错误，但循环既无次数上限也无终态记录 —— 于是单机**每 30 秒一次 403，永久**。
+- **复现证据（真实 `RelayClient` + `httpx.MockTransport` 返回 403，压缩退避窗口）**：修复前 1.5s 内 9 次 `POST /activate`，间隔按 0.05/0.1/0.2/0.2… 饱和；修复后 3 次即停止。
+- **修复**：401/403 抛出的 `RelayAuthError` 视为终态 —— 连续 `max_auth_failures`（默认 **3**，配置项 `RELAY_MAX_AUTH_FAILURES`）次被拒后**停止重连**并置 `state.terminal_reason="license_rejected"`；网络不可达 / 5xx 等瞬时错误仍按指数退避重试。`start()` 会清除终态，重新激活即可恢复。
+- **连带修复（同路径，否则换证后中继永不恢复）**：`POST /pair/activate` 遇到**已终止**或**仍持有旧许可证**的 WSS 客户端时先 `stop()` 再新建 —— 此前该分支直接判定"已在运行"并返回成功，用户重新配对后中继仍是旧连接。
+- **可观测**：`GET /api/v1/health/full` 新增 `relay` 组件（`disabled` / `healthy` / `degraded` / `unhealthy`，终态附带 `terminal_reason` 与 `auth_failures`），终态时整体状态置 `degraded`，用户/运维不再只能靠猜。
+- **回归测试（新增 6 条）**：`tests/test_relay_wss_client.py` 4 条（终态后停止、尝试次数**不随存活时间增长**、瞬时错误仍继续重试、`start()` 清除终态并恢复）＋ `tests/test_pair_wss_lifecycle.py` 1 条（终止/换证的客户端被替换）＋ `tests/test_coverage_boost.py` 1 条（health 暴露终态）。未放宽任何既有断言（`test_activate_does_not_duplicate_wss_if_already_running` 的既有断言原样保留，仅把原先的 `MagicMock` 补成"健康且同证"的真实语义）。
+
 ### Changed — CI：性能/负载用例拆出独立 job（修「门禁遮挡」，L-6）
 
 - **问题**：`tests/test_performance_baseline.py`（17 条）与 `tests/test_load_real.py`（17 条）此前都跑在带 coverage 的 `test` job 里。coverage 插桩使并发用例耗时长约 2 个数量级 —— 本机实测：`test_concurrent_get_entities` 带插桩单条 **7.3s**，同文件无插桩 17 条合计 **2.8s**；在 CI 共享 runner 上表现为 10 并发耗时**均匀挤在 650~655ms** → 越过 500ms 阈值 → `test (3.11)` 红。

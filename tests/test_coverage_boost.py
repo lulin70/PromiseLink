@@ -181,6 +181,44 @@ class TestHealthAPI:
         assert data["components"]["database"]["status"] == "healthy"
         assert data["components"]["cache"]["status"] in ("healthy", "degraded")
         assert data["components"]["llm"]["status"] in ("configured", "not_configured", "error")
+        # L-1: the relay WSS link is reported too (disabled when unconfigured).
+        assert "relay" in data["components"]
+        assert data["components"]["relay"]["status"] in ("disabled", "healthy", "degraded", "unhealthy")
+
+    @pytest.mark.asyncio
+    async def test_full_health_check_surfaces_relay_terminal_state(self, client):
+        """L-1: a relay that gave up on a rejected license must be observable.
+
+        Before this, a license rejected with HTTP 403 left the desktop
+        retrying POST /license/activate forever with no state anywhere the
+        user could see. /health/full now reports it and flips to "degraded".
+        """
+
+        class _TerminalRelayState:
+            def as_dict(self):
+                return {
+                    "connected": False,
+                    "reconnect_count": 7,
+                    "auth_failures": 3,
+                    "terminal_reason": "license_rejected",
+                }
+
+        class _TerminalRelayClient:
+            state = _TerminalRelayState()
+
+        app.state.relay_wss_client = _TerminalRelayClient()
+        try:
+            response = await client.get(f"{API_PREFIX}/health/full")
+        finally:
+            del app.state.relay_wss_client
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "degraded"
+        relay = data["components"]["relay"]
+        assert relay["status"] == "unhealthy"
+        assert relay["terminal_reason"] == "license_rejected"
+        assert relay["auth_failures"] == 3
 
 
 # ══════════════════════════════════════════════════════════════════

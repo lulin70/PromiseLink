@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+from typing import Any
 
 import httpx
 from fastapi import APIRouter, Request
@@ -246,7 +247,23 @@ async def activate_pair(body: PairActivateRequest, request: Request) -> PairActi
     wss_error = ""
 
     # Start WSS relay dynamically if not already running.
-    existing_wss = getattr(request.app.state, "relay_wss_client", None)
+    existing_wss: Any = getattr(request.app.state, "relay_wss_client", None)
+    # L-1 (2026-09-21): a client that already gave up (terminal_reason set
+    # after a license rejection) — or that is still holding a previous
+    # license key — must be replaced, otherwise re-activation reports
+    # success while the stale client keeps failing / never reconnects.
+    if existing_wss is not None:
+        terminal_reason = getattr(getattr(existing_wss, "state", None), "terminal_reason", "")
+        stale = bool(terminal_reason) or getattr(existing_wss, "license_key", None) != license_key
+        if stale:
+            try:
+                await existing_wss.stop()
+                logger.info("pair_activate_wss_replaced", reason="terminal_or_license_changed")
+            except Exception as exc:  # never block activation on a stale client
+                logger.warning("pair_activate_wss_stop_failed", error=str(exc)[:200])
+            request.app.state.relay_wss_client = None
+            existing_wss = None
+
     if existing_wss is not None:
         # Already running — nothing to do.
         wss_started = True
@@ -261,6 +278,7 @@ async def activate_pair(body: PairActivateRequest, request: Request) -> PairActi
                 heartbeat_interval=fresh_settings.relay_heartbeat_interval,
                 reconnect_interval=fresh_settings.relay_reconnect_interval,
                 reconnect_max=fresh_settings.relay_reconnect_max,
+                max_auth_failures=fresh_settings.relay_max_auth_failures,
                 http_request_timeout=fresh_settings.relay_http_request_timeout,
             )
             await relay_wss.start()

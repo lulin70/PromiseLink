@@ -232,6 +232,7 @@ class Settings(BaseSettings):
     relay_user_token: str = Field(default="", description="网关JWT令牌")
     relay_reconnect_interval: int = 1  # 初始重连间隔(秒)
     relay_reconnect_max: int = 30  # 最大重连间隔(秒)
+    relay_max_auth_failures: int = 3  # 连续401/403激活失败上限，达到后停止重连(L-1)
     relay_heartbeat_interval: int = 30  # 心跳间隔(秒)
     relay_token_refresh_interval: int = 900  # relay token刷新间隔(秒)
     relay_wss_enabled: bool = Field(

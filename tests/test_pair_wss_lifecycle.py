@@ -94,6 +94,7 @@ def _make_test_get_settings(
         relay_heartbeat_interval=30,
         relay_reconnect_interval=5,
         relay_reconnect_max=10,
+        relay_max_auth_failures=3,  # L-1: consecutive 403 cap
         relay_http_request_timeout=10.0,
     )
     mock = MagicMock(return_value=test_settings)
@@ -233,8 +234,12 @@ class TestPairActivateWssStartup:
 
         from promiselink.main import app
 
-        # Pre-set an existing WSS client on app.state
+        # Pre-set an existing, HEALTHY WSS client already serving the same
+        # license key (L-1: a client kept only while it is healthy and holds
+        # the current license).
         existing_wss = MagicMock()
+        existing_wss.license_key = "PL-PRO-DUP-002"
+        existing_wss.state.terminal_reason = ""
         app.state.relay_wss_client = existing_wss
 
         with TestClient(app) as client:
@@ -248,6 +253,66 @@ class TestPairActivateWssStartup:
         assert len(mock_wss_instances) == 0
         # The existing one should still be there
         assert app.state.relay_wss_client is existing_wss
+
+    def test_activate_replaces_wss_client_that_gave_up_on_bad_license(self, monkeypatch, tmp_path):
+        """L-1 regression: a client that went terminal must be replaced.
+
+        Symptom: the desktop process was rejected with 403 on
+        POST /api/v1/pro/license/activate every ~30s. Once such a client
+        latches its terminal state, re-activation used to find
+        ``app.state.relay_wss_client`` still set and answer "already
+        running" — so the relay never came back even after the user
+        re-paired with a valid license.
+        """
+        fake_env = tmp_path / ".env"
+        fake_env.write_text("APP_ENV=development\n", encoding="utf-8")
+
+        monkeypatch.setattr(pair_module, "_get_env_path", lambda: fake_env)
+        monkeypatch.setenv("RELAY_GATEWAY_URL", "https://gateway.promiselink.cn")
+        monkeypatch.setenv("RELAY_WSS_ENABLED", "true")
+
+        mock_wss_instances = []
+
+        class _MockRelayWSSClient:
+            def __init__(self, **kwargs):
+                self.kwargs = kwargs
+                self.license_key = kwargs.get("license_key", "")
+                self.state = types.SimpleNamespace(terminal_reason="", auth_failures=0)
+                self.stopped = False
+                mock_wss_instances.append(self)
+
+            async def start(self):
+                pass
+
+            async def stop(self):
+                self.stopped = True
+
+        monkeypatch.setattr(
+            "promiselink.services.relay_wss_client.RelayWSSClient",
+            _MockRelayWSSClient,
+        )
+
+        from promiselink.main import app
+
+        stale_wss = MagicMock()
+        stale_wss.license_key = "PL-PRO-STALE-000"  # the rejected license
+        stale_wss.state.terminal_reason = "license_rejected"
+        stale_wss.stop = AsyncMock()
+        app.state.relay_wss_client = stale_wss
+
+        with TestClient(app) as client:
+            resp = client.post(
+                "/api/v1/pair/activate",
+                json={"license_key": "PL-PRO-FRESH-003"},
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+        # The stale client was stopped and a fresh one replaced it.
+        stale_wss.stop.assert_awaited_once()
+        assert len(mock_wss_instances) == 1
+        assert mock_wss_instances[0].license_key == "PL-PRO-FRESH-003"
+        assert app.state.relay_wss_client is mock_wss_instances[0]
 
     def test_activate_reports_failure_when_wss_start_raises(self, monkeypatch, tmp_path):
         """POST /pair/activate must report WSS startup failure without crashing."""

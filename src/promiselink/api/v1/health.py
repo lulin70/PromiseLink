@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -60,16 +60,17 @@ async def health_check_db(
 
 @router.get("/health/full", response_model=HealthResponse)
 async def health_check_full(
+    request: Request,
     session: AsyncSession = Depends(get_async_session),
     user_id: str = Depends(get_current_user_id),
 ) -> HealthResponse:
     """
     Full health check with all dependency verification (requires authentication).
 
-    Checks: Database, Redis cache, LLM API availability.
+    Checks: Database, Redis cache, LLM API availability, relay WSS link.
     Returns individual component status and overall health.
     """
-    components = {}
+    components: dict[str, Any] = {}
     overall_healthy = True
 
     # 1. Database check
@@ -113,6 +114,36 @@ async def health_check_full(
         components["llm"] = {"status": "error"}
         overall_healthy = False
         logger.warning("health_llm_check_failed", error=str(exc))
+
+    # 4. Relay WSS link (Pro edition bridge to the cloud gateway).
+    # L-1 (2026-09-21): surfaces the terminal state so a license rejection is
+    # visible to the user/operator instead of silently retrying forever.
+    # Only reported when the relay is actually configured; a basic-edition
+    # install with no relay shows "disabled" and is NOT counted as degraded.
+    try:
+        relay_wss = getattr(request.app.state, "relay_wss_client", None)
+        if relay_wss is None:
+            components["relay"] = {"status": "disabled"}
+        else:
+            relay_state = relay_wss.state.as_dict()
+            terminal_reason = relay_state.get("terminal_reason", "")
+            if terminal_reason:
+                components["relay"] = {
+                    "status": "unhealthy",
+                    "connected": False,
+                    "terminal_reason": terminal_reason,
+                    "auth_failures": relay_state.get("auth_failures", 0),
+                }
+                overall_healthy = False
+            else:
+                components["relay"] = {
+                    "status": "healthy" if relay_state.get("connected") else "degraded",
+                    "connected": bool(relay_state.get("connected")),
+                    "reconnect_count": relay_state.get("reconnect_count", 0),
+                }
+    except Exception as exc:  # Health check — keep broad catch for resilience
+        components["relay"] = {"status": "error"}
+        logger.warning("health_relay_check_failed", error=str(exc))
 
     return HealthResponse(
         status="healthy" if overall_healthy else "degraded",
