@@ -78,6 +78,38 @@ def _mock_httpx_module(handler) -> types.ModuleType:
     return mock
 
 
+@pytest.fixture(autouse=True)
+def _isolate_app_relay_state():
+    """隔离 ``app.state.relay_wss_client``，避免用例之间互相污染。
+
+    ``app`` 是模块级单例，而 ``lifespan`` 的 startup / shutdown **都不会**清空
+    ``app.state.relay_wss_client``（``main.py``：只有 gateway + license + 开关
+    三者齐备时才赋值，shutdown 仅调用 ``stop()``）。于是用例里写进去的中继替身
+    会活到下一个用例 —— ② 的 ``test_pair_status_rejected_kind_mapping`` 留下的
+    ``terminal_reason="license_rejected"`` 会直接改写紧随其后的
+    ``test_pair_status_rejected_kind_is_distinct_from_expired`` 的答案。
+
+    实测：CI（无 .env，relay 门为假，startup 不覆盖替身）该用例红
+    （``assert 'rejected' == 'expired'``）；本机因 .env 里配齐了 relay 三项、
+    startup 用真实客户端盖掉了替身而看不到 —— 典型的"测试结果取决于环境"。
+    本 fixture 让本模块与 .env 无关：用例开始前清空，结束后还原。
+    """
+    from promiselink.main import app
+
+    _absent = object()
+    before = getattr(app.state, "relay_wss_client", _absent)
+    if hasattr(app.state, "relay_wss_client"):
+        del app.state.relay_wss_client
+
+    yield
+
+    if before is _absent:
+        if hasattr(app.state, "relay_wss_client"):
+            del app.state.relay_wss_client
+    else:
+        app.state.relay_wss_client = before
+
+
 # ── /pair/init tests ──
 
 

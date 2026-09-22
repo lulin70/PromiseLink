@@ -4,6 +4,38 @@ All notable changes to PromiseLink will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed — 测试结果取决于 `.env`：pair 用例之间泄漏 `app.state`（L-23，2026-09-21）
+
+- **现象**：CI run `35626284375`（commit `6acaa4f`）的 `test (3.11)` 在 `Run tests` 红：`FAILED tests/test_pair_mode.py::test_pair_status_rejected_kind_is_distinct_from_expired - AssertionError: assert 'rejected' == 'expired'`，因 `--maxfail=1` 于 `1 failed, 1137 passed, 31 skipped, 15 warnings in 615.01s` **提前终止**（批 4 的 CI 证据链因此被遮挡）。该用例 captured stdout 里有 `relay_wss_stop_error error="'_FakeRelayClient' object has no attribute 'stop'"` —— 证明那一刻 `app.state` 里仍然是**上一个用例留下的替身**。
+- **根因**：`app` 是模块级单例，而 `lifespan` 的 startup / shutdown **都不清空** `app.state.relay_wss_client`（`main.py:363-378` 只在 gateway + license + 开关三者齐备时赋值；`main.py:424-430` 仅调用 `stop()`）。② 的 `test_pair_status_rejected_kind_mapping` 在 `with TestClient(app)` 内写入 `terminal_reason="license_rejected"` 的替身**且不还原** → 紧随其后的 expired 用例读到的是"本地中继终态优先"分支，答案被改写成 `rejected`。
+- **本机为何永不复现（已实测，不是推断）**：本机 `.env` 恰好配齐 relay 三项（`RELAY_GATEWAY_URL` / `PRO_LICENSE_KEY` / `relay_wss_enabled`）→ 每次 lifespan startup 都用**真实客户端盖掉**泄漏的替身（泄漏仍在，只是看不见）；CI 无 `.env`、relay 门为假 → 替身存活。判定差异变量并把它搬到本地（`PRO_LICENSE_KEY=""`）后才拿到受控复现。
+- **修复（仅测试隔离；未改任何断言、未改源码）**：`tests/test_pair_mode.py` 新增模块级 autouse fixture `_isolate_app_relay_state` —— 用例开始前清空、结束后还原 `app.state.relay_wss_client`，使该模块不再依赖 `.env` 与执行顺序。**不改源码的理由**：`get_pair_status` 的"本地中继终态优先"是 ② 的设计（凭据被拒必须胜过"配对码过期"），本例是用例**没有建立自己的前置条件**，不是源码优先级错误。
+- **实测（真实命令输出）**：
+
+  ```
+  # 修前：把 CI 的差异变量搬到本地（本机 1:1 复现 CI）
+  $ PRO_LICENSE_KEY="" .venv/bin/python -m pytest tests/test_pair_mode.py -o addopts="" -q -k "rejected_kind"
+  FAILED tests/test_pair_mode.py::test_pair_status_rejected_kind_is_distinct_from_expired - AssertionError: assert 'rejected' == 'expired'
+  1 failed, 9 passed, 18 deselected, 1 warning in 21.79s
+
+  # 修后：同条件（relay 门为假，等同 CI）
+  $ PRO_LICENSE_KEY="" .venv/bin/python -m pytest tests/test_pair_mode.py -o addopts="" -q
+  28 passed, 1 warning in 52.64s
+
+  # 修后：本机条件（relay 门为真）
+  $ .venv/bin/python -m pytest tests/test_pair_mode.py -o addopts="" -q
+  28 passed, 1 warning in 6.76s
+
+  # 全量主套件（同一 -o addopts="" 口径）
+  $ .venv/bin/python -m pytest -o addopts="" -q
+  2150 passed, 79 skipped, 23 warnings in 204.28s
+  ```
+
+  全量较前一次基线 `2133 passed, 79 skipped` 多的 **17 条**均为 ③ 门禁（`test_doc_version_gate.py` 4 条）与 ⑥（`test_file_logging.py` 10 条 + `test_packaging_spec.py` 3 条）的新增用例；**本次修复只加 fixture、不加用例**（用例数不变）。
+
+- **连带修复**：`src/promiselink/core/logging.py` 与 `tests/test_file_logging.py` 补文件末尾换行（CI `Run linting` 报 `W292 ×2`，同批推送的两个 run 均因此失败）。
+- **登记**：`PromiseLink-Pro/docs/review/PROJECT_REVIEW_20260918_FINDINGS.md` §9.11 增 L-23 行（含方法学要点：同类"本地不复现"应先找环境变量 / 配置文件的有无，而不是先怀疑解释器版本或覆盖率插桩）。
+
 ### Fixed — macOS 包窗口化后日志无处可看：新增文件日志 + `console` 改 `False`（⑥ / L-16 / L-18，2026-09-21）
 
 - **前置事实（L-18，写方案时为核实 L-16 而查）**：桌面端此前**只有 stdout 一个日志出口** —— `core/logging.py` 的 `logger_factory=structlog.PrintLoggerFactory()`，`configure_logging()` 只设 root level、**未挂任何 `FileHandler`**（全仓 grep `FileHandler|RotatingFile|WriteLoggerFactory` 无命中）。终端窗口一关（或用户从不看它）日志即**永久丢失**，而最需要日志的**非技术用户恰恰不读终端** → 售后拿不到任何证据。
