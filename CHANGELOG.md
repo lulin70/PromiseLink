@@ -34,6 +34,7 @@ All notable changes to PromiseLink will be documented in this file.
   全量较前一次基线 `2133 passed, 79 skipped` 多的 **17 条**均为 ③ 门禁（`test_doc_version_gate.py` 4 条）与 ⑥（`test_file_logging.py` 10 条 + `test_packaging_spec.py` 3 条）的新增用例；**本次修复只加 fixture、不加用例**（用例数不变）。
 
 - **连带修复**：`src/promiselink/core/logging.py` 与 `tests/test_file_logging.py` 补文件末尾换行（CI `Run linting` 报 `W292 ×2`，同批推送的两个 run 均因此失败）。
+- **同时解掉的类型检查阻塞**：⑥ 的 `_TeeFile` 过不了 `Run type checking` —— `Argument "file" to "PrintLoggerFactory" has incompatible type "_TeeFile"; expected "TextIO | None"`（lint 修好后该步骤才第一次真正执行到，故此前从未暴露）。实测**继承 `io.TextIOBase` 解决不了**（mypy 2.1.0 / typeshed 并不把 `io.TextIOBase` 视作 `typing.TextIO` 的子类型），故仅在唯一调用点显式 `cast(TextIO, …)` 并注明缺口位置。本机实测：`mypy src/promiselink --ignore-missing-imports` → `Success: no issues found in 127 source files`（与 CI 的 `checked 127 source files` 同范围）。
 - **登记**：`PromiseLink-Pro/docs/review/PROJECT_REVIEW_20260918_FINDINGS.md` §9.11 增 L-23 行（含方法学要点：同类"本地不复现"应先找环境变量 / 配置文件的有无，而不是先怀疑解释器版本或覆盖率插桩）。
 
 ### Fixed — macOS 包窗口化后日志无处可看：新增文件日志 + `console` 改 `False`（⑥ / L-16 / L-18，2026-09-21）

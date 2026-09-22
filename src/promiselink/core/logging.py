@@ -15,7 +15,7 @@ import sys
 import uuid
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TextIO, cast
 
 import structlog
 
@@ -62,6 +62,11 @@ class _TeeFile:
 
     保留终端输出是刻意的：源码运行 / 前台调试的输出与改动前**完全一致**，
     文件日志只是"多一个出口"，不是"换一个出口"。
+
+    刻意**不**继承 ``io.TextIOBase``：实测（mypy 2.1.0）typeshed 并不把
+    ``io.TextIOBase`` 视作 ``typing.TextIO``（= ``IO[str]``）的子类型，
+    继承解决不了 ``PrintLoggerFactory(file=...)`` 的类型检查，只会多一层无用的
+    IOBase 语义。类型缺口在调用点用 ``cast`` 显式说明（见 ``configure_logging``）。
     """
 
     def __init__(self, *files: Any) -> None:
@@ -151,13 +156,18 @@ def configure_logging(
 
     sink = _attach_file_logging(log_level, Path(log_dir)) if log_dir is not None else None
 
+    # CI `Run type checking` 实测：`PrintLoggerFactory` 的 `file` 形参类型是
+    # `TextIO | None`，而 `_TeeFile` 只提供 write/flush（typeshed 也未把
+    # `io.TextIOBase` 视作 `TextIO` 子类型）→ 在此显式转换，缺口只此一处。
+    tee: TextIO | None = cast(TextIO, _TeeFile(sys.stdout, sink)) if sink is not None else None
+
     structlog.configure(
         processors=processors,
         wrapper_class=structlog.stdlib.BoundLogger,
         context_class=dict,
         logger_factory=(
-            structlog.PrintLoggerFactory(file=_TeeFile(sys.stdout, sink))
-            if sink is not None
+            structlog.PrintLoggerFactory(file=tee)
+            if tee is not None
             else structlog.PrintLoggerFactory()
         ),
         cache_logger_on_first_use=True,
