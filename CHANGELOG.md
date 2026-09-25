@@ -4,6 +4,42 @@ All notable changes to PromiseLink will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed — 依赖漂移把 CI 门禁变成"永远红"：`sqlalchemy` 无上限拉到 2.1.0（L-24，2026-09-25）
+
+- **现象**：run `36104762398`（commit `62c05ed`）两个 job 红 —— ① `test (3.11)` 的 `Contract consistency (W1, zero-cost push gate)` 报 `FAIL: 契约文档与代码不同步`（diff：契约版本 `f3b3ba49a983 → 59f459512599`，`input_scope_confidence` / `confidence` / `dynamic_score` 三列 `FLOAT → DOUBLE`）；② `Performance & Load (no coverage)` 在 `test_performance_baseline.py::TestConcurrencyPerformance::test_concurrent_post_events` 报 `sqlite3.OperationalError: cannot commit transaction - SQL statements in progress`（`POST /api/v1/events`）。**两个失败都与该 commit 的改动无关**（该 commit 只动了 e2e 脚本与 `ci.yml`，未碰模型）。
+- **归因（同一条流水线对照，非推断）**：CI 日志实装 `sqlalchemy-2.1.0`；上一个全绿 run `35720539607`（`be96c42`，09-22）实装 `sqlalchemy-2.0.54`。根因是 `pyproject.toml` 的 `sqlalchemy>=2.0.25` **无上限** → CI 每次都装最新。
+- **受控复现（本机，两处均确定性）**：`.venv` 切到 2.1.0 后 ① 契约门禁输出与 CI 日志**逐字节吻合**；② 同一 perf 用例 **3/3 失败**（41.8s / 51.2s / 43.5s）。切回 2.0.54 后同一用例 **1.14s 通过**、契约门禁 `OK: contract document in sync`。
+- **根因①已定位到具体行为变更**：SQLAlchemy 2.1.0 的默认 `type_annotation_map` 把 `float` 注解映射为 `Double` —— 实测探针（`Mapped[float]` + 不写显式列类型）在 2.0.54 打印 `'FLOAT'` / `Float`，在 2.1.0 打印 `'DOUBLE'` / `Double`。契约文档的 ORM 列类型表取自 `str(col.type)`，故随之漂移。
+- **根因②尚未定性**（我们侧还是 aiosqlite / 驱动侧），只确证「只在 2.1.0 下出现」，**不在本轮处理**。
+- **修复**：`pyproject.toml` 钉上限 `sqlalchemy>=2.0.25,<2.1`（与 `requirements.lock` 的 `SQLAlchemy==2.0.50` 一致；同 `mypy<1.12` 的上限先例）。**升级 2.1 属独立事项**：须先重新生成契约文档并复核"对外契约的列类型是否允许随依赖版本变化"，再复现并定性 `cannot commit transaction`，取得裁定后才放开上限。
+- **实测（真实命令输出）**：
+
+  ```
+  # 反向探针：切到 2.1.0（复刻 CI）
+  $ .venv/bin/pip install 'sqlalchemy==2.1.0'
+  $ .venv/bin/python scripts/generate_semantic_contract.py --check
+  -> **契约版本**: `f3b3ba49a983`（由代码五源内容哈希自动计算，勿手改）
+  +> **契约版本**: `59f459512599`（由代码五源内容哈希自动计算，勿手改）
+  -| `input_scope_confidence` | FLOAT | 是 |
+  +| `input_scope_confidence` | DOUBLE | 是 |
+  FAIL: 契约文档与代码不同步（schema/词表/枚举变更后未重新生成）
+
+  $ .venv/bin/python -m pytest "...::test_concurrent_post_events" -q --no-cov -o addopts=""
+  FAILED ... - sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) cannot commit transaction - SQL statements in progress
+  1 failed in 41.81s        # 3/3 复现（41.8 / 51.2 / 43.5s）
+
+  # 正向：钉上限后（2.0.54）
+  $ .venv/bin/python -c "import sqlalchemy;print(sqlalchemy.__version__)"   → 2.0.54
+  $ .venv/bin/python scripts/generate_semantic_contract.py --check
+  OK: contract document in sync
+  $ .venv/bin/python -m pytest "...::test_concurrent_post_events" -q --no-cov -o addopts=""
+  1 passed in 1.14s
+
+  # 类型映射探针（同一段代码，两个版本）
+  Mapped[float] → 2.0.54: 'FLOAT' Float    |    2.1.0: 'DOUBLE' Double
+  ```
+- **登记**：`PromiseLink-Pro/docs/review/PROJECT_REVIEW_20260918_FINDINGS.md` 新增 L-24 行。
+
 ### Fixed — `e2e-nightly` 长期红灯：语义断言与 mock 环境错配，另有四处假绿掩盖（L-21，2026-09-25）
 
 - **现象**：`e2e-nightly`（仅 `schedule` 触发）的 `Run E2E full user journey` 长期 `failure`。实测 run `35574911595`（`6608256`）、`35969871778` / `35832687825`（`be96c42`）失败步骤恒为同一步，报告为 `2 PASS / 2 PARTIAL / 3 FAIL`。**同一 commit 的 push run（如 `35720539607`）里该 job 是 `skipped`**（`if: github.event_name == 'schedule'`）—— 所以"push 全绿"从不能代表这条门禁通过。

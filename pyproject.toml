@@ -10,7 +10,16 @@ license = "MPL-2.0"
 dependencies = [
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
-    "sqlalchemy>=2.0.25",
+    # 上限必须保留：SQLAlchemy 2.1.0 有两处会打破本仓已发布的行为契约 ——
+    #   ① 默认 type_annotation_map 把 `float` 注解由 Float 改为 Double，
+    #      使 docs/spec/PARSING_SEMANTIC_CONTRACT.md 的 ORM 列类型表漂移
+    #      （contract 门禁 FLOAT → DOUBLE 变红）；
+    #   ② aiosqlite 下并发 POST 出现 `sqlite3.OperationalError: cannot commit
+    #      transaction - SQL statements in progress`（perf job 变红）。
+    # 已锁定验证过的 2.0.x（requirements.lock: SQLAlchemy==2.0.50）。
+    # 升级到 2.1 属独立事项，须先重新生成契约文档并复现②、取得裁定后再放开上限。
+    # 详见 PROJECT_REVIEW_20260918_FINDINGS.md L-24。
+    "sqlalchemy>=2.0.25,<2.1",
     "alembic>=1.13.1",
     "aiosqlite>=0.20.0",
     "greenlet>=3.0.0",
