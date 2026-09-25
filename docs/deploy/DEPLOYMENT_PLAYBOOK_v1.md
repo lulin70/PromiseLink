@@ -194,7 +194,7 @@ STALE=$(grep -oE 'PromiseLink-[0-9][0-9a-zA-Z.\\-]*-(mac\.dmg|windows\.exe)' dow
 **判据必须是「对外 URL 的实测 HTTP 响应」，不是服务器上某个目录的文件内容**——后者曾在 P0-0 中导致虚假通过。
 
 ```bash
-VER=1.1.1   # = 基础版 release tag（去掉 v 前缀）
+VER=1.1.2   # = 基础版 release tag（去掉 v 前缀）
 
 # 1. 下载页文案/链接（对外）
 curl -sk https://www.promiselink.cn/download.html | grep -oE 'PromiseLink-[0-9][0-9.a-zA-Z-]*-(mac\.dmg|windows\.exe)' | sort -u
