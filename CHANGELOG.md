@@ -4,6 +4,8 @@ All notable changes to PromiseLink will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-09-25
+
 ### Fixed — 依赖漂移把 CI 门禁变成"永远红"：`sqlalchemy` 无上限拉到 2.1.0（L-24，2026-09-25）
 
 - **现象**：run `36104762398`（commit `62c05ed`）两个 job 红 —— ① `test (3.11)` 的 `Contract consistency (W1, zero-cost push gate)` 报 `FAIL: 契约文档与代码不同步`（diff：契约版本 `f3b3ba49a983 → 59f459512599`，`input_scope_confidence` / `confidence` / `dynamic_score` 三列 `FLOAT → DOUBLE`）；② `Performance & Load (no coverage)` 在 `test_performance_baseline.py::TestConcurrencyPerformance::test_concurrent_post_events` 报 `sqlite3.OperationalError: cannot commit transaction - SQL statements in progress`（`POST /api/v1/events`）。**两个失败都与该 commit 的改动无关**（该 commit 只动了 e2e 脚本与 `ci.yml`，未碰模型）。
