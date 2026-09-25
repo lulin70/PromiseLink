@@ -4,6 +4,38 @@ All notable changes to PromiseLink will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed — `e2e-nightly` 长期红灯：语义断言与 mock 环境错配，另有四处假绿掩盖（L-21，2026-09-25）
+
+- **现象**：`e2e-nightly`（仅 `schedule` 触发）的 `Run E2E full user journey` 长期 `failure`。实测 run `35574911595`（`6608256`）、`35969871778` / `35832687825`（`be96c42`）失败步骤恒为同一步，报告为 `2 PASS / 2 PARTIAL / 3 FAIL`。**同一 commit 的 push run（如 `35720539607`）里该 job 是 `skipped`**（`if: github.event_name == 'schedule'`）—— 所以"push 全绿"从不能代表这条门禁通过。
+- **根因（受控复现，非推断）**：该 job 以 `LLM_PROVIDER=mock` 启动服务，而 `MockLLMClient._mock_response` 对「商务交流信息提取」**只固定返回「张总」一人**、对「我答应过什么」只固定返回一条承诺、其余 prompt 返回 `{}`；而脚本 S1/S3/S5 断言的 `entities_min≥2~3`、`todos_min≥2~3` 是**真实语义数量** —— 在 mock 下原理上不可能成立，与管线是否健康无关。本地按 CI 同参（`LLM_PROVIDER=mock` + 全新 DB + 同端口/凭据）逐字节复现：`S1/S3/S5 = FAIL`、`S2/S4 = PARTIAL`、`S6/S7 = PASS`，实体列表恒为 `['张总']`、Todo 恒为 1 条。
+- **修复① 按模式分派断言**：脚本新增 `E2E_LLM_MODE`（`mock|real`，缺省 `real`；非法值立即非零退出）。`mock` 下只断言 mock 能证明的不变量 —— ① 每个事件 Pipeline 必须到 `completed`；② 抽取结果必须落库并可经公开 API 读回；③ **归并去重未回归**：实体 / Todo 总量恒等于 mock 基数（`MOCK_ENTITY_CARDINALITY` / `MOCK_TODO_CARDINALITY`，与 `llm_client.py` 的桩体一一对应）。`real` 分支保持原语义断言不变。`ci.yml` 的该步骤显式声明 `E2E_LLM_MODE: "mock"`，并订正原注释（原文声称"e2e-nightly 需要真实 LLM API key，CI 环境无法通过"，与代码里的 `LLM_PROVIDER=mock` 自相矛盾）。**真实语义质量由 `golden-baseline.yml`（真实 `secrets.LLM_API_KEY`，每周一）覆盖，本条不放松那一层。**
+- **修复② 四处假绿（每处均有反向探针证伪）**：
+  1. `run_batch_test` 中 `status == "completed"` 直接判 `PASS` → 「实体≈0、Todo≈0」也报绿（实测复现）；
+  2. 实体 / Todo 判定用 `or entities_total >= expect_min` 以**累计总量**兜底 → 后续场景靠前面场景的残留实体白拿通过，掩盖单场景回归；
+  3. 承诺统计接口异常时 `except` 分支不置负（**fail-open**）→ "抽不到就绿"，改为判负；
+  4. **`PARTIAL` 软着陆**：场景 `PARTIAL` 不计入 `fail_count`，且跨场景验证失败时 `overall` 只降为 `PARTIAL`，而退出码判据是 `overall != "FAIL"` → **`PARTIAL` 从不导致红灯**。改为「全部场景 `PASS` 且跨场景验证全通过才算 `PASS`」，退出码仅 `PASS` 为 0。
+- **顺带修正的场景数据 bug**：S4 的 `expect.keywords` 写 `'Q2报告'`，而它的 `raw_text` 是 `'Q2季度报告'` —— 关键词自检长期为假、并被上层 `PARTIAL` 掩盖。**这是期望值写错（数据 bug），不是放松断言**：修正为 `'Q2季度报告'`，护栏保留并参与判定。
+- **实测（真实命令输出）**：
+
+  ```
+  # 修前（CI 同参：LLM_PROVIDER=mock + 全新 DB + 独立端口）—— 与 CI 日志逐字节吻合
+  exit=1
+    ├─ PASS:   2/7   ├─ PARTIAL:2/7   └─ FAIL:   3/7
+    总评: FAIL
+    批量后总计: 实体=1, Todo=1；批量新增: 实体≈0, Todo≈0   ← 仍报 PASS = 假绿
+
+  # 修后：正向 + 4 条反向探针
+  ########## P1-mock-期望绿 ##########         exit=0  → 7/7 PASS，总评: PASS
+  ########## P2-real-期望红 ##########          exit=1  → 7/7 FAIL，总评: FAIL（严格分支仍生效）
+  ########## P3-基数篡改-期望红 ##########       exit=1  → 7/7 FAIL（去重不变量可被证伪）
+  ########## P4-关键词护栏篡改-期望红 ########## exit=1  → 6 PASS + 1 PARTIAL，总评: PARTIAL
+  ########## P5-非法模式-期望立即失败 ########## exit=1  → E2E_LLM_MODE 只支持 mock|real，收到: 'bogus'
+  ```
+  P4 是修复②-4 的**专向探针**：同一篡改在修前得到 `总评: PASS / exit=0`（护栏形同虚设），修后得到 `总评: PARTIAL / exit=1`。
+  复现要点：`alembic upgrade head` → `LLM_PROVIDER=mock uvicorn promiselink.main:app --port 8012` → `E2E_BASE_URL=http://localhost:8012/api/v1 E2E_LLM_MODE=mock python3 scripts/e2e/e2e_full_user_journey.py`。
+- **CI 侧复验的已知限制**：该 job 仅在 `schedule` 触发时执行，push run 中恒为 `skipped`，故本条的绿灯**最快只能在下一次 02:00 UTC 定时运行**见到。是否需要把它接入 push 触发属**门禁触发条件变更**，须另行请示，本轮保持 `if: schedule` 不动。
+- **登记**：`PromiseLink-Pro/docs/review/PROJECT_REVIEW_20260918_FINDINGS.md` 的 L-21 行状态列已回填 ✅ 已修；执行记录见 `NEXT_STEPS_20260925.md` §8.5。
+
 ### Fixed — 测试结果取决于 `.env`：pair 用例之间泄漏 `app.state`（L-23，2026-09-21）
 
 - **现象**：CI run `35626284375`（commit `6acaa4f`）的 `test (3.11)` 在 `Run tests` 红：`FAILED tests/test_pair_mode.py::test_pair_status_rejected_kind_is_distinct_from_expired - AssertionError: assert 'rejected' == 'expired'`，因 `--maxfail=1` 于 `1 failed, 1137 passed, 31 skipped, 15 warnings in 615.01s` **提前终止**（批 4 的 CI 证据链因此被遮挡）。该用例 captured stdout 里有 `relay_wss_stop_error error="'_FakeRelayClient' object has no attribute 'stop'"` —— 证明那一刻 `app.state` 里仍然是**上一个用例留下的替身**。

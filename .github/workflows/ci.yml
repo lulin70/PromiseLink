@@ -271,9 +271,13 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # 仅夜间定时运行：e2e-nightly 需要真实 LLM API key，CI 环境无法通过。
-    # 每次 push 都跑会浪费 30 分钟 CI 时间并可能导致 concurrency 取消。
-    # 基本 E2E 由 e2e job 覆盖（push 时运行）。
+    # 仅夜间定时运行（02:00 UTC / 10:00 CST）。
+    # 注意：LLM_PROVIDER=mock（见下方 Start PromiseLink server 的 env），
+    # 因此本 job 断言的是「Pipeline 完成 + 抽取结果落库 + 归并去重」不变量，
+    # **不是**语义抽取质量 —— 语义质量由 golden-baseline.yml（真实 LLM_API_KEY，每周一）覆盖。
+    # 所以脚本必须显式以 E2E_LLM_MODE=mock 运行，否则它的语义数量断言
+    # （S1 要 ≥2 实体 / ≥3 Todo 等）在 mock 下不可能成立，会成为长期红灯。
+    # 定位记录：docs 中 L-21（2026-09-25）。
     if: github.event_name == 'schedule'
 
     steps:
@@ -323,6 +327,8 @@ jobs:
         run: python3 scripts/e2e/e2e_user_journey.py
 
       - name: Run E2E full user journey
+        env:
+          E2E_LLM_MODE: "mock"
         run: python3 scripts/e2e/e2e_full_user_journey.py
 
       - name: Display server logs

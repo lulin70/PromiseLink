@@ -25,6 +25,29 @@ TIMEOUT = 60.0
 POC_SECRET = os.getenv("POC_SECRET", "promiselink2026")
 USER_ID = os.getenv("E2E_USER_ID", "00000000-0000-4000-8000-000000000004")
 
+# ── LLM 模式（L-21 定位结论，2026-09-25）────────────────────
+# CI 的 e2e-nightly job 以 LLM_PROVIDER=mock 启动服务。mock 桩
+# （src/promiselink/services/llm_client.py::MockLLMClient._mock_response）对
+# 「商务交流信息提取」固定返回「张总」一人，对「我答应过什么」固定返回一条
+# 「下周三之前把方案发给他」，其余 prompt 一律返回 {}。
+# 因此语义数量类断言（S1 要 ≥2 实体 / ≥3 Todo、S3 要 ≥2/≥2、S5 要 ≥3/≥2）
+# 在 mock 下**原理上不可能成立**，与管线是否健康无关。
+#
+# mock 模式下本脚本只断言 mock 能够证明的不变量：
+#   ① 每个事件的 Pipeline 必须到达 completed；
+#   ② 抽取结果必须落库并可经公开 API 读回；
+#   ③ 同一固定输出必须被去重 —— 实体 / Todo 总量恒等于 mock 的基数，
+#      即「实体归并 + Todo 去重」链路未回归。
+# 真实语义质量由 golden-baseline.yml（真实 LLM_API_KEY，每周一）覆盖。
+LLM_MODE = os.getenv("E2E_LLM_MODE", "real").strip().lower()
+if LLM_MODE not in ("mock", "real"):
+    raise SystemExit(f"E2E_LLM_MODE 只支持 mock|real，收到: {LLM_MODE!r}")
+
+# mock 桩固定输出对应的基数：与 llm_client.py 的 mock 返回体一一对应。
+# mock 内容若变更，此处必须同步 —— 不变量失败会显式报错，属预期的 fail-loud 耦合。
+MOCK_ENTITY_CARDINALITY = 1
+MOCK_TODO_CARDINALITY = 1
+
 # ── 6份用户场景录入内容 ─────────────────────────────────
 # 基于真实业务场景，覆盖核心功能点
 
@@ -91,7 +114,7 @@ SCENARIOS = [
         "expect": {
             "entities_min": 1,       # 赵磊
             "todos_min": 4,          # 4个明确待办
-            "keywords": ["Q2报告", "路线图", "API接口", "赵磊", "产品评审会", "A301"],
+            "keywords": ["Q2季度报告", "路线图", "API接口", "赵磊", "产品评审会", "A301"],
         }
     },
     {
@@ -253,7 +276,8 @@ def verify_scenario(client: PromiseLinkClient, scenario: dict, prev_counts: dict
     # 2. 等待Pipeline
     print("\n  [步骤2] 等待AI Pipeline处理...")
     final_status = client.wait_for_pipeline(event_id)
-    print(f"  ✅ Pipeline完成，状态={final_status}")
+    pipeline_ok = final_status == "completed"
+    print(f"  {'✅' if pipeline_ok else '❌'} Pipeline状态={final_status}（必须为 completed）")
 
     # 3. 检查实体
     print("\n  [步骤3] 验证实体提取...")
@@ -269,9 +293,17 @@ def verify_scenario(client: PromiseLinkClient, scenario: dict, prev_counts: dict
 
     expect_min_e = scenario["expect"].get("entities_min", 0)
     new_entities = entities_total - prev_counts.get("entities", 0)
-    e_ok = new_entities >= expect_min_e or entities_total >= expect_min_e
+    if LLM_MODE == "mock":
+        # mock：语义数量无意义，断言「已落库 + 去重基数正确」
+        e_ok = entities_total == MOCK_ENTITY_CARDINALITY
+        e_rule = f"实体总量应恒为 {MOCK_ENTITY_CARDINALITY}（mock 固定输出经归并去重后）"
+    else:
+        # real：只认本场景自身的增量。旧实现用 `or entities_total >= expect_min_e`
+        # 以累计总量兜底，会让后续场景靠前面场景的残留实体白拿通过、掩盖单场景回归。
+        e_ok = new_entities >= expect_min_e
+        e_rule = f"本场景新增实体应 ≥{expect_min_e}"
 
-    print(f"  总实体数: {entities_total} (新增≥{new_entities}, 期望≥{expect_min_e})")
+    print(f"  总实体数: {entities_total} (新增{new_entities}, {e_rule})")
     print(f"  实体列表: {entity_names[:10]}")
     print(f"  {'✅' if e_ok else '❌'} 实体验证 {'通过' if e_ok else '未达标'}")
 
@@ -289,9 +321,14 @@ def verify_scenario(client: PromiseLinkClient, scenario: dict, prev_counts: dict
 
     expect_min_t = scenario["expect"].get("todos_min", 0)
     new_todos = todos_total - prev_counts.get("todos", 0)
-    t_ok = new_todos >= expect_min_t or todos_total >= expect_min_t
+    if LLM_MODE == "mock":
+        t_ok = todos_total == MOCK_TODO_CARDINALITY
+        t_rule = f"Todo 总量应恒为 {MOCK_TODO_CARDINALITY}（mock 固定输出经去重后）"
+    else:
+        t_ok = new_todos >= expect_min_t
+        t_rule = f"本场景新增 Todo 应 ≥{expect_min_t}"
 
-    print(f"  总Todo数: {todos_total} (新增≥{new_todos}, 期望≥{expect_min_t})")
+    print(f"  总Todo数: {todos_total} (新增{new_todos}, {t_rule})")
     for tt in todo_titles[-5:]:
         print(f"    - {tt}")
     print(f"  {'✅' if t_ok else '❌'} Todo验证 {'通过' if t_ok else '未达标'}")
@@ -313,8 +350,13 @@ def verify_scenario(client: PromiseLinkClient, scenario: dict, prev_counts: dict
         expect_my = scenario["expect"].get("promises_my_min", 0)
         expect_their = scenario["expect"].get("promises_their_min", 0)
 
-        p_my_ok = my_count >= expect_my
-        p_their_ok = their_count >= expect_their
+        if LLM_MODE == "mock":
+            # mock 桩只产出「我的承诺」一条，「对方承诺」在 mock 下不可判 → 不对其判负
+            p_my_ok = my_count >= 1
+            p_their_ok = True
+        else:
+            p_my_ok = my_count >= expect_my
+            p_their_ok = their_count >= expect_their
 
         print(f"  我的承诺(全状态): {my_count} (期望≥{expect_my}) {'✅' if p_my_ok else '❌'}")
         print(f"  对方承诺(全状态): {their_count} (期望≥{expect_their}) {'✅' if p_their_ok else '❌'}")
@@ -323,10 +365,19 @@ def verify_scenario(client: PromiseLinkClient, scenario: dict, prev_counts: dict
         if their_p:
             print(f"    对方分布: {json.dumps(their_p, ensure_ascii=False)}")
     except Exception as ex:
-        print(f"  ⚠️ Promise检查异常: {ex}")
+        # 不允许 fail-open：承诺统计接口异常必须判负，否则「抽不到就绿」
+        print(f"  ❌ 承诺检查异常（判负）: {ex}")
+        p_my_ok = False
+        p_their_ok = False
 
-    # 6. 关键词检查
-    print("\n  [步骤6] 关键词匹配...")
+    # 6. 关键词自检
+    # 这是**输入自检**：只验证 `expect.keywords` 是否真的出现在 `raw_text` 里，
+    # 不校验抽取结果，因此它衡量的是「场景数据与期望值是否自洽」，而非管线质量。
+    # 它参与最终判定（见下方 all_pass）— 一旦为假说明场景数据被改动或期望值写错，
+    # 属 fail-loud 的数据完整性护栏。
+    # 历史：2026-09-25 之前 S4 的 expect 写 'Q2报告' 而 raw_text 是 'Q2季度报告'，
+    # 该护栏一直为假且被上层 PARTIAL 掩盖；本次修正期望值（数据 bug，非断言放宽）。
+    print("\n  [步骤6] 关键词自检（仅校验输入文本包含，不校验抽取结果）...")
     keywords = scenario["expect"].get("keywords", [])
     all_text = scenario["raw_text"]
     kw_results = {}
@@ -345,9 +396,10 @@ def verify_scenario(client: PromiseLinkClient, scenario: dict, prev_counts: dict
         "todos": todos_total,
     }
 
-    # 综合判定
-    all_pass = e_ok and t_ok and p_my_ok and p_their_ok and kw_all_ok
-    verdict = "PASS" if all_pass else "PARTIAL" if (e_ok or t_ok) else "FAIL"
+    # 综合判定：Pipeline 必须 completed（前置不变量），再叠加实体 / Todo / 承诺判定。
+    # kw_all_ok 为场景数据自洽性护栏（见步骤6），同样参与判定。
+    all_pass = pipeline_ok and e_ok and t_ok and p_my_ok and p_their_ok and kw_all_ok
+    verdict = "PASS" if all_pass else "PARTIAL" if (pipeline_ok and (e_ok or t_ok)) else "FAIL"
 
     print(f"\n  ━━━ [{sid}] 结果: {verdict} | 实体:{'+'.join(entity_names[:5])} | Todo:{new_todos}条新增 ━━━")
 
@@ -362,13 +414,14 @@ def verify_scenario(client: PromiseLinkClient, scenario: dict, prev_counts: dict
         "todos_total": todos_total,
         "todos_new": new_todos,
         "todo_titles": todo_titles[-5:],
-        "my_promises": my_count if 'my_count' in dir() else 0,
-        "their_promises": their_count if 'their_count' in dir() else 0,
+        "my_promises": my_count,
+        "their_promises": their_count,
         "checks": {
+            "pipeline": pipeline_ok,
             "entities": e_ok,
             "todos": t_ok,
-            "promises_my": p_my_ok if 'p_my_ok' in dir() else True,
-            "promises_their": p_their_ok if 'p_their_ok' in dir() else True,
+            "promises_my": p_my_ok,
+            "promises_their": p_their_ok,
             "keywords": kw_all_ok,
         },
         "counts": current_counts,
@@ -409,23 +462,32 @@ def run_batch_test(client: PromiseLinkClient, scenarios: list, prev_counts: dict
     print(f"\n  批量后总计: 实体={e_total}, Todo={t_total}")
     print(f"  批量新增: 实体≈{e_total - prev_counts.get('entities', 0)}, Todo≈{t_total - prev_counts.get('todos', 0)}")
 
-    # 宽松判定：只要实体和Todo有增长就算PASS，不再要求每个事件都completed
+    # 判定：Pipeline 完成是必要条件，但**不能只看状态**——旧实现在 status==completed
+    # 时直接给 PASS，导致「实体≈0、Todo≈0」也报 PASS（2026-09-25 实测复现，见 L-21）。
     for sid, status, sc in statuses:
-        new_entities = e_total - prev_counts.get("entities", 0)
-        new_todos = t_total - prev_counts.get("todos", 0)
-        # 只要有增量（>=期望最小值），即使pipeline timeout也算PARTIAL
         expect_e = sc.get("expect", {}).get("entities_min", 0)
         expect_t = sc.get("expect", {}).get("todos_min", 0)
-        if new_entities >= expect_e and new_todos >= expect_t:
-            verdict = "PASS"
-        elif status == "completed":
-            verdict = "PASS"
+        if LLM_MODE == "mock":
+            entities_ok = e_total == MOCK_ENTITY_CARDINALITY
+            todos_ok = t_total == MOCK_TODO_CARDINALITY
         else:
-            verdict = "PARTIAL" if status in ("pending", "timeout") else "FAIL"
+            entities_ok = (e_total - prev_counts.get("entities", 0)) >= expect_e
+            todos_ok = (t_total - prev_counts.get("todos", 0)) >= expect_t
+
+        pipeline_ok = status == "completed"
+        if pipeline_ok and entities_ok and todos_ok:
+            verdict = "PASS"
+        elif (pipeline_ok and (entities_ok or todos_ok)) or status in ("pending", "timeout"):
+            verdict = "PARTIAL"
+        else:
+            verdict = "FAIL"
         results.append({
             "id": sid,
             "verdict": verdict,
             "pipeline_status": status,
+            "entities_total": e_total,
+            "todos_total": t_total,
+            "checks": {"pipeline": pipeline_ok, "entities": entities_ok, "todos": todos_ok},
         })
 
     return results
@@ -502,11 +564,12 @@ def run_cross_scenario_validation(client: PromiseLinkClient, all_results: list):
 
         pending_resp = client.get_todos(status="pending", limit=100)
         pending_count = pending_resp.get("total", 0) if isinstance(pending_resp, dict) else len(pending_resp)
-        if pending_count >= 3:
-            print(f"  ✅ 有{pending_count}个待处理Todo")
+        min_pending = 1 if LLM_MODE == "mock" else 3
+        if pending_count >= min_pending:
+            print(f"  ✅ 有{pending_count}个待处理Todo（阈值≥{min_pending}）")
             passed += 1
         else:
-            print(f"  ⚠️ 待处理Todo较少({pending_count})")
+            print(f"  ❌ 待处理Todo不足({pending_count}，阈值≥{min_pending})")
             failed += 1
     except Exception as ex:
         print(f"  ❌ Todo状态检查失败: {ex}")
@@ -571,6 +634,10 @@ def main():
     print("  PromiseLink 基础版 — 完整用户旅程 E2E 测试")
     print(f"  开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"  目标API: {BASE}")
+    if LLM_MODE == "mock":
+        print("  LLM 模式: mock（确定性桩）→ 语义数量断言已关闭，只断言 Pipeline/落库/去重不变量")
+    else:
+        print("  LLM 模式: real → 语义数量断言开启（按场景增量判定）")
     print("=" * 60)
 
     client = PromiseLinkClient(BASE)
@@ -626,6 +693,7 @@ def main():
         for r in all_results:
             checks = r.get("checks", {})
             check_str = " ".join([
+                f"PL{'✅'if checks.get('pipeline')else'❌'}",
                 f"E{'✅'if checks.get('entities')else'❌'}",
                 f"T{'✅'if checks.get('todos')else'❌'}",
                 f"P{'✅'if checks.get('promises_my',True)else'❌'}",
@@ -633,8 +701,14 @@ def main():
             print(f"  {r['id']:12s} | {r['verdict']:7s} | pipeline={r.get('pipeline_status','?'):15s} | "
                   f"实体+{r.get('entities_new','?')} Todo+{r.get('todos_new','?')} | {check_str}")
 
-        overall = "PASS" if fail_count == 0 and cv_result["failed"] == 0 else \
-                  "PARTIAL" if fail_count == 0 else "FAIL"
+        # 门禁结论：只有「全部场景 PASS 且跨场景验证全通过」才算 PASS。
+        # 旧实现有两处软着陆漏洞（2026-09-25 反向探针实测）：
+        #   ① 场景 PARTIAL 不计入 fail_count → 「部分断言未过」仍算 PASS；
+        #   ② 跨场景验证失败时 overall 只降为 PARTIAL，而退出码判据是 `overall != "FAIL"` → 仍为 0。
+        # 合起来即：PARTIAL 在这条门禁里**从不**导致红灯，等于给"说不清的失败"开绿灯
+        # （与 L-21 同族：门禁必须能被证伪，见下方探针 P4）。
+        overall = "PASS" if (fail_count == 0 and partial_count == 0 and cv_result["failed"] == 0) else \
+                  "FAIL" if (fail_count > 0 or cv_result["failed"] > 0) else "PARTIAL"
 
         print("\n  ══════════════════════════════════════════")
         print(f"  总评: {overall}")
@@ -645,6 +719,7 @@ def main():
         # 输出JSON报告
         report = {
             "overall": overall,
+            "llm_mode": LLM_MODE,
             "duration_sec": round(duration, 1),
             "timestamp": end_time.isoformat(),
             "scenarios": all_results,
@@ -655,7 +730,8 @@ def main():
             json.dump(report, f, ensure_ascii=False, indent=2)
         print(f"\n  详细报告已保存: {report_path}")
 
-        return 0 if overall != "FAIL" else 1
+        # 退出码判据必须与 overall 的三态一致：仅 PASS 为绿（PARTIAL 也是不通过）。
+        return 0 if overall == "PASS" else 1
 
     finally:
         client.close()
