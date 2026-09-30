@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://promiselink.cn"><img src="https://img.shields.io/badge/🌐_官网-promiselink.cn-blue?style=for-the-badge" alt="Website"></a>
-  <a href="https://github.com/lulin70/PromiseLink/releases"><img src="https://img.shields.io/badge/version-v1.1.1-blue?style=flat-square" alt="Version"></a>
+  <a href="https://github.com/lulin70/PromiseLink/releases"><img src="https://img.shields.io/badge/version-v1.1.2-blue?style=flat-square" alt="Version"></a>
   <br/>
   <a href="https://github.com/lulin70/PromiseLink/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/lulin70/PromiseLink/ci.yml?branch=main&label=CI&logo=github" alt="CI"></a>
   <img src="https://img.shields.io/badge/tests-2087%20passed-brightgreen" alt="Tests">
@@ -74,10 +74,10 @@
 
 ### 方式一：一键下载安装包（推荐非技术用户）
 
-**v1.1.1 直接下载**（双击安装，无需 Python 环境）：
+**v1.1.2 直接下载**（双击安装，无需 Python 环境）：
 
-- **macOS**: [PromiseLink-1.1.1-mac.dmg](https://github.com/lulin70/PromiseLink/releases/download/v1.1.1/PromiseLink-1.1.1-mac.dmg)（Apple Silicon / Intel，~36 MB）
-- **Windows**: [PromiseLink-1.1.1-windows.exe](https://github.com/lulin70/PromiseLink/releases/download/v1.1.1/PromiseLink-1.1.1-windows.exe)（Windows 10/11 64-bit，~43 MB）
+- **macOS**: [PromiseLink-1.1.2-mac.dmg](https://github.com/lulin70/PromiseLink/releases/download/v1.1.2/PromiseLink-1.1.2-mac.dmg)（Apple Silicon / Intel）
+- **Windows**: [PromiseLink-1.1.2-windows.exe](https://github.com/lulin70/PromiseLink/releases/download/v1.1.2/PromiseLink-1.1.2-windows.exe)（Windows 10/11 64-bit）
 
 或从 [Releases 页面](https://github.com/lulin70/PromiseLink/releases) 下载所有版本。
 

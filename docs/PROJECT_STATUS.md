@@ -4,8 +4,10 @@
 
 > ⚠️ **基础版交付链收敛（2026-09-19 更新）**：已采纳方案 B，**删除基础版 Docker 交付链、并清除基础版的 PostgreSQL 后端支持**（SQLite 为基础版唯一后端）。本文档中"基础版 Docker 打包 / Docker 镜像分发 / 一键安装脚本 `install_basic.sh`"等表述均为**历史记录**，不再反映现状。基础版当前**唯一**二进制交付路径为桌面安装包 `PromiseLink-<VERSION>-mac.dmg` / `PromiseLink-<VERSION>-windows.exe`（下载：https://www.promiselink.cn/download.html 或 GitHub Releases，双击安装后浏览器自动打开 http://localhost:8000）；亦支持源码运行（`pip install -e '.[dev]'` + `cp .env.basic.example .env` + `bash scripts/start.sh`）。已删除文件：`Dockerfile`、`.dockerignore`、`docker-compose*.yml`、`install-docker.sh`、`deploy/quick_install.sh`、`scripts/install_basic.sh`、`nginx/conf.d/default.conf`、`.env.poc*.example`。决策与证据详见 PromiseLink-Pro `docs/review/PROJECT_REVIEW_20260918_FINDINGS.md` §9。PostgreSQL 仅保留为**定制版（团队版/多租户）**的选型。
 
-> **更新时间**: 2026-07-28 (基础版 v0.9.0，技术债 9/9 RESOLVED，ICP 备案已通过)
-> **当前阶段**: 基础版 v0.9.0 发布前准备就绪；技术债全部清理完成；1968 tests collected / 3 skipif (依赖运行中的服务器，合理保留)；专业版 v0.9.0 同步发布，gateway 855 + pro-tests 272 passed；ICP 备案已通过（网站备案号：沪ICP备2026035458号-1，2026-07-27，主办单位：麟研(上海)文化艺术传播有限公司），gateway.promiselink.cn ACME 证书待 ICP 同步完成后签发
+> **更新时间**: 2026-09-27（当前基线复核）
+> **当前版本**: 基础版 `1.1.2`；专业版/Gateway `1.0.4`；小程序 `1.0.3`。本文件保留历史阶段记录，但历史版本、测试数字和“技术债全部清理完成”不再作为当前发布结论。
+> **当前阶段**: 基础版工程回归和发布包用户旅程已有证据；Pro/Gateway 内部与 CI 回归已有证据；小程序本地运行验证受 `node` 与 `npm` 均不可用阻断。Enterprise SSO、真实设备验收、真实多 worker WSS 和部分真实 AI relay 仍未完成发布级证明。
+> **发布原则**: 只有在真实后端/真实浏览器/真实小程序运行时验证完成，并且文档、版本、对外页面和 CI 门禁一致后，才能标记“对外可用”。本轮已清理官网残留的“微信转发”及过度承诺的数据流文案；小程序录音不可用时不再生成预览业务结果，并统一增加登录 + Pro 门禁；小程序真实运行时仍受本机 `node` 与 `npm` 均不可用阻断。
 > **产品定位**: AI驱动的个人商务关系经营助手
 > **产品层级**: 基础版(本地免费) / 专业版(网关中继) / 定制版(团队)
 > **负责人**: 林总 (CarryMem 团队)
