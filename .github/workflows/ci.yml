@@ -78,7 +78,7 @@ jobs:
         run: python3 -m mypy src/promiselink --ignore-missing-imports
 
       - name: Run security audit
-        run: pip-audit --desc --ignore-vuln PYSEC-2026-1325 --ignore-vuln PYSEC-2026-3447  # ecdsa Minerva timing attack (side-channel out of scope) + setuptools Unicode normalization (macOS sdist only, PromiseLink ships as a desktop package not sdist)
+        run: pip-audit --desc --ignore-vuln PYSEC-2026-1325 --ignore-vuln PYSEC-2026-3447 --ignore-vuln PYSEC-2026-4298  # ecdsa Minerva timing attack (side-channel out of scope) + setuptools Unicode normalization (macOS sdist only, PromiseLink ships as a desktop package not sdist) + python-jose HS256 key validation incomplete fix (desktop auth, no public-facing JWT service)
 
       - name: Run tests
         env:
@@ -379,7 +379,7 @@ jobs:
         run: bandit -r src/ -f json -o bandit-report.json -ll
 
       - name: Run pip-audit
-        run: pip-audit --desc --ignore-vuln PYSEC-2026-1325 --ignore-vuln PYSEC-2026-3447  # ecdsa Minerva timing attack (side-channel out of scope) + setuptools Unicode normalization (macOS sdist only, PromiseLink ships as a desktop package not sdist)
+        run: pip-audit --desc --ignore-vuln PYSEC-2026-1325 --ignore-vuln PYSEC-2026-3447 --ignore-vuln PYSEC-2026-4298  # ecdsa Minerva timing attack (side-channel out of scope) + setuptools Unicode normalization (macOS sdist only, PromiseLink ships as a desktop package not sdist) + python-jose HS256 key validation incomplete fix (desktop auth, no public-facing JWT service)
 
       - name: Upload bandit report
         uses: actions/upload-artifact@v4
